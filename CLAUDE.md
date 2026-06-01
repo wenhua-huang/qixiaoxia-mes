@@ -173,14 +173,42 @@ python3 backend/scripts/fix_encoding.py --dry-run
 python3 backend/scripts/fix_encoding.py
 ```
 
-### Token 获取（调试用）
+## 调试约定 (Debugging Convention)
+
+### API 调试前置：自动获取 Token
+
+> **规则**：当需要调试后端 API（调用 `/getInfo`、`/getRouters` 等受保护接口）时，**必须先通过 `get_token.py` 脚本获取 token**，不要手动走 captcha→Redis→login 流程。
 
 ```bash
-# 获取 token（依赖: pip3 install requests redis）
-python3 backend/scripts/get_token.py
+# 基础：获取 token 并存入变量
+TOKEN=$(python3 backend/scripts/get_token.py 2>/dev/null)
 
-# 输出完整 header 供 curl 使用
+# curl 中使用
+curl -s http://localhost:8081/getInfo -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
+
+# 一步到位：获取 token 并直接测试 API
+python3 backend/scripts/get_token.py --test
+
+# 输出 header 格式，直接给 curl 用
 python3 backend/scripts/get_token.py --print-header
+# → Authorization: Bearer eyJhbGciOi...
+```
+
+**依赖**：`pip3 install requests redis`（已安装）
+
+**配置**：可通过环境变量覆盖默认值：
+- `QXX_API_URL` — 后端地址（默认 `http://localhost:8081`）
+- `QXX_REDIS_HOST` / `QXX_REDIS_PORT` / `QXX_REDIS_PASSWORD` — Redis 配置
+
+### curl 调试模板
+
+```bash
+# 标准模板：获取 token → 调用 API
+TOKEN=$(python3 backend/scripts/get_token.py 2>/dev/null)
+curl -s http://localhost:8081/接口路径 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"key":"value"}' | python3 -m json.tool
 ```
 
 ## Key References

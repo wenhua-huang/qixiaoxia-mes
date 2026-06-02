@@ -16,10 +16,10 @@
     <div class="login-card">
       <div class="card-header">
         <div class="logo-wrapper">
-          <img src="@/assets/logo/logo.png" class="brand-logo" />
+          <AppLogo class="brand-logo" />
         </div>
-        <h2 class="brand-title">企小侠 · MES</h2>
-        <p class="brand-subtitle">文化纸盒智能制造执行系统</p>
+        <h2 class="brand-title">企小侠平台</h2>
+        <p class="brand-subtitle">助力中小企业，完成数字化转型</p>
       </div>
 
       <el-form ref="loginRef" :model="loginForm" :rules="loginRules" class="login-form">
@@ -96,6 +96,7 @@ import Cookies from "js-cookie"
 import { encrypt, decrypt } from "@/utils/jsencrypt"
 import useUserStore from '@/store/modules/user'
 import defaultSettings from '@/settings'
+import AppLogo from '@/assets/logo/AppLogo.vue'
 import type { CaptchaInfoResult } from '@/types/api/login'
 import type { LoginForm } from '@/types/api/login'
 
@@ -275,13 +276,13 @@ getCookie()
   margin-bottom: 28px;
 
   .logo-wrapper {
-    margin-bottom: 12px;
+    margin-bottom: 16px;
 
     .brand-logo {
-      width: 56px;
-      height: 56px;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(26, 60, 94, 0.2);
+      width: 64px;
+      height: 64px;
+      border-radius: 14px;
+      box-shadow: 0 4px 16px rgba(123, 92, 250, 0.3);
     }
   }
 
@@ -411,7 +412,7 @@ html.dark .login {
                 0 0 1px rgba(12, 215, 189, 0.2);
 
     .brand-title {
-      color: #0cd7bd;
+      color: #a78bfa;
     }
     .brand-subtitle {
       color: #909399;

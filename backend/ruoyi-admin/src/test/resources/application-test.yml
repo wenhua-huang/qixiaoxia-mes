@@ -1,0 +1,78 @@
+# 集成测试配置
+# 数据源由 BaseIntegrationTest 通过 @DynamicPropertySource 动态注入
+# Redis 连接本地 Docker Redis（由 docker compose up -d redis 启动）
+
+# 项目配置
+ruoyi:
+  name: 企小侠MES-TEST
+  version: 3.9.2
+  copyrightYear: 2026
+  profile: /tmp/qixiaoxia-mes-test/uploadPath
+  addressEnabled: false
+  captchaType: math
+
+server:
+  port: 0
+
+# Redis — 连接本地 Docker (docker compose up -d redis)
+spring:
+  data:
+    redis:
+      host: localhost
+      port: 6380
+      password: qxx123456
+      database: 0
+      timeout: 10s
+      lettuce:
+        pool:
+          min-idle: 0
+          max-idle: 4
+          max-active: 4
+          max-wait: -1ms
+
+# Token 配置
+token:
+  header: Authorization
+  secret: abcdefghijklmnopqrstuvwxyz
+  expireTime: 30
+
+# 日志（测试时降低噪音）
+logging:
+  level:
+    com.ruoyi: warn
+    org.springframework: warn
+    org.testcontainers: info
+    org.apache.ibatis: warn
+
+# MyBatis
+mybatis:
+  typeAliasesPackage: com.ruoyi.**.domain
+  mapperLocations: classpath*:mapper/**/*Mapper.xml
+  configLocation: classpath:mybatis/mybatis-config.xml
+
+# PageHelper
+pagehelper:
+  helperDialect: mysql
+  supportMethodsArguments: true
+  params: count=countSql
+
+# Springdoc (测试时关闭)
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+# 防盗链（测试时关闭）
+referer:
+  enabled: false
+
+# XSS（测试时关闭）
+xss:
+  enabled: false
+  excludes: ''
+  urlPatterns: ''
+
+# MinIO（测试时关闭）
+minio:
+  enabled: false

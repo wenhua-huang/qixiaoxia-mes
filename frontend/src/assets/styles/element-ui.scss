@@ -101,12 +101,12 @@
 // MES 暗蓝专业版 — 按钮样式覆盖
 // ==========================================
 .el-button--primary {
-  --el-button-bg-color: #1a3c5e !important;
-  --el-button-border-color: #1a3c5e !important;
-  --el-button-hover-bg-color: #2a5a8a !important;
-  --el-button-hover-border-color: #2a5a8a !important;
-  --el-button-active-bg-color: #0f2540 !important;
-  --el-button-active-border-color: #0f2540 !important;
+  --el-button-bg-color: #0cd7bd !important;
+  --el-button-border-color: #0cd7bd !important;
+  --el-button-hover-bg-color: #3de0ca !important;
+  --el-button-hover-border-color: #3de0ca !important;
+  --el-button-active-bg-color: #0ab89e !important;
+  --el-button-active-border-color: #0ab89e !important;
 }
 
 // 表格表头样式 — 浅灰底
@@ -180,8 +180,8 @@
 .el-card__header {
   padding: 14px 15px 7px !important;
   min-height: 40px;
-  border-bottom: 2px solid #1a3c5e;
-  color: #1a3c5e;
+  border-bottom: 2px solid #0cd7bd;
+  color: #0ea88b;
   font-weight: 600;
 }
 
@@ -208,7 +208,7 @@
 // 下拉菜单高亮
 .el-dropdown-menu__item:not(.is-disabled):hover,
 .el-dropdown-menu__item:focus {
-  color: #1a3c5e !important;
+  color: #0cd7bd !important;
 }
 
 

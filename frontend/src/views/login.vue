@@ -282,7 +282,7 @@ getCookie()
       width: 64px;
       height: 64px;
       border-radius: 14px;
-      box-shadow: 0 4px 16px rgba(123, 92, 250, 0.3);
+      box-shadow: 0 4px 16px rgba(47, 103, 169, 0.3);
     }
   }
 
@@ -412,7 +412,7 @@ html.dark .login {
                 0 0 1px rgba(12, 215, 189, 0.2);
 
     .brand-title {
-      color: #a78bfa;
+      color: #5b9bd5;
     }
     .brand-subtitle {
       color: #909399;

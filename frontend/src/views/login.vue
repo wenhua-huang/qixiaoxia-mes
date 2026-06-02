@@ -16,7 +16,7 @@
     <div class="login-card">
       <div class="card-header">
         <div class="logo-wrapper">
-          <AppLogo class="brand-logo" />
+          <img src="@/assets/logo/logo.png" class="brand-logo" />
         </div>
         <h2 class="brand-title">企小侠平台</h2>
         <p class="brand-subtitle">助力中小企业，完成数字化转型</p>
@@ -96,7 +96,6 @@ import Cookies from "js-cookie"
 import { encrypt, decrypt } from "@/utils/jsencrypt"
 import useUserStore from '@/store/modules/user'
 import defaultSettings from '@/settings'
-import AppLogo from '@/assets/logo/AppLogo.vue'
 import type { CaptchaInfoResult } from '@/types/api/login'
 import type { LoginForm } from '@/types/api/login'
 

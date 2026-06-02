@@ -2,11 +2,11 @@
   <div class="sidebar-logo-container" :class="{ 'collapse': collapse }">
     <transition name="sidebarLogoFade">
       <router-link v-if="collapse" key="collapse" class="sidebar-logo-link" to="/">
-        <AppLogo v-if="true" class="sidebar-logo" />
+        <img v-if="logo" :src="logo" class="sidebar-logo" />
         <h1 v-else class="sidebar-title">{{ title }}</h1>
       </router-link>
       <router-link v-else key="expand" class="sidebar-logo-link" to="/">
-        <AppLogo v-if="true" class="sidebar-logo" />
+        <img v-if="logo" :src="logo" class="sidebar-logo" />
         <div class="sidebar-brand">
           <h1 class="sidebar-title">企小侠</h1>
           <span class="sidebar-subtitle">MES 智能执行系统</span>
@@ -17,7 +17,7 @@
 </template>
 
 <script setup lang="ts">
-import AppLogo from '@/assets/logo/AppLogo.vue'
+import logo from '@/assets/logo/logo.png'
 import useSettingsStore from '@/store/modules/settings'
 import variables from '@/assets/styles/variables.module.scss'
 

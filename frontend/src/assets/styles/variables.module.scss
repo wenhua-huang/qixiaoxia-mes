@@ -21,11 +21,11 @@ $menuActiveText: #ffffff;        // 菜单激活文字
 $menuBg: #152238;                // 一级菜单背景 (深海蓝)
 $menuHover: #1e3450;             // 菜单悬停背景
 
-// 浅色主题 theme-light (保留不变)
+// 浅色主题 theme-light — 白色侧边栏
 $menuLightBg: #ffffff;
-$menuLightHover: #f0f1f5;
-$menuLightText: #303133;
-$menuLightActiveText: #409EFF;
+$menuLightHover: #f5f7fa;
+$menuLightText: #595959;
+$menuLightActiveText: #0cd7bd;
 
 // 基础变量
 $base-sidebar-width: 200px;
@@ -39,9 +39,9 @@ $base-sub-menu-background: #101c2e;       // 子菜单背景 (更深)
 $base-sub-menu-hover: rgba(255, 255, 255, .08);
 
 // MES 品牌色 — 深海蓝 (替代默认 #409EFF)
-$color-primary: #1a3c5e;           // 主色调
-$color-primary-light: #2a5a8a;     // 浅主色
-$color-primary-dark: #0f2540;      // 深主色
+$color-primary: #0cd7bd;           // 主色调 teal绿
+$color-primary-light: #3de0ca;     // 浅主色
+$color-primary-dark: #0ab89e;      // 深主色
 $color-accent: #0cd7bd;            // teal绿点缀
 
 $color-success: #67C23A;

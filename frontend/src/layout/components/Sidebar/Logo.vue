@@ -40,7 +40,7 @@ const getLogoBackground = computed(() => {
   if (settingsStore.navType == 3) {
     return variables.menuLightBg
   }
-  return sideTheme.value === 'theme-dark' ? '#0c2a2a' : variables.menuLightBg
+  return sideTheme.value === 'theme-dark' ? '#0c2a2a' : '#ffffff'
 })
 
 // Logo 文字颜色
@@ -51,7 +51,7 @@ const getLogoTextColor = computed(() => {
   if (settingsStore.navType == 3) {
     return variables.menuLightText
   }
-  return sideTheme.value === 'theme-dark' ? '#fff' : variables.menuLightText
+  return sideTheme.value === 'theme-dark' ? '#fff' : '#262626'
 })
 </script>
 
@@ -75,7 +75,7 @@ const getLogoTextColor = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-bottom: 1px solid rgba(12, 215, 189, 0.15);
+  border-bottom: 1px solid #f0f0f0;
 
   & .sidebar-logo-link {
     height: 100%;
@@ -109,7 +109,7 @@ const getLogoTextColor = computed(() => {
 
       & .sidebar-subtitle {
         font-size: 10px;
-        color: rgba(255, 255, 255, 0.45);
+        color: #8c8c8c;
         letter-spacing: 0.5px;
       }
     }

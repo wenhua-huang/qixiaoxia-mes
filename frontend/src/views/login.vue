@@ -32,7 +32,7 @@
             placeholder="请输入账号"
           >
             <template #prefix>
-              <svg-icon icon-class="user" class="input-icon" />
+              <AppIcon icon-class="user" class="input-icon" />
             </template>
           </el-input>
         </el-form-item>
@@ -46,7 +46,7 @@
             @keyup.enter="handleLogin"
           >
             <template #prefix>
-              <svg-icon icon-class="password" class="input-icon" />
+              <AppIcon icon-class="password" class="input-icon" />
             </template>
           </el-input>
         </el-form-item>
@@ -60,7 +60,7 @@
             @keyup.enter="handleLogin"
           >
             <template #prefix>
-              <svg-icon icon-class="validCode" class="input-icon" />
+              <AppIcon icon-class="validCode" class="input-icon" />
             </template>
           </el-input>
           <div class="login-code">

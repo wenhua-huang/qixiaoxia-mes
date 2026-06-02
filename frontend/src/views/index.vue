@@ -15,7 +15,7 @@
       <el-col :xs="12" :sm="8" :md="4" v-for="mod in modules" :key="mod.key">
         <div class="module-card" @click="goModule(mod.path)">
           <div class="module-icon" :style="{ background: mod.color }">
-            <svg-icon :icon-class="mod.icon" />
+            <AppIcon :icon-class="mod.icon" />
           </div>
           <span class="module-name">{{ mod.name }}</span>
           <span class="module-desc">{{ mod.desc }}</span>

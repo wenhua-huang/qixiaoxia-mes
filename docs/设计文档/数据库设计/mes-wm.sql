@@ -130,11 +130,7 @@ create table qxx_wm_material_stock (
   vendor_name       varchar(255)    default null               comment '供应商名称',
   workorder_id      bigint(20)      default null               comment '生产工单ID(关联qxx_pro_workorder)',
   workorder_code    varchar(64)     default null               comment '生产工单编码',
-  -- 纸张行业特有字段
-  paper_roll_no     varchar(64)     default null               comment '纸卷号(纸张行业特有)',
-  paper_width       varchar(20)     default null               comment '门幅(mm)',
-  paper_weight      varchar(20)     default null               comment '克重(g)',
-  paper_length      decimal(14,2)   default 0.00               comment '纸卷长度(米)',
+  -- 纸卷明细见 qxx_wm_roll_detail 表
   expire_date       datetime        default null               comment '有效期至',
   lot_number        varchar(64)     default null               comment '生产批号',
   quality_status    varchar(50)     default 'NORMAL'           comment '质量状态:NORMAL-正常,HOLD-冻结,REJECT-不合格,SCRAP-报废',
@@ -391,11 +387,7 @@ create table qxx_wm_item_recpt_detail (
   location_id       bigint(20)      default null               comment '库区ID',
   area_id           bigint(20)      default null               comment '库位ID',
   material_stock_id bigint(20)      not null                   comment '库存记录ID(关联qxx_wm_material_stock)',
-  -- 纸张行业扩展
-  paper_roll_no     varchar(64)     default null               comment '纸卷号',
-  paper_width       varchar(20)     default null               comment '门幅(mm)',
-  paper_weight      varchar(20)     default null               comment '克重(g)',
-  paper_length      decimal(14,2)   default 0.00               comment '纸卷长度(米)',
+  -- 纸卷明细见 qxx_wm_roll_detail 表
   remark            varchar(500)    default ''                 comment '备注',
   create_by         varchar(64)     default ''                 comment '创建者',
   create_time       datetime        default current_timestamp  comment '创建时间',
@@ -588,9 +580,7 @@ create table qxx_wm_issue_detail (
   location_id       bigint(20)      default null               comment '库区ID',
   area_id           bigint(20)      default null               comment '库位ID',
   material_stock_id bigint(20)      not null                   comment '库存记录ID(关联qxx_wm_material_stock)',
-  -- 纸张行业扩展
-  paper_roll_no     varchar(64)     default null               comment '纸卷号',
-  paper_width       varchar(20)     default null               comment '门幅(mm)',
+  -- 纸卷明细见 qxx_wm_roll_detail 表
   remark            varchar(500)    default ''                 comment '备注',
   create_by         varchar(64)     default ''                 comment '创建者',
   create_time       datetime        default current_timestamp  comment '创建时间',
@@ -1139,6 +1129,7 @@ create table qxx_wm_outsource_issue (
   update_by         varchar(64)     default ''                 comment '更新者',
   update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
   key idx_factory_id (factory_id),
+  key idx_outsource_factory_id (outsource_factory_id),
   primary key (issue_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '外协领料单头表';
 
@@ -1169,8 +1160,7 @@ create table qxx_wm_outsource_issue_line (
   warehouse_id      bigint(20)      not null                   comment '仓库ID',
   location_id       bigint(20)      default null               comment '库区ID',
   area_id           bigint(20)      default null               comment '库位ID',
-  paper_roll_no     varchar(64)     default null               comment '纸卷号(纸张行业)',
-  paper_width       varchar(20)     default null               comment '门幅(mm)',
+  -- 纸卷明细见 qxx_wm_roll_detail 表
   remark            varchar(500)    default ''                 comment '备注',
   create_by         varchar(64)     default ''                 comment '创建者',
   create_time       datetime        default current_timestamp  comment '创建时间',
@@ -1245,6 +1235,7 @@ create table qxx_wm_outsource_recpt (
   update_by         varchar(64)     default ''                 comment '更新者',
   update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
   key idx_factory_id (factory_id),
+  key idx_outsource_factory_id (outsource_factory_id),
   primary key (recpt_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '外协入库单表';
 
@@ -1458,8 +1449,8 @@ create table qxx_wm_stock_taking (
   create_time       datetime        default current_timestamp  comment '创建时间',
   update_by         varchar(64)     default ''                 comment '更新者',
   update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
-,
-  key idx_factory_id (factory_id)  primary key (taking_id)
+  key idx_factory_id (factory_id),
+  primary key (taking_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '盘点任务表';
 
 -- ----------------------------
@@ -1650,3 +1641,70 @@ create table qxx_wm_misc_issue (
   key idx_factory_id (factory_id),
   primary key (issue_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '杂项出库单表';
+
+-- ============================================================
+-- 八、纸张行业特有：纸卷明细
+-- ============================================================
+
+-- ----------------------------
+-- 51、纸卷明细表
+-- 用途：纸张行业特有。每卷纸到货后建立独立记录，追踪每卷的实际规格和消耗状态。
+--       解决"50卷纸入库，每卷门幅/克重/长度不同，领料时选哪卷"的问题。
+--
+-- === 与 qxx_md_item / qxx_wm_material_stock 的关系 ===
+-- qxx_md_item          = 标准规格（"应该是什么"）：联盛A2箱板纸，门幅=925mm，克重=120g
+-- qxx_wm_roll_detail   = 到货实绩（"实际是什么"）：卷号RX001，实际门幅=923mm，克重=118g，长=3200m
+-- qxx_wm_material_stock = 库存聚合（"总共多少"）：联盛A2箱板纸，库存=50卷/34.85吨
+--
+-- === 生命周期 ===
+-- 入库时创建 → 领料时扣减 → 部分消耗标记PARTIAL → 全部消耗标记CONSUMED
+-- 一卷一行，永不合并。退料时原卷恢复剩余量。
+-- ----------------------------
+drop table if exists qxx_wm_roll_detail;
+create table qxx_wm_roll_detail (
+  roll_id           bigint(20)      not null auto_increment    comment '纸卷明细ID',
+  factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
+  roll_code         varchar(64)     not null                   comment '纸卷号(唯一,如RX20260608-001,可贴条码)',
+  item_id           bigint(20)      not null                   comment '物料ID(关联qxx_md_item)',
+  item_code         varchar(64)     not null                   comment '物料编码',
+  item_name         varchar(255)    not null                   comment '物料名称',
+  specification     varchar(500)    default null               comment '规格型号',
+  -- 源头追溯
+  batch_id          bigint(20)      default null               comment '批次ID(关联qxx_wm_batch)',
+  batch_code        varchar(64)     default null               comment '批次编码',
+  recpt_id          bigint(20)      not null                   comment '入库单ID(关联qxx_wm_item_recpt,哪张入库单收的)',
+  recpt_detail_id   bigint(20)      default null               comment '入库明细ID(关联qxx_wm_item_recpt_detail)',
+  vendor_id         bigint(20)      default null               comment '供应商ID(关联qxx_md_vendor)',
+  vendor_code       varchar(64)     default null               comment '供应商编码',
+  vendor_name       varchar(255)    default null               comment '供应商名称',
+  vendor_roll_no    varchar(64)     default null               comment '供应商原始卷号(来料时的编号)',
+  -- 实际规格（到货实测值，≠物料主数据的标准值）
+  actual_width      varchar(20)     default null               comment '实际门幅(mm),如923mm',
+  actual_weight_gsm varchar(20)     default null               comment '实际克重(g/㎡),如118g',
+  actual_length     decimal(14,2)   default 0.00               comment '实际长度(米)',
+  actual_weight     decimal(14,4)   default 0.0000             comment '实际重量(吨),到货过磅值',
+  -- 库存追踪（随消耗递减）
+  unit_of_measure   varchar(64)     not null                   comment '计量单位(如TON-吨,KG-千克,M-米)',
+  original_quantity decimal(14,4)   default 0.0000             comment '原始数量(入库时)',
+  remaining_quantity decimal(14,4)  default 0.0000             comment '剩余数量(扣减后)',
+  -- 存储位置
+  warehouse_id      bigint(20)      not null                   comment '所在仓库ID(关联qxx_wm_warehouse)',
+  warehouse_code    varchar(64)     default null               comment '仓库编码',
+  warehouse_name    varchar(255)    default null               comment '仓库名称',
+  location_id       bigint(20)      default null               comment '库区ID(关联qxx_wm_storage_location)',
+  area_id           bigint(20)      default null               comment '库位ID(关联qxx_wm_storage_area)',
+  material_stock_id bigint(20)      default null               comment '库存记录ID(关联qxx_wm_material_stock,汇总库存行)',
+  -- 消耗追踪
+  last_issue_id     bigint(20)      default null               comment '最近领料单ID(关联qxx_wm_issue_header)',
+  last_workorder_id bigint(20)      default null               comment '最近生产工单ID(关联qxx_pro_workorder)',
+  last_workorder_code varchar(64)   default null               comment '最近生产工单编码',
+  status            varchar(50)     default 'IN_STOCK'         comment '纸卷状态:IN_STOCK-在库,PARTIAL-部分已用,CONSUMED-已用完,RETURNED-已退回,SCRAPPED-已报废',
+  remark            varchar(500)    default ''                 comment '备注',
+  create_by         varchar(64)     default ''                 comment '创建者',
+  create_time       datetime        default current_timestamp  comment '创建时间',
+  update_by         varchar(64)     default ''                 comment '更新者',
+  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
+  key idx_factory_id (factory_id),
+  primary key (roll_id),
+  unique key uk_roll_code (roll_code)
+) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '纸卷明细表';

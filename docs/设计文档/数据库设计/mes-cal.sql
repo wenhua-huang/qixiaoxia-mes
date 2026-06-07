@@ -27,8 +27,8 @@ create table qxx_cal_team (
   create_time         datetime        default current_timestamp  comment '创建时间',
   update_by           varchar(64)     default ''                 comment '更新者',
   update_time         datetime        default current_timestamp on update current_timestamp comment '更新时间',
-,
-  key idx_factory_id (factory_id)  primary key (team_id),
+  key idx_factory_id (factory_id),
+  primary key (team_id),
   unique key uk_team_code (team_code)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '班组表';
 
@@ -51,8 +51,8 @@ create table qxx_cal_team_member (
   create_time         datetime        default current_timestamp  comment '创建时间',
   update_by           varchar(64)     default ''                 comment '更新者',
   update_time         datetime        default current_timestamp on update current_timestamp comment '更新时间',
-,
-  key idx_factory_id (factory_id)  primary key (member_id)
+  key idx_factory_id (factory_id),
+  primary key (member_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '班组成员表';
 
 -- ----------------------------
@@ -76,8 +76,8 @@ create table qxx_cal_plan (
   create_time         datetime        default current_timestamp  comment '创建时间',
   update_by           varchar(64)     default ''                 comment '更新者',
   update_time         datetime        default current_timestamp on update current_timestamp comment '更新时间',
-,
-  key idx_factory_id (factory_id)  primary key (plan_id),
+  key idx_factory_id (factory_id),
+  primary key (plan_id),
   unique key uk_plan_code (plan_code)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '排班计划表';
 
@@ -99,8 +99,8 @@ create table qxx_cal_shift (
   create_time         datetime        default current_timestamp  comment '创建时间',
   update_by           varchar(64)     default ''                 comment '更新者',
   update_time         datetime        default current_timestamp on update current_timestamp comment '更新时间',
-,
-  key idx_factory_id (factory_id)  primary key (shift_id)
+  key idx_factory_id (factory_id),
+  primary key (shift_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '计划班次表';
 
 -- ----------------------------
@@ -122,8 +122,8 @@ create table qxx_cal_plan_team (
   create_time         datetime        default current_timestamp  comment '创建时间',
   update_by           varchar(64)     default ''                 comment '更新者',
   update_time         datetime        default current_timestamp on update current_timestamp comment '更新时间',
-,
-  key idx_factory_id (factory_id)  primary key (record_id)
+  key idx_factory_id (factory_id),
+  primary key (record_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '计划班组关联表';
 
 -- ----------------------------
@@ -143,8 +143,8 @@ create table qxx_cal_holiday (
   create_time         datetime        default current_timestamp  comment '创建时间',
   update_by           varchar(64)     default ''                 comment '更新者',
   update_time         datetime        default current_timestamp on update current_timestamp comment '更新时间',
-,
-  key idx_factory_id (factory_id)  primary key (holiday_id)
+  key idx_factory_id (factory_id),
+  primary key (holiday_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '节假日设置表';
 
 -- ----------------------------
@@ -169,6 +169,6 @@ create table qxx_cal_teamshift (
   create_time         datetime        default current_timestamp  comment '创建时间',
   update_by           varchar(64)     default ''                 comment '更新者',
   update_time         datetime        default current_timestamp on update current_timestamp comment '更新时间',
-,
-  key idx_factory_id (factory_id)  primary key (teamshift_id)
+  key idx_factory_id (factory_id),
+  primary key (teamshift_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '班组排班明细表';

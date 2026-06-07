@@ -198,8 +198,8 @@ create table qxx_qc_iqc (
   create_time              datetime        default current_timestamp  comment '创建时间',
   update_by                varchar(64)     default ''                 comment '更新者',
   update_time              datetime        default current_timestamp on update current_timestamp comment '更新时间',
-,
-  key idx_factory_id (factory_id)  primary key (iqc_id),
+  key idx_factory_id (factory_id),
+  primary key (iqc_id),
   unique key uk_iqc_code (iqc_code)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '来料检验单表';
 
@@ -231,8 +231,8 @@ create table qxx_qc_iqc_line (
   create_time       datetime        default current_timestamp  comment '创建时间',
   update_by         varchar(64)     default ''                 comment '更新者',
   update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
-,
-  key idx_factory_id (factory_id)  primary key (line_id)
+  key idx_factory_id (factory_id),
+  primary key (line_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '来料检验单行表';
 
 -- ============================================================
@@ -302,8 +302,8 @@ create table qxx_qc_ipqc (
   create_time            datetime        default current_timestamp  comment '创建时间',
   update_by              varchar(64)     default ''                 comment '更新者',
   update_time            datetime        default current_timestamp on update current_timestamp comment '更新时间',
-,
-  key idx_factory_id (factory_id)  primary key (ipqc_id),
+  key idx_factory_id (factory_id),
+  primary key (ipqc_id),
   unique key uk_ipqc_code (ipqc_code)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '过程检验单表';
 
@@ -335,8 +335,8 @@ create table qxx_qc_ipqc_line (
   create_time       datetime        default current_timestamp  comment '创建时间',
   update_by         varchar(64)     default ''                 comment '更新者',
   update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
-,
-  key idx_factory_id (factory_id)  primary key (line_id)
+  key idx_factory_id (factory_id),
+  primary key (line_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '过程检验单行表';
 
 -- ============================================================
@@ -396,8 +396,8 @@ create table qxx_qc_oqc (
   create_time              datetime        default current_timestamp  comment '创建时间',
   update_by                varchar(64)     default ''                 comment '更新者',
   update_time              datetime        default current_timestamp on update current_timestamp comment '更新时间',
-,
-  key idx_factory_id (factory_id)  primary key (oqc_id),
+  key idx_factory_id (factory_id),
+  primary key (oqc_id),
   unique key uk_oqc_code (oqc_code)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '出货检验单表';
 
@@ -429,8 +429,8 @@ create table qxx_qc_oqc_line (
   create_time       datetime        default current_timestamp  comment '创建时间',
   update_by         varchar(64)     default ''                 comment '更新者',
   update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
-,
-  key idx_factory_id (factory_id)  primary key (line_id)
+  key idx_factory_id (factory_id),
+  primary key (line_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '出货检验单行表';
 
 -- ============================================================
@@ -479,11 +479,10 @@ create table qxx_qc_rqc (
   create_time              datetime        default current_timestamp  comment '创建时间',
   update_by                varchar(64)     default ''                 comment '更新者',
   update_time              datetime        default current_timestamp on update current_timestamp comment '更新时间',
-,
-  key idx_factory_id (factory_id)  primary key (rqc_id),
+  key idx_factory_id (factory_id),
+  primary key (rqc_id),
   unique key uk_rqc_code (rqc_code)
-,
-  key idx_factory_id (factory_id)) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '退料检验单表';
+) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '退料检验单表';
 
 -- ----------------------------
 -- 13、退料检验单行表
@@ -513,8 +512,7 @@ create table qxx_qc_rqc_line (
   create_time       datetime        default current_timestamp  comment '创建时间',
   update_by         varchar(64)     default ''                 comment '更新者',
   update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
-  primary key (line_id)
-,
+  primary key (line_id),
   key idx_factory_id (factory_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '退料检验单行表';
 

@@ -71,6 +71,7 @@ create table qxx_pro_workorder (
   update_by                   varchar(64)     default ''                 comment '更新者',
   update_time                 datetime        default current_timestamp on update current_timestamp comment '更新时间',
   key idx_factory_id (factory_id),
+  key idx_outsource_factory_id (outsource_factory_id),
   primary key (workorder_id),
   unique key uk_workorder_code (workorder_code)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '生产工单表';
@@ -223,6 +224,7 @@ create table qxx_pro_route_process (
   update_by                   varchar(64)     default ''                 comment '更新者',
   update_time                 datetime        default current_timestamp on update current_timestamp comment '更新时间',
   key idx_factory_id (factory_id),
+  key idx_outsource_factory_id (outsource_factory_id),
   primary key (record_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '工艺路线-工序组成表';
 
@@ -419,8 +421,9 @@ create table qxx_pro_feedback (
   create_time                 datetime        default current_timestamp  comment '创建时间',
   update_by                   varchar(64)     default ''                 comment '更新者',
   update_time                 datetime        default current_timestamp on update current_timestamp comment '更新时间',
-,
-  key idx_factory_id (factory_id)  primary key (record_id)
+  key idx_factory_id (factory_id),
+  key idx_outsource_factory_id (outsource_factory_id),
+  primary key (record_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '报工记录表';
 
 
@@ -707,5 +710,6 @@ create table qxx_pro_card_process (
   update_by                   varchar(64)     default ''                 comment '更新者',
   update_time                 datetime        default current_timestamp on update current_timestamp comment '更新时间',
   key idx_factory_id (factory_id),
+  key idx_outsource_factory_id (outsource_factory_id),
   primary key (record_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '流转卡工序信息表';

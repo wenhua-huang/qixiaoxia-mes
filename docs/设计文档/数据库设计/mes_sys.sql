@@ -30,8 +30,8 @@ create table sys_auto_code_rule (
   create_time       datetime        default current_timestamp  comment '创建时间',
   update_by         varchar(64)     default ''                 comment '更新者',
   update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
-,
-  key idx_factory_id (factory_id)  primary key (rule_id)
+  key idx_factory_id (factory_id),
+  primary key (rule_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '编码生成规则表';
 
 -- ----------------------------
@@ -61,8 +61,8 @@ create table sys_auto_code_part (
   create_time       datetime        default current_timestamp  comment '创建时间',
   update_by         varchar(64)     default ''                 comment '更新者',
   update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
-,
-  key idx_factory_id (factory_id)  primary key (part_id)
+  key idx_factory_id (factory_id),
+  primary key (part_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '编码生成规则组成表';
 
 -- ----------------------------
@@ -84,8 +84,8 @@ create table sys_auto_code_result (
   create_time       datetime        default current_timestamp  comment '创建时间',
   update_by         varchar(64)     default ''                 comment '更新者',
   update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
-,
-  key idx_factory_id (factory_id)  primary key (code_id)
+  key idx_factory_id (factory_id),
+  primary key (code_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '编码生成记录表';
 
 -- ----------------------------
@@ -109,8 +109,8 @@ create table sys_attachment (
   create_time       datetime        default current_timestamp  comment '创建时间',
   update_by         varchar(64)     default ''                 comment '更新者',
   update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
-,
-  key idx_factory_id (factory_id)  primary key (attachment_id)
+  key idx_factory_id (factory_id),
+  primary key (attachment_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '通用附件表';
 
 -- ----------------------------
@@ -134,8 +134,8 @@ create table sys_message (
   create_time       datetime        default current_timestamp  comment '创建时间',
   update_by         varchar(64)     default ''                 comment '更新者',
   update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
-,
-  key idx_factory_id (factory_id)  primary key (message_id)
+  key idx_factory_id (factory_id),
+  primary key (message_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '系统消息表';
 
 -- ----------------------------
@@ -162,6 +162,6 @@ create table sys_todo_list (
   create_time       datetime        default current_timestamp  comment '创建时间',
   update_by         varchar(64)     default ''                 comment '更新者',
   update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
-,
-  key idx_factory_id (factory_id)  primary key (todo_id)
+  key idx_factory_id (factory_id),
+  primary key (todo_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '通用待办事项表';

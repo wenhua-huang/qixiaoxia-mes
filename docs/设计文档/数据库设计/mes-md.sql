@@ -150,9 +150,9 @@ create table qxx_md_item_type (
   create_by         varchar(64)     default ''                 comment '创建者',
   create_time       datetime        default current_timestamp  comment '创建时间',
   update_by         varchar(64)     default ''                 comment '更新者',
-  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',,
+  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
 
-  key idx_factory_id (factory_id)
+  key idx_factory_id (factory_id),
   primary key (item_type_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '物料产品分类表';
 
@@ -163,7 +163,7 @@ create table qxx_md_item_type (
 drop table if exists qxx_md_product_bom;
 create table qxx_md_product_bom (
   bom_id            bigint(20)      not null auto_increment    comment 'BOM行ID',
-  factory_id        bigint(20)      not null                   comment \'工厂ID(关联qxx_md_factory)\',
+  factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
   item_id           bigint(20)      not null                   comment '成品物料ID(关联qxx_md_item)',
   bom_item_id       bigint(20)      not null                   comment 'BOM子物料ID(关联qxx_md_item,名称/规格/编码通过JOIN获取)',
   unit_of_measure   varchar(64)     not null                   comment '子物料BOM用量单位(可能≠库存单位,如库存按卷/BOM按kg)',
@@ -174,8 +174,8 @@ create table qxx_md_product_bom (
   create_by         varchar(64)     default ''                 comment '创建者',
   create_time       datetime        default current_timestamp  comment '创建时间',
   update_by         varchar(64)     default ''                 comment '更新者',
-  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',,
-  key idx_factory_id (factory_id)
+  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
+  key idx_factory_id (factory_id),
   primary key (bom_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '产品BOM关系表';
 
@@ -231,7 +231,7 @@ create table qxx_md_product_bom (
 drop table if exists qxx_md_item_batch_config;
 create table qxx_md_item_batch_config (
   config_id             bigint(20)      not null auto_increment     comment '配置ID',
-  factory_id        bigint(20)      not null                   comment \'工厂ID(关联qxx_md_factory)\',
+  factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
   item_id               bigint(20)      not null                    comment '⚠️ 物料ID(关联qxx_md_item) — 待确认:是否改为item_type_id',
   produce_date_flag     char(1)         default '0'                 comment '是否追踪生产日期(1-是,0-否)',
   expire_date_flag      char(1)         default '0'                 comment '是否追踪有效期(1-是,0-否)',
@@ -254,8 +254,8 @@ create table qxx_md_item_batch_config (
   create_by             varchar(64)     default ''                  comment '创建者',
   create_time           datetime        default current_timestamp   comment '创建时间',
   update_by             varchar(64)     default ''                  comment '更新者',
-  update_time           datetime        default current_timestamp on update current_timestamp comment '更新时间',,
-  key idx_factory_id (factory_id)
+  update_time           datetime        default current_timestamp on update current_timestamp comment '更新时间',
+  key idx_factory_id (factory_id),
   primary key (config_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '物料批次属性配置表';
 
@@ -297,9 +297,10 @@ create table qxx_md_vendor (
   create_by         varchar(64)     default ''                 comment '创建者',
   create_time       datetime        default current_timestamp  comment '创建时间',
   update_by         varchar(64)     default ''                 comment '更新者',
-  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',,
+  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
 
-  key idx_factory_id (factory_id)
+  key idx_factory_id (factory_id),
+  key idx_outsource_factory_id (outsource_factory_id),
   primary key (vendor_id),
   unique key uk_vendor_code (vendor_code)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '供应商表';
@@ -336,9 +337,9 @@ create table qxx_md_client (
   create_by         varchar(64)     default ''                 comment '创建者',
   create_time       datetime        default current_timestamp  comment '创建时间',
   update_by         varchar(64)     default ''                 comment '更新者',
-  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',,
+  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
 
-  key idx_factory_id (factory_id)
+  key idx_factory_id (factory_id),
   primary key (client_id),
   unique key uk_client_code (client_code)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '客户表';
@@ -361,9 +362,9 @@ create table qxx_md_unit_measure (
   create_by         varchar(64)     default ''                 comment '创建者',
   create_time       datetime        default current_timestamp  comment '创建时间',
   update_by         varchar(64)     default ''                 comment '更新者',
-  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',,
+  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
 
-  key idx_factory_id (factory_id)
+  key idx_factory_id (factory_id),
   primary key (unit_id),
   unique key uk_unit_code (unit_code)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '单位管理表';
@@ -375,7 +376,7 @@ create table qxx_md_unit_measure (
 drop table if exists qxx_md_workshop;
 create table qxx_md_workshop (
   workshop_id       bigint(20)      not null auto_increment    comment '车间ID',
-  factory_id        bigint(20)      not null                   comment \'工厂ID(关联qxx_md_factory)\',
+  factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
   workshop_code     varchar(64)     not null                   comment '车间编码(如PRINT-印刷车间,BAG-制袋车间)',
   workshop_name     varchar(255)    not null                   comment '车间名称',
   address           varchar(500)    default null               comment '车间位置/地址',
@@ -385,8 +386,8 @@ create table qxx_md_workshop (
   create_by         varchar(64)     default ''                 comment '创建者',
   create_time       datetime        default current_timestamp  comment '创建时间',
   update_by         varchar(64)     default ''                 comment '更新者',
-  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',,
-  key idx_factory_id (factory_id)
+  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
+  key idx_factory_id (factory_id),
   primary key (workshop_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '车间管理表';
 
@@ -397,7 +398,7 @@ create table qxx_md_workshop (
 drop table if exists qxx_md_workstation;
 create table qxx_md_workstation (
   workstation_id    bigint(20)      not null auto_increment    comment '工作站ID',
-  factory_id        bigint(20)      not null                   comment \'工厂ID(关联qxx_md_factory)\',
+  factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
   workstation_code  varchar(64)     not null                   comment '工作站编码(如PRINT-01/BAG-01)',
   workstation_name  varchar(255)    not null                   comment '工作站名称(如1号印刷机/2号全自动制袋机)',
   workshop_id       bigint(20)      not null                   comment '所属车间ID(关联qxx_md_workshop)',
@@ -410,8 +411,8 @@ create table qxx_md_workstation (
   create_by         varchar(64)     default ''                 comment '创建者',
   create_time       datetime        default current_timestamp  comment '创建时间',
   update_by         varchar(64)     default ''                 comment '更新者',
-  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',,
-  key idx_factory_id (factory_id)
+  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
+  key idx_factory_id (factory_id),
   primary key (workstation_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '工作站管理表';
 
@@ -422,7 +423,7 @@ create table qxx_md_workstation (
 drop table if exists qxx_md_workstation_machine;
 create table qxx_md_workstation_machine (
   record_id         bigint(20)      not null auto_increment    comment '记录ID',
-  factory_id        bigint(20)      not null                   comment \'工厂ID(关联qxx_md_factory)\',
+  factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
   workstation_id    bigint(20)      not null                   comment '工作站ID(关联qxx_md_workstation)',
   machinery_id      bigint(20)      not null                   comment '设备ID(关联qxx_dv_machinery)',
   machinery_code    varchar(64)     default null               comment '设备编码',
@@ -431,8 +432,8 @@ create table qxx_md_workstation_machine (
   create_by         varchar(64)     default ''                 comment '创建者',
   create_time       datetime        default current_timestamp  comment '创建时间',
   update_by         varchar(64)     default ''                 comment '更新者',
-  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',,
-  key idx_factory_id (factory_id)
+  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
+  key idx_factory_id (factory_id),
   primary key (record_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '工作站-设备关联表';
 
@@ -443,7 +444,7 @@ create table qxx_md_workstation_machine (
 drop table if exists qxx_md_workstation_worker;
 create table qxx_md_workstation_worker (
   record_id         bigint(20)      not null auto_increment    comment '记录ID',
-  factory_id        bigint(20)      not null                   comment \'工厂ID(关联qxx_md_factory)\',
+  factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
   workstation_id    bigint(20)      not null                   comment '工作站ID(关联qxx_md_workstation)',
   user_id           bigint(20)      not null                   comment '用户ID(关联sys_user)',
   user_name         varchar(64)     default null               comment '用户姓名',
@@ -452,8 +453,8 @@ create table qxx_md_workstation_worker (
   create_by         varchar(64)     default ''                 comment '创建者',
   create_time       datetime        default current_timestamp  comment '创建时间',
   update_by         varchar(64)     default ''                 comment '更新者',
-  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',,
-  key idx_factory_id (factory_id)
+  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
+  key idx_factory_id (factory_id),
   primary key (record_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '工作站-人员关联表';
 
@@ -464,7 +465,7 @@ create table qxx_md_workstation_worker (
 drop table if exists qxx_md_product_sop;
 create table qxx_md_product_sop (
   sop_id            bigint(20)      not null auto_increment    comment 'SOP ID',
-  factory_id        bigint(20)      not null                   comment \'工厂ID(关联qxx_md_factory)\',
+  factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
   item_id           bigint(20)      not null                   comment '产品ID(关联qxx_md_item)',
   sop_name          varchar(255)    not null                   comment 'SOP名称',
   sop_url           varchar(255)    default null               comment 'SOP文件URL',
@@ -474,8 +475,8 @@ create table qxx_md_product_sop (
   create_by         varchar(64)     default ''                 comment '创建者',
   create_time       datetime        default current_timestamp  comment '创建时间',
   update_by         varchar(64)     default ''                 comment '更新者',
-  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',,
-  key idx_factory_id (factory_id)
+  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
+  key idx_factory_id (factory_id),
   primary key (sop_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '产品SOP表';
 
@@ -486,7 +487,7 @@ create table qxx_md_product_sop (
 drop table if exists qxx_md_product_sip;
 create table qxx_md_product_sip (
   sip_id            bigint(20)      not null auto_increment    comment 'SIP ID',
-  factory_id        bigint(20)      not null                   comment \'工厂ID(关联qxx_md_factory)\',
+  factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
   item_id           bigint(20)      not null                   comment '产品ID(关联qxx_md_item)',
   sip_name          varchar(255)    not null                   comment 'SIP名称',
   sip_url           varchar(255)    default null               comment 'SIP文件URL',
@@ -496,7 +497,7 @@ create table qxx_md_product_sip (
   create_by         varchar(64)     default ''                 comment '创建者',
   create_time       datetime        default current_timestamp  comment '创建时间',
   update_by         varchar(64)     default ''                 comment '更新者',
-  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',,
-  key idx_factory_id (factory_id)
+  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
+  key idx_factory_id (factory_id),
   primary key (sip_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '产品SIP表';

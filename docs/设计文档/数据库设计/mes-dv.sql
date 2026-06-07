@@ -59,8 +59,8 @@ create table qxx_dv_machinery (
   create_time         datetime        default current_timestamp  comment '创建时间',
   update_by           varchar(64)     default ''                 comment '更新者',
   update_time         datetime        default current_timestamp on update current_timestamp comment '更新时间',
-,
-  key idx_factory_id (factory_id)  primary key (machinery_id),
+  key idx_factory_id (factory_id),
+  primary key (machinery_id),
   unique key uk_machinery_code (machinery_code)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '设备台账表';
 

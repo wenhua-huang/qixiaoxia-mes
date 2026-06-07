@@ -34,9 +34,6 @@ const sideTheme = computed(() => settingsStore.sideTheme)
 
 // Logo 背景色 — MES 暗蓝版
 const getLogoBackground = computed(() => {
-  if (settingsStore.isDark) {
-    return 'var(--sidebar-bg)'
-  }
   if (settingsStore.navType == 3) {
     return variables.menuLightBg
   }
@@ -45,9 +42,6 @@ const getLogoBackground = computed(() => {
 
 // Logo 文字颜色
 const getLogoTextColor = computed(() => {
-  if (settingsStore.isDark) {
-    return 'var(--sidebar-logo-text)'
-  }
   if (settingsStore.navType == 3) {
     return variables.menuLightText
   }

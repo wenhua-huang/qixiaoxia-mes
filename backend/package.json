@@ -1,0 +1,8 @@
+{
+  "devDependencies": {
+    "@pinia/testing": "^1.0.3",
+    "@vue/test-utils": "^2.4.10",
+    "jsdom": "^29.1.1",
+    "vitest": "^4.1.8"
+  }
+}

@@ -278,70 +278,11 @@ create table qxx_wm_batch (
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '批次记录表';
 
 -- ============================================================
--- 二、采购入库流程
+-- 二、采购入库流程（入库单直接关联采购订单，不经过到货通知）
 -- ============================================================
 
 -- ----------------------------
--- 7、到货通知单表
--- ----------------------------
-drop table if exists qxx_wm_arrival_notice;
-create table qxx_wm_arrival_notice (
-  notice_id         bigint(20)      not null auto_increment    comment '通知单ID',
-  factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
-  notice_code       varchar(64)     not null                   comment '通知单编码',
-  notice_name       varchar(255)    default null               comment '通知单名称',
-  source_doc_type   varchar(64)     default null               comment '来源单据类型(pur_order-采购订单)',
-  source_doc_id     bigint(20)      default null               comment '来源单据ID(关联qxx_pur_order)',
-  source_doc_code   varchar(64)     default null               comment '来源单据编码',
-  vendor_id         bigint(20)      not null                   comment '供应商ID(关联qxx_md_vendor)',
-  vendor_code       varchar(64)     default null               comment '供应商编码',
-  vendor_name       varchar(255)    default null               comment '供应商名称',
-  arrival_date      datetime        default null               comment '预计到货日期',
-  total_quantity    decimal(14,4)   default 0.0000             comment '到货总数量',
-  iqc_id            bigint(20)      default null               comment '关联质检单ID(关联qxx_qc_iqc)',
-  iqc_code          varchar(64)     default null               comment '关联质检单编码',
-  status            varchar(50)     default 'PENDING'          comment '状态:PENDING-待收货,RECEIVING-收货中,RECEIVED-已收货,CANCEL-取消',
-  remark            varchar(500)    default ''                 comment '备注',
-  create_by         varchar(64)     default ''                 comment '创建者',
-  create_time       datetime        default current_timestamp  comment '创建时间',
-  update_by         varchar(64)     default ''                 comment '更新者',
-  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
-  key idx_factory_id (factory_id),
-  primary key (notice_id)
-) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '到货通知单表';
-
--- ----------------------------
--- 8、到货通知单行表
--- ----------------------------
-drop table if exists qxx_wm_arrival_notice_line;
-create table qxx_wm_arrival_notice_line (
-  line_id           bigint(20)      not null auto_increment    comment '行ID',
-
-  factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
-  notice_id         bigint(20)      not null                   comment '通知单ID(关联qxx_wm_arrival_notice)',
-  item_id           bigint(20)      not null                   comment '物料ID(关联qxx_md_item)',
-  item_code         varchar(64)     not null                   comment '物料编码',
-  item_name         varchar(255)    not null                   comment '物料名称',
-  specification     varchar(500)    default null               comment '规格型号',
-  unit_of_measure   varchar(64)     not null                   comment '单位编码',
-  unit_name         varchar(64)     not null                   comment '单位名称',
-  quantity_arrival  decimal(14,4)   default 0.0000             comment '到货数量',
-  quantity_recpt    decimal(14,4)   default 0.0000             comment '已入库数量',
-  quantity_return   decimal(14,4)   default 0.0000             comment '退货数量',
-  batch_code        varchar(64)     default null               comment '供应商批次号',
-  iqc_id            bigint(20)      default null               comment '关联质检行ID',
-  enable_flag       char(1)         default '1' not null       comment '是否启用(1-是,0-否)',
-  remark            varchar(500)    default ''                 comment '备注',
-  create_by         varchar(64)     default ''                 comment '创建者',
-  create_time       datetime        default current_timestamp  comment '创建时间',
-  update_by         varchar(64)     default ''                 comment '更新者',
-  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
-  key idx_factory_id (factory_id),
-  primary key (line_id)
-) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '到货通知单行表';
-
--- ----------------------------
--- 9、物料入库单表(Header)
+-- 7、物料入库单表(Header)
 -- ----------------------------
 drop table if exists qxx_wm_item_recpt;
 create table qxx_wm_item_recpt (
@@ -349,8 +290,8 @@ create table qxx_wm_item_recpt (
   factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
   recpt_code        varchar(64)     not null                   comment '入库单编码(自动生成)',
   recpt_name        varchar(255)    default null               comment '入库单名称',
-  notice_id         bigint(20)      default null               comment '到货通知单ID(关联qxx_wm_arrival_notice)',
-  notice_code       varchar(64)     default null               comment '到货通知单编码',
+  pur_order_id      bigint(20)      default null               comment '采购订单ID(关联qxx_pur_order,采购入库时填写)',
+  pur_order_code    varchar(64)     default null               comment '采购订单编码',
   vendor_id         bigint(20)      default null               comment '供应商ID(关联qxx_md_vendor)',
   vendor_code       varchar(64)     default null               comment '供应商编码',
   vendor_name       varchar(255)    default null               comment '供应商名称',
@@ -940,68 +881,7 @@ create table qxx_wm_product_recpt_detail (
 -- ============================================================
 
 -- ----------------------------
--- 27、发货通知单表
--- ----------------------------
-drop table if exists qxx_wm_sales_notice;
-create table qxx_wm_sales_notice (
-  notice_id         bigint(20)      not null auto_increment    comment '通知单ID',
-  factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
-  notice_code       varchar(64)     not null                   comment '通知单编码',
-  notice_name       varchar(255)    default null               comment '通知单名称',
-  client_id         bigint(20)      not null                   comment '客户ID(关联qxx_md_client)',
-  client_code       varchar(64)     default null               comment '客户编码',
-  client_name       varchar(255)    default null               comment '客户名称',
-  client_order_code varchar(64)     default null               comment '客户订单号(如PO#ORD66003MT)',
-  salesperson       varchar(64)     default null               comment '业务员(如陈仁林/陈丽丽)',
-  notice_date       datetime        default current_timestamp  comment '通知日期',
-  total_quantity    decimal(14,4)   default 0.0000             comment '发货总数量',
-  total_box         int(11)         default 0                  comment '总箱数',
-  oqc_id            bigint(20)      default null               comment '出货检验单ID(关联qxx_qc_oqc)',
-  oqc_code          varchar(64)     default null               comment '出货检验单编码',
-  shipping_address  varchar(500)    default null               comment '收货地址',
-  receiver_name     varchar(64)     default null               comment '收货人',
-  receiver_tel      varchar(64)     default null               comment '收货人电话',
-  status            varchar(50)     default 'PENDING'          comment '状态:PENDING-待发货,SHIPPING-发货中,SHIPPED-已发货,CANCEL-取消',
-  remark            varchar(500)    default ''                 comment '备注',
-  create_by         varchar(64)     default ''                 comment '创建者',
-  create_time       datetime        default current_timestamp  comment '创建时间',
-  update_by         varchar(64)     default ''                 comment '更新者',
-  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
-  key idx_factory_id (factory_id),
-  primary key (notice_id)
-) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '发货通知单表';
-
--- ----------------------------
--- 28、发货通知单行表
--- ----------------------------
-drop table if exists qxx_wm_sales_notice_line;
-create table qxx_wm_sales_notice_line (
-  line_id           bigint(20)      not null auto_increment    comment '行ID',
-
-  factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
-  notice_id         bigint(20)      not null                   comment '通知单ID(关联qxx_wm_sales_notice)',
-  item_id           bigint(20)      not null                   comment '物料ID(关联qxx_md_item)',
-  item_code         varchar(64)     not null                   comment '物料编码',
-  item_name         varchar(255)    not null                   comment '物料名称',
-  specification     varchar(500)    default null               comment '规格型号',
-  unit_of_measure   varchar(64)     not null                   comment '单位编码',
-  unit_name         varchar(64)     not null                   comment '单位名称',
-  quantity_notice   decimal(14,4)   default 0.0000             comment '发货通知数量',
-  quantity_shipped  decimal(14,4)   default 0.0000             comment '已发货数量',
-  quantity_box      int(11)         default 0                  comment '箱数',
-  box_spec          varchar(100)    default null               comment '箱规(如250个/箱)',
-  enable_flag       char(1)         default '1' not null       comment '是否启用(1-是,0-否)',
-  remark            varchar(500)    default ''                 comment '备注',
-  create_by         varchar(64)     default ''                 comment '创建者',
-  create_time       datetime        default current_timestamp  comment '创建时间',
-  update_by         varchar(64)     default ''                 comment '更新者',
-  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
-  key idx_factory_id (factory_id),
-  primary key (line_id)
-) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '发货通知单行表';
-
--- ----------------------------
--- 29、销售出库单表(Header)
+-- 27、销售出库单表(Header)
 -- 纸张行业扩展: 完整物流追踪字段
 -- ----------------------------
 drop table if exists qxx_wm_product_sales;
@@ -1010,8 +890,6 @@ create table qxx_wm_product_sales (
   factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
   sales_code        varchar(64)     not null                   comment '出库单编码',
   sales_name        varchar(255)    default null               comment '出库单名称',
-  notice_id         bigint(20)      default null               comment '发货通知单ID(关联qxx_wm_sales_notice)',
-  notice_code       varchar(64)     default null               comment '发货通知单编码',
   client_id         bigint(20)      not null                   comment '客户ID(关联qxx_md_client)',
   client_code       varchar(64)     default null               comment '客户编码',
   client_name       varchar(255)    default null               comment '客户名称',
@@ -1146,6 +1024,68 @@ create table qxx_wm_rt_sales (
   key idx_factory_id (factory_id),
   primary key (rt_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '销售退货单表';
+
+-- ----------------------------
+-- 31、销售退货单行表
+-- ----------------------------
+drop table if exists qxx_wm_rt_sales_line;
+create table qxx_wm_rt_sales_line (
+  line_id           bigint(20)      not null auto_increment    comment '行ID',
+
+  factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
+  rt_id             bigint(20)      not null                   comment '退货单ID(关联qxx_wm_rt_sales)',
+  item_id           bigint(20)      not null                   comment '物料ID(关联qxx_md_item)',
+  item_code         varchar(64)     not null                   comment '物料编码',
+  item_name         varchar(255)    not null                   comment '物料名称',
+  specification     varchar(500)    default null               comment '规格型号',
+  unit_of_measure   varchar(64)     not null                   comment '单位编码',
+  unit_name         varchar(64)     not null                   comment '单位名称',
+  quantity_rt       decimal(14,4)   default 0.0000             comment '退货数量',
+  batch_id          bigint(20)      default null               comment '批次ID',
+  batch_code        varchar(64)     default null               comment '批次编码',
+  warehouse_id      bigint(20)      not null                   comment '仓库ID',
+  location_id       bigint(20)      default null               comment '库区ID',
+  area_id           bigint(20)      default null               comment '库位ID',
+  remark            varchar(500)    default ''                 comment '备注',
+  create_by         varchar(64)     default ''                 comment '创建者',
+  create_time       datetime        default current_timestamp  comment '创建时间',
+  update_by         varchar(64)     default ''                 comment '更新者',
+  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
+  key idx_factory_id (factory_id),
+  primary key (line_id)
+) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '销售退货单行表';
+
+-- ----------------------------
+-- 32、销售退货单明细表
+-- ----------------------------
+drop table if exists qxx_wm_rt_sales_detail;
+create table qxx_wm_rt_sales_detail (
+  detail_id         bigint(20)      not null auto_increment    comment '明细ID',
+
+  factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
+  rt_id             bigint(20)      not null                   comment '退货单ID(关联qxx_wm_rt_sales)',
+  line_id           bigint(20)      not null                   comment '行ID(关联qxx_wm_rt_sales_line)',
+  item_id           bigint(20)      not null                   comment '物料ID',
+  item_code         varchar(64)     not null                   comment '物料编码',
+  item_name         varchar(255)    not null                   comment '物料名称',
+  specification     varchar(500)    default null               comment '规格型号',
+  unit_of_measure   varchar(64)     not null                   comment '单位编码',
+  unit_name         varchar(64)     not null                   comment '单位名称',
+  quantity          decimal(14,4)   default 0.0000             comment '退货数量',
+  batch_id          bigint(20)      default null               comment '批次ID',
+  batch_code        varchar(64)     default null               comment '批次编码',
+  warehouse_id      bigint(20)      not null                   comment '仓库ID',
+  location_id       bigint(20)      default null               comment '库区ID',
+  area_id           bigint(20)      default null               comment '库位ID',
+  material_stock_id bigint(20)      not null                   comment '库存记录ID(关联qxx_wm_material_stock)',
+  remark            varchar(500)    default ''                 comment '备注',
+  create_by         varchar(64)     default ''                 comment '创建者',
+  create_time       datetime        default current_timestamp  comment '创建时间',
+  update_by         varchar(64)     default ''                 comment '更新者',
+  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
+  key idx_factory_id (factory_id),
+  primary key (detail_id)
+) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '销售退货单明细表';
 
 -- ============================================================
 -- 六、外协管理流程 (圣享核心业务: 100%带料外发)
@@ -1596,33 +1536,7 @@ create table qxx_wm_package_line (
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '装箱明细表';
 
 -- ----------------------------
--- 47、SN码管理表
--- ----------------------------
-drop table if exists qxx_wm_sn;
-create table qxx_wm_sn (
-  sn_id             bigint(20)      not null auto_increment    comment 'SN ID',
-  factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
-  sn_code           varchar(255)    not null                   comment 'SN码(序列号,唯一)',
-  item_id           bigint(20)      not null                   comment '物料ID(关联qxx_md_item)',
-  item_code         varchar(64)     not null                   comment '物料编码',
-  item_name         varchar(255)    not null                   comment '物料名称',
-  batch_id          bigint(20)      default null               comment '批次ID(关联qxx_wm_batch)',
-  batch_code        varchar(64)     default null               comment '批次编码',
-  workorder_id      bigint(20)      default null               comment '生产工单ID(关联qxx_pro_workorder)',
-  workorder_code    varchar(64)     default null               comment '生产工单编码',
-  status            varchar(50)     default 'CREATED'          comment '状态:CREATED-已创建,USED-已使用,SCRAP-已报废',
-  remark            varchar(500)    default ''                 comment '备注',
-  create_by         varchar(64)     default ''                 comment '创建者',
-  create_time       datetime        default current_timestamp  comment '创建时间',
-  update_by         varchar(64)     default ''                 comment '更新者',
-  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
-  key idx_factory_id (factory_id),
-  primary key (sn_id),
-  unique key uk_sn_code (sn_code)
-) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = 'SN码管理表';
-
--- ----------------------------
--- 48、备料通知单表
+-- 47、备料通知单表
 -- ----------------------------
 drop table if exists qxx_wm_materialrequest_notice;
 create table qxx_wm_materialrequest_notice (
@@ -1645,6 +1559,37 @@ create table qxx_wm_materialrequest_notice (
   key idx_factory_id (factory_id),
   primary key (notice_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '备料通知单表';
+
+-- ----------------------------
+-- 48、备料通知单行表
+-- ----------------------------
+drop table if exists qxx_wm_materialrequest_notice_line;
+create table qxx_wm_materialrequest_notice_line (
+  line_id           bigint(20)      not null auto_increment    comment '行ID',
+
+  factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
+  notice_id         bigint(20)      not null                   comment '备料通知单ID(关联qxx_wm_materialrequest_notice)',
+  item_id           bigint(20)      not null                   comment '物料ID(关联qxx_md_item)',
+  item_code         varchar(64)     not null                   comment '物料编码',
+  item_name         varchar(255)    not null                   comment '物料名称',
+  specification     varchar(500)    default null               comment '规格型号',
+  unit_of_measure   varchar(64)     not null                   comment '单位编码',
+  unit_name         varchar(64)     not null                   comment '单位名称',
+  quantity_request  decimal(14,4)   default 0.0000             comment '申请备料数量',
+  quantity_prepared decimal(14,4)   default 0.0000             comment '已备料数量',
+  batch_id          bigint(20)      default null               comment '批次ID',
+  batch_code        varchar(64)     default null               comment '批次编码',
+  warehouse_id      bigint(20)      not null                   comment '仓库ID',
+  location_id       bigint(20)      default null               comment '库区ID',
+  area_id           bigint(20)      default null               comment '库位ID',
+  remark            varchar(500)    default ''                 comment '备注',
+  create_by         varchar(64)     default ''                 comment '创建者',
+  create_time       datetime        default current_timestamp  comment '创建时间',
+  update_by         varchar(64)     default ''                 comment '更新者',
+  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
+  key idx_factory_id (factory_id),
+  primary key (line_id)
+) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '备料通知单行表';
 
 -- ----------------------------
 -- 49、杂项入库单表
@@ -1671,7 +1616,37 @@ create table qxx_wm_misc_recpt (
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '杂项入库单表';
 
 -- ----------------------------
--- 50、杂项出库单表
+-- 50、杂项入库单行表
+-- ----------------------------
+drop table if exists qxx_wm_misc_recpt_line;
+create table qxx_wm_misc_recpt_line (
+  line_id           bigint(20)      not null auto_increment    comment '行ID',
+
+  factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
+  recpt_id          bigint(20)      not null                   comment '杂项入库单ID(关联qxx_wm_misc_recpt)',
+  item_id           bigint(20)      not null                   comment '物料ID(关联qxx_md_item)',
+  item_code         varchar(64)     not null                   comment '物料编码',
+  item_name         varchar(255)    not null                   comment '物料名称',
+  specification     varchar(500)    default null               comment '规格型号',
+  unit_of_measure   varchar(64)     not null                   comment '单位编码',
+  unit_name         varchar(64)     not null                   comment '单位名称',
+  quantity          decimal(14,4)   default 0.0000             comment '入库数量',
+  batch_id          bigint(20)      default null               comment '批次ID',
+  batch_code        varchar(64)     default null               comment '批次编码',
+  warehouse_id      bigint(20)      not null                   comment '仓库ID',
+  location_id       bigint(20)      default null               comment '库区ID',
+  area_id           bigint(20)      default null               comment '库位ID',
+  remark            varchar(500)    default ''                 comment '备注',
+  create_by         varchar(64)     default ''                 comment '创建者',
+  create_time       datetime        default current_timestamp  comment '创建时间',
+  update_by         varchar(64)     default ''                 comment '更新者',
+  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
+  key idx_factory_id (factory_id),
+  primary key (line_id)
+) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '杂项入库单行表';
+
+-- ----------------------------
+-- 51、杂项出库单表
 -- ----------------------------
 drop table if exists qxx_wm_misc_issue;
 create table qxx_wm_misc_issue (
@@ -1693,6 +1668,36 @@ create table qxx_wm_misc_issue (
   key idx_factory_id (factory_id),
   primary key (issue_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '杂项出库单表';
+
+-- ----------------------------
+-- 52、杂项出库单行表
+-- ----------------------------
+drop table if exists qxx_wm_misc_issue_line;
+create table qxx_wm_misc_issue_line (
+  line_id           bigint(20)      not null auto_increment    comment '行ID',
+
+  factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
+  issue_id          bigint(20)      not null                   comment '杂项出库单ID(关联qxx_wm_misc_issue)',
+  item_id           bigint(20)      not null                   comment '物料ID(关联qxx_md_item)',
+  item_code         varchar(64)     not null                   comment '物料编码',
+  item_name         varchar(255)    not null                   comment '物料名称',
+  specification     varchar(500)    default null               comment '规格型号',
+  unit_of_measure   varchar(64)     not null                   comment '单位编码',
+  unit_name         varchar(64)     not null                   comment '单位名称',
+  quantity          decimal(14,4)   default 0.0000             comment '出库数量',
+  batch_id          bigint(20)      default null               comment '批次ID',
+  batch_code        varchar(64)     default null               comment '批次编码',
+  warehouse_id      bigint(20)      not null                   comment '仓库ID',
+  location_id       bigint(20)      default null               comment '库区ID',
+  area_id           bigint(20)      default null               comment '库位ID',
+  remark            varchar(500)    default ''                 comment '备注',
+  create_by         varchar(64)     default ''                 comment '创建者',
+  create_time       datetime        default current_timestamp  comment '创建时间',
+  update_by         varchar(64)     default ''                 comment '更新者',
+  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
+  key idx_factory_id (factory_id),
+  primary key (line_id)
+) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '杂项出库单行表';
 
 -- ============================================================
 -- 八、纸张行业特有：纸卷明细

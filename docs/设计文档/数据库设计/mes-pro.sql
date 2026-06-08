@@ -342,6 +342,10 @@ create table qxx_pro_task (
   request_date                datetime        default null               comment '需求日期(客户交期)',
   finish_date                 datetime        default null               comment '实际完成日期',
   cancel_date                 datetime        default null               comment '取消日期',
+  -- 外协信息
+  vendor_id                   bigint(20)      default null               comment '外协供应商ID(关联qxx_md_vendor,外发工序时填写)',
+  vendor_code                 varchar(64)     default null               comment '外协供应商编码',
+  outsource_factory_id        bigint(20)      default null               comment '外协场景：该供应商对应的系统工厂ID(关联qxx_md_factory)',
   status                      varchar(64)     default 'NORMAL'           comment '生产状态:PREPARE-待排产,NORMAL-正常,PRODUCING-生产中,COMPLETED-已完成,PAUSED-暂停,CANCEL-取消',
   remark                      varchar(500)    default ''                 comment '备注',
   create_by                   varchar(64)     default ''                 comment '创建者',
@@ -349,6 +353,7 @@ create table qxx_pro_task (
   update_by                   varchar(64)     default ''                 comment '更新者',
   update_time                 datetime        default current_timestamp on update current_timestamp comment '更新时间',
   key idx_factory_id (factory_id),
+  key idx_outsource_factory_id (outsource_factory_id),
   primary key (task_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '生产任务/排产表';
 

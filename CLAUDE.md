@@ -70,7 +70,7 @@ cd app && npm install
 | 文档 | 内容 |
 |------|------|
 | [数据库设计决策](docs/设计文档/数据库设计决策.md) | 库存分层、SPU/SKU (parent_id)、BOM 约定、表结构约定、复卷明细 |
-| [多工厂外协设计](docs/设计文档/多工厂外协设计.md) | factory_id（全量表）、outsource_factory_id（7张表）、外协登录与报工流程 |
+| [多工厂外协设计](docs/设计文档/多工厂外协设计.md) | factory_id（全量表）、outsource_factory_id（8张表）、外协登录与报工流程 |
 | [Qcadoo架构分析](docs/设计文档/Qcadoo架构分析.md) | Qcadoo MES 架构思想、表设计对比、qixiaoxia-mes 落地方案 |
 | [数据库字符集规范](docs/设计文档/数据库字符集规范.md) | utf8mb4 DDL 模板、导入规范、乱码排查与修复 |
 | [测试约定](docs/设计文档/测试约定.md) | 测试金字塔、命名规范、Pre-commit/Pre-PR 流程 |
@@ -78,7 +78,7 @@ cd app && npm install
 核心原则速查：
 
 - **所有表都有 `factory_id`**，DDL 模板：`factory_id bigint(20) not null comment '工厂ID'` + `key idx_factory_id`
-- **外协7张表冗余 `outsource_factory_id`**：vendor、workorder、route_process、card_process、feedback、outsource_issue、outsource_recpt
+- **外协8张表冗余 `outsource_factory_id`**：vendor、workorder、task、route_process、card_process、feedback、outsource_issue、outsource_recpt
 - **`sys_user.factory_id`** not null，用户直接归属工厂
 
 ## Development Conventions

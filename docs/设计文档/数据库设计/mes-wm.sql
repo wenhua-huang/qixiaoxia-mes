@@ -1735,6 +1735,7 @@ create table qxx_wm_roll_detail (
   vendor_code       varchar(64)     default null               comment '供应商编码',
   vendor_name       varchar(255)    default null               comment '供应商名称',
   vendor_roll_no    varchar(64)     default null               comment '供应商原始卷号(来料时的编号)',
+  parent_roll_id    bigint(20)      default null               comment '父卷ID(自引用qxx_wm_roll_detail,分切场景:子卷→母卷)',
   -- 实际规格（到货实测值，≠物料主数据的标准值）
   actual_width      varchar(20)     default null               comment '实际门幅(mm),如923mm',
   actual_weight_gsm varchar(20)     default null               comment '实际克重(g/㎡),如118g',

@@ -287,6 +287,125 @@ create table qxx_pro_route_product_bom (
 
 
 -- ============================================================
+-- 2.5、工序参数模版（四层参数体系）
+-- ============================================================
+
+-- ----------------------------
+-- 8.1、工序参数模版定义表 (L1)
+-- 用途: 定义每种工序有哪些参数，是参数元数据的"字典"
+-- 设计: EAV(行即参数) — 每个参数一行，不同工序参数完全不同
+-- 印刷: 色数/印刷机型号/油墨品牌/印刷速度/色差标准值/文件版本号
+-- 分切: 来源卷号/分切宽度规格/分切长度/刀设备编号数
+-- 覆膜: 膜类型(光膜/哑膜)/膜厚/覆膜机型号/张力参数/速度
+-- 烫金: 烫金版编号/烫金面积/金箔型号/温度/压力参数
+-- 制袋: 袋型/袋口宽/袋高/底宽/手提绳类型/打孔规格/责任人
+-- ----------------------------
+drop table if exists qxx_pro_param_template;
+create table qxx_pro_param_template (
+  template_id       bigint(20)    not null auto_increment  comment '模版ID',
+  factory_id        bigint(20)    not null                 comment '工厂ID(关联qxx_md_factory)',
+  process_id        bigint(20)    not null                 comment '工序ID(关联qxx_pro_process)',
+  param_code        varchar(64)   not null                 comment '参数编码(英文标识,同一工序下唯一)',
+  param_name        varchar(128)  not null                 comment '参数名称(中文显示名)',
+  param_group       varchar(64)   default 'PROCESS'        comment '参数分组:MACHINE-设备参数,PROCESS-工艺参数,MATERIAL-材料参数,QUALITY-质量参数,PRODUCT-产品规格参数',
+  param_type        varchar(32)   not null default 'VARCHAR' comment '参数值类型:INT,DECIMAL,VARCHAR,ENUM,DATE,BOOLEAN',
+  unit              varchar(32)   default null             comment '单位(如mm,μm,℃,m/min,mm²,kg)',
+  enum_values       varchar(500)  default null             comment '枚举可选值(JSON数组,param_type=ENUM时必填,如["光膜","哑膜"])',
+  default_value     varchar(255)  default null             comment '默认值(新建路线工序时自动填充)',
+  min_value         decimal(14,4) default null             comment '最小值(超出时触发偏差预警)',
+  max_value         decimal(14,4) default null             comment '最大值(超出时触发偏差预警)',
+  sort_order        int(4)        default 1                comment '排序号(同一工序下参数显示顺序)',
+  is_required       char(1)       default 'Y'              comment '是否必填(Y-是,N-否)',
+  is_report_visible char(1)       default 'Y'              comment '报工时是否显示(Y-是=操作工可见可填,N-否=仅工艺设计时可见)',
+  enable_flag       char(1)       default '1'              comment '是否启用(1-是,0-否)',
+  remark            varchar(500)  default ''               comment '备注',
+  create_by         varchar(64)   default ''               comment '创建者',
+  create_time       datetime      default current_timestamp comment '创建时间',
+  update_by         varchar(64)   default ''               comment '更新者',
+  update_time       datetime      default current_timestamp on update current_timestamp comment '更新时间',
+  key idx_factory_id (factory_id),
+  primary key (template_id),
+  unique key uk_process_param (factory_id, process_id, param_code)
+) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '工序参数模版定义表';
+
+
+-- ----------------------------
+-- 8.2、路线产品工序标准参数值表 (L2)
+-- 用途: 产品级标准参数值，挂在 route_product 上，不同产品即使共享路线也可不同参数值
+-- 创建路线产品关联时从模版(L1)复制默认值，工艺工程师修改为该产品的标准值
+-- 与 route_product_bom 同层：都是产品-路线级别的"标准配方"
+-- ----------------------------
+drop table if exists qxx_pro_route_process_param;
+create table qxx_pro_route_process_param (
+  record_id         bigint(20)    not null auto_increment  comment '记录ID',
+  factory_id        bigint(20)    not null                 comment '工厂ID(关联qxx_md_factory)',
+  route_product_id  bigint(20)    not null                 comment '路线产品ID(关联qxx_pro_route_product.record_id)',
+  process_id        bigint(20)    not null                 comment '工序ID(关联qxx_pro_process,冗余便于按工序查询)',
+  template_id       bigint(20)    not null                 comment '参数模版ID(关联qxx_pro_param_template)',
+  param_value       varchar(500)  default null             comment '标准参数值(统一存字符串,前端按param_type校验)',
+  remark            varchar(500)  default ''               comment '备注',
+  create_by         varchar(64)   default ''               comment '创建者',
+  create_time       datetime      default current_timestamp comment '创建时间',
+  update_by         varchar(64)   default ''               comment '更新者',
+  update_time       datetime      default current_timestamp on update current_timestamp comment '更新时间',
+  key idx_factory_id (factory_id),
+  primary key (record_id),
+  unique key uk_route_product_param (route_product_id, template_id)
+) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '路线产品工序标准参数值表';
+
+
+-- ----------------------------
+-- 8.3、工单工序参数值表 (L3)
+-- 用途: 创建工单时从路线标准(L2)复制，计划员可按本单需求调整
+-- 设计: standard_value(快照锁定) + adjusted_value(独立修改)，追溯清晰
+-- 与 workorder_bom 同层：单向下行复制，可改不回流
+-- ----------------------------
+drop table if exists qxx_pro_workorder_param;
+create table qxx_pro_workorder_param (
+  record_id         bigint(20)    not null auto_increment  comment '记录ID',
+  factory_id        bigint(20)    not null                 comment '工厂ID(关联qxx_md_factory)',
+  workorder_id      bigint(20)    not null                 comment '工单ID(关联qxx_pro_workorder)',
+  route_product_id  bigint(20)    not null                 comment '路线产品ID(关联qxx_pro_route_product,追溯来源)',
+  template_id       bigint(20)    not null                 comment '参数模版ID(关联qxx_pro_param_template)',
+  standard_value    varchar(500)  default null             comment '路线标准值(快照,从L2复制锁定)',
+  adjusted_value    varchar(500)  default null             comment '工单调整值(计划员修改后的值,为null则沿用standard_value)',
+  remark            varchar(500)  default ''               comment '调整原因说明',
+  create_by         varchar(64)   default ''               comment '创建者',
+  create_time       datetime      default current_timestamp comment '创建时间',
+  update_by         varchar(64)   default ''               comment '更新者',
+  update_time       datetime      default current_timestamp on update current_timestamp comment '更新时间',
+  key idx_factory_id (factory_id),
+  primary key (record_id),
+  unique key uk_workorder_param (workorder_id, route_product_id, template_id)
+) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '工单工序参数值表';
+
+
+-- ----------------------------
+-- 8.4、报工实际参数值表 (L4)
+-- 用途: 操作工报工时填写实际参数值，与工单参数(L3)对比→偏差分析
+-- 设计: 通过 template_id 获取取值约束(min/max/enum)，实际值超出范围→is_deviation='Y'
+-- ----------------------------
+drop table if exists qxx_pro_feedback_param;
+create table qxx_pro_feedback_param (
+  record_id          bigint(20)    not null auto_increment  comment '记录ID',
+  factory_id         bigint(20)    not null                 comment '工厂ID(关联qxx_md_factory)',
+  feedback_id        bigint(20)    not null                 comment '报工记录ID(关联qxx_pro_feedback.record_id)',
+  workorder_param_id bigint(20)    default null             comment '工单参数ID(关联qxx_pro_workorder_param,对比基准)',
+  template_id        bigint(20)    not null                 comment '参数模版ID(关联qxx_pro_param_template,取值约束)',
+  actual_value       varchar(500)  default null             comment '实际参数值(操作工填报)',
+  is_deviation       char(1)       default null             comment '是否偏差(Y-超出min/max,N-正常,NULL-无约束未判定)',
+  remark             varchar(500)  default ''               comment '偏差说明',
+  create_by          varchar(64)   default ''               comment '创建者',
+  create_time        datetime      default current_timestamp comment '创建时间',
+  update_by          varchar(64)   default ''               comment '更新者',
+  update_time        datetime      default current_timestamp on update current_timestamp comment '更新时间',
+  key idx_factory_id (factory_id),
+  primary key (record_id),
+  unique key uk_feedback_param (feedback_id, template_id)
+) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '报工实际参数值表';
+
+
+-- ============================================================
 -- 三、生产排产与报工
 -- ============================================================
 
@@ -634,6 +753,7 @@ create table qxx_pro_card_process (
   ipqc_id                     bigint(20)      default null               comment '过程检验单ID(关联qxx_qc_ipqc)',
   ipqc_code                   varchar(64)     default null               comment '过程检验单编码',
   feedback_id                 bigint(20)      default null               comment '报工记录ID(关联qxx_pro_feedback)',
+  issue_detail_id             bigint(20)      default null               comment '领料明细ID(关联qxx_wm_issue_detail,建立card↔原料批次直接追溯)',
   remark                      varchar(500)    default ''                 comment '备注',
   create_by                   varchar(64)     default ''                 comment '创建者',
   create_time                 datetime        default current_timestamp  comment '创建时间',
@@ -643,3 +763,73 @@ create table qxx_pro_card_process (
   key idx_outsource_factory_id (outsource_factory_id),
   primary key (record_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '流转卡工序信息表';
+
+
+-- ============================================================
+-- 六、物料追溯
+-- ============================================================
+
+-- ----------------------------
+-- 19、物料谱系追溯表
+-- 用途: ⭐记录所有物料转移的父子关系（投料/产出/分切/合并），实现正向追溯(原料→成品)和反向追溯(成品→原料)
+--
+-- === 追溯闭环 ===
+--
+--   正向追溯（原料 → 成品）：
+--   ROLL_DETAIL(卷号RX-001) → [ISSUE] → CARD → [PRODUCE] → BATCH(成品批次B-001) → 客户
+--
+--   反向追溯（成品 → 原料）：
+--   BATCH(成品B-001) → [PRODUCE] → CARD → [ISSUE] → BATCH/ROLL_DETAIL(原料) → 供应商
+--
+--   分切追溯：
+--   ROLL_DETAIL(母卷) → [SLIT] → ROLL_DETAIL(子卷1,子卷2,...)
+--      ↑ parent_roll_id 自引用(qxx_wm_roll_detail)
+--      ↑ 本表也记录一条 SLIT trace（双保险）
+--
+-- === 数据写入时机 ===
+--
+--   投料(ISSUE):        领料单过账 → INSERT trace(parent=BATCH→child=CARD)
+--   产出(PRODUCE):      最后工序报工 → INSERT trace(parent=CARD→child=BATCH成品)
+--   分切(SLIT):         分切工序报工 → INSERT trace(parent=母卷→child=子卷)
+--   流转卡拆分(MERGE):   拆卡 → INSERT trace(parent=原卡→child=子卡)
+--
+-- === 与 card_process.issue_detail_id 的关系 ===
+--   card_process.issue_detail_id → 快速追溯某工序的领料来源（单步查询）
+--   material_trace → 完整谱系图（递归查询），双通道满足不同精度需求
+-- ----------------------------
+drop table if exists qxx_pro_material_trace;
+create table qxx_pro_material_trace (
+  trace_id          bigint(20)      not null auto_increment    comment '追溯记录ID',
+  factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
+  trace_type        varchar(32)     not null                   comment '追溯类型:ISSUE-投料消耗,PRODUCE-生产产出,SLIT-分切,MERGE-合并,ADJUST-调整',
+  -- 父节点（来源）
+  parent_type       varchar(32)     not null                   comment '父类型:BATCH/ROLL_DETAIL/MATERIAL_STOCK/CARD',
+  parent_id         bigint(20)      not null                   comment '父记录ID',
+  -- 子节点（去向）
+  child_type        varchar(32)     not null                   comment '子类型:BATCH/ROLL_DETAIL/MATERIAL_STOCK/CARD',
+  child_id          bigint(20)      not null                   comment '子记录ID',
+  -- 数量与单位
+  quantity          decimal(14,4)   not null                   comment '转移数量',
+  unit_of_measure   varchar(64)     not null                   comment '单位编码',
+  -- 业务关联
+  workorder_id      bigint(20)      default null               comment '生产工单ID(关联qxx_pro_workorder)',
+  card_id           bigint(20)      default null               comment '流转卡ID(关联qxx_pro_card)',
+  card_process_id   bigint(20)      default null               comment '流转卡工序ID(关联qxx_pro_card_process)',
+  issue_id          bigint(20)      default null               comment '领料单ID(关联qxx_wm_issue_header)',
+  issue_detail_id   bigint(20)      default null               comment '领料明细ID(关联qxx_wm_issue_detail)',
+  feedback_id       bigint(20)      default null               comment '报工记录ID(关联qxx_pro_feedback)',
+  transaction_id    bigint(20)      default null               comment '库存事务ID(关联qxx_wm_transaction)',
+  process_id        bigint(20)      default null               comment '工序ID(关联qxx_pro_process)',
+  trace_time        datetime        default current_timestamp  comment '追溯时间(业务发生时间)',
+  remark            varchar(500)    default ''                 comment '备注',
+  create_by         varchar(64)     default ''                 comment '创建者',
+  create_time       datetime        default current_timestamp  comment '创建时间',
+  update_by         varchar(64)     default ''                 comment '更新者',
+  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
+  key idx_factory_id (factory_id),
+  primary key (trace_id),
+  key idx_parent (factory_id, parent_type, parent_id),
+  key idx_child (factory_id, child_type, child_id),
+  key idx_workorder (workorder_id),
+  key idx_card (card_id)
+) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '物料谱系追溯表';

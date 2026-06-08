@@ -22,9 +22,8 @@ create table sys_dept (
   create_time 	    datetime                                   comment '创建时间',
   update_by         varchar(64)     default ''                 comment '更新者',
   update_time       datetime                                   comment '更新时间',
-,
+  primary key (dept_id),
   key idx_factory_id (factory_id)
-  primary key (dept_id)
 ) engine=innodb auto_increment=200 comment = '部门表';
 
 -- ----------------------------
@@ -68,9 +67,8 @@ create table sys_user (
   update_by         varchar(64)     default ''                 comment '更新者',
   update_time       datetime                                   comment '更新时间',
   remark            varchar(500)    default null               comment '备注',
-,
+  primary key (user_id),
   key idx_factory_id (factory_id)
-  primary key (user_id)
 ) engine=innodb auto_increment=100 comment = '用户信息表';
 
 -- ----------------------------
@@ -128,9 +126,8 @@ create table sys_role (
   update_by            varchar(64)     default ''                 comment '更新者',
   update_time          datetime                                   comment '更新时间',
   remark               varchar(500)    default null               comment '备注',
-,
+  primary key (role_id),
   key idx_factory_id (factory_id)
-  primary key (role_id)
 ) engine=innodb auto_increment=100 comment = '角色信息表';
 
 -- ----------------------------
@@ -281,11 +278,9 @@ drop table if exists sys_user_role;
 create table sys_user_role (
   user_id   bigint(20) not null comment '用户ID',
   role_id   bigint(20) not null comment '角色ID',
-,
+  factory_id bigint(20) not null comment '工厂ID',
+  primary key(user_id, role_id, factory_id),
   key idx_factory_id (factory_id)
-  primary key(user_id, role_id)
-factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
-
 ) engine=innodb comment = '用户和角色关联表';
 
 -- ----------------------------
@@ -302,11 +297,9 @@ drop table if exists sys_role_menu;
 create table sys_role_menu (
   role_id   bigint(20) not null comment '角色ID',
   menu_id   bigint(20) not null comment '菜单ID',
-,
+  factory_id bigint(20) not null comment '工厂ID',
+  primary key(role_id, menu_id, factory_id),
   key idx_factory_id (factory_id)
-  primary key(role_id, menu_id)
-factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
-
 ) engine=innodb comment = '角色和菜单关联表';
 
 -- ----------------------------
@@ -405,11 +398,9 @@ drop table if exists sys_role_dept;
 create table sys_role_dept (
   role_id   bigint(20) not null comment '角色ID',
   dept_id   bigint(20) not null comment '部门ID',
-,
+  factory_id bigint(20) not null comment '工厂ID',
+  primary key(role_id, dept_id, factory_id),
   key idx_factory_id (factory_id)
-  primary key(role_id, dept_id)
-factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
-
 ) engine=innodb comment = '角色和部门关联表';
 
 -- ----------------------------
@@ -428,11 +419,9 @@ create table sys_user_post
 (
   user_id   bigint(20) not null comment '用户ID',
   post_id   bigint(20) not null comment '岗位ID',
-,
+  factory_id bigint(20) not null comment '工厂ID',
+  primary key (user_id, post_id, factory_id),
   key idx_factory_id (factory_id)
-  primary key (user_id, post_id)
-factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
-
 ) engine=innodb comment = '用户与岗位关联表';
 
 -- ----------------------------

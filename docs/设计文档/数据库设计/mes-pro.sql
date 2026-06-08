@@ -60,8 +60,7 @@ create table qxx_pro_workorder (
   -- 批次与计划
   batch_code                  varchar(64)     default null               comment '批次号',
   request_date                datetime        default null               comment '需求日期(客户要求的交期)',
-  parent_id                   bigint(20)      default 0 not null         comment '父工单ID(拆单场景,0表示无父工单)',
-  ancestors                   varchar(500)    default '0'                comment '所有父节点ID(逗号分隔)',
+  -- 批次拆分通过流转卡(qxx_pro_card)实现，工单不再拆分子工单
   cancel_date                 datetime        default null               comment '取消日期',
   finish_date                 datetime        default null               comment '实际完成日期',
   status                      varchar(64)     default 'PREPARE'          comment '工单状态:PREPARE-待生产,PRODUCING-生产中,COMPLETED-已完成,CANCEL-已取消,CLOSED-已关闭',

@@ -95,6 +95,18 @@ create table qxx_wm_storage_area (
 -- ----------------------------
 -- 4、库存记录表
 -- 纸张行业扩展: 双单位库存（主单位+辅助单位数量）
+--
+-- === 库存唯一性（双重保障）===
+-- A. 应用层：INSERT 前先 SELECT 查重，查到则 UPDATE 数量（UPSERT 语义）
+-- B. 数据库层：uk_stock 唯一索引兜底，防止并发/绕过应用层的重复插入
+--
+-- 唯一键 = factory_id + item_id + batch_id + warehouse_id + vendor_id + workorder_id + quality_status
+-- batch_id/vendor_id/workorder_id 用 0 而非 NULL（MySQL 唯一索引不认 NULL）
+--
+-- 示例：
+--   原料（纸张）= factory_id=1 + item_id=100 + batch_id=5 + warehouse_id=10 + vendor_id=3 + workorder_id=0 + quality_status=NORMAL
+--   成品（纸袋）= factory_id=1 + item_id=200 + batch_id=8 + warehouse_id=20 + vendor_id=0 + workorder_id=15 + quality_status=NORMAL
+--   辅料（胶水）= factory_id=1 + item_id=300 + batch_id=0 + warehouse_id=30 + vendor_id=0 + workorder_id=0 + quality_status=NORMAL
 -- ----------------------------
 drop table if exists qxx_wm_material_stock;
 create table qxx_wm_material_stock (
@@ -114,7 +126,7 @@ create table qxx_wm_material_stock (
   quantity_onhand2  decimal(14,4)   default 0.0000             comment '现有库存量(辅助单位)',
   quantity_available decimal(14,4)  default 0.0000             comment '可用库存量(主单位,扣减已分配)',
   -- 批次与库存信息
-  batch_id          bigint(20)      default null               comment '批次ID(关联qxx_wm_batch)',
+  batch_id          bigint(20)      default 0 not null           comment '批次ID(关联qxx_wm_batch,0=无批次管理)',
   batch_code        varchar(64)     default null               comment '批次编码',
   warehouse_id      bigint(20)      not null                   comment '仓库ID(关联qxx_wm_warehouse)',
   warehouse_code    varchar(64)     default null               comment '仓库编码',
@@ -125,10 +137,10 @@ create table qxx_wm_material_stock (
   area_id           bigint(20)      default null               comment '库位ID(关联qxx_wm_storage_area)',
   area_code         varchar(64)     default null               comment '库位编码',
   area_name         varchar(255)    default null               comment '库位名称',
-  vendor_id         bigint(20)      default null               comment '供应商ID(关联qxx_md_vendor)',
+  vendor_id         bigint(20)      default 0 not null          comment '供应商ID(关联qxx_md_vendor,0=不适用)',
   vendor_code       varchar(64)     default null               comment '供应商编码',
   vendor_name       varchar(255)    default null               comment '供应商名称',
-  workorder_id      bigint(20)      default null               comment '生产工单ID(关联qxx_pro_workorder)',
+  workorder_id      bigint(20)      default 0 not null          comment '生产工单ID(关联qxx_pro_workorder,0=不适用)',
   workorder_code    varchar(64)     default null               comment '生产工单编码',
   -- 纸卷明细见 qxx_wm_roll_detail 表
   expire_date       datetime        default null               comment '有效期至',
@@ -142,6 +154,7 @@ create table qxx_wm_material_stock (
   update_by         varchar(64)     default ''                 comment '更新者',
   update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
   key idx_factory_id (factory_id),
+  unique key uk_stock (factory_id, item_id, batch_id, warehouse_id, vendor_id, workorder_id, quality_status),
   primary key (material_stock_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '库存记录表';
 

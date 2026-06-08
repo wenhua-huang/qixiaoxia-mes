@@ -207,6 +207,45 @@ create table qxx_wm_transaction (
 
 -- ----------------------------
 -- 6、批次记录表
+-- 用途：记录物料批次及其追踪属性。批次身份 = 属性组合（非批次号本身），同物料+同属性=同一批次。
+--
+-- === 批次号生成时机 ===
+--
+-- 原料（RAW）：
+--   ⏰ 入库时生成。仓库收货员填追踪属性（供应商/采购单/到货日期）→ 系统查重 → 匹配则复用，无则生成。
+--   触发：qxx_wm_item_recpt 提交确认
+--
+-- 成品/半成品（FINISHED / SEMI）：
+--   ⏰ 排产时生成。计划员拆分流转卡时一并创建批次 → 流转卡带着 batch_code 走完所有工序 → 完工入库时 batch 关闭。
+--   触发：qxx_pro_card 创建时（排产页面）
+--
+-- === 完整生命周期 ===
+--
+--   原料批次：                                    成品批次：
+--   ────────                                    ────────
+--   入库单提交                                   排产（拆流转卡）
+--     │                                            │
+--     ▼                                            ▼
+--   ① 读 qxx_md_item_batch_config                ① 生成 batch_code
+--   ② 查重（同item+同追踪属性？）                   ② INSERT qxx_wm_batch (status=ACTIVE)
+--      → 有 → 复用已有 batch_code                  ③ qxx_pro_card.batch_code = batch_code
+--      → 无 → ③                                            │
+--   ③ INSERT qxx_wm_batch (status=ACTIVE)                 │  流转卡走完各工序
+--   ④ batch_code 关联到入库行                               │  印刷→制袋→贴绳→包装
+--     │                                                    │
+--     ▼                                                    ▼
+--   领料出库引用 batch_code                            最后工序报工完成
+--   消耗/退料都追溯到这个批次                                │
+--                                                         ▼
+--                                                     成品入库 qxx_wm_product_recpt
+--                                                        │
+--                                                        ▼
+--                                                     UPDATE batch: status=CLOSED
+--                                                        recpt_date = 入库日期
+--
+-- === 批次号 = 流水号，批次身份 = 属性组合 ===
+-- 入库员/计划员不需要手动编批次号，只需填好追踪属性，系统自动匹配或生成。
+-- 同物料 + 同属性组合 → 同一批次。返单生产时自动复用历史批次号。
 -- ----------------------------
 drop table if exists qxx_wm_batch;
 create table qxx_wm_batch (

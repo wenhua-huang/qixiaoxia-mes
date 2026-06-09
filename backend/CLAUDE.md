@@ -202,3 +202,236 @@ mvn verify
 # 特定集成测试
 mvn test -pl ruoyi-admin -Dtest="*IT" -Dsurefire.failIfNoSpecifiedTests=false
 ```
+
+## RuoYi 框架工具清单
+
+> ⚠️ RuoYi `ruoyi-common` 已封装大量工具类和注解，**优先使用，禁止重复造轮子或另引三方库**。
+
+### 工具类（`com.ruoyi.common.utils`）
+
+| 工具 | 用途 | 禁止代替方案 |
+|------|------|-------------|
+| `StringUtils` | 字符串判空、格式化、驼峰/下划线互转 | ❌ Apache Commons / 手写 |
+| `DateUtils` | 日期格式化、解析、计算 | ❌ `SimpleDateFormat` 手写 |
+| `SecurityUtils` | 获取当前用户、角色、权限、`factoryId` | ❌ 从 HttpSession 手动取 |
+| `ServletUtils` | 获取 Request/Response、请求参数 | ❌ 直接注入 `HttpServletRequest` |
+| `DictUtils` | 字典数据读取（自带缓存） | ❌ 每次查数据库 |
+| `ExceptionUtil` | 异常堆栈转字符串 | ❌ 手写 `printStackTrace` |
+| `Arith` | 精确浮点运算 | ❌ `double` 直接计算 |
+| `MessageUtils` | i18n 国际化消息 | ❌ 硬编码中文提示 |
+| `LogUtils` | 操作日志记录 | ❌ 手写日志插入逻辑 |
+| `PageUtils` | 分页数据包装 | ❌ 手写分页包装 |
+
+### 关键注解（`com.ruoyi.common.annotation`）
+
+| 注解 | 功能 | 位置 |
+|------|------|------|
+| `@Log` | 自动记录操作日志入库 | 方法级 |
+| `@DataScope` | 数据权限部门隔离 | Mapper 方法 |
+| `@Excel` | Entity 字段标注 → 自动导出 | Entity 字段 |
+| `@RepeatSubmit` | 防重复提交（仅 HTTP 幂等，非并发锁） | Controller 方法 |
+| `@RateLimiter` | 接口限流（Redis 令牌桶） | Controller 方法 |
+| `@Anonymous` | 跳过认证 | Controller 方法 |
+| `@Sensitive` | 字段脱敏（日志/返回时） | Entity 字段 |
+
+### 框架基类
+
+| 类 | 提供能力 |
+|----|---------|
+| `BaseEntity` | `createBy`、`createTime`、`updateBy`、`updateTime`、`remark` |
+| `BaseController` | `startPage()`、`getDataTable()`、`success()`、`toAjax()`、`error()` |
+| `TreeEntity` | 树形表通用字段（`parentId`、`ancestors`） |
+
+## 代码风格与静态检查
+
+### Java 编码约定
+
+- **import 顺序**: `com.qixiaoxia` → `com.ruoyi` → 三方库 → `java.*` → `jakarta.*`
+- **包结构**: Controller 放 `ruoyi-admin/module/controller/{domain}/`，Service/Mapper 放业务模块
+- **命名**: 类名 PascalCase，方法/变量 camelCase，常量 UPPER_SNAKE_CASE
+- 所有 `@RequestMapping` 路径使用 kebab-case（`/wm/item-receipt`）
+
+### 推荐静态检查
+
+待配置 `maven-checkstyle-plugin`，AI 生成代码后先 `mvn compile` 验证。
+
+## DTO/Entity/VO 分层规范
+
+### 核心原则
+
+> RuoYi 代码生成器不分 DTO/VO，模板只有 `domain.java.vm`（Entity）。**生成器产出的 CRUD 沿用 RuoYi 模式（Entity 一把梭），不加 DTO/VO。**
+
+### 什么时候需要 VO/Body（仅手写复杂业务时）
+
+| 场景 | 用什么 | 触发条件 |
+|------|--------|----------|
+| 标准 CRUD（生成器） | Entity 贯穿 | 默认，不建 DTO/VO |
+| 多表组合查询结果 | VO | 返回字段来自 ≥2 张表，无现成 Entity |
+| 请求体字段与 Entity 差异大 | Body | 前端提交字段 ≠ Entity 字段（含临时字段、验证码） |
+| 敏感字段需隐藏 | VO | Entity 含 password 等不应暴露的字段 |
+
+### 什么时候不需要
+
+- 查询参数多几个筛选条件 → 直接用 Entity，别建 Query
+- 返回字段 = Entity 的 80% 以上 → 直接用 Entity，别建 VO
+- 「以后可能会变」→ 别提前建，等实际需要再说
+
+### 转换方式（仅手写 VO/Body 时）
+
+- **优先用静态工厂方法**：`XxxVO.from(entity)` — 零依赖
+- 字段 > 10 或嵌套多时考虑 MapStruct（需先加依赖）
+- **禁止**：手写逐字段 setter、`BeanUtils.copyProperties`
+
+## 分层开发模板
+
+### Controller（`ruoyi-admin` 的 controller 目录）
+
+```java
+@RestController
+@RequestMapping("/mes/{domain}/{entity}")
+public class XxxController extends BaseController {
+
+    @Autowired
+    private IXxxService xxxService;
+
+    @PreAuthorize("@ss.hasPermi('mes:{domain}:{entity}:list')")
+    @GetMapping("/list")
+    public TableDataInfo list(Xxx xxx) {
+        startPage();
+        List<Xxx> list = xxxService.selectXxxList(xxx);
+        return getDataTable(list);
+    }
+
+    @PreAuthorize("@ss.hasPermi('mes:{domain}:{entity}:query')")
+    @GetMapping("/{id}")
+    public AjaxResult getInfo(@PathVariable Long id) {
+        return success(xxxService.selectXxxById(id));
+    }
+
+    @PreAuthorize("@ss.hasPermi('mes:{domain}:{entity}:add')")
+    @Log(title = "新增XXX", businessType = BusinessType.INSERT)
+    @PostMapping
+    public AjaxResult add(@RequestBody Xxx xxx) {
+        xxx.setCreateBy(SecurityUtils.getUsername());
+        return toAjax(xxxService.insertXxx(xxx));
+    }
+}
+```
+
+### Service（业务模块中）
+
+```java
+@Service
+public class XxxServiceImpl implements IXxxService {
+
+    @Autowired
+    private XxxMapper xxxMapper;
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int insertXxx(Xxx xxx) {
+        // 业务校验 → Mapper
+        return xxxMapper.insertXxx(xxx);
+    }
+}
+```
+
+### Mapper XML
+
+```java
+// Java 接口
+public interface XxxMapper {
+    List<Xxx> selectXxxList(Xxx xxx);
+    Xxx selectXxxById(Long id);
+    int insertXxx(Xxx xxx);
+    int updateXxx(Xxx xxx);
+}
+```
+
+```xml
+<!-- XML 中 SELECT 必须带 factory_id -->
+<select id="selectXxxList" resultType="Xxx">
+    SELECT * FROM qxx_{domain}_{entity}
+    <where>
+        AND factory_id = #{factoryId}
+        <if test="name != null and name != ''">AND name LIKE CONCAT('%', #{name}, '%')</if>
+    </where>
+</select>
+```
+
+## 并发控制 & 数据一致性
+
+> ⚠️ RuoYi 框架**无内置分布式锁/乐观锁工具**。`@RepeatSubmit` 只防重复提交（HTTP 幂等），`@RateLimiter` 只做限流。以下为设计规范，**具体工具类待后续完善**。
+
+### 必须加锁的 MES 场景
+
+| 场景 | 并发冲突 | 后果 |
+|------|---------|------|
+| 库存扣减（领料/入库/盘点） | 两人同时扣减同一批次库存 | 库存超扣/负数 |
+| 工单状态变更（开工/暂停/完工/关闭） | 两人同时操作同一工单 | 状态机混乱 |
+| 质检判定提交（IQC/IPQC/OQC） | 两人同时提交同一检验单 | 判定结果被覆盖 |
+| 外协收料/发料确认 | 两人同时确认同一外协单 | 重复入库 |
+| 设备状态变更（维修→正常、报废） | 两人同时更新同一设备 | 状态跳跃 |
+
+### 推荐方案
+
+| 方案 | 适用场景 | 实现思路 |
+|------|---------|---------|
+| **乐观锁（推荐首选）** | 更新频率低、冲突概率小 | 表加 `version` 字段，UPDATE 时 `WHERE version = ?`，不匹配则重试 |
+| **Redis 分布式锁** | 更新频率高、需跨服务锁定 | `SET lock:key value NX EX 30`，操作完释放 |
+| **SELECT FOR UPDATE** | 事务内必须保证读取一致性 | Mapper XML 中手写，事务提交后自动释放 |
+
+### 乐观锁模板（待工具化）
+
+```sql
+-- 1. DDL 加 version 字段
+ALTER TABLE qxx_wm_item_inventory ADD COLUMN version INT DEFAULT 0 NOT NULL COMMENT '乐观锁版本号';
+
+-- 2. UPDATE 带 version + 条件约束
+UPDATE qxx_wm_item_inventory
+SET quantity = quantity - #{quantity}, version = version + 1
+WHERE id = #{id} AND version = #{version} AND quantity >= #{quantity};
+-- affected rows = 0 → 版本冲突，重试或返回错误
+```
+
+### AI 开发并发检查
+
+- 涉及上述 5 类场景的 UPDATE → 必须加锁措施
+- Code Review 必须检查并发安全
+
+## 异常处理与日志规范
+
+### 异常处理
+
+- Service 层抛出 `ServiceException("业务描述")`，不吞异常
+- Controller 层由 `GlobalExceptionHandler` 统一捕获，不手写 try-catch
+- 不要 `catch (Exception e) { e.printStackTrace(); return null; }`
+
+### 日志级别
+
+| 级别 | 使用场景 |
+|------|---------|
+| `info` | 业务流程节点（开工、完工、入库、出库） |
+| `warn` | 可恢复异常（库存不足、状态不允许、参数越界） |
+| `error` | 不可恢复异常（数据库连接失败、外部系统调用失败） |
+| `debug` | 调试信息（SQL 参数、中间结果），生产关闭 |
+
+### 日志格式
+
+```java
+log.info("工单开工, workorderId={}, operator={}", workorderId, SecurityUtils.getUsername());
+log.warn("库存不足, itemId={}, required={}, available={}", itemId, qty, stock);
+log.error("入库失败, recptCode={}", recptCode, exception);  // 异常作最后一个参数
+```
+
+## 测试覆盖率底线
+
+- Service 层单元测试覆盖率 ≥ 80%
+- Mapper 集成测试覆盖核心 SQL（至少含 factory_id 过滤、分页查询）
+- 生成器的标准 CRUD 可不测（框架保证），手写业务逻辑必须测
+
+## 环境与依赖管理
+
+- Maven BOM（父 POM `<dependencyManagement>`）统一管理版本
+- 新增依赖：优先查 `ruoyi-common` 是否已有工具 → 其次用 Spring Boot 自带 → 最后才引入三方库
+- 引入新依赖需在父 POM 声明版本，不得在子模块直接写 version

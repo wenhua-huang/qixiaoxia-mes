@@ -254,3 +254,125 @@ npx vitest run src/views/__tests__/login.spec.ts
 - `vitest.config.ts` — 测试配置（jsdom 环境、路径别名）
 - `src/__tests__/setup.ts` — 全局 setup（stub 浏览器 API、Element Plus 插件）
 - `src/__tests__/helpers/` — 测试辅助工具（mockRouter、mockStore）
+
+## 代码风格与静态检查
+
+### 当前状态
+
+项目暂未配置 ESLint，以下为 AI 生成代码的编码约定。后续应添加 ESLint + Prettier 自动化检查。
+
+### 编码约定
+
+- `<script setup lang="ts">` 必须（新的 `<script setup>` 写法 + TypeScript）
+- 组件名 PascalCase，文件名 kebab-case
+- import 顺序：`vue` → `vue-router` → `pinia` → `element-plus` → `@/` → `./`
+- 禁止 `any` 类型（除非确实无法推断的第三方库）
+- Props/Emits 必须显式声明类型
+- CSS 使用 `scoped` + SCSS 变量
+
+### 计划添加的 lint 工具
+
+- ESLint（`@typescript-eslint` + `eslint-plugin-vue`）
+- Prettier（统一格式化）
+- AI 生成代码后运行 `npx eslint --fix src/`
+
+## 已有工具使用规范
+
+> ⚠️ 项目已有以下工具模块，**优先使用，不要手写替代或引入新库**。
+
+| 工具 | 位置 | 用途 | 核心 API |
+|------|------|------|---------|
+| `request` | `@/utils/request` | Axios 封装 | 自动带 token、防重复提交、统一错误处理 |
+| `ruoyi` | `@/utils/ruoyi` | 框架工具 | `parseTime`、`handleTree`、`selectDictLabel`、`download` |
+| `auth` | `@/utils/auth` | Token 存取 | `getToken()`、`setToken()`、`removeToken()` |
+| `permission` | `@/utils/permission` | 权限检查 | `checkPermi(perm)`、`checkRole(role)` |
+| `validate` | `@/utils/validate` | 表单校验 | 手机号、邮箱、URL 等常用规则 |
+| `dict` | `@/utils/dict` | 字典缓存 | 字典数据获取 |
+| `scroll-to` | `@/utils/scroll-to` | 页面滚动 | 平滑滚动到指定位置 |
+
+## 标准 CRUD 页面模板
+
+所有 MES 业务页面遵循统一模板：
+
+```vue
+<script setup lang="ts">
+import { ref, reactive, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import type { XxxVO, XxxQuery } from '@/types/mes/{domain}'
+import { listXxx, getXxx, addXxx, updateXxx, delXxx } from '@/api/mes/{domain}/xxx'
+
+// 搜索表单
+const queryParams = reactive<XxxQuery>({ pageNum: 1, pageSize: 10 })
+
+// 表格数据
+const tableData = ref<XxxVO[]>([])
+const total = ref(0)
+const loading = ref(false)
+
+// 弹窗控制
+const open = ref(false)
+const title = ref('')
+const formRef = ref()
+const form = reactive<XxxVO>({})
+
+// 查询列表
+function getList() {
+  loading.value = true
+  listXxx(queryParams).then(res => {
+    tableData.value = res.rows
+    total.value = res.total
+    loading.value = false
+  })
+}
+
+// 新增/编辑弹窗
+function handleAdd() { /* open=true, title='新增', form={} */ }
+function handleUpdate(row: XxxVO) { /* open=true, title='修改', form={...row} */ }
+
+// 提交
+function submitForm() {
+  formRef.value?.validate((valid: boolean) => {
+    if (!valid) return
+    const api = form.id ? updateXxx : addXxx
+    api(form).then(() => { ElMessage.success('操作成功'); getList(); open.value = false })
+  })
+}
+
+// 删除
+function handleDelete(ids: number[]) {
+  ElMessageBox.confirm('确认删除？', '警告', { type: 'warning' })
+    .then(() => delXxx(ids)).then(() => { ElMessage.success('删除成功'); getList() })
+}
+
+onMounted(() => getList())
+</script>
+```
+
+## Composable 与组件规范
+
+### Composable（use*）
+
+- 放在 `src/hooks/useXxx.ts`
+- 命名 `useXxx`，返回 `{ state, method }` 对象（不用 `toRefs` 自动解构）
+- 单一职责：一个 Composable 只管理一个关注点
+- 复用 ≥3 次 → 抽 Composable
+
+### 组件抽取标准
+
+| 条件 | 动作 |
+|------|------|
+| 同一 UI 片段出现 ≥3 次 | 抽取为独立组件 |
+| 组件 > 300 行 | 拆分子组件 |
+| 业务逻辑 > 100 行 | 抽到 Composable |
+| 仅 1-2 个页面用 | 放在当前目录 `components/` |
+| ≥3 个页面用 | 放到 `src/components/`（全局） |
+
+### MES 业务组件
+
+放在 `src/components/mes/`，命名 PascalCase。如物料选择器 `ItemSelect.vue`、仓库选择器 `WarehouseSelect.vue`。
+
+## 测试覆盖率底线
+
+- 关键页面（登录、CRUD 核心流程）组件测试覆盖率 ≥ 60%
+- 生成器生成的页面可不测（框架内），手写业务组件必须测
+- 测试文件放在 `__tests__/` 与组件同目录

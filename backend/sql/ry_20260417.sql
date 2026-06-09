@@ -286,8 +286,8 @@ create table sys_user_role (
 -- ----------------------------
 -- 初始化-用户和角色关联表数据
 -- ----------------------------
-insert into sys_user_role values (1, '1', '1');
-insert into sys_user_role values (1, '2', '2');
+insert into sys_user_role values ('1', '1', '1');
+insert into sys_user_role values ('2', '2', '1');
 
 
 -- ----------------------------
@@ -305,91 +305,91 @@ create table sys_role_menu (
 -- ----------------------------
 -- 初始化-角色和菜单关联表数据
 -- ----------------------------
-insert into sys_role_menu values (1, '2', '1');
-insert into sys_role_menu values (1, '2', '2');
-insert into sys_role_menu values (1, '2', '3');
-insert into sys_role_menu values (1, '2', '4');
-insert into sys_role_menu values (1, '2', '100');
-insert into sys_role_menu values (1, '2', '101');
-insert into sys_role_menu values (1, '2', '102');
-insert into sys_role_menu values (1, '2', '103');
-insert into sys_role_menu values (1, '2', '104');
-insert into sys_role_menu values (1, '2', '105');
-insert into sys_role_menu values (1, '2', '106');
-insert into sys_role_menu values (1, '2', '107');
-insert into sys_role_menu values (1, '2', '108');
-insert into sys_role_menu values (1, '2', '109');
-insert into sys_role_menu values (1, '2', '110');
-insert into sys_role_menu values (1, '2', '111');
-insert into sys_role_menu values (1, '2', '112');
-insert into sys_role_menu values (1, '2', '113');
-insert into sys_role_menu values (1, '2', '114');
-insert into sys_role_menu values (1, '2', '115');
-insert into sys_role_menu values (1, '2', '116');
-insert into sys_role_menu values (1, '2', '117');
-insert into sys_role_menu values (1, '2', '500');
-insert into sys_role_menu values (1, '2', '501');
-insert into sys_role_menu values (1, '2', '1000');
-insert into sys_role_menu values (1, '2', '1001');
-insert into sys_role_menu values (1, '2', '1002');
-insert into sys_role_menu values (1, '2', '1003');
-insert into sys_role_menu values (1, '2', '1004');
-insert into sys_role_menu values (1, '2', '1005');
-insert into sys_role_menu values (1, '2', '1006');
-insert into sys_role_menu values (1, '2', '1007');
-insert into sys_role_menu values (1, '2', '1008');
-insert into sys_role_menu values (1, '2', '1009');
-insert into sys_role_menu values (1, '2', '1010');
-insert into sys_role_menu values (1, '2', '1011');
-insert into sys_role_menu values (1, '2', '1012');
-insert into sys_role_menu values (1, '2', '1013');
-insert into sys_role_menu values (1, '2', '1014');
-insert into sys_role_menu values (1, '2', '1015');
-insert into sys_role_menu values (1, '2', '1016');
-insert into sys_role_menu values (1, '2', '1017');
-insert into sys_role_menu values (1, '2', '1018');
-insert into sys_role_menu values (1, '2', '1019');
-insert into sys_role_menu values (1, '2', '1020');
-insert into sys_role_menu values (1, '2', '1021');
-insert into sys_role_menu values (1, '2', '1022');
-insert into sys_role_menu values (1, '2', '1023');
-insert into sys_role_menu values (1, '2', '1024');
-insert into sys_role_menu values (1, '2', '1025');
-insert into sys_role_menu values (1, '2', '1026');
-insert into sys_role_menu values (1, '2', '1027');
-insert into sys_role_menu values (1, '2', '1028');
-insert into sys_role_menu values (1, '2', '1029');
-insert into sys_role_menu values (1, '2', '1030');
-insert into sys_role_menu values (1, '2', '1031');
-insert into sys_role_menu values (1, '2', '1032');
-insert into sys_role_menu values (1, '2', '1033');
-insert into sys_role_menu values (1, '2', '1034');
-insert into sys_role_menu values (1, '2', '1035');
-insert into sys_role_menu values (1, '2', '1036');
-insert into sys_role_menu values (1, '2', '1037');
-insert into sys_role_menu values (1, '2', '1038');
-insert into sys_role_menu values (1, '2', '1039');
-insert into sys_role_menu values (1, '2', '1040');
-insert into sys_role_menu values (1, '2', '1041');
-insert into sys_role_menu values (1, '2', '1042');
-insert into sys_role_menu values (1, '2', '1043');
-insert into sys_role_menu values (1, '2', '1044');
-insert into sys_role_menu values (1, '2', '1045');
-insert into sys_role_menu values (1, '2', '1046');
-insert into sys_role_menu values (1, '2', '1047');
-insert into sys_role_menu values (1, '2', '1048');
-insert into sys_role_menu values (1, '2', '1049');
-insert into sys_role_menu values (1, '2', '1050');
-insert into sys_role_menu values (1, '2', '1051');
-insert into sys_role_menu values (1, '2', '1052');
-insert into sys_role_menu values (1, '2', '1053');
-insert into sys_role_menu values (1, '2', '1054');
-insert into sys_role_menu values (1, '2', '1055');
-insert into sys_role_menu values (1, '2', '1056');
-insert into sys_role_menu values (1, '2', '1057');
-insert into sys_role_menu values (1, '2', '1058');
-insert into sys_role_menu values (1, '2', '1059');
-insert into sys_role_menu values (1, '2', '1060');
+insert into sys_role_menu values ('2', '1', '1');
+insert into sys_role_menu values ('2', '2', '1');
+insert into sys_role_menu values ('2', '3', '1');
+insert into sys_role_menu values ('2', '4', '1');
+insert into sys_role_menu values ('2', '100', '1');
+insert into sys_role_menu values ('2', '101', '1');
+insert into sys_role_menu values ('2', '102', '1');
+insert into sys_role_menu values ('2', '103', '1');
+insert into sys_role_menu values ('2', '104', '1');
+insert into sys_role_menu values ('2', '105', '1');
+insert into sys_role_menu values ('2', '106', '1');
+insert into sys_role_menu values ('2', '107', '1');
+insert into sys_role_menu values ('2', '108', '1');
+insert into sys_role_menu values ('2', '109', '1');
+insert into sys_role_menu values ('2', '110', '1');
+insert into sys_role_menu values ('2', '111', '1');
+insert into sys_role_menu values ('2', '112', '1');
+insert into sys_role_menu values ('2', '113', '1');
+insert into sys_role_menu values ('2', '114', '1');
+insert into sys_role_menu values ('2', '115', '1');
+insert into sys_role_menu values ('2', '116', '1');
+insert into sys_role_menu values ('2', '117', '1');
+insert into sys_role_menu values ('2', '500', '1');
+insert into sys_role_menu values ('2', '501', '1');
+insert into sys_role_menu values ('2', '1000', '1');
+insert into sys_role_menu values ('2', '1001', '1');
+insert into sys_role_menu values ('2', '1002', '1');
+insert into sys_role_menu values ('2', '1003', '1');
+insert into sys_role_menu values ('2', '1004', '1');
+insert into sys_role_menu values ('2', '1005', '1');
+insert into sys_role_menu values ('2', '1006', '1');
+insert into sys_role_menu values ('2', '1007', '1');
+insert into sys_role_menu values ('2', '1008', '1');
+insert into sys_role_menu values ('2', '1009', '1');
+insert into sys_role_menu values ('2', '1010', '1');
+insert into sys_role_menu values ('2', '1011', '1');
+insert into sys_role_menu values ('2', '1012', '1');
+insert into sys_role_menu values ('2', '1013', '1');
+insert into sys_role_menu values ('2', '1014', '1');
+insert into sys_role_menu values ('2', '1015', '1');
+insert into sys_role_menu values ('2', '1016', '1');
+insert into sys_role_menu values ('2', '1017', '1');
+insert into sys_role_menu values ('2', '1018', '1');
+insert into sys_role_menu values ('2', '1019', '1');
+insert into sys_role_menu values ('2', '1020', '1');
+insert into sys_role_menu values ('2', '1021', '1');
+insert into sys_role_menu values ('2', '1022', '1');
+insert into sys_role_menu values ('2', '1023', '1');
+insert into sys_role_menu values ('2', '1024', '1');
+insert into sys_role_menu values ('2', '1025', '1');
+insert into sys_role_menu values ('2', '1026', '1');
+insert into sys_role_menu values ('2', '1027', '1');
+insert into sys_role_menu values ('2', '1028', '1');
+insert into sys_role_menu values ('2', '1029', '1');
+insert into sys_role_menu values ('2', '1030', '1');
+insert into sys_role_menu values ('2', '1031', '1');
+insert into sys_role_menu values ('2', '1032', '1');
+insert into sys_role_menu values ('2', '1033', '1');
+insert into sys_role_menu values ('2', '1034', '1');
+insert into sys_role_menu values ('2', '1035', '1');
+insert into sys_role_menu values ('2', '1036', '1');
+insert into sys_role_menu values ('2', '1037', '1');
+insert into sys_role_menu values ('2', '1038', '1');
+insert into sys_role_menu values ('2', '1039', '1');
+insert into sys_role_menu values ('2', '1040', '1');
+insert into sys_role_menu values ('2', '1041', '1');
+insert into sys_role_menu values ('2', '1042', '1');
+insert into sys_role_menu values ('2', '1043', '1');
+insert into sys_role_menu values ('2', '1044', '1');
+insert into sys_role_menu values ('2', '1045', '1');
+insert into sys_role_menu values ('2', '1046', '1');
+insert into sys_role_menu values ('2', '1047', '1');
+insert into sys_role_menu values ('2', '1048', '1');
+insert into sys_role_menu values ('2', '1049', '1');
+insert into sys_role_menu values ('2', '1050', '1');
+insert into sys_role_menu values ('2', '1051', '1');
+insert into sys_role_menu values ('2', '1052', '1');
+insert into sys_role_menu values ('2', '1053', '1');
+insert into sys_role_menu values ('2', '1054', '1');
+insert into sys_role_menu values ('2', '1055', '1');
+insert into sys_role_menu values ('2', '1056', '1');
+insert into sys_role_menu values ('2', '1057', '1');
+insert into sys_role_menu values ('2', '1058', '1');
+insert into sys_role_menu values ('2', '1059', '1');
+insert into sys_role_menu values ('2', '1060', '1');
 
 -- ----------------------------
 -- 8、角色和部门关联表  角色1-N部门
@@ -406,9 +406,9 @@ create table sys_role_dept (
 -- ----------------------------
 -- 初始化-角色和部门关联表数据
 -- ----------------------------
-insert into sys_role_dept values (1, '2', '100');
-insert into sys_role_dept values (1, '2', '101');
-insert into sys_role_dept values (1, '2', '105');
+insert into sys_role_dept values ('2', '100', '1');
+insert into sys_role_dept values ('2', '101', '1');
+insert into sys_role_dept values ('2', '105', '1');
 
 
 -- ----------------------------
@@ -428,7 +428,7 @@ create table sys_user_post
 -- 初始化-用户与岗位关联表数据
 -- ----------------------------
 insert into sys_user_post values (1, '1', '1');
-insert into sys_user_post values (1, '2', '2');
+insert into sys_user_post values (2, '2', '1');
 
 
 -- ----------------------------

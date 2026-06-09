@@ -58,6 +58,12 @@ create table qxx_md_factory (
 ) engine=innodb auto_increment=100 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '工厂定义表';
 
 -- ----------------------------
+-- 初始化-工厂定义表数据
+-- ----------------------------
+insert into qxx_md_factory (factory_id, factory_code, factory_name, short_name, address, contact, phone, enable_flag, remark, create_by, create_time, update_by, update_time)
+values (1, 'SX', '圣享工厂', '圣享', null, null, null, '1', '', 'admin', sysdate(), '', sysdate());
+
+-- ----------------------------
 -- 2、物料产品表
 -- 用途：核心主数据表，管理所有物料/半成品/成品/辅料。支持多行业（纸张/纸袋/礼品盒）。
 --       行业专用属性已抽取子表：qxx_md_item_attr_paper / _paper_bag / _gift_box

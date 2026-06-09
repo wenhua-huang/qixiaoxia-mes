@@ -1,19 +1,22 @@
 import { test, expect } from '@playwright/test'
 
 test.describe('登录流程', () => {
-  // 覆盖项目级 storageState，确保以未认证状态测试登录页
-  test.use({ storageState: undefined as any })
+  // 每个测试使用全新的浏览器上下文(不共享登录态)
+  test.use({ storageState: { cookies: [], origins: [] } })
 
   test('should display login form elements', async ({ page }) => {
+    // 清除可能残留的认证信息后访问登录页
+    await page.context().clearCookies()
     await page.goto('/login')
-    await expect(page.locator('input[placeholder="请输入账号"]')).toBeVisible()
+    await expect(page.locator('input[placeholder="请输入账号"]')).toBeVisible({ timeout: 5000 })
     await expect(page.locator('input[placeholder="请输入密码"]')).toBeVisible()
     await expect(page.locator('.login-btn')).toBeVisible()
   })
 
   test('should show brand title on login page', async ({ page }) => {
+    await page.context().clearCookies()
     await page.goto('/login')
-    await expect(page.locator('text=企小侠平台')).toBeVisible()
+    await expect(page.locator('text=企小侠平台')).toBeVisible({ timeout: 5000 })
   })
 })
 

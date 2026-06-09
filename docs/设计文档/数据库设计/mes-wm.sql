@@ -5,7 +5,7 @@
 -- 数据库: MySQL 8.0+, 字符集 utf8mb4
 -- 表前缀: qxx_wm_ (Warehouse Management 仓储管理)
 -- 说明: 仓库/库区/库位、入库/出库/调拨/盘点/外协/条码/装箱等完整仓库生命周期
---       纸张行业扩展: 双单位(卷数+重量)、物流追踪字段
+--       行业扩展: 双单位(卷数+重量等)、物流追踪字段、纸卷明细(纸张特有)
 --       单据模式: Header-Line-Detail 三层结构
 -- ============================================================
 
@@ -17,7 +17,7 @@ SET CHARACTER SET utf8mb4;
 -- ============================================================
 
 -- ----------------------------
--- 1、仓库表
+-- 1、仓库表.  区分外部仓库 合作仓库
 -- ----------------------------
 drop table if exists qxx_wm_warehouse;
 create table qxx_wm_warehouse (
@@ -94,7 +94,7 @@ create table qxx_wm_storage_area (
 
 -- ----------------------------
 -- 4、库存记录表
--- 纸张行业扩展: 双单位库存（主单位+辅助单位数量）
+-- 双单位库存（主单位+辅助单位数量，纸张/礼品盒等行业通用）
 --
 -- === 库存唯一性（双重保障）===
 -- A. 应用层：INSERT 前先 SELECT 查重，查到则 UPDATE 数量（UPSERT 语义）
@@ -118,7 +118,7 @@ create table qxx_wm_material_stock (
   specification     varchar(500)    default null               comment '规格型号',
   unit_of_measure   varchar(64)     not null                   comment '主单位编码',
   unit_name         varchar(64)     not null                   comment '主单位名称',
-  -- 纸张行业双单位扩展
+  -- 双单位扩展（纸袋/礼品盒等行业通用）
   unit2             varchar(64)     default null               comment '辅助单位编码(纸张行业:ROLL-卷/TON-吨)',
   unit2_name        varchar(64)     default null               comment '辅助单位名称',
   conversion_rate   decimal(10,4)   default 1.0000             comment '主单位→辅助单位换算率',
@@ -800,7 +800,7 @@ create table qxx_wm_product_recpt (
   warehouse_name    varchar(255)    default null               comment '目标仓库名称',
   recpt_date        datetime        default current_timestamp  comment '入库日期',
   total_quantity    decimal(14,4)   default 0.0000             comment '入库总数量(个数)',
-  total_box         int(11)         default 0                  comment '入库总箱数(纸张行业)',
+  total_box         int(11)         default 0                  comment '入库总箱数',
   ipqc_id           bigint(20)      default null               comment '过程质检单ID(关联qxx_qc_ipqc)',
   ipqc_code         varchar(64)     default null               comment '过程质检单编码',
   status            varchar(50)     default 'DRAFT'            comment '状态:DRAFT-草稿,CONFIRMED-已确认,POSTED-已过账',
@@ -829,7 +829,7 @@ create table qxx_wm_product_recpt_line (
   unit_of_measure   varchar(64)     not null                   comment '单位编码',
   unit_name         varchar(64)     not null                   comment '单位名称',
   quantity_recpt    decimal(14,4)   default 0.0000             comment '入库数量(个数)',
-  quantity_box      int(11)         default 0                  comment '入库箱数(纸张行业)',
+  quantity_box      int(11)         default 0                  comment '入库箱数',
   batch_id          bigint(20)      default null               comment '批次ID',
   batch_code        varchar(64)     default null               comment '批次编码',
   warehouse_id      bigint(20)      not null                   comment '目标仓库ID',
@@ -877,12 +877,12 @@ create table qxx_wm_product_recpt_detail (
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '产品入库单明细表';
 
 -- ============================================================
--- 五、销售发货流程 (纸张行业扩展: 物流追踪字段)
+-- 五、销售发货流程（物流追踪字段，纸袋/礼品盒通用）
 -- ============================================================
 
 -- ----------------------------
 -- 27、销售出库单表(Header)
--- 纸张行业扩展: 完整物流追踪字段
+-- 物流追踪字段：纸袋/礼品盒通用，发货后独立更新
 -- ----------------------------
 drop table if exists qxx_wm_product_sales;
 create table qxx_wm_product_sales (
@@ -1092,7 +1092,7 @@ create table qxx_wm_rt_sales_detail (
 -- ============================================================
 
 -- ----------------------------
--- 33、外协领料单头表
+-- 33、外协领料单头表  workorder_code   应该是工序
 -- 用途: 圣享将纸张/半成品/绳子发给外协厂(万隆/吉荣/浩卓/欧诺/圣皓)
 -- ----------------------------
 drop table if exists qxx_wm_outsource_issue;
@@ -1146,7 +1146,7 @@ create table qxx_wm_outsource_issue_line (
   unit2_name        varchar(64)     default null               comment '辅助单位名称',
   quantity_issue    decimal(14,4)   default 0.0000             comment '发料数量(主单位)',
   quantity_issue2   decimal(14,4)   default 0.0000             comment '发料数量(辅助单位,如重量吨)',
-  bundle_count      int(11)         default 0                  comment '卷数/捆数(纸张行业)',
+  bundle_count      int(11)         default 0                  comment '卷数/捆数',
   batch_id          bigint(20)      default null               comment '批次ID',
   batch_code        varchar(64)     default null               comment '批次编码',
   warehouse_id      bigint(20)      not null                   comment '仓库ID',

@@ -5,7 +5,8 @@
 -- 数据库: MySQL 8.0+, 字符集 utf8mb4
 -- 表前缀: qxx_pro_ (Production Management 生产管理)
 -- 说明: 生产工单/工艺路线/生产排产/报工/投料/流转卡/外协/安灯等完整生产生命周期
---       纸张/纸袋行业扩展: 客户订单号,产品尺寸,印刷要求,绳料要求,包装/发货要求,订单类型
+--       通用扩展: 客户订单号,产品尺寸,印刷要求,包装/发货要求,订单类型(纸袋/礼品盒共用)
+--       纸袋专用: 绳料规格(rope_spec)，礼品盒订单留NULL
 --       外发工序扩展: 工序类型(自制/外发/分切), 报工类型(自制/外发代填/外发直填)
 -- ============================================================
 
@@ -19,7 +20,8 @@ SET CHARACTER SET utf8mb4;
 -- ----------------------------
 -- 1、生产工单表
 -- 用途: 核心生产单据，承接销售订单生成生产任务
--- 纸张/纸袋行业扩展: 客户订单号,产品尺寸,印刷要求,绳料规格,包装要求,发货要求,订单类型
+-- 通用扩展: 客户订单号,产品尺寸,印刷要求,包装要求,发货要求,订单类型(纸袋/礼品盒共用)
+-- 纸袋专用: 绳料规格(rope_spec)
 -- ----------------------------
 drop table if exists qxx_pro_workorder;
 create table qxx_pro_workorder (
@@ -44,11 +46,11 @@ create table qxx_pro_workorder (
   client_id                   bigint(20)      default null               comment '客户ID(关联qxx_md_client)',
   client_code                 varchar(64)     default null               comment '客户编码',
   client_name                 varchar(255)    default null               comment '客户名称',
-  -- 纸张/纸袋行业扩展字段
+  -- 通用扩展字段（纸袋/礼品盒共用，rope_spec为纸袋专用）
   client_order_code           varchar(64)     default null               comment '客户订单号(PO号)',
   product_size                varchar(100)    default null               comment '产品尺寸(长*宽*高mm),如254*127*330mm',
   printing_req                varchar(500)    default null               comment '印刷要求描述,如1色满版黑印刷/彩印',
-  rope_spec                   varchar(200)    default null               comment '绳料规格要求,如7.5cm间距黄牛皮色圆纸绳',
+  rope_spec                   varchar(200)    default null               comment '绳料规格要求(纸袋专用,礼品盒留NULL)',
   package_req                 varchar(500)    default null               comment '包装要求描述,如250个/箱,贴唛头',
   shipping_req                varchar(500)    default null               comment '发货要求描述',
   order_type                  varchar(50)     default 'NEW'              comment '订单类型:NEW-新单,REPEAT-返单',
@@ -79,7 +81,7 @@ create table qxx_pro_workorder (
 -- ----------------------------
 -- 2、工单BOM组成表
 -- 用途: 记录每个工单所需的物料清单，与标准BOM可不同(工单级BOM覆盖)
--- 纸张行业: 支持双单位物料消耗
+-- 支持双单位物料消耗
 -- ----------------------------
 drop table if exists qxx_pro_workorder_bom;
 create table qxx_pro_workorder_bom (
@@ -94,7 +96,7 @@ create table qxx_pro_workorder_bom (
   unit_of_measure             varchar(64)     not null                   comment '主单位编码',
   unit_name                   varchar(64)     default null               comment '主单位名称',
   -- 双单位扩展
-  unit2                       varchar(64)     default null               comment '辅助单位编码(纸张行业:ROLL-卷/TON-吨)',
+  unit2                       varchar(64)     default null               comment '辅助单位编码(如ROLL-卷/TON-吨,纸袋/礼品盒通用)',
   unit2_name                  varchar(64)     default null               comment '辅助单位名称',
   conversion_rate             decimal(10,4)   default 1.0000             comment '主单位→辅助单位换算率',
   item_or_product             varchar(20)     not null                   comment '物料产品标识:RAW-原料,SEMI-半成品,FINISHED-成品,AUXILIARY-辅料,PACK-包材',
@@ -117,7 +119,7 @@ create table qxx_pro_workorder_bom (
 
 -- ----------------------------
 -- 3、生产工序表
--- 纸张/纸袋行业扩展: 工序类型(自制/外发/分切)
+-- 工序类型: INTERNAL-自制,OUTSOURCE-外发,SLITTING-分切(纸袋)/CUTTING-裁切(礼品盒)等
 -- ----------------------------
 drop table if exists qxx_pro_process;
 create table qxx_pro_process (
@@ -412,7 +414,7 @@ create table qxx_pro_feedback_param (
 -- ----------------------------
 -- 9、生产任务/排产表
 -- 用途: 将工单指派到具体工作站/设备进行排产，甘特图可视化排程
--- 纸张行业扩展: machine_code机台号,setup_duration调机时长,bag_duration制袋耗时,offline_qty下机个数
+-- 排产扩展: machine_code机台号,setup_duration调机时长,unit_duration单位耗时,offline_qty下机个数
 -- ----------------------------
 drop table if exists qxx_pro_task;
 create table qxx_pro_task (
@@ -439,18 +441,18 @@ create table qxx_pro_task (
   unit_name                   varchar(64)     default null               comment '主单位名称',
   quantity                    decimal(14,2)   default 1.00  not null     comment '排产数量',
   quantity_produced           decimal(14,2)   default 0.00               comment '已生产数量',
-  quantity_quanlify           decimal(14,2)   default 0.00               comment '合格品累计数量',
-  quantity_unquanlify         decimal(14,2)   default 0.00               comment '不合格品累计数量',
+  quantity_qualified          decimal(14,2)   default 0.00               comment '合格品累计数量',
+  quantity_unqualified        decimal(14,2)   default 0.00               comment '不合格品累计数量',
   quantity_changed            decimal(14,2)   default 0.00               comment '调整数量',
   -- 客户信息
   client_id                   bigint(20)      default null               comment '客户ID(关联qxx_md_client)',
   client_code                 varchar(64)     default null               comment '客户编码',
   client_name                 varchar(255)    default null               comment '客户名称',
   client_nick                 varchar(255)    default null               comment '客户简称',
-  -- 纸张/纸袋行业扩展
+  -- 排产扩展（纸袋/礼品盒通用）
   machine_code                varchar(64)     default null               comment '机台号/设备编号(排产到具体机器)',
   setup_duration              int(11)         default 0                  comment '调机时长(分钟)',
-  bag_duration                decimal(10,2)   default 0.00               comment '制袋耗时(分钟,单袋耗时)',
+  unit_duration               decimal(10,2)   default 0.00               comment '单位耗时(分钟,纸袋=制袋耗时/礼品盒=成型耗时)',
   offline_qty                 int(11)         default 0                  comment '下机个数(每批次离线数量)',
   -- 排产时间
   start_time                  datetime        default current_timestamp  comment '计划开始时间',
@@ -526,7 +528,7 @@ create table qxx_pro_feedback (
   quantity                    decimal(14,2)   default null               comment '排产数量(任务计划数)',
   quantity_feedback           decimal(14,2)   default null               comment '本次报工数量(工序产出总数)',
   quantity_qualified          decimal(14,2)   default null               comment '合格品数量',
-  quantity_unquanlified       decimal(14,2)   default null               comment '不合格品数量',
+  quantity_unqualified        decimal(14,2)   default null               comment '不合格品数量',
   quantity_uncheck            decimal(14,2)   default null               comment '待检测数量(待质检判定)',
   quantity_labor_scrap        decimal(14,2)   default null               comment '工废数量(操作原因报废)',
   quantity_material_scrap     decimal(14,2)   default null               comment '料废数量(材料原因报废)',
@@ -653,7 +655,7 @@ create table qxx_pro_andon_record (
   process_id                  bigint(20)      default null               comment '关联工序ID(关联qxx_pro_process)',
   process_code                varchar(64)     default null               comment '关联工序编码',
   process_name                varchar(255)    default null               comment '关联工序名称',
-  machinery_id                bigint(20)      default null               comment '关联设备ID(关联qxx_md_machinery)',
+  machinery_id                bigint(20)      default null               comment '关联设备ID(关联qxx_dv_machinery)',
   machinery_code              varchar(64)     default null               comment '关联设备编码',
   machinery_name              varchar(255)    default null               comment '关联设备名称',
   andon_reason                varchar(500)    not null                   comment '呼叫原因',
@@ -680,7 +682,7 @@ create table qxx_pro_andon_record (
 -- ----------------------------
 -- 17、流转卡表
 -- 用途: ⭐流转单跟踪，记录工序间物料/半成品的流转信息，实现生产全过程追溯
--- 纸张行业: 支持流转卡赋码(条码/二维码)
+-- 支持流转卡赋码(条码/二维码)
 -- ----------------------------
 drop table if exists qxx_pro_card;
 create table qxx_pro_card (
@@ -717,7 +719,7 @@ create table qxx_pro_card (
 -- ----------------------------
 -- 18、流转卡工序信息表
 -- 用途: 记录流转卡在每道工序的投入/产出/操作人/工作站信息
--- 纸张行业: 支持外发工序的流转跟踪
+-- 支持外发工序的流转跟踪
 -- ----------------------------
 drop table if exists qxx_pro_card_process;
 create table qxx_pro_card_process (
@@ -735,7 +737,7 @@ create table qxx_pro_card_process (
   output_time                 datetime        default null               comment '出工序时间(本道工序完成时间)',
   quantity_input              decimal(12,2)   default null               comment '投入数量',
   quantity_output             decimal(12,2)   default null               comment '产出数量',
-  quantity_unquanlify         decimal(12,2)   default null               comment '不合格品数量',
+  quantity_unqualified        decimal(12,2)   default null               comment '不合格品数量',
   -- 工作站信息
   workstation_id              bigint(20)      not null                   comment '工作站ID(关联qxx_md_workstation)',
   workstation_code            varchar(64)     default null               comment '工作站编码',

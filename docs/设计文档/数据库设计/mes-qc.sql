@@ -5,7 +5,8 @@
 -- 数据库: MySQL 8.0+, 字符集 utf8mb4
 -- 表前缀: qxx_qc_ (Quality Control 质量管理)
 -- 说明: 检测项/检测模板/来料检验/过程检验/出货检验/退料检验/缺陷记录/检测结果等完整质量管理体系
---       纸袋行业扩展: 印刷颜色检测/制袋尺寸检测/绳长检测/胶合强度检测/装箱核对/箱唛核对
+--       纸袋行业扩展字段已抽取: qxx_qc_ipqc_attr_paper_bag
+--       礼品盒扩展字段预留子表: qxx_qc_ipqc_attr_gift_box（待业务方确认）
 --       单据模式: Header-Line-Result-Detail 多层结构，支持数值型/文本型/字典型/文件型/计数型多种检测结果类型
 -- ============================================================
 
@@ -125,7 +126,7 @@ create table qxx_qc_template_product (
 
 -- ----------------------------
 -- 5、常见缺陷表
--- 用途：维护常见缺陷字典，纸袋行业特有缺陷如印刷偏位/色差/爆边/绳长偏差/胶合不牢
+-- 用途：维护常见缺陷字典，如印刷偏位/色差/爆边/绳长偏差/胶合不牢等
 -- ----------------------------
 drop table if exists qxx_qc_defect;
 create table qxx_qc_defect (
@@ -241,7 +242,7 @@ create table qxx_qc_iqc_line (
 
 -- ----------------------------
 -- 8、过程检验单表
--- 用途：对生产过程进行巡检/首检/尾检，纸袋行业特有检测项：印刷颜色/制袋尺寸/绳长/胶合强度
+-- 用途：对生产过程进行巡检/首检/尾检。行业专用检测项见子表 qxx_qc_ipqc_attr_paper_bag。
 -- ----------------------------
 drop table if exists qxx_qc_ipqc;
 create table qxx_qc_ipqc (
@@ -272,13 +273,7 @@ create table qxx_qc_ipqc (
   item_name              varchar(255)    default null               comment '产品物料名称',
   specification          varchar(500)    default null               comment '规格型号',
   unit_of_measure        varchar(64)     default null               comment '单位编码',
-  -- 纸袋行业特有过程检验字段
-  print_color_result     varchar(64)     default null               comment '印刷颜色检测结果(纸袋特有:PASS-合格/FAIL-不合格,色差仪检测ΔE值)',
-  bag_size_result        varchar(64)     default null               comment '制袋尺寸检测结果(纸袋特有:PASS-合格/FAIL-不合格,长宽高测量)',
-  rope_length_result     varchar(64)     default null               comment '绳长检测结果(纸袋特有:PASS-合格/FAIL-不合格,测量绳料长度)',
-  glue_strength_result   varchar(64)     default null               comment '胶合强度检测结果(纸袋特有:PASS-合格/FAIL-不合格,拉力测试)',
-  bottom_result          varchar(64)     default null               comment '袋底检测结果(纸袋特有:PASS-合格/FAIL-不合格,袋底成型/加固检查)',
-  mouth_result           varchar(64)     default null               comment '口部检测结果(纸袋特有:PASS-合格/FAIL-不合格,锯齿口/平口成型检查)',
+  -- 行业专用检测结果见子表: qxx_qc_ipqc_attr_paper_bag（纸袋）/ _attr_gift_box（礼品盒预留）
   -- 检验数量统计
   quantity_check         double(12,4)    default 1.0000             comment '检测数量',
   quantity_qualified     double(12,4)    default 0.0000             comment '合格品数量',
@@ -306,6 +301,32 @@ create table qxx_qc_ipqc (
   primary key (ipqc_id),
   unique key uk_ipqc_code (ipqc_code)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '过程检验单表';
+
+-- ----------------------------
+-- 8a、过程检验单-纸袋属性表（IPQC 行业子表）
+-- 用途：存储纸袋行业特有的过程检验结果。ipqc_id 与 qxx_qc_ipqc 1:1。
+--       只有检验的物料属于纸袋产品时才有此行，礼品盒等非纸袋产品不插入。
+-- ----------------------------
+drop table if exists qxx_qc_ipqc_attr_paper_bag;
+create table qxx_qc_ipqc_attr_paper_bag (
+  attr_id             bigint(20)      not null auto_increment    comment '属性ID',
+  factory_id          bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
+  ipqc_id             bigint(20)      not null                   comment '过程检验单ID(关联qxx_qc_ipqc)',
+  print_color_result  varchar(64)     default null               comment '印刷颜色检测结果(PASS-合格/FAIL-不合格,色差仪检测ΔE值)',
+  bag_size_result     varchar(64)     default null               comment '制袋尺寸检测结果(PASS-合格/FAIL-不合格,长宽高测量)',
+  rope_length_result  varchar(64)     default null               comment '绳长检测结果(PASS-合格/FAIL-不合格,测量绳料长度)',
+  glue_strength_result varchar(64)    default null               comment '胶合强度检测结果(PASS-合格/FAIL-不合格,拉力测试)',
+  bottom_result       varchar(64)     default null               comment '袋底检测结果(PASS-合格/FAIL-不合格,袋底成型/加固检查)',
+  mouth_result        varchar(64)     default null               comment '口部检测结果(PASS-合格/FAIL-不合格,锯齿口/平口成型检查)',
+  remark              varchar(500)    default ''                 comment '备注',
+  create_by           varchar(64)     default ''                 comment '创建者',
+  create_time         datetime        default current_timestamp  comment '创建时间',
+  update_by           varchar(64)     default ''                 comment '更新者',
+  update_time         datetime        default current_timestamp on update current_timestamp comment '更新时间',
+  key idx_factory_id (factory_id),
+  primary key (attr_id),
+  unique key uk_ipqc_id (ipqc_id)
+) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '过程检验单-纸袋属性表';
 
 -- ----------------------------
 -- 9、过程检验单行表
@@ -345,7 +366,7 @@ create table qxx_qc_ipqc_line (
 
 -- ----------------------------
 -- 10、出货检验单表
--- 用途：成品出货前最终检验，纸袋行业特有：装箱核对/外观检查/箱唛核对
+-- 用途：成品出货前最终检验，装箱核对/外观检查/箱唛核对/封箱检查/托盘检查（纸袋/礼品盒通用）
 -- ----------------------------
 drop table if exists qxx_qc_oqc;
 create table qxx_qc_oqc (
@@ -367,12 +388,12 @@ create table qxx_qc_oqc (
   item_name                varchar(255)    default null               comment '产品物料名称',
   specification            varchar(500)    default null               comment '规格型号',
   unit_of_measure          varchar(64)     default null               comment '单位编码',
-  -- 出货特有检验字段(纸袋行业)
-  box_check_result         varchar(64)     default null               comment '装箱核对结果(纸袋特有:PASS-合格/FAIL-不合格,核对装箱数量/箱规/标签)',
-  appearance_result        varchar(64)     default null               comment '外观检查结果(纸袋特有:PASS-合格/FAIL-不合格,检查表面/印刷/清洁度)',
-  box_mark_result          varchar(64)     default null               comment '箱唛核对结果(纸袋特有:PASS-合格/FAIL-不合格,核对唛头/收货人/PO号)',
-  seal_result              varchar(64)     default null               comment '封箱检查结果(纸袋特有:PASS-合格/FAIL-不合格,检查封箱胶带/打包带)',
-  pallet_result            varchar(64)     default null               comment '托盘检查结果(纸袋特有:PASS-合格/FAIL-不合格,检查托盘稳固/防潮)',
+  -- 出货检验字段（纸袋/礼品盒通用）
+  box_check_result         varchar(64)     default null               comment '装箱核对结果(PASS-合格/FAIL-不合格,核对装箱数量/箱规/标签)',
+  appearance_result        varchar(64)     default null               comment '外观检查结果(PASS-合格/FAIL-不合格,检查表面/印刷/清洁度)',
+  box_mark_result          varchar(64)     default null               comment '箱唛核对结果(PASS-合格/FAIL-不合格,核对唛头/收货人/PO号)',
+  seal_result              varchar(64)     default null               comment '封箱检查结果(PASS-合格/FAIL-不合格,检查封箱胶带/打包带)',
+  pallet_result            varchar(64)     default null               comment '托盘检查结果(PASS-合格/FAIL-不合格,检查托盘稳固/防潮)',
   -- 检验数量统计
   quantity_min_check       double(12,4)    default 1.0000             comment '最低检测数',
   quantity_max_unqualified double(12,4)    default 0.0000             comment '最大不合格数(Ac值)',

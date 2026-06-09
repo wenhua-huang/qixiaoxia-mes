@@ -48,7 +48,7 @@ create table qxx_pur_order (
 
 -- ----------------------------
 -- 2、采购订单行表
--- 用途：采购订单的物料明细行。纸张行业特有字段：门幅/克重/卷数/吨价
+-- 用途：采购订单的物料明细行。纸张行业可选字段（门幅/克重/卷数），非纸张物料留NULL。
 -- ----------------------------
 drop table if exists qxx_pur_order_line;
 create table qxx_pur_order_line (
@@ -61,7 +61,7 @@ create table qxx_pur_order_line (
   specification     varchar(500)    default null               comment '规格型号',
   unit_of_measure   varchar(64)     not null                   comment '主单位编码(如TON-吨,ROLL-卷,PCS-个,KG-千克)',
   unit_name         varchar(64)     not null                   comment '主单位名称',
-  -- 纸张行业双单位
+  -- 双单位（纸张行业:ROLL-卷/TON-吨，其他行业可按需使用）
   unit2             varchar(64)     default null               comment '辅助单位编码(如ROLL-卷,与主单位联动)',
   unit2_name        varchar(64)     default null               comment '辅助单位名称',
   conversion_rate   decimal(10,4)   default 1.0000             comment '主单位→辅助单位换算率',
@@ -72,11 +72,11 @@ create table qxx_pur_order_line (
   unit_price        decimal(14,4)   default 0.0000             comment '单价(元/主单位,如元/吨)',
   amount            decimal(14,2)   default 0.00               comment '行金额(不含税)',
   tax_rate          decimal(5,2)    default 0.00               comment '税率(%)',
-  -- 纸张行业特有字段（采购时填的规格要求，到货后可对比实际值）
+  -- 纸张行业可选字段（采购纸张时填写规格要求，到货后可对比实际值；非纸张物料留NULL）
   paper_width       varchar(20)     default null               comment '门幅要求(mm),如925mm',
   paper_weight      varchar(20)     default null               comment '克重要求(g),如120g',
   paper_type        varchar(50)     default null               comment '纸张种类:乌卡/俄卡/箱板纸/白牛皮/TC箱板纸/瑞典赤牛',
-  roll_count        int(11)         default 0                  comment '预计卷数',
+  roll_count        int(11)         default 0                  comment '预计卷数(纸张行业用，其他行业=0)',
   -- 关联客户订单（圣享特有：每笔采购追溯到具体客户订单）
   source_order_code varchar(64)     default null               comment '关联客户订单号',
   expected_date     datetime        default null               comment '预计到货日期',

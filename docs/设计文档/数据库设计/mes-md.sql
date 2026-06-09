@@ -59,9 +59,11 @@ create table qxx_md_factory (
 
 -- ----------------------------
 -- 2、物料产品表
--- 用途：核心主数据表，管理所有物料/半成品/成品/辅料。纸张行业扩展字段（门幅/克重/纸张来源/双单位）
+-- 用途：核心主数据表，管理所有物料/半成品/成品/辅料。支持多行业（纸张/纸袋/礼品盒）。
+--       行业专用属性已抽取子表：qxx_md_item_attr_paper / _paper_bag / _gift_box
+--       通用属性（产品尺寸/装箱规格/印刷要求）保留在主表。
 -- SPU/变体自引用：parent_id=0→顶层SPU/原料；parent_id>0→变体（如 奔趣纸袋←奔趣-彩印红绳）
--- 变体(item_type/code/name)继承父产品，差异字段(printing_req/rope_spec等)有值=覆盖/null=继承
+-- 变体(item_type/code/name)继承父产品，差异字段有值=覆盖/null=继承
 --
 -- === 变体创建时机（parent_id>0 的行什么时候写入）===
 -- 变体由系统/业务员创建，不是物料管理员手动建档：
@@ -72,13 +74,25 @@ create table qxx_md_factory (
 -- │              │ 差异字段全=NULL      │ 的变体行，作为"默认规格"        │
 -- ├──────────────┼─────────────────────┼──────────────────────────────┤
 -- │ 首次客户定制   │ 业务员接单时手动创建   │ 业务员在物料界面"新增变体"       │
--- │              │ 填差异字段（彩印/红绳） │ → INSERT INTO qxx_md_item      │
--- │              │ 其余留空=继承SPU     │   parent_id=SPU_ID             │
+-- │              │ 填差异字段（彩印/红绳） │ ① INSERT INTO qxx_md_item      │
+-- │              │                     │    parent_id=SPU_ID             │
+-- │              │                     │ ② INSERT INTO 行业子表           │
+-- │              │                     │    SELECT ... FROM 子表          │
+-- │              │                     │    WHERE item_id=SPU_ID          │
+-- │              │                     │    → 方案A：复制父产品子表行       │
+-- │              │                     │ ③ UPDATE 差异字段               │
 -- ├──────────────┼─────────────────────┼──────────────────────────────┤
 -- │ 返单（同规格） │ 不创建，复用已有变体    │ 业务员下拉选已有变体 item_id     │
 -- └──────────────┴─────────────────────┴──────────────────────────────┘
 -- 变体生命周期：首次接单→创建；返单→复用；随产品生命周期长期存在。
 -- 与库存纸卷(roll_detail)的区别：变体是产品定义(永久可复用)，纸卷是物理实例(消耗性)。
+--
+-- === 多行业子表设计 ===
+-- 行业专用属性不在主表内联，按行业拆分到独立子表（item_id 1:1）：
+--   qxx_md_item_attr_paper      — 纸张原材料属性（门幅/克重/来源/种类）
+--   qxx_md_item_attr_paper_bag  — 纸袋成品属性（绳料/口部/底板）
+--   qxx_md_item_attr_gift_box   — 礼品盒成品属性（预留）
+-- 查询时：主表 + LEFT JOIN 对应行业子表，无需判断 parent_id 回退（方案A：变体创建时已复制父行）。
 -- ----------------------------
 drop table if exists qxx_md_item;
 create table qxx_md_item (
@@ -89,24 +103,18 @@ create table qxx_md_item (
   specification     varchar(500)    default null               comment '规格型号描述',
   unit_of_measure   varchar(64)     not null                   comment '主单位编码(如PCS-个,ROLL-卷,KG-千克,TON-吨,M-米)',
   unit_name         varchar(64)     not null                   comment '主单位名称',
-  unit2             varchar(64)     default null               comment '辅助单位编码(纸张行业:ROLL-卷/TON-吨 双单位)',
+  unit2             varchar(64)     default null               comment '辅助单位编码(如ROLL-卷/TON-吨,纸袋/礼品盒通用)',
   unit2_name        varchar(64)     default null               comment '辅助单位名称',
   conversion_rate   decimal(10,4)   default 1.0000             comment '主单位→辅助单位换算率(如1卷=0.697吨)',
   item_type_id      bigint(20)      default 0                  comment '物料类型ID(关联qxx_md_item_type,变体继承父产品)',
   item_type_code    varchar(64)     default ''                 comment '物料类型编码(变体继承父产品,后端带出)',
   item_type_name    varchar(255)    default ''                 comment '物料类型名称(变体继承父产品,后端带出)',
   parent_id         bigint(20)      default 0                  comment '父产品ID(0=顶层SPU/原料,非0=变体,parent_id>0时item_type_id/code/name继承父产品)',
-  -- 纸张行业扩展字段
-  paper_width       varchar(20)     default null               comment '纸张门幅(mm),如925mm',
-  paper_weight      varchar(20)     default null               comment '纸张克重(g),如120g',
-  paper_source      varchar(100)    default null               comment '纸张来源/品牌,如联盛A2/蓝叶-牛卡',
-  paper_type        varchar(50)     default null               comment '纸张种类:乌卡/俄卡/箱板纸/白牛皮/TC箱板纸/瑞典赤牛',
+  -- 通用成品属性（纸袋和礼品盒共用）
   product_size      varchar(100)    default null               comment '产品尺寸(长*宽*高mm),如254*127*330mm',
   package_spec      varchar(100)    default null               comment '装箱规格(XX个/箱),如250个/箱',
   printing_req      varchar(500)    default null               comment '印刷要求描述,如1色满版黑印刷',
-  rope_spec         varchar(200)    default null               comment '绳料规格要求,如7.5cm间距黄牛皮色圆纸绳',
-  mouth_type        varchar(50)     default null               comment '口部提拔:锯齿口/平口/翻口',
-  bottom_type       varchar(50)     default null               comment '底板类型:无/灰底白板/加强底板',
+  -- 行业专用属性见子表: qxx_md_item_attr_paper / _paper_bag / _gift_box
   -- 库存控制字段
   enable_flag       char(1)         default '1' not null       comment '是否启用(1-是,0-否)',
   safe_stock_flag   char(1)         default '0' not null       comment '是否设置安全库存(1-是,0-否)',
@@ -124,6 +132,82 @@ create table qxx_md_item (
   unique key uk_item_code (item_code),
   key idx_factory_id (factory_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '物料产品表';
+
+-- ----------------------------
+-- 2a、物料纸张属性表（物料产品表的行业子表）
+-- 用途：存储纸张原材料的行业专用属性。item_id 与 qxx_md_item 1:1。
+--       只有物料类型为 RAW-原料 且属于纸张分类时才插入行。
+--       变体创建时（方案A）：复制父产品 SPU 的对应子表行 → 再 UPDATE 差异字段。
+-- ----------------------------
+drop table if exists qxx_md_item_attr_paper;
+create table qxx_md_item_attr_paper (
+  attr_id           bigint(20)      not null auto_increment    comment '属性ID',
+  factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
+  item_id           bigint(20)      not null                   comment '物料ID(关联qxx_md_item)',
+  paper_width       varchar(20)     default null               comment '纸张门幅(mm),如925mm',
+  paper_weight      varchar(20)     default null               comment '纸张克重(g),如120g',
+  paper_source      varchar(100)    default null               comment '纸张来源/品牌,如联盛A2/蓝叶-牛卡',
+  paper_type        varchar(50)     default null               comment '纸张种类:乌卡/俄卡/箱板纸/白牛皮/TC箱板纸/瑞典赤牛',
+  remark            varchar(500)    default ''                 comment '备注',
+  create_by         varchar(64)     default ''                 comment '创建者',
+  create_time       datetime        default current_timestamp  comment '创建时间',
+  update_by         varchar(64)     default ''                 comment '更新者',
+  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
+  key idx_factory_id (factory_id),
+  primary key (attr_id),
+  unique key uk_item_id (item_id)
+) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '物料纸张属性表';
+
+-- ----------------------------
+-- 2b、物料纸袋成品属性表（物料产品表的行业子表）
+-- 用途：存储纸袋成品的行业专用属性。item_id 与 qxx_md_item 1:1。
+--       只有物料类型为 FINISHED-成品 且属于纸袋产品时才插入行。
+--       变体创建时（方案A）：复制父产品 SPU 的对应子表行 → 再 UPDATE 差异字段。
+-- ----------------------------
+drop table if exists qxx_md_item_attr_paper_bag;
+create table qxx_md_item_attr_paper_bag (
+  attr_id           bigint(20)      not null auto_increment    comment '属性ID',
+  factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
+  item_id           bigint(20)      not null                   comment '物料ID(关联qxx_md_item)',
+  rope_spec         varchar(200)    default null               comment '绳料规格要求,如7.5cm间距黄牛皮色圆纸绳',
+  mouth_type        varchar(50)     default null               comment '口部提拔:锯齿口/平口/翻口',
+  bottom_type       varchar(50)     default null               comment '底板类型:无/灰底白板/加强底板',
+  remark            varchar(500)    default ''                 comment '备注',
+  create_by         varchar(64)     default ''                 comment '创建者',
+  create_time       datetime        default current_timestamp  comment '创建时间',
+  update_by         varchar(64)     default ''                 comment '更新者',
+  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
+  key idx_factory_id (factory_id),
+  primary key (attr_id),
+  unique key uk_item_id (item_id)
+) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '物料纸袋成品属性表';
+
+-- ----------------------------
+-- 2c、物料礼品盒属性表（物料产品表的行业子表，预留）
+-- 用途：存储礼品盒成品的行业专用属性。item_id 与 qxx_md_item 1:1。
+--       字段待业务方确认后补充。
+-- ----------------------------
+drop table if exists qxx_md_item_attr_gift_box;
+create table qxx_md_item_attr_gift_box (
+  attr_id           bigint(20)      not null auto_increment    comment '属性ID',
+  factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
+  item_id           bigint(20)      not null                   comment '物料ID(关联qxx_md_item)',
+  -- TODO: 礼品盒具体属性字段待业务方确认，参考方向：
+  -- box_material      varchar(100)  default null             comment '盒身材质:灰板纸/白卡纸/瓦楞纸',
+  -- lining_material   varchar(100)  default null             comment '内衬材质:绒布/珍珠棉/丝绸',
+  -- cover_type        varchar(50)   default null             comment '盒盖类型:天地盖/翻盖/抽拉式',
+  -- surface_treatment varchar(100)  default null             comment '表面处理:覆膜/烫金/UV/压纹',
+  -- magnet_flag       char(1)       default '0'              comment '是否带磁吸(1-是,0-否)',
+  -- ribbon_spec       varchar(200)  default null             comment '丝带规格',
+  remark            varchar(500)    default ''                 comment '备注',
+  create_by         varchar(64)     default ''                 comment '创建者',
+  create_time       datetime        default current_timestamp  comment '创建时间',
+  update_by         varchar(64)     default ''                 comment '更新者',
+  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
+  key idx_factory_id (factory_id),
+  primary key (attr_id),
+  unique key uk_item_id (item_id)
+) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '物料礼品盒属性表';
 
 -- ----------------------------
 -- 3、物料产品分类表
@@ -182,7 +266,7 @@ create table qxx_md_product_bom (
 -- ----------------------------
 -- 5、物料批次属性配置表
 -- 用途：定义物料入库/生产时**必须填写哪些追踪属性**，不直接生成批次号
--- ⚠️ 待确认：当前挂在 item_id 上（逐物料配置），见下方说明
+-- 批次规则挂在 item_id 上（与 ktg-mes 一致），逐物料配置。同分类不同物料可配不同规则。
 --
 -- === 批次生成机制（本表 = 规则清单，不是批次号生成器）===
 -- 一个 item_id 要么是采购的原料(RAW)，要么是生产的成品(FINISHED)，不会身兼两职。
@@ -212,29 +296,14 @@ create table qxx_md_product_bom (
 --    原料：入库时触发（仓库收货员）；成品/半成品：排产拆卡时触发（计划员）
 --    详见 mes-wm.sql 的 qxx_wm_batch 表注释
 --
--- ⚠️ 关键：批次号是流水号，批次身份是属性组合。同物料+同属性组合=同一批次。
---        入库员/计划员不需要手动编批次号，只需填好追踪属性，系统自动匹配或生成。
--- ----------------------------
--- ⚠️ 【设计决策待确认 — 批次规则应该挂在物料(item_id)还是物料分类(item_type_id)？】
---
--- 方案A：挂在 item_id（当前设计，与 ktg-mes 一致）
---   ✅ 灵活 — 同分类下不同物料可配不同规则（如国产箱板纸不追有效期、瑞典赤牛追有效期）
---   ✅ 简单 — 无继承逻辑，item_id 直查
---   ❌ 配置量大 — 圣享 ~100 个物料需逐条配置（UI 可加"复制配置"缓解）
---
--- 方案B：挂在 item_type_id
---   ✅ 简洁 — 圣享只需配 5~8 行（纸张/绳子/胶水/成品外贸/成品内贸…）
---   ❌ 不灵活 — 同分类下无法差异化（如进口纸 vs 国产纸的不同追踪需求）
---   ❌ 复杂 — 需继承链：物料→item_type→config，异常情况仍需物料级覆盖
---
--- → 需与客户确认：实际业务中"同分类不同物料追踪属性不同"的情况多不多？
---   如果多 → 方案A。如果极少 → 方案B。
+-- 关键：批次号是流水号，批次身份是属性组合。同物料+同属性组合=同一批次。
+--       入库员/计划员不需要手动编批次号，只需填好追踪属性，系统自动匹配或生成。
 -- ----------------------------
 drop table if exists qxx_md_item_batch_config;
 create table qxx_md_item_batch_config (
   config_id             bigint(20)      not null auto_increment     comment '配置ID',
   factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
-  item_id               bigint(20)      not null                    comment '⚠️ 物料ID(关联qxx_md_item) — 待确认:是否改为item_type_id',
+  item_id               bigint(20)      not null                    comment '物料ID(关联qxx_md_item)',
   produce_date_flag     char(1)         default '0'                 comment '是否追踪生产日期(1-是,0-否)',
   expire_date_flag      char(1)         default '0'                 comment '是否追踪有效期(1-是,0-否)',
   recpt_date_flag       char(1)         default '0'                 comment '是否追踪入库日期(1-是,0-否)',
@@ -249,8 +318,8 @@ create table qxx_md_item_batch_config (
   mold_flag             char(1)         default '0'                 comment '是否追踪模具(1-是,0-否)',
   lot_number_flag       char(1)         default '0'                 comment '是否追踪生产批号(1-是,0-否)',
   quality_status_flag   char(1)         default '0'                 comment '是否追踪质量状态(1-是,0-否)',
-  paper_roll_flag       char(1)         default '0'                 comment '是否追踪纸卷号(纸张行业特有,1-是,0-否)',
-  paper_width_flag      char(1)         default '0'                 comment '是否追踪门幅(纸张行业特有,1-是,0-否)',
+  paper_roll_flag       char(1)         default '0'                 comment '是否追踪纸卷号(纸张行业可选,非纸张物料=0,1-是,0-否)',
+  paper_width_flag      char(1)         default '0'                 comment '是否追踪门幅(纸张行业可选,非纸张物料=0,1-是,0-否)',
   enable_flag           char(1)         default '1'                 comment '是否启用(1-是,0-否)',
   remark                varchar(500)    default ''                  comment '备注',
   create_by             varchar(64)     default ''                  comment '创建者',

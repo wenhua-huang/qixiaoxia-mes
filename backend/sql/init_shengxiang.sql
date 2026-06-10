@@ -149,7 +149,7 @@ INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component,
 (2103, '产品BOM',      2001, 4, 'bom',         'mes/md/bom/index',         1, 0, 'C', '0', '0', 'mes:md:bom:list',         '#', 'admin', sysdate()),
 (2104, '供应商管理',   2001, 5, 'vendor',      'mes/md/vendor/index',      1, 0, 'C', '0', '0', 'mes:md:vendor:list',      '#', 'admin', sysdate()),
 (2105, '客户管理',     2001, 6, 'client',      'mes/md/client/index',      1, 0, 'C', '0', '0', 'mes:md:client:list',      '#', 'admin', sysdate()),
-(2106, '计量单位',     2001, 7, 'unit',        'mes/md/unit/index',        1, 0, 'C', '0', '0', 'mes:md:unit:list',        '#', 'admin', sysdate()),
+(2106, '计量单位',     2001, 7, 'unitmeasure', 'mes/md/unitmeasure/index', 1, 0, 'C', '0', '0', 'mes:md:unitmeasure:list', '#', 'admin', sysdate()),
 (2107, '车间管理',     2001, 8, 'workshop',    'mes/md/workshop/index',    1, 0, 'C', '0', '0', 'mes:md:workshop:list',    '#', 'admin', sysdate()),
 (2108, '工作站管理',   2001, 9, 'workstation', 'mes/md/workstation/index', 1, 0, 'C', '0', '0', 'mes:md:workstation:list', '#', 'admin', sysdate());
 
@@ -239,6 +239,12 @@ INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, menu_type, visib
 (21053, '客户修改', 2105, 3, 'F', '0', '0', 'mes:md:client:edit',   'admin', sysdate()),
 (21054, '客户删除', 2105, 4, 'F', '0', '0', 'mes:md:client:remove', 'admin', sysdate()),
 (21055, '客户导出', 2105, 5, 'F', '0', '0', 'mes:md:client:export', 'admin', sysdate()),
+-- 计量单位 2106
+(21061, '单位查询', 2106, 1, 'F', '0', '0', 'mes:md:unitmeasure:query',  'admin', sysdate()),
+(21062, '单位新增', 2106, 2, 'F', '0', '0', 'mes:md:unitmeasure:add',    'admin', sysdate()),
+(21063, '单位修改', 2106, 3, 'F', '0', '0', 'mes:md:unitmeasure:edit',   'admin', sysdate()),
+(21064, '单位删除', 2106, 4, 'F', '0', '0', 'mes:md:unitmeasure:remove', 'admin', sysdate()),
+(21065, '单位导出', 2106, 5, 'F', '0', '0', 'mes:md:unitmeasure:export', 'admin', sysdate()),
 -- 车间管理 2107
 (21071, '车间查询', 2107, 1, 'F', '0', '0', 'mes:md:workshop:query',  'admin', sysdate()),
 (21072, '车间新增', 2107, 2, 'F', '0', '0', 'mes:md:workshop:add',    'admin', sysdate()),
@@ -410,11 +416,11 @@ SELECT '11', menu_id, 1 FROM sys_menu WHERE parent_id IN (2001, 2003);
 
 -- MD 所有子菜单
 INSERT IGNORE INTO sys_role_menu (role_id, menu_id, factory_id)
-SELECT '11', menu_id, 1 FROM sys_menu WHERE menu_id IN (2100, 2101, 2102, 2103, 2104, 2105, 2107, 2108);
+SELECT '11', menu_id, 1 FROM sys_menu WHERE menu_id IN (2100, 2101, 2102, 2103, 2104, 2105, 2106, 2107, 2108);
 
 -- MD 所有按钮
 INSERT IGNORE INTO sys_role_menu (role_id, menu_id, factory_id)
-SELECT '11', menu_id, 1 FROM sys_menu WHERE parent_id IN (2100, 2101, 2102, 2103, 2104, 2105, 2107, 2108);
+SELECT '11', menu_id, 1 FROM sys_menu WHERE parent_id IN (2100, 2101, 2102, 2103, 2104, 2105, 2106, 2107, 2108);
 
 -- PRO 所有子菜单
 INSERT IGNORE INTO sys_role_menu (role_id, menu_id, factory_id)

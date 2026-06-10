@@ -15,7 +15,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * 单位管理Controller
+ * 单位管理Controller（factory_id 由 FactoryIdInterceptor 自动注入）
  *
  * @author qixiaoxia
  * @date 2025-06-10
@@ -27,9 +27,6 @@ public class MdUnitMeasureController extends BaseController
     @Autowired
     private IMdUnitMeasureService mdUnitMeasureService;
 
-    /**
-     * 查询单位列表
-     */
     @PreAuthorize("@ss.hasPermi('mes:md:unitmeasure:list')")
     @GetMapping("/list")
     public TableDataInfo list(MdUnitMeasure mdUnitMeasure)
@@ -39,35 +36,27 @@ public class MdUnitMeasureController extends BaseController
         return getDataTable(list);
     }
 
-    /**
-     * 查询所有主单位列表（primary_unit 为空的都是主单位）
-     */
+    @PreAuthorize("@ss.hasPermi('mes:md:unitmeasure:query')")
     @GetMapping("/listprimary")
     public AjaxResult listPrimary()
     {
         MdUnitMeasure mdUnitMeasure = new MdUnitMeasure();
-        mdUnitMeasure.setEnableFlag("1");
+        mdUnitMeasure.setEnableFlag("Y");
         List<MdUnitMeasure> list = mdUnitMeasureService.selectMdUnitMeasureList(mdUnitMeasure);
-        // 过滤出主单位（primary_unit 为空或 null 的）
         list.removeIf(u -> u.getPrimaryUnit() != null && !u.getPrimaryUnit().isEmpty());
         return AjaxResult.success(list);
     }
 
-    /**
-     * 查询所有启用的单位
-     */
+    @PreAuthorize("@ss.hasPermi('mes:md:unitmeasure:query')")
     @GetMapping("/selectall")
     public AjaxResult selectAll()
     {
         MdUnitMeasure mdUnitMeasure = new MdUnitMeasure();
-        mdUnitMeasure.setEnableFlag("1");
+        mdUnitMeasure.setEnableFlag("Y");
         List<MdUnitMeasure> list = mdUnitMeasureService.selectMdUnitMeasureList(mdUnitMeasure);
         return AjaxResult.success(list);
     }
 
-    /**
-     * 导出单位列表
-     */
     @PreAuthorize("@ss.hasPermi('mes:md:unitmeasure:export')")
     @Log(title = "单位管理", businessType = BusinessType.EXPORT)
     @PostMapping("/export")
@@ -78,9 +67,6 @@ public class MdUnitMeasureController extends BaseController
         util.exportExcel(response, list, "单位数据");
     }
 
-    /**
-     * 获取单位详细信息
-     */
     @PreAuthorize("@ss.hasPermi('mes:md:unitmeasure:query')")
     @GetMapping(value = "/{unitId}")
     public AjaxResult getInfo(@PathVariable("unitId") Long unitId)
@@ -88,9 +74,6 @@ public class MdUnitMeasureController extends BaseController
         return AjaxResult.success(mdUnitMeasureService.selectMdUnitMeasureByUnitId(unitId));
     }
 
-    /**
-     * 新增单位
-     */
     @PreAuthorize("@ss.hasPermi('mes:md:unitmeasure:add')")
     @Log(title = "单位管理", businessType = BusinessType.INSERT)
     @PostMapping
@@ -103,9 +86,6 @@ public class MdUnitMeasureController extends BaseController
         return toAjax(mdUnitMeasureService.insertMdUnitMeasure(mdUnitMeasure));
     }
 
-    /**
-     * 修改单位
-     */
     @PreAuthorize("@ss.hasPermi('mes:md:unitmeasure:edit')")
     @Log(title = "单位管理", businessType = BusinessType.UPDATE)
     @PutMapping
@@ -118,9 +98,6 @@ public class MdUnitMeasureController extends BaseController
         return toAjax(mdUnitMeasureService.updateMdUnitMeasure(mdUnitMeasure));
     }
 
-    /**
-     * 删除单位
-     */
     @PreAuthorize("@ss.hasPermi('mes:md:unitmeasure:remove')")
     @Log(title = "单位管理", businessType = BusinessType.DELETE)
     @DeleteMapping("/{unitIds}")

@@ -85,7 +85,16 @@ Controller (ruoyi-admin) → Service (ruoyi-system) → Mapper (ruoyi-system)
 - **认证**: Spring Security + JWT (无状态)，`ruoyi-framework` 中配置
 - **权限**: RBAC 模型 — 用户 → 角色 → 菜单/权限
 - **数据权限**: `@DataScope` 注解，按部门数据隔离
+- **工厂隔离**: `FactoryIdInterceptor` MyBatis 拦截器，自动注入 `factory_id`（详见根 CLAUDE.md）
 - **注解驱动**: `@PreAuthorize` + 自定义 `@RequiresPermissions` / `@RequiresRoles`
+
+### FactoryIdInterceptor
+
+`ruoyi-framework/.../interceptor/FactoryIdInterceptor.java` — MyBatis 拦截器，拦截所有 `Executor.update()` 和 `Executor.query()`：
+
+- 参数对象有 `factoryId` 字段且为 null → 自动注入 `SecurityUtils.getFactoryId()`
+- Mapper 方法上加 `@SkipFactoryId` → 跳过
+- 外协表：参数对象有 `outsourceFactoryId` 且已设值 → 跳过（用外协工厂隔离）
 
 ### Request Lifecycle
 

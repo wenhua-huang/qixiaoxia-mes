@@ -125,28 +125,28 @@ SELECT * FROM qxx_wm_item_recpt WHERE recpt_id = ?;
 INSERT INTO qxx_wm_item_recpt (factory_id, recpt_code, ...) VALUES (?, ?, ...);
 ```
 
-### FactoryId MyBatis 拦截器 ⚠️ 待实现
+### FactoryId MyBatis 拦截器 ✅ 已实现
 
-> 以下为设计，尚未实现。实现后 Code Review 规则 ①②③ 由拦截器自动保证。
+> MyBatis Interceptor 自动注入 `factory_id`，Code Review 规则 ①②③ 由拦截器自动保证。
 
-**方案**：MyBatis Interceptor 拦截 `Executor.update()` 和 `Executor.query()`。
+**实现文件**：
+- `ruoyi-framework/.../interceptor/FactoryIdInterceptor.java` — 拦截器核心逻辑（~120 行）
+- `ruoyi-common/.../annotation/SkipFactoryId.java` — 放行注解
+- `ruoyi-framework/.../config/MyBatisConfig.java` — 注册拦截器
 
-- **INSERT/UPDATE**：参数对象有 `factoryId` 字段 → 自动注入 `SecurityUtils.getFactoryId()`
-- **SELECT**：涉及的表有 `factory_id` 列 → SQL 自动追加 `AND factory_id = ?`
-  - 涉及的表有 `outsource_factory_id` 列且当前请求为外协视角 → 追加 `AND outsource_factory_id = ?`（不追加 `factory_id`）
+**拦截规则**：
 
-**放行**：方法上加 `@SkipFactoryId` 注解跳过所有拦截。仅用于平台管理员全局查询等极少数场景。**外协不是放行**——外协是已知业务规则，用 `outsource_factory_id` 替代 `factory_id` 做隔离，不是无限制跳过。
+| 场景 | 行为 |
+|------|------|
+| **INSERT/UPDATE** | 参数对象有 `factoryId` 字段且为 null → 自动注入 `SecurityUtils.getFactoryId()` |
+| **SELECT** | 同上（参数对象自动注入 factoryId，SQL 通过 `<if test="factoryId != null">` 过滤） |
+| **外协表** | 参数对象有 `outsourceFactoryId` 且已设值 → 跳过（用外协工厂 ID 替代） |
+| **@SkipFactoryId** | Mapper 方法上有此注解 → 跳过所有拦截 |
+| **参数为 null** | 跳过 |
+
+> ⚠️ **所有用户（含 admin）都受拦截**，不区分角色。仅 `@SkipFactoryId` 可放行。外协不是放行——外协是已知业务规则，用 `outsource_factory_id` 替代 `factory_id` 做隔离。
 
 **为什么不选 AOP**：AOP 只拦 Service 方法，Mapper 直接调用、动态 SQL 拼接都拦不到。MyBatis Interceptor 在 SQL 执行层，100% 覆盖。
-
-```java
-// 核心代码 ~80 行，位于 ruoyi-common 模块
-@Intercepts({
-    @Signature(type = Executor.class, method = "update", args = {MappedStatement.class, Object.class}),
-    @Signature(type = Executor.class, method = "query", args = {MappedStatement.class, Object.class, RowBounds.class, ResultHandler.class})
-})
-public class FactoryIdInterceptor implements Interceptor { ... }
-```
 
 ### Adding a New MES Feature (Full Stack)
 

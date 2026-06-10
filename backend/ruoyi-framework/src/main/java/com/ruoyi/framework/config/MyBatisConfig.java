@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.List;
 import javax.sql.DataSource;
 import org.apache.ibatis.io.VFS;
+import org.apache.ibatis.plugin.Interceptor;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.mybatis.spring.boot.autoconfigure.SpringBootVFS;
@@ -23,6 +24,7 @@ import org.springframework.core.type.classreading.MetadataReader;
 import org.springframework.core.type.classreading.MetadataReaderFactory;
 import org.springframework.util.ClassUtils;
 import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.framework.interceptor.FactoryIdInterceptor;
 
 /**
  * Mybatis支持*匹配扫描包
@@ -114,7 +116,13 @@ public class MyBatisConfig
     }
 
     @Bean
-    public SqlSessionFactory sqlSessionFactory(DataSource dataSource) throws Exception
+    public FactoryIdInterceptor factoryIdInterceptor()
+    {
+        return new FactoryIdInterceptor();
+    }
+
+    @Bean
+    public SqlSessionFactory sqlSessionFactory(DataSource dataSource, List<Interceptor> interceptors) throws Exception
     {
         String typeAliasesPackage = env.getProperty("mybatis.typeAliasesPackage");
         String mapperLocations = env.getProperty("mybatis.mapperLocations");
@@ -127,6 +135,10 @@ public class MyBatisConfig
         sessionFactory.setTypeAliasesPackage(typeAliasesPackage);
         sessionFactory.setMapperLocations(resolveMapperLocations(StringUtils.split(mapperLocations, ",")));
         sessionFactory.setConfigLocation(new DefaultResourceLoader().getResource(configLocation));
+        if (interceptors != null && !interceptors.isEmpty())
+        {
+            sessionFactory.setPlugins(interceptors.toArray(new Interceptor[0]));
+        }
         return sessionFactory.getObject();
     }
 }

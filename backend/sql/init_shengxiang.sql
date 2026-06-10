@@ -25,6 +25,29 @@ INSERT IGNORE INTO qxx_md_factory (factory_id, factory_code, factory_name, short
 VALUES (1, 'SX', '圣享工厂', '圣享', '1', 'admin', sysdate(), '', sysdate());
 
 -- ============================================================
+-- Part 1.5: 计量单位初始化（qxx_md_unit_measure）
+-- 说明：圣享工厂纸袋生产所需计量单位，主单位 primary_unit 为空
+-- ============================================================
+
+DELETE FROM qxx_md_unit_measure WHERE factory_id = 1;
+
+-- ### 1.5.1 主单位（primary_unit 为空）###
+INSERT INTO qxx_md_unit_measure (unit_id, factory_id, unit_code, unit_name, primary_unit, conversion_rate, enable_flag, remark, create_by, create_time) VALUES
+(200, 1, 'PCS',  '个',   NULL, 1.000000, 'Y', '计数单位，用于成品/纸箱/塑料盖等', 'admin', sysdate()),
+(201, 1, 'KG',   '千克', NULL, 1.000000, 'Y', '重量主单位，用于纸张/原料称重', 'admin', sysdate()),
+(202, 1, 'M',    '米',   NULL, 1.000000, 'Y', '长度单位，用于纸张门幅/米数', 'admin', sysdate()),
+(203, 1, 'ROLL', '卷',   NULL, 1.000000, 'Y', '纸张计数单位，一卷纸的完整包装', 'admin', sysdate()),
+(204, 1, 'PAIR', '对',   NULL, 1.000000, 'Y', '成对计数单位，用于绳子/织带/指甲扣', 'admin', sysdate()),
+(205, 1, 'BARREL','桶',  NULL, 1.000000, 'Y', '容量单位，用于油墨/胶水', 'admin', sysdate()),
+(206, 1, 'SET',  '套',   NULL, 1.000000, 'Y', '成套单位，用于工具/模具', 'admin', sysdate());
+
+-- ### 1.5.2 辅助单位（primary_unit 指向主单位编码，conversion_rate = 1本单位 = N主单位）###
+INSERT INTO qxx_md_unit_measure (unit_id, factory_id, unit_code, unit_name, primary_unit, conversion_rate, enable_flag, remark, create_by, create_time) VALUES
+(210, 1, 'BOX', '箱',   'PCS', 250.000000, 'Y', '包装单位，1箱=250个（按实际装箱规格调整）', 'admin', sysdate()),
+(211, 1, 'TON', '吨',   'KG',  1000.000000,'Y', '重量单位，1吨=1000千克', 'admin', sysdate()),
+(212, 1, 'G',   '克',   'KG',  0.001000,  'Y', '重量单位，1克=0.001千克', 'admin', sysdate());
+
+-- ============================================================
 -- Part 2: 部门（sys_dept）— 删除 RuoYi 默认，重建圣享架构
 -- ============================================================
 

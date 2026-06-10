@@ -125,7 +125,7 @@
               :key="item.unitCode"
               :label="item.unitName + ' (' + item.unitCode + ')'"
               :value="item.unitCode"
-              :disabled="item.enableFlag === '0'"
+              :disabled="item.enableFlag === 'N'"
             />
           </el-select>
         </el-form-item>
@@ -227,7 +227,7 @@ function reset() {
     unitName: undefined,
     primaryUnit: undefined,
     conversionRate: undefined,
-    enableFlag: '1',
+    enableFlag: 'Y',
     remark: undefined
   }
   proxy.resetForm('formRef')

@@ -37,6 +37,21 @@ public class SecurityUtils
     }
 
     /**
+     * 获取工厂ID
+     **/
+    public static Long getFactoryId()
+    {
+        try
+        {
+            return getLoginUser().getUser().getFactoryId();
+        }
+        catch (Exception e)
+        {
+            throw new ServiceException("获取工厂ID异常", HttpStatus.UNAUTHORIZED);
+        }
+    }
+
+    /**
      * 获取部门ID
      **/
     public static Long getDeptId()

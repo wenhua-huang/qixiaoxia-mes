@@ -28,7 +28,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectMdUnitMeasureList" parameterType="com.ruoyi.system.domain.mes.md.MdUnitMeasure" resultMap="MdUnitMeasureResult">
         <include refid="selectMdUnitMeasureVo"/>
         <where>
-            <if test="factoryId != null "> and factory_id = #{factoryId}</if>
             <if test="unitCode != null  and unitCode != ''"> and unit_code = #{unitCode}</if>
             <if test="unitName != null  and unitName != ''"> and unit_name like concat('%', #{unitName}, '%')</if>
             <if test="primaryUnit != null  and primaryUnit != ''"> and primary_unit = #{primaryUnit}</if>

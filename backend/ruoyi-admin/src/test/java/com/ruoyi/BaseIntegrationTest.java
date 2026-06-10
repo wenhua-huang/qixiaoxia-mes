@@ -1,5 +1,6 @@
 package com.ruoyi;
 
+import com.ruoyi.RuoYiApplication;
 import com.ruoyi.common.constant.CacheConstants;
 import com.ruoyi.common.constant.Constants;
 import com.ruoyi.common.core.domain.model.LoginBody;
@@ -40,6 +41,7 @@ import java.util.Map;
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    classes = RuoYiApplication.class,
     properties = {"spring.profiles.active=test,druid"}
 )
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)

@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.md.MdUnitMeasureMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.md.MdUnitMeasure" id="MdUnitMeasureResult">
+        <result property="unitId"         column="unit_id"         />
+        <result property="factoryId"      column="factory_id"      />
+        <result property="unitCode"       column="unit_code"       />
+        <result property="unitName"       column="unit_name"       />
+        <result property="primaryUnit"    column="primary_unit"    />
+        <result property="conversionRate" column="conversion_rate" />
+        <result property="enableFlag"     column="enable_flag"     />
+        <result property="remark"         column="remark"          />
+        <result property="createBy"       column="create_by"       />
+        <result property="createTime"     column="create_time"     />
+        <result property="updateBy"       column="update_by"       />
+        <result property="updateTime"     column="update_time"     />
+    </resultMap>
+
+    <sql id="selectMdUnitMeasureVo">
+        select unit_id, factory_id, unit_code, unit_name, primary_unit, conversion_rate,
+               enable_flag, remark, create_by, create_time, update_by, update_time
+        from qxx_md_unit_measure
+    </sql>
+
+    <select id="selectMdUnitMeasureList" parameterType="com.ruoyi.system.domain.mes.md.MdUnitMeasure" resultMap="MdUnitMeasureResult">
+        <include refid="selectMdUnitMeasureVo"/>
+        <where>
+            <if test="factoryId != null "> and factory_id = #{factoryId}</if>
+            <if test="unitCode != null  and unitCode != ''"> and unit_code = #{unitCode}</if>
+            <if test="unitName != null  and unitName != ''"> and unit_name like concat('%', #{unitName}, '%')</if>
+            <if test="primaryUnit != null  and primaryUnit != ''"> and primary_unit = #{primaryUnit}</if>
+            <if test="enableFlag != null  and enableFlag != ''"> and enable_flag = #{enableFlag}</if>
+        </where>
+    </select>
+
+    <select id="checkUnitCodeUnique" parameterType="com.ruoyi.system.domain.mes.md.MdUnitMeasure" resultMap="MdUnitMeasureResult">
+        <include refid="selectMdUnitMeasureVo"/>
+        where unit_code = #{unitCode} limit 1
+    </select>
+
+    <select id="selectMdUnitMeasureByUnitId" parameterType="Long" resultMap="MdUnitMeasureResult">
+        <include refid="selectMdUnitMeasureVo"/>
+        where unit_id = #{unitId}
+    </select>
+
+    <select id="selectMdUnitMeasureByCode" parameterType="String" resultMap="MdUnitMeasureResult">
+        <include refid="selectMdUnitMeasureVo"/>
+        where unit_code = #{unitCode}
+    </select>
+
+    <insert id="insertMdUnitMeasure" parameterType="com.ruoyi.system.domain.mes.md.MdUnitMeasure" useGeneratedKeys="true" keyProperty="unitId">
+        insert into qxx_md_unit_measure
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="unitCode != null and unitCode != ''">unit_code,</if>
+            <if test="unitName != null and unitName != ''">unit_name,</if>
+            <if test="primaryUnit != null">primary_unit,</if>
+            <if test="conversionRate != null">conversion_rate,</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="unitCode != null and unitCode != ''">#{unitCode},</if>
+            <if test="unitName != null and unitName != ''">#{unitName},</if>
+            <if test="primaryUnit != null">#{primaryUnit},</if>
+            <if test="conversionRate != null">#{conversionRate},</if>
+            <if test="enableFlag != null and enableFlag != ''">#{enableFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateMdUnitMeasure" parameterType="com.ruoyi.system.domain.mes.md.MdUnitMeasure">
+        update qxx_md_unit_measure
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="unitCode != null and unitCode != ''">unit_code = #{unitCode},</if>
+            <if test="unitName != null and unitName != ''">unit_name = #{unitName},</if>
+            <if test="primaryUnit != null">primary_unit = #{primaryUnit},</if>
+            <if test="conversionRate != null">conversion_rate = #{conversionRate},</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag = #{enableFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where unit_id = #{unitId}
+    </update>
+
+    <delete id="deleteMdUnitMeasureByUnitId" parameterType="Long">
+        delete from qxx_md_unit_measure where unit_id = #{unitId}
+    </delete>
+
+    <delete id="deleteMdUnitMeasureByUnitIds" parameterType="String">
+        delete from qxx_md_unit_measure where unit_id in
+        <foreach item="unitId" collection="array" open="(" separator="," close=")">
+            #{unitId}
+        </foreach>
+    </delete>
+</mapper>

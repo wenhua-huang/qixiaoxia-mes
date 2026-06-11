@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.sys.SysAutoCodeRuleMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.sys.SysAutoCodeRule" id="SysAutoCodeRuleResult">
+        <result property="ruleId"       column="rule_id"        />
+        <result property="factoryId"    column="factory_id"     />
+        <result property="ruleCode"     column="rule_code"      />
+        <result property="ruleName"     column="rule_name"      />
+        <result property="ruleDesc"     column="rule_desc"      />
+        <result property="maxLength"    column="max_length"     />
+        <result property="isPadded"     column="is_padded"      />
+        <result property="paddedChar"   column="padded_char"    />
+        <result property="paddedMethod" column="padded_method"  />
+        <result property="enableFlag"   column="enable_flag"    />
+        <result property="remark"       column="remark"         />
+        <result property="createBy"     column="create_by"      />
+        <result property="createTime"   column="create_time"    />
+        <result property="updateBy"     column="update_by"      />
+        <result property="updateTime"   column="update_time"    />
+    </resultMap>
+
+    <sql id="selectSysAutoCodeRuleVo">
+        select rule_id, factory_id, rule_code, rule_name, rule_desc, max_length,
+               is_padded, padded_char, padded_method, enable_flag,
+               remark, create_by, create_time, update_by, update_time
+        from sys_auto_code_rule
+    </sql>
+
+    <select id="selectSysAutoCodeRuleList" parameterType="com.ruoyi.system.domain.mes.sys.SysAutoCodeRule" resultMap="SysAutoCodeRuleResult">
+        <include refid="selectSysAutoCodeRuleVo"/>
+        <where>
+            <if test="ruleCode != null  and ruleCode != ''"> and rule_code like concat('%', #{ruleCode}, '%')</if>
+            <if test="ruleName != null  and ruleName != ''"> and rule_name like concat('%', #{ruleName}, '%')</if>
+            <if test="enableFlag != null  and enableFlag != ''"> and enable_flag = #{enableFlag}</if>
+        </where>
+    </select>
+
+    <select id="selectSysAutoCodeRuleByRuleId" parameterType="Long" resultMap="SysAutoCodeRuleResult">
+        <include refid="selectSysAutoCodeRuleVo"/>
+        where rule_id = #{ruleId}
+    </select>
+
+    <select id="selectSysAutoCodeRuleByRuleCode" parameterType="String" resultMap="SysAutoCodeRuleResult">
+        <include refid="selectSysAutoCodeRuleVo"/>
+        where rule_code = #{ruleCode}
+    </select>
+
+    <select id="checkRuleCodeUnique" parameterType="com.ruoyi.system.domain.mes.sys.SysAutoCodeRule" resultMap="SysAutoCodeRuleResult">
+        <include refid="selectSysAutoCodeRuleVo"/>
+        where rule_code = #{ruleCode} limit 1
+    </select>
+
+    <insert id="insertSysAutoCodeRule" parameterType="com.ruoyi.system.domain.mes.sys.SysAutoCodeRule" useGeneratedKeys="true" keyProperty="ruleId">
+        insert into sys_auto_code_rule
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="ruleCode != null and ruleCode != ''">rule_code,</if>
+            <if test="ruleName != null and ruleName != ''">rule_name,</if>
+            <if test="ruleDesc != null">rule_desc,</if>
+            <if test="maxLength != null">max_length,</if>
+            <if test="isPadded != null">is_padded,</if>
+            <if test="paddedChar != null">padded_char,</if>
+            <if test="paddedMethod != null">padded_method,</if>
+            <if test="enableFlag != null">enable_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="ruleCode != null and ruleCode != ''">#{ruleCode},</if>
+            <if test="ruleName != null and ruleName != ''">#{ruleName},</if>
+            <if test="ruleDesc != null">#{ruleDesc},</if>
+            <if test="maxLength != null">#{maxLength},</if>
+            <if test="isPadded != null">#{isPadded},</if>
+            <if test="paddedChar != null">#{paddedChar},</if>
+            <if test="paddedMethod != null">#{paddedMethod},</if>
+            <if test="enableFlag != null">#{enableFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateSysAutoCodeRule" parameterType="com.ruoyi.system.domain.mes.sys.SysAutoCodeRule">
+        update sys_auto_code_rule
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="ruleCode != null and ruleCode != ''">rule_code = #{ruleCode},</if>
+            <if test="ruleName != null and ruleName != ''">rule_name = #{ruleName},</if>
+            <if test="ruleDesc != null">rule_desc = #{ruleDesc},</if>
+            <if test="maxLength != null">max_length = #{maxLength},</if>
+            <if test="isPadded != null">is_padded = #{isPadded},</if>
+            <if test="paddedChar != null">padded_char = #{paddedChar},</if>
+            <if test="paddedMethod != null">padded_method = #{paddedMethod},</if>
+            <if test="enableFlag != null">enable_flag = #{enableFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where rule_id = #{ruleId}
+    </update>
+
+    <delete id="deleteSysAutoCodeRuleByRuleId" parameterType="Long">
+        delete from sys_auto_code_rule where rule_id = #{ruleId}
+    </delete>
+
+    <delete id="deleteSysAutoCodeRuleByRuleIds" parameterType="String">
+        delete from sys_auto_code_rule where rule_id in
+        <foreach item="ruleId" collection="array" open="(" separator="," close=")">
+            #{ruleId}
+        </foreach>
+    </delete>
+</mapper>

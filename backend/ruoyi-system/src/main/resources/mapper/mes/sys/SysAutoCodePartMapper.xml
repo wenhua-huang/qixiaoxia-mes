@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.sys.SysAutoCodePartMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.sys.SysAutoCodePart" id="SysAutoCodePartResult">
+        <result property="partId"         column="part_id"          />
+        <result property="factoryId"      column="factory_id"       />
+        <result property="ruleId"         column="rule_id"          />
+        <result property="partIndex"      column="part_index"       />
+        <result property="partType"       column="part_type"        />
+        <result property="partCode"       column="part_code"        />
+        <result property="partName"       column="part_name"        />
+        <result property="partLength"     column="part_length"      />
+        <result property="dateFormat"     column="date_format"      />
+        <result property="inputCharacter" column="input_character"  />
+        <result property="fixCharacter"   column="fix_character"    />
+        <result property="seriaStartNo"   column="seria_start_no"   />
+        <result property="seriaStep"      column="seria_step"       />
+        <result property="seriaNowNo"     column="seria_now_no"     />
+        <result property="cycleFlag"      column="cycle_flag"       />
+        <result property="cycleMethod"    column="cycle_method"     />
+        <result property="remark"         column="remark"           />
+        <result property="createBy"       column="create_by"        />
+        <result property="createTime"     column="create_time"      />
+        <result property="updateBy"       column="update_by"        />
+        <result property="updateTime"     column="update_time"      />
+    </resultMap>
+
+    <sql id="selectSysAutoCodePartVo">
+        select part_id, factory_id, rule_id, part_index, part_type, part_code, part_name,
+               part_length, date_format, input_character, fix_character,
+               seria_start_no, seria_step, seria_now_no, cycle_flag, cycle_method,
+               remark, create_by, create_time, update_by, update_time
+        from sys_auto_code_part
+    </sql>
+
+    <select id="selectSysAutoCodePartList" parameterType="com.ruoyi.system.domain.mes.sys.SysAutoCodePart" resultMap="SysAutoCodePartResult">
+        <include refid="selectSysAutoCodePartVo"/>
+        <where>
+            <if test="ruleId != null"> and rule_id = #{ruleId}</if>
+            <if test="partType != null  and partType != ''"> and part_type = #{partType}</if>
+            <if test="partCode != null  and partCode != ''"> and part_code like concat('%', #{partCode}, '%')</if>
+            <if test="partName != null  and partName != ''"> and part_name like concat('%', #{partName}, '%')</if>
+        </where>
+        order by part_index
+    </select>
+
+    <select id="selectSysAutoCodePartByRuleId" parameterType="Long" resultMap="SysAutoCodePartResult">
+        <include refid="selectSysAutoCodePartVo"/>
+        where rule_id = #{ruleId}
+        order by part_index
+    </select>
+
+    <select id="selectSysAutoCodePartByPartId" parameterType="Long" resultMap="SysAutoCodePartResult">
+        <include refid="selectSysAutoCodePartVo"/>
+        where part_id = #{partId}
+    </select>
+
+    <insert id="insertSysAutoCodePart" parameterType="com.ruoyi.system.domain.mes.sys.SysAutoCodePart" useGeneratedKeys="true" keyProperty="partId">
+        insert into sys_auto_code_part
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="ruleId != null">rule_id,</if>
+            <if test="partIndex != null">part_index,</if>
+            <if test="partType != null">part_type,</if>
+            <if test="partCode != null">part_code,</if>
+            <if test="partName != null">part_name,</if>
+            <if test="partLength != null">part_length,</if>
+            <if test="dateFormat != null">date_format,</if>
+            <if test="inputCharacter != null">input_character,</if>
+            <if test="fixCharacter != null">fix_character,</if>
+            <if test="seriaStartNo != null">seria_start_no,</if>
+            <if test="seriaStep != null">seria_step,</if>
+            <if test="seriaNowNo != null">seria_now_no,</if>
+            <if test="cycleFlag != null">cycle_flag,</if>
+            <if test="cycleMethod != null">cycle_method,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="ruleId != null">#{ruleId},</if>
+            <if test="partIndex != null">#{partIndex},</if>
+            <if test="partType != null">#{partType},</if>
+            <if test="partCode != null">#{partCode},</if>
+            <if test="partName != null">#{partName},</if>
+            <if test="partLength != null">#{partLength},</if>
+            <if test="dateFormat != null">#{dateFormat},</if>
+            <if test="inputCharacter != null">#{inputCharacter},</if>
+            <if test="fixCharacter != null">#{fixCharacter},</if>
+            <if test="seriaStartNo != null">#{seriaStartNo},</if>
+            <if test="seriaStep != null">#{seriaStep},</if>
+            <if test="seriaNowNo != null">#{seriaNowNo},</if>
+            <if test="cycleFlag != null">#{cycleFlag},</if>
+            <if test="cycleMethod != null">#{cycleMethod},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateSysAutoCodePart" parameterType="com.ruoyi.system.domain.mes.sys.SysAutoCodePart">
+        update sys_auto_code_part
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="ruleId != null">rule_id = #{ruleId},</if>
+            <if test="partIndex != null">part_index = #{partIndex},</if>
+            <if test="partType != null">part_type = #{partType},</if>
+            <if test="partCode != null">part_code = #{partCode},</if>
+            <if test="partName != null">part_name = #{partName},</if>
+            <if test="partLength != null">part_length = #{partLength},</if>
+            <if test="dateFormat != null">date_format = #{dateFormat},</if>
+            <if test="inputCharacter != null">input_character = #{inputCharacter},</if>
+            <if test="fixCharacter != null">fix_character = #{fixCharacter},</if>
+            <if test="seriaStartNo != null">seria_start_no = #{seriaStartNo},</if>
+            <if test="seriaStep != null">seria_step = #{seriaStep},</if>
+            <if test="seriaNowNo != null">seria_now_no = #{seriaNowNo},</if>
+            <if test="cycleFlag != null">cycle_flag = #{cycleFlag},</if>
+            <if test="cycleMethod != null">cycle_method = #{cycleMethod},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where part_id = #{partId}
+    </update>
+
+    <delete id="deleteSysAutoCodePartByPartId" parameterType="Long">
+        delete from sys_auto_code_part where part_id = #{partId}
+    </delete>
+
+    <delete id="deleteSysAutoCodePartByPartIds" parameterType="String">
+        delete from sys_auto_code_part where part_id in
+        <foreach item="partId" collection="array" open="(" separator="," close=")">
+            #{partId}
+        </foreach>
+    </delete>
+
+    <delete id="deleteSysAutoCodePartByRuleId" parameterType="Long">
+        delete from sys_auto_code_part where rule_id = #{ruleId}
+    </delete>
+</mapper>

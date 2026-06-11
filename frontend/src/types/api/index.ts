@@ -32,3 +32,11 @@ export * from "./tool/gen";
 export * from "./mes/md/unitmeasure";
 export * from "./mes/dv/machinerytype";
 export * from "./mes/dv/machinery";
+
+// MES SYS 模块
+export * from "./mes/sys/autocoderule";
+export * from "./mes/sys/autocodepart";
+export * from "./mes/sys/autocoderesult";
+export * from "./mes/sys/attachment";
+export * from "./mes/sys/message";
+export * from "./mes/sys/todolist";

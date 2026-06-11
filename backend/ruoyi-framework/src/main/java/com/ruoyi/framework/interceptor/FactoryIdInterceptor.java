@@ -47,7 +47,7 @@ public class FactoryIdInterceptor implements Interceptor
 {
     private static final Logger log = LoggerFactory.getLogger(FactoryIdInterceptor.class);
     private static final Pattern FACTORY_ID_TABLE = Pattern.compile(
-        "\\b(qxx_\\w+|sys_user|sys_user_post|sys_user_role|sys_dept|sys_role|sys_role_dept|sys_role_menu)\\b",
+        "\\b(qxx_\\w+|sys_user|sys_user_post|sys_user_role|sys_dept|sys_role|sys_role_dept|sys_role_menu|sys_auto_code_rule|sys_auto_code_part|sys_auto_code_result|sys_attachment|sys_message|sys_todo_list)\\b",
         Pattern.CASE_INSENSITIVE);
     private static final Pattern FROM_ALIAS = Pattern.compile(
         "(?:from|join)\\s+(\\w+)(?:\\s+(?:as\\s+)?(\\w+))?", Pattern.CASE_INSENSITIVE);

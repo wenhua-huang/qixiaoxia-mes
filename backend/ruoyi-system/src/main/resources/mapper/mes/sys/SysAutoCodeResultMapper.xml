@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.sys.SysAutoCodeResultMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.sys.SysAutoCodeResult" id="SysAutoCodeResultResult">
+        <result property="codeId"        column="code_id"         />
+        <result property="factoryId"     column="factory_id"      />
+        <result property="ruleId"        column="rule_id"         />
+        <result property="genDate"       column="gen_date"        />
+        <result property="genIndex"      column="gen_index"       />
+        <result property="lastResult"    column="last_result"     />
+        <result property="lastSerialNo"  column="last_serial_no"  />
+        <result property="lastInputChar" column="last_input_char" />
+        <result property="remark"        column="remark"          />
+        <result property="createBy"      column="create_by"       />
+        <result property="createTime"    column="create_time"     />
+        <result property="updateBy"      column="update_by"       />
+        <result property="updateTime"    column="update_time"     />
+    </resultMap>
+
+    <sql id="selectSysAutoCodeResultVo">
+        select code_id, factory_id, rule_id, gen_date, gen_index, last_result,
+               last_serial_no, last_input_char,
+               remark, create_by, create_time, update_by, update_time
+        from sys_auto_code_result
+    </sql>
+
+    <select id="selectSysAutoCodeResultList" parameterType="com.ruoyi.system.domain.mes.sys.SysAutoCodeResult" resultMap="SysAutoCodeResultResult">
+        <include refid="selectSysAutoCodeResultVo"/>
+        <where>
+            <if test="ruleId != null"> and rule_id = #{ruleId}</if>
+            <if test="genDate != null  and genDate != ''"> and gen_date like concat(#{genDate}, '%')</if>
+            <if test="lastInputChar != null  and lastInputChar != ''"> and last_input_char = #{lastInputChar}</if>
+        </where>
+    </select>
+
+    <!-- 用于流水号循环查询：按 rule_id + 周期键(gen_date LIKE) 或 rule_id + 传入字符(OTHER) 查最新记录，FOR UPDATE 防止多实例并发重复 -->
+    <select id="selectSysAutoCodeResultForUpdate" resultMap="SysAutoCodeResultResult">
+        <include refid="selectSysAutoCodeResultVo"/>
+        where rule_id = #{ruleId}
+        <if test="genDate != null and genDate != ''"> and gen_date like concat(#{genDate}, '%')</if>
+        <if test="lastInputChar != null and lastInputChar != ''"> and last_input_char = #{lastInputChar}</if>
+        order by gen_date desc, last_serial_no desc
+        limit 1
+        for update
+    </select>
+
+    <select id="selectSysAutoCodeResultByCodeId" parameterType="Long" resultMap="SysAutoCodeResultResult">
+        <include refid="selectSysAutoCodeResultVo"/>
+        where code_id = #{codeId}
+    </select>
+
+    <insert id="insertSysAutoCodeResult" parameterType="com.ruoyi.system.domain.mes.sys.SysAutoCodeResult" useGeneratedKeys="true" keyProperty="codeId">
+        insert into sys_auto_code_result
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="ruleId != null">rule_id,</if>
+            <if test="genDate != null">gen_date,</if>
+            <if test="genIndex != null">gen_index,</if>
+            <if test="lastResult != null">last_result,</if>
+            <if test="lastSerialNo != null">last_serial_no,</if>
+            <if test="lastInputChar != null">last_input_char,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="ruleId != null">#{ruleId},</if>
+            <if test="genDate != null">#{genDate},</if>
+            <if test="genIndex != null">#{genIndex},</if>
+            <if test="lastResult != null">#{lastResult},</if>
+            <if test="lastSerialNo != null">#{lastSerialNo},</if>
+            <if test="lastInputChar != null">#{lastInputChar},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateSysAutoCodeResult" parameterType="com.ruoyi.system.domain.mes.sys.SysAutoCodeResult">
+        update sys_auto_code_result
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="ruleId != null">rule_id = #{ruleId},</if>
+            <if test="genDate != null">gen_date = #{genDate},</if>
+            <if test="genIndex != null">gen_index = #{genIndex},</if>
+            <if test="lastResult != null">last_result = #{lastResult},</if>
+            <if test="lastSerialNo != null">last_serial_no = #{lastSerialNo},</if>
+            <if test="lastInputChar != null">last_input_char = #{lastInputChar},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where code_id = #{codeId}
+    </update>
+
+    <delete id="deleteSysAutoCodeResultByCodeId" parameterType="Long">
+        delete from sys_auto_code_result where code_id = #{codeId}
+    </delete>
+
+    <delete id="deleteSysAutoCodeResultByCodeIds" parameterType="String">
+        delete from sys_auto_code_result where code_id in
+        <foreach item="codeId" collection="array" open="(" separator="," close=")">
+            #{codeId}
+        </foreach>
+    </delete>
+</mapper>

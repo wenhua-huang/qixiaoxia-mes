@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.md.MdFactoryMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.md.MdFactory" id="MdFactoryResult">
+        <result property="factoryId"    column="factory_id"    />
+        <result property="factoryCode"  column="factory_code"  />
+        <result property="factoryName"  column="factory_name"  />
+        <result property="shortName"    column="short_name"    />
+        <result property="address"      column="address"       />
+        <result property="contact"      column="contact"       />
+        <result property="phone"        column="phone"         />
+        <result property="enableFlag"   column="enable_flag"   />
+        <result property="remark"       column="remark"        />
+        <result property="createBy"     column="create_by"     />
+        <result property="createTime"   column="create_time"   />
+        <result property="updateBy"     column="update_by"     />
+        <result property="updateTime"   column="update_time"   />
+    </resultMap>
+
+    <sql id="selectMdFactoryVo">
+        select factory_id, factory_code, factory_name, short_name, address, contact, phone,
+               enable_flag, remark, create_by, create_time, update_by, update_time
+        from qxx_md_factory
+    </sql>
+
+    <select id="selectMdFactoryList" parameterType="com.ruoyi.system.domain.mes.md.MdFactory" resultMap="MdFactoryResult">
+        <include refid="selectMdFactoryVo"/>
+        <where>
+            <if test="factoryCode != null and factoryCode != ''"> and factory_code like concat('%', #{factoryCode}, '%')</if>
+            <if test="factoryName != null and factoryName != ''"> and factory_name like concat('%', #{factoryName}, '%')</if>
+            <if test="enableFlag != null and enableFlag != ''"> and enable_flag = #{enableFlag}</if>
+        </where>
+    </select>
+
+    <select id="selectMdFactoryById" parameterType="Long" resultMap="MdFactoryResult">
+        <include refid="selectMdFactoryVo"/>
+        where factory_id = #{factoryId}
+    </select>
+
+    <select id="checkFactoryCodeUnique" parameterType="com.ruoyi.system.domain.mes.md.MdFactory" resultMap="MdFactoryResult">
+        <include refid="selectMdFactoryVo"/>
+        where factory_code = #{factoryCode} limit 1
+    </select>
+
+    <insert id="insertMdFactory" parameterType="com.ruoyi.system.domain.mes.md.MdFactory" useGeneratedKeys="true" keyProperty="factoryId">
+        insert into qxx_md_factory
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryCode != null and factoryCode != ''">factory_code,</if>
+            <if test="factoryName != null and factoryName != ''">factory_name,</if>
+            <if test="shortName != null">short_name,</if>
+            <if test="address != null">address,</if>
+            <if test="contact != null">contact,</if>
+            <if test="phone != null">phone,</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryCode != null and factoryCode != ''">#{factoryCode},</if>
+            <if test="factoryName != null and factoryName != ''">#{factoryName},</if>
+            <if test="shortName != null">#{shortName},</if>
+            <if test="address != null">#{address},</if>
+            <if test="contact != null">#{contact},</if>
+            <if test="phone != null">#{phone},</if>
+            <if test="enableFlag != null and enableFlag != ''">#{enableFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateMdFactory" parameterType="com.ruoyi.system.domain.mes.md.MdFactory">
+        update qxx_md_factory
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryCode != null and factoryCode != ''">factory_code = #{factoryCode},</if>
+            <if test="factoryName != null and factoryName != ''">factory_name = #{factoryName},</if>
+            <if test="shortName != null">short_name = #{shortName},</if>
+            <if test="address != null">address = #{address},</if>
+            <if test="contact != null">contact = #{contact},</if>
+            <if test="phone != null">phone = #{phone},</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag = #{enableFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where factory_id = #{factoryId}
+    </update>
+
+    <delete id="deleteMdFactoryById" parameterType="Long">
+        delete from qxx_md_factory where factory_id = #{factoryId}
+    </delete>
+
+    <delete id="deleteMdFactoryByIds" parameterType="String">
+        delete from qxx_md_factory where factory_id in
+        <foreach item="factoryId" collection="array" open="(" separator="," close=")">
+            #{factoryId}
+        </foreach>
+    </delete>
+</mapper>

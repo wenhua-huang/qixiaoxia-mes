@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.md.MdProductBomMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.md.MdProductBom" id="MdProductBomResult">
+        <result property="bomId"          column="bom_id"           />
+        <result property="factoryId"      column="factory_id"       />
+        <result property="itemId"         column="item_id"          />
+        <result property="bomItemId"      column="bom_item_id"      />
+        <result property="unitOfMeasure"  column="unit_of_measure"  />
+        <result property="quantity"       column="quantity"         />
+        <result property="scrapRate"      column="scrap_rate"       />
+        <result property="enableFlag"     column="enable_flag"      />
+        <result property="remark"         column="remark"           />
+        <result property="createBy"       column="create_by"        />
+        <result property="createTime"     column="create_time"      />
+        <result property="updateBy"       column="update_by"        />
+        <result property="updateTime"     column="update_time"      />
+        <result property="itemCode"       column="item_code"        />
+        <result property="itemName"       column="item_name"        />
+        <result property="bomItemCode"    column="bom_item_code"    />
+        <result property="bomItemName"    column="bom_item_name"    />
+    </resultMap>
+
+    <sql id="selectMdProductBomVo">
+        select b.bom_id, b.factory_id, b.item_id, b.bom_item_id, b.unit_of_measure,
+               b.quantity, b.scrap_rate, b.enable_flag, b.remark, b.create_by, b.create_time,
+               b.update_by, b.update_time,
+               i.item_code as item_code, i.item_name as item_name,
+               c.item_code as bom_item_code, c.item_name as bom_item_name
+        from qxx_md_product_bom b
+        left join qxx_md_item i on i.item_id = b.item_id
+        left join qxx_md_item c on c.item_id = b.bom_item_id
+    </sql>
+
+    <select id="selectMdProductBomList" parameterType="com.ruoyi.system.domain.mes.md.MdProductBom" resultMap="MdProductBomResult">
+        <include refid="selectMdProductBomVo"/>
+        <where>
+            <if test="itemId != null"> and b.item_id = #{itemId}</if>
+            <if test="bomItemId != null"> and b.bom_item_id = #{bomItemId}</if>
+            <if test="enableFlag != null  and enableFlag != ''"> and b.enable_flag = #{enableFlag}</if>
+        </where>
+    </select>
+
+    <select id="selectAll" resultMap="MdProductBomResult">
+        <include refid="selectMdProductBomVo"/>
+    </select>
+
+    <select id="selectMdProductBomByBomId" parameterType="Long" resultMap="MdProductBomResult">
+        <include refid="selectMdProductBomVo"/>
+        where bom_id = #{bomId}
+    </select>
+
+    <insert id="insertMdProductBom" parameterType="com.ruoyi.system.domain.mes.md.MdProductBom" useGeneratedKeys="true" keyProperty="bomId">
+        insert into qxx_md_product_bom
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="itemId != null">item_id,</if>
+            <if test="bomItemId != null">bom_item_id,</if>
+            <if test="unitOfMeasure != null">unit_of_measure,</if>
+            <if test="quantity != null">quantity,</if>
+            <if test="scrapRate != null">scrap_rate,</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="itemId != null">#{itemId},</if>
+            <if test="bomItemId != null">#{bomItemId},</if>
+            <if test="unitOfMeasure != null">#{unitOfMeasure},</if>
+            <if test="quantity != null">#{quantity},</if>
+            <if test="scrapRate != null">#{scrapRate},</if>
+            <if test="enableFlag != null and enableFlag != ''">#{enableFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateMdProductBom" parameterType="com.ruoyi.system.domain.mes.md.MdProductBom">
+        update qxx_md_product_bom
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="itemId != null">item_id = #{itemId},</if>
+            <if test="bomItemId != null">bom_item_id = #{bomItemId},</if>
+            <if test="unitOfMeasure != null">unit_of_measure = #{unitOfMeasure},</if>
+            <if test="quantity != null">quantity = #{quantity},</if>
+            <if test="scrapRate != null">scrap_rate = #{scrapRate},</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag = #{enableFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where bom_id = #{bomId}
+    </update>
+
+    <delete id="deleteMdProductBomByBomId" parameterType="Long">
+        delete from qxx_md_product_bom where bom_id = #{bomId}
+    </delete>
+
+    <delete id="deleteMdProductBomByBomIds" parameterType="String">
+        delete from qxx_md_product_bom where bom_id in
+        <foreach item="bomId" collection="array" open="(" separator="," close=")">
+            #{bomId}
+        </foreach>
+    </delete>
+</mapper>

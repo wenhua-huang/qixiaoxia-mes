@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.md.MdVendorMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.md.MdVendor" id="MdVendorResult">
+        <result property="vendorId"          column="vendor_id"           />
+        <result property="factoryId"         column="factory_id"          />
+        <result property="vendorCode"        column="vendor_code"         />
+        <result property="vendorName"        column="vendor_name"         />
+        <result property="outsourceFactoryId" column="outsource_factory_id"/>
+        <result property="vendorNick"        column="vendor_nick"         />
+        <result property="vendorEn"          column="vendor_en"           />
+        <result property="vendorType"        column="vendor_type"         />
+        <result property="vendorDes"         column="vendor_des"          />
+        <result property="vendorLogo"        column="vendor_logo"         />
+        <result property="vendorLevel"       column="vendor_level"        />
+        <result property="vendorScore"       column="vendor_score"        />
+        <result property="address"           column="address"             />
+        <result property="website"           column="website"             />
+        <result property="email"             column="email"               />
+        <result property="tel"               column="tel"                 />
+        <result property="contact1"          column="contact1"            />
+        <result property="contact1Tel"       column="contact1_tel"        />
+        <result property="contact1Email"     column="contact1_email"      />
+        <result property="contact2"          column="contact2"            />
+        <result property="contact2Tel"       column="contact2_tel"        />
+        <result property="contact2Email"     column="contact2_email"      />
+        <result property="creditCode"        column="credit_code"         />
+        <result property="settlementType"    column="settlement_type"     />
+        <result property="paymentTerms"      column="payment_terms"       />
+        <result property="coopStatus"        column="coop_status"         />
+        <result property="enableFlag"        column="enable_flag"         />
+        <result property="remark"            column="remark"              />
+        <result property="createBy"          column="create_by"           />
+        <result property="createTime"        column="create_time"         />
+        <result property="updateBy"          column="update_by"           />
+        <result property="updateTime"        column="update_time"         />
+    </resultMap>
+
+    <sql id="selectMdVendorVo">
+        select vendor_id, factory_id, vendor_code, vendor_name, outsource_factory_id, vendor_nick,
+               vendor_en, vendor_type, vendor_des, vendor_logo, vendor_level, vendor_score,
+               address, website, email, tel, contact1, contact1_tel, contact1_email,
+               contact2, contact2_tel, contact2_email, credit_code, settlement_type,
+               payment_terms, coop_status, enable_flag, remark, create_by, create_time,
+               update_by, update_time
+        from qxx_md_vendor
+    </sql>
+
+    <select id="selectMdVendorList" parameterType="com.ruoyi.system.domain.mes.md.MdVendor" resultMap="MdVendorResult">
+        <include refid="selectMdVendorVo"/>
+        <where>
+            <if test="vendorCode != null  and vendorCode != ''"> and vendor_code = #{vendorCode}</if>
+            <if test="vendorName != null  and vendorName != ''"> and vendor_name like concat('%', #{vendorName}, '%')</if>
+            <if test="vendorNick != null  and vendorNick != ''"> and vendor_nick like concat('%', #{vendorNick}, '%')</if>
+            <if test="vendorType != null  and vendorType != ''"> and vendor_type = #{vendorType}</if>
+            <if test="vendorLevel != null  and vendorLevel != ''"> and vendor_level = #{vendorLevel}</if>
+            <if test="coopStatus != null  and coopStatus != ''"> and coop_status = #{coopStatus}</if>
+            <if test="enableFlag != null  and enableFlag != ''"> and enable_flag = #{enableFlag}</if>
+        </where>
+    </select>
+
+    <select id="selectMdVendorAllEnabled" resultMap="MdVendorResult">
+        <include refid="selectMdVendorVo"/>
+        where enable_flag = 'Y'
+    </select>
+
+    <select id="checkVendorCodeUnique" parameterType="com.ruoyi.system.domain.mes.md.MdVendor" resultMap="MdVendorResult">
+        <include refid="selectMdVendorVo"/>
+        where vendor_code = #{vendorCode} limit 1
+    </select>
+
+    <select id="selectMdVendorByVendorId" parameterType="Long" resultMap="MdVendorResult">
+        <include refid="selectMdVendorVo"/>
+        where vendor_id = #{vendorId}
+    </select>
+
+    <insert id="insertMdVendor" parameterType="com.ruoyi.system.domain.mes.md.MdVendor" useGeneratedKeys="true" keyProperty="vendorId">
+        insert into qxx_md_vendor
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="vendorCode != null and vendorCode != ''">vendor_code,</if>
+            <if test="vendorName != null and vendorName != ''">vendor_name,</if>
+            <if test="outsourceFactoryId != null">outsource_factory_id,</if>
+            <if test="vendorNick != null">vendor_nick,</if>
+            <if test="vendorEn != null">vendor_en,</if>
+            <if test="vendorType != null">vendor_type,</if>
+            <if test="vendorDes != null">vendor_des,</if>
+            <if test="vendorLogo != null">vendor_logo,</if>
+            <if test="vendorLevel != null">vendor_level,</if>
+            <if test="vendorScore != null">vendor_score,</if>
+            <if test="address != null">address,</if>
+            <if test="website != null">website,</if>
+            <if test="email != null">email,</if>
+            <if test="tel != null">tel,</if>
+            <if test="contact1 != null">contact1,</if>
+            <if test="contact1Tel != null">contact1_tel,</if>
+            <if test="contact1Email != null">contact1_email,</if>
+            <if test="contact2 != null">contact2,</if>
+            <if test="contact2Tel != null">contact2_tel,</if>
+            <if test="contact2Email != null">contact2_email,</if>
+            <if test="creditCode != null">credit_code,</if>
+            <if test="settlementType != null">settlement_type,</if>
+            <if test="paymentTerms != null">payment_terms,</if>
+            <if test="coopStatus != null">coop_status,</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="vendorCode != null and vendorCode != ''">#{vendorCode},</if>
+            <if test="vendorName != null and vendorName != ''">#{vendorName},</if>
+            <if test="outsourceFactoryId != null">#{outsourceFactoryId},</if>
+            <if test="vendorNick != null">#{vendorNick},</if>
+            <if test="vendorEn != null">#{vendorEn},</if>
+            <if test="vendorType != null">#{vendorType},</if>
+            <if test="vendorDes != null">#{vendorDes},</if>
+            <if test="vendorLogo != null">#{vendorLogo},</if>
+            <if test="vendorLevel != null">#{vendorLevel},</if>
+            <if test="vendorScore != null">#{vendorScore},</if>
+            <if test="address != null">#{address},</if>
+            <if test="website != null">#{website},</if>
+            <if test="email != null">#{email},</if>
+            <if test="tel != null">#{tel},</if>
+            <if test="contact1 != null">#{contact1},</if>
+            <if test="contact1Tel != null">#{contact1Tel},</if>
+            <if test="contact1Email != null">#{contact1Email},</if>
+            <if test="contact2 != null">#{contact2},</if>
+            <if test="contact2Tel != null">#{contact2Tel},</if>
+            <if test="contact2Email != null">#{contact2Email},</if>
+            <if test="creditCode != null">#{creditCode},</if>
+            <if test="settlementType != null">#{settlementType},</if>
+            <if test="paymentTerms != null">#{paymentTerms},</if>
+            <if test="coopStatus != null">#{coopStatus},</if>
+            <if test="enableFlag != null and enableFlag != ''">#{enableFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateMdVendor" parameterType="com.ruoyi.system.domain.mes.md.MdVendor">
+        update qxx_md_vendor
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="vendorCode != null and vendorCode != ''">vendor_code = #{vendorCode},</if>
+            <if test="vendorName != null and vendorName != ''">vendor_name = #{vendorName},</if>
+            <if test="outsourceFactoryId != null">outsource_factory_id = #{outsourceFactoryId},</if>
+            <if test="vendorNick != null">vendor_nick = #{vendorNick},</if>
+            <if test="vendorEn != null">vendor_en = #{vendorEn},</if>
+            <if test="vendorType != null">vendor_type = #{vendorType},</if>
+            <if test="vendorDes != null">vendor_des = #{vendorDes},</if>
+            <if test="vendorLogo != null">vendor_logo = #{vendorLogo},</if>
+            <if test="vendorLevel != null">vendor_level = #{vendorLevel},</if>
+            <if test="vendorScore != null">vendor_score = #{vendorScore},</if>
+            <if test="address != null">address = #{address},</if>
+            <if test="website != null">website = #{website},</if>
+            <if test="email != null">email = #{email},</if>
+            <if test="tel != null">tel = #{tel},</if>
+            <if test="contact1 != null">contact1 = #{contact1},</if>
+            <if test="contact1Tel != null">contact1_tel = #{contact1Tel},</if>
+            <if test="contact1Email != null">contact1_email = #{contact1Email},</if>
+            <if test="contact2 != null">contact2 = #{contact2},</if>
+            <if test="contact2Tel != null">contact2_tel = #{contact2Tel},</if>
+            <if test="contact2Email != null">contact2_email = #{contact2Email},</if>
+            <if test="creditCode != null">credit_code = #{creditCode},</if>
+            <if test="settlementType != null">settlement_type = #{settlementType},</if>
+            <if test="paymentTerms != null">payment_terms = #{paymentTerms},</if>
+            <if test="coopStatus != null">coop_status = #{coopStatus},</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag = #{enableFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where vendor_id = #{vendorId}
+    </update>
+
+    <delete id="deleteMdVendorByVendorId" parameterType="Long">
+        delete from qxx_md_vendor where vendor_id = #{vendorId}
+    </delete>
+
+    <delete id="deleteMdVendorByVendorIds" parameterType="String">
+        delete from qxx_md_vendor where vendor_id in
+        <foreach item="vendorId" collection="array" open="(" separator="," close=")">
+            #{vendorId}
+        </foreach>
+    </delete>
+</mapper>

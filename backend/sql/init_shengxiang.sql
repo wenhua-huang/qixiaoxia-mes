@@ -164,17 +164,16 @@ INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component,
 (2007, '排班管理', 2000, 7, 'cal', NULL, 1, 0, 'M', '0', '0', '', 'date',     'admin', sysdate()),
 (2008, '工装管理', 2000, 8, 'tm',  NULL, 1, 0, 'M', '0', '0', '', 'nested',   'admin', sysdate());
 
--- ### 8.3 基础数据(md) 子菜单（2100-2108）###
+-- ### 8.3 基础数据(md) 子菜单（2101-2108）###
+-- 注：工厂无CRUD页面，由开发人员直接SQL操作；BOM已集成到物料主数据对话框中，无独立页面
 INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time) VALUES
-(2100, '工厂定义',     2001, 1, 'factory',     'mes/md/factory/index',     1, 0, 'C', '0', '0', 'mes:md:factory:list',     '#', 'admin', sysdate()),
-(2101, '物料主数据',   2001, 2, 'item',        'mes/md/item/index',        1, 0, 'C', '0', '0', 'mes:md:item:list',        '#', 'admin', sysdate()),
-(2102, '物料分类',     2001, 3, 'itemtype',    'mes/md/itemtype/index',    1, 0, 'C', '0', '0', 'mes:md:itemtype:list',    '#', 'admin', sysdate()),
-(2103, '产品BOM',      2001, 4, 'bom',         'mes/md/bom/index',         1, 0, 'C', '0', '0', 'mes:md:bom:list',         '#', 'admin', sysdate()),
-(2104, '供应商管理',   2001, 5, 'vendor',      'mes/md/vendor/index',      1, 0, 'C', '0', '0', 'mes:md:vendor:list',      '#', 'admin', sysdate()),
-(2105, '客户管理',     2001, 6, 'client',      'mes/md/client/index',      1, 0, 'C', '0', '0', 'mes:md:client:list',      '#', 'admin', sysdate()),
-(2106, '计量单位',     2001, 7, 'unitmeasure', 'mes/md/unitmeasure/index', 1, 0, 'C', '0', '0', 'mes:md:unitmeasure:list', '#', 'admin', sysdate()),
-(2107, '车间管理',     2001, 8, 'workshop',    'mes/md/workshop/index',    1, 0, 'C', '0', '0', 'mes:md:workshop:list',    '#', 'admin', sysdate()),
-(2108, '工作站管理',   2001, 9, 'workstation', 'mes/md/workstation/index', 1, 0, 'C', '0', '0', 'mes:md:workstation:list', '#', 'admin', sysdate());
+(2101, '物料主数据',   2001, 1, 'item',        'mes/md/item/index',        1, 0, 'C', '0', '0', 'mes:md:item:list',        '#', 'admin', sysdate()),
+(2102, '物料分类',     2001, 2, 'itemtype',    'mes/md/itemtype/index',    1, 0, 'C', '0', '0', 'mes:md:itemtype:list',    '#', 'admin', sysdate()),
+(2104, '供应商管理',   2001, 3, 'vendor',      'mes/md/vendor/index',      1, 0, 'C', '0', '0', 'mes:md:vendor:list',      '#', 'admin', sysdate()),
+(2105, '客户管理',     2001, 4, 'client',      'mes/md/client/index',      1, 0, 'C', '0', '0', 'mes:md:client:list',      '#', 'admin', sysdate()),
+(2106, '计量单位',     2001, 5, 'unitmeasure', 'mes/md/unitmeasure/index', 1, 0, 'C', '0', '0', 'mes:md:unitmeasure:list', '#', 'admin', sysdate()),
+(2107, '车间管理',     2001, 6, 'workshop',    'mes/md/workshop/index',    1, 0, 'C', '0', '0', 'mes:md:workshop:list',    '#', 'admin', sysdate()),
+(2108, '工作站管理',   2001, 7, 'workstation', 'mes/md/workstation/index', 1, 0, 'C', '0', '0', 'mes:md:workstation:list', '#', 'admin', sysdate());
 
 -- ### 8.4 仓储管理(wm) 子菜单（2200-2206）###
 INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time) VALUES
@@ -227,13 +226,8 @@ INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component,
 -- ============================================================
 
 -- 9.1 基础数据(md) 按钮
+-- 注：工厂无CRUD，按钮已移除（原21001-21005），只保留list/listAll接口
 INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, menu_type, visible, status, perms, create_by, create_time) VALUES
--- 工厂定义 2100
-(21001, '工厂查询', 2100, 1, 'F', '0', '0', 'mes:md:factory:query',  'admin', sysdate()),
-(21002, '工厂新增', 2100, 2, 'F', '0', '0', 'mes:md:factory:add',    'admin', sysdate()),
-(21003, '工厂修改', 2100, 3, 'F', '0', '0', 'mes:md:factory:edit',   'admin', sysdate()),
-(21004, '工厂删除', 2100, 4, 'F', '0', '0', 'mes:md:factory:remove', 'admin', sysdate()),
-(21005, '工厂导出', 2100, 5, 'F', '0', '0', 'mes:md:factory:export', 'admin', sysdate()),
 -- 物料主数据 2101
 (21011, '物料查询', 2101, 1, 'F', '0', '0', 'mes:md:item:query',  'admin', sysdate()),
 (21012, '物料新增', 2101, 2, 'F', '0', '0', 'mes:md:item:add',    'admin', sysdate()),
@@ -245,11 +239,6 @@ INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, menu_type, visib
 (21022, '分类新增', 2102, 2, 'F', '0', '0', 'mes:md:itemtype:add',    'admin', sysdate()),
 (21023, '分类修改', 2102, 3, 'F', '0', '0', 'mes:md:itemtype:edit',   'admin', sysdate()),
 (21024, '分类删除', 2102, 4, 'F', '0', '0', 'mes:md:itemtype:remove', 'admin', sysdate()),
--- 产品BOM 2103
-(21031, 'BOM查询', 2103, 1, 'F', '0', '0', 'mes:md:bom:query',  'admin', sysdate()),
-(21032, 'BOM新增', 2103, 2, 'F', '0', '0', 'mes:md:bom:add',    'admin', sysdate()),
-(21033, 'BOM修改', 2103, 3, 'F', '0', '0', 'mes:md:bom:edit',   'admin', sysdate()),
-(21034, 'BOM删除', 2103, 4, 'F', '0', '0', 'mes:md:bom:remove', 'admin', sysdate()),
 -- 供应商管理 2104
 (21041, '供应商查询', 2104, 1, 'F', '0', '0', 'mes:md:vendor:query',  'admin', sysdate()),
 (21042, '供应商新增', 2104, 2, 'F', '0', '0', 'mes:md:vendor:add',    'admin', sysdate()),
@@ -439,11 +428,11 @@ SELECT '11', menu_id, 1 FROM sys_menu WHERE parent_id IN (2001, 2003);
 
 -- MD 所有子菜单
 INSERT IGNORE INTO sys_role_menu (role_id, menu_id, factory_id)
-SELECT '11', menu_id, 1 FROM sys_menu WHERE menu_id IN (2100, 2101, 2102, 2103, 2104, 2105, 2106, 2107, 2108);
+SELECT '11', menu_id, 1 FROM sys_menu WHERE menu_id IN (2101, 2102, 2104, 2105, 2106, 2107, 2108);
 
 -- MD 所有按钮
 INSERT IGNORE INTO sys_role_menu (role_id, menu_id, factory_id)
-SELECT '11', menu_id, 1 FROM sys_menu WHERE parent_id IN (2100, 2101, 2102, 2103, 2104, 2105, 2106, 2107, 2108);
+SELECT '11', menu_id, 1 FROM sys_menu WHERE parent_id IN (2101, 2102, 2104, 2105, 2106, 2107, 2108);
 
 -- PRO 所有子菜单
 INSERT IGNORE INTO sys_role_menu (role_id, menu_id, factory_id)

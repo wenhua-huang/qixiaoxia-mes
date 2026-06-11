@@ -246,6 +246,7 @@ public class FactoryIdInterceptor implements Interceptor
 
         if (wi >= 0)
         {
+            // 如果 WHERE 在子查询里，注入到子查询 ) 之前（别名作用域内）
             int at = findInsertPoint(s, wi + 6);
             if (at < 0) at = s.length();
             return s.substring(0, at) + " AND " + fkCol + " = __FACTORY_ID__ " + s.substring(at);
@@ -259,8 +260,9 @@ public class FactoryIdInterceptor implements Interceptor
     }
 
     /**
-     * 从 WHERE 之后找到 AND 注入点。先找 ORDER BY/LIMIT 等关键字；找不到时从末尾倒查
-     * 第一个非 IN(?) 闭括号的 `)`（子查询结束符），向前插入。覆盖所有现有 Mapper SQL 场景。
+     * 从 WHERE 之后找到 AND 注入点。优先 ORDER BY/GROUP BY/LIMIT/FOR UPDATE 关键字；
+     * 其次找最外层子查询的 `)`（括号内含 SELECT 才算子查询，排除 CONCAT 等函数括号），
+     * 注入到 `)` 之前（子查询内部，别名有效）；都不满足则追加到 SQL 末尾。
      */
     private int findInsertPoint(String s, int start)
     {
@@ -271,20 +273,34 @@ public class FactoryIdInterceptor implements Interceptor
             int idx = lower.indexOf(kw, start);
             if (idx > 0 && idx < min) min = idx;
         }
-        // 从末尾倒查第一个 )（排除 IN (?) / func(?) 的闭括号）
-        int idx = s.length();
-        while (--idx > start)
+        if (min < Integer.MAX_VALUE) return min;
+
+        // 没有关键字 → 扫描整个 SQL 找最外层子查询 `)`（括号内含 SELECT），注入到其内。
+        // 从末尾向前扫，跟踪括号深度，忽略 start 参数（它可能落在子查询内部）。
+        int depth = 0;
+        int lastParen = -1;
+        for (int i = s.length() - 1; i > 0; i--)
         {
-            if (s.charAt(idx) == ')')
+            char c = s.charAt(i);
+            if (c == ')')
             {
-                int b = idx - 1;
-                while (b > start && Character.isWhitespace(s.charAt(b))) b--;
-                if (b > start && s.charAt(b) == '?') { idx = b; continue; } // 跳过 ? 直接前导的 )
-                if (idx < min) min = idx;
-                break;
+                if (depth == 0) lastParen = i;
+                depth++;
+            }
+            else if (c == '(')
+            {
+                depth--;
+                if (depth == 0 && lastParen > 0)
+                {
+                    if (s.substring(i, lastParen).toLowerCase().contains("select"))
+                    {
+                        return lastParen; // 注入到子查询 ) 之前（WHERE 在子查询内）
+                    }
+                    lastParen = -1;
+                }
             }
         }
-        return min == Integer.MAX_VALUE ? -1 : min;
+        return s.length();
     }
 
     private int findWhereInsertPoint(String s)

@@ -21,12 +21,8 @@
       </el-form-item>
       <el-form-item label="是否启用" prop="enableFlag">
         <el-select v-model="queryParams.enableFlag" placeholder="是否启用" clearable style="width: 200px">
-          <el-option
-            v-for="dict in sys_yes_no"
-            :key="dict.value"
-            :label="dict.label"
-            :value="dict.value"
-          />
+          <el-option label="是" value="Y" />
+          <el-option label="否" value="N" />
         </el-select>
       </el-form-item>
       <el-form-item>
@@ -135,11 +131,8 @@
         </el-form-item>
         <el-form-item label="是否启用" prop="enableFlag">
           <el-radio-group v-model="form.enableFlag">
-            <el-radio
-              v-for="dict in sys_yes_no"
-              :key="dict.value"
-              :value="dict.value"
-            >{{ dict.label }}</el-radio>
+            <el-radio value="Y">是</el-radio>
+            <el-radio value="N">否</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="备注" prop="remark">

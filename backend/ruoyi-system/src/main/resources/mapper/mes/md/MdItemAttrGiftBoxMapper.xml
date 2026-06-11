@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.md.MdItemAttrGiftBoxMapper">
+    <resultMap type="com.ruoyi.system.domain.mes.md.MdItemAttrGiftBox" id="Result">
+        <result property="attrId" column="attr_id"/>
+        <result property="factoryId" column="factory_id"/>
+        <result property="itemId" column="item_id"/>
+    </resultMap>
+
+    <sql id="cols">attr_id,factory_id,item_id,create_by,create_time,update_by,update_time,remark</sql>
+
+    <select id="selectByItemId" parameterType="Long" resultMap="Result">
+        select <include refid="cols"/> from qxx_md_item_attr_gift_box where item_id = #{itemId}
+    </select>
+
+    <insert id="insert" parameterType="com.ruoyi.system.domain.mes.md.MdItemAttrGiftBox" useGeneratedKeys="true" keyProperty="attrId">
+        insert into qxx_md_item_attr_gift_box
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="itemId != null">item_id,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="itemId != null">#{itemId},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateByItemId" parameterType="com.ruoyi.system.domain.mes.md.MdItemAttrGiftBox">
+        update qxx_md_item_attr_gift_box
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where item_id = #{itemId}
+    </update>
+
+    <delete id="deleteByItemId" parameterType="Long">
+        delete from qxx_md_item_attr_gift_box where item_id = #{itemId}
+    </delete>
+</mapper>

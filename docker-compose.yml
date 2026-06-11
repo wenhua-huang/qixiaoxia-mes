@@ -16,6 +16,9 @@ services:
       - ./backend/sql:/docker-entrypoint-initdb.d  # 自动执行初始化SQL
     command:
       --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --init-connect='SET NAMES utf8mb4'
+      --skip-character-set-client-handshake
       --collation-server=utf8mb4_general_ci
       --default-time-zone=+08:00
       --skip-character-set-client-handshake

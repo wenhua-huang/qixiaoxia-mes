@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.md.MdWorkshopMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.md.MdWorkshop" id="MdWorkshopResult">
+        <result property="workshopId"    column="workshop_id"    />
+        <result property="factoryId"     column="factory_id"     />
+        <result property="workshopCode"  column="workshop_code"  />
+        <result property="workshopName"  column="workshop_name"  />
+        <result property="address"       column="address"        />
+        <result property="manager"       column="manager"        />
+        <result property="enableFlag"    column="enable_flag"    />
+        <result property="remark"        column="remark"         />
+        <result property="createBy"      column="create_by"      />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"      column="update_by"      />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectMdWorkshopVo">
+        select workshop_id, factory_id, workshop_code, workshop_name, address, manager,
+               enable_flag, remark, create_by, create_time, update_by, update_time
+        from qxx_md_workshop
+    </sql>
+
+    <select id="selectMdWorkshopList" parameterType="com.ruoyi.system.domain.mes.md.MdWorkshop" resultMap="MdWorkshopResult">
+        <include refid="selectMdWorkshopVo"/>
+        <where>
+            <if test="workshopCode != null and workshopCode != ''"> and workshop_code like concat('%', #{workshopCode}, '%')</if>
+            <if test="workshopName != null and workshopName != ''"> and workshop_name like concat('%', #{workshopName}, '%')</if>
+            <if test="enableFlag != null and enableFlag != ''"> and enable_flag = #{enableFlag}</if>
+        </where>
+    </select>
+
+    <select id="selectMdWorkshopById" parameterType="Long" resultMap="MdWorkshopResult">
+        <include refid="selectMdWorkshopVo"/>
+        where workshop_id = #{workshopId}
+    </select>
+
+    <select id="checkWorkshopCodeUnique" parameterType="com.ruoyi.system.domain.mes.md.MdWorkshop" resultMap="MdWorkshopResult">
+        <include refid="selectMdWorkshopVo"/>
+        where workshop_code = #{workshopCode} limit 1
+    </select>
+
+    <insert id="insertMdWorkshop" parameterType="com.ruoyi.system.domain.mes.md.MdWorkshop" useGeneratedKeys="true" keyProperty="workshopId">
+        insert into qxx_md_workshop
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="workshopCode != null and workshopCode != ''">workshop_code,</if>
+            <if test="workshopName != null and workshopName != ''">workshop_name,</if>
+            <if test="address != null">address,</if>
+            <if test="manager != null">manager,</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="workshopCode != null and workshopCode != ''">#{workshopCode},</if>
+            <if test="workshopName != null and workshopName != ''">#{workshopName},</if>
+            <if test="address != null">#{address},</if>
+            <if test="manager != null">#{manager},</if>
+            <if test="enableFlag != null and enableFlag != ''">#{enableFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateMdWorkshop" parameterType="com.ruoyi.system.domain.mes.md.MdWorkshop">
+        update qxx_md_workshop
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="workshopCode != null and workshopCode != ''">workshop_code = #{workshopCode},</if>
+            <if test="workshopName != null and workshopName != ''">workshop_name = #{workshopName},</if>
+            <if test="address != null">address = #{address},</if>
+            <if test="manager != null">manager = #{manager},</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag = #{enableFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where workshop_id = #{workshopId}
+    </update>
+
+    <delete id="deleteMdWorkshopById" parameterType="Long">
+        delete from qxx_md_workshop where workshop_id = #{workshopId}
+    </delete>
+
+    <delete id="deleteMdWorkshopByIds" parameterType="String">
+        delete from qxx_md_workshop where workshop_id in
+        <foreach item="workshopId" collection="array" open="(" separator="," close=")">
+            #{workshopId}
+        </foreach>
+    </delete>
+</mapper>

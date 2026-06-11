@@ -537,7 +537,7 @@ create table qxx_md_workstation_worker (
 
 -- ----------------------------
 -- 13、产品SOP表(作业指导书)
--- 用途：关联产品的操作指导书附件
+-- 用途：关联产品的操作指导书附件 暂时不用
 -- ----------------------------
 drop table if exists qxx_md_product_sop;
 create table qxx_md_product_sop (
@@ -559,7 +559,7 @@ create table qxx_md_product_sop (
 
 -- ----------------------------
 -- 14、产品SIP表(检验指导书)
--- 用途：关联产品的检验标准文件
+-- 用途：关联产品的检验标准文件 暂时不用
 -- ----------------------------
 drop table if exists qxx_md_product_sip;
 create table qxx_md_product_sip (

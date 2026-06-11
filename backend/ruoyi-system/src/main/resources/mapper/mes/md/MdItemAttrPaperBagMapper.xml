@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.md.MdItemAttrPaperBagMapper">
+    <resultMap type="com.ruoyi.system.domain.mes.md.MdItemAttrPaperBag" id="Result">
+        <result property="attrId" column="attr_id"/>
+        <result property="factoryId" column="factory_id"/>
+        <result property="itemId" column="item_id"/>
+        <result property="ropeSpec" column="rope_spec"/>
+        <result property="mouthType" column="mouth_type"/>
+        <result property="bottomType" column="bottom_type"/>
+    </resultMap>
+
+    <sql id="cols">attr_id,factory_id,item_id,rope_spec,mouth_type,bottom_type,create_by,create_time,update_by,update_time,remark</sql>
+
+    <select id="selectByItemId" parameterType="Long" resultMap="Result">
+        select <include refid="cols"/> from qxx_md_item_attr_paper_bag where item_id = #{itemId}
+    </select>
+
+    <insert id="insert" parameterType="com.ruoyi.system.domain.mes.md.MdItemAttrPaperBag" useGeneratedKeys="true" keyProperty="attrId">
+        insert into qxx_md_item_attr_paper_bag
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="itemId != null">item_id,</if>
+            <if test="ropeSpec != null">rope_spec,</if>
+            <if test="mouthType != null">mouth_type,</if>
+            <if test="bottomType != null">bottom_type,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="itemId != null">#{itemId},</if>
+            <if test="ropeSpec != null">#{ropeSpec},</if>
+            <if test="mouthType != null">#{mouthType},</if>
+            <if test="bottomType != null">#{bottomType},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateByItemId" parameterType="com.ruoyi.system.domain.mes.md.MdItemAttrPaperBag">
+        update qxx_md_item_attr_paper_bag
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="ropeSpec != null">rope_spec = #{ropeSpec},</if>
+            <if test="mouthType != null">mouth_type = #{mouthType},</if>
+            <if test="bottomType != null">bottom_type = #{bottomType},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where item_id = #{itemId}
+    </update>
+
+    <delete id="deleteByItemId" parameterType="Long">
+        delete from qxx_md_item_attr_paper_bag where item_id = #{itemId}
+    </delete>
+</mapper>

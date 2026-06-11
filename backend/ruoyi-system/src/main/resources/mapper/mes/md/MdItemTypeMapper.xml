@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.md.MdItemTypeMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.md.MdItemType" id="MdItemTypeResult">
+        <result property="itemTypeId"    column="item_type_id"    />
+        <result property="factoryId"     column="factory_id"      />
+        <result property="itemTypeCode"  column="item_type_code"  />
+        <result property="itemTypeName"  column="item_type_name"  />
+        <result property="parentTypeId"  column="parent_type_id"  />
+        <result property="itemOrProduct" column="item_or_product" />
+        <result property="orderNum"      column="order_num"       />
+        <result property="enableFlag"    column="enable_flag"     />
+        <result property="remark"        column="remark"          />
+        <result property="createBy"      column="create_by"       />
+        <result property="createTime"    column="create_time"     />
+        <result property="updateBy"      column="update_by"       />
+        <result property="updateTime"    column="update_time"     />
+    </resultMap>
+
+    <sql id="selectMdItemTypeVo">
+        select item_type_id, factory_id, item_type_code, item_type_name, parent_type_id,
+               item_or_product, order_num, enable_flag, remark, create_by, create_time,
+               update_by, update_time
+        from qxx_md_item_type
+    </sql>
+
+    <select id="selectMdItemTypeList" parameterType="com.ruoyi.system.domain.mes.md.MdItemType" resultMap="MdItemTypeResult">
+        <include refid="selectMdItemTypeVo"/>
+        <where>
+            <if test="itemTypeCode != null and itemTypeCode != ''"> and item_type_code like concat('%', #{itemTypeCode}, '%')</if>
+            <if test="itemTypeName != null and itemTypeName != ''"> and item_type_name like concat('%', #{itemTypeName}, '%')</if>
+            <if test="itemOrProduct != null and itemOrProduct != ''"> and item_or_product = #{itemOrProduct}</if>
+            <if test="enableFlag != null and enableFlag != ''"> and enable_flag = #{enableFlag}</if>
+        </where>
+        order by order_num, item_type_id
+    </select>
+
+    <select id="selectMdItemTypeById" parameterType="Long" resultMap="MdItemTypeResult">
+        <include refid="selectMdItemTypeVo"/>
+        where item_type_id = #{itemTypeId}
+    </select>
+
+    <select id="selectMdItemTypeByParentId" parameterType="Long" resultMap="MdItemTypeResult">
+        <include refid="selectMdItemTypeVo"/>
+        where parent_type_id = #{parentTypeId}
+        order by order_num, item_type_id
+    </select>
+
+    <select id="selectDescendantIds" parameterType="Long" resultType="Long">
+        WITH RECURSIVE cte AS (
+            SELECT item_type_id FROM qxx_md_item_type WHERE item_type_id = #{itemTypeId}
+            UNION ALL
+            SELECT t.item_type_id FROM qxx_md_item_type t
+            INNER JOIN cte ON t.parent_type_id = cte.item_type_id
+        )
+        SELECT item_type_id FROM cte
+    </select>
+
+    <select id="checkItemTypeCodeUnique" parameterType="com.ruoyi.system.domain.mes.md.MdItemType" resultMap="MdItemTypeResult">
+        <include refid="selectMdItemTypeVo"/>
+        where item_type_code = #{itemTypeCode} limit 1
+    </select>
+
+    <insert id="insertMdItemType" parameterType="com.ruoyi.system.domain.mes.md.MdItemType" useGeneratedKeys="true" keyProperty="itemTypeId">
+        insert into qxx_md_item_type
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="itemTypeCode != null and itemTypeCode != ''">item_type_code,</if>
+            <if test="itemTypeName != null and itemTypeName != ''">item_type_name,</if>
+            <if test="parentTypeId != null">parent_type_id,</if>
+            <if test="itemOrProduct != null and itemOrProduct != ''">item_or_product,</if>
+            <if test="orderNum != null">order_num,</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="itemTypeCode != null and itemTypeCode != ''">#{itemTypeCode},</if>
+            <if test="itemTypeName != null and itemTypeName != ''">#{itemTypeName},</if>
+            <if test="parentTypeId != null">#{parentTypeId},</if>
+            <if test="itemOrProduct != null and itemOrProduct != ''">#{itemOrProduct},</if>
+            <if test="orderNum != null">#{orderNum},</if>
+            <if test="enableFlag != null and enableFlag != ''">#{enableFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateMdItemType" parameterType="com.ruoyi.system.domain.mes.md.MdItemType">
+        update qxx_md_item_type
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="itemTypeCode != null and itemTypeCode != ''">item_type_code = #{itemTypeCode},</if>
+            <if test="itemTypeName != null and itemTypeName != ''">item_type_name = #{itemTypeName},</if>
+            <if test="parentTypeId != null">parent_type_id = #{parentTypeId},</if>
+            <if test="itemOrProduct != null and itemOrProduct != ''">item_or_product = #{itemOrProduct},</if>
+            <if test="orderNum != null">order_num = #{orderNum},</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag = #{enableFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where item_type_id = #{itemTypeId}
+    </update>
+
+    <delete id="deleteMdItemTypeById" parameterType="Long">
+        delete from qxx_md_item_type where item_type_id = #{itemTypeId}
+    </delete>
+
+    <delete id="deleteMdItemTypeByIds" parameterType="String">
+        delete from qxx_md_item_type where item_type_id in
+        <foreach item="itemTypeId" collection="array" open="(" separator="," close=")">
+            #{itemTypeId}
+        </foreach>
+    </delete>
+</mapper>

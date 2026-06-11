@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.md.MdItemBatchConfigMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.md.MdItemBatchConfig" id="Result">
+        <result property="configId" column="config_id"/>
+        <result property="factoryId" column="factory_id"/>
+        <result property="itemId" column="item_id"/>
+        <result property="produceDateFlag" column="produce_date_flag"/>
+        <result property="expireDateFlag" column="expire_date_flag"/>
+        <result property="recptDateFlag" column="recpt_date_flag"/>
+        <result property="vendorFlag" column="vendor_flag"/>
+        <result property="clientFlag" column="client_flag"/>
+        <result property="coCodeFlag" column="co_code_flag"/>
+        <result property="poCodeFlag" column="po_code_flag"/>
+        <result property="workorderFlag" column="workorder_flag"/>
+        <result property="taskFlag" column="task_flag"/>
+        <result property="workstationFlag" column="workstation_flag"/>
+        <result property="toolFlag" column="tool_flag"/>
+        <result property="moldFlag" column="mold_flag"/>
+        <result property="lotNumberFlag" column="lot_number_flag"/>
+        <result property="qualityStatusFlag" column="quality_status_flag"/>
+        <result property="paperRollFlag" column="paper_roll_flag"/>
+        <result property="paperWidthFlag" column="paper_width_flag"/>
+        <result property="enableFlag" column="enable_flag"/>
+        <result property="remark" column="remark"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="cols">config_id,factory_id,item_id,produce_date_flag,expire_date_flag,recpt_date_flag,
+        vendor_flag,client_flag,co_code_flag,po_code_flag,workorder_flag,task_flag,
+        workstation_flag,tool_flag,mold_flag,lot_number_flag,quality_status_flag,
+        paper_roll_flag,paper_width_flag,enable_flag,remark,create_by,create_time,update_by,update_time</sql>
+
+    <select id="selectMdItemBatchConfigList" parameterType="com.ruoyi.system.domain.mes.md.MdItemBatchConfig" resultMap="Result">
+        select <include refid="cols"/> from qxx_md_item_batch_config
+        <where>
+            <if test="itemId != null"> and item_id = #{itemId}</if>
+        </where>
+    </select>
+
+    <select id="selectByItemId" parameterType="Long" resultMap="Result">
+        select <include refid="cols"/> from qxx_md_item_batch_config where item_id = #{itemId} limit 1
+    </select>
+
+    <select id="selectMdItemBatchConfigById" parameterType="Long" resultMap="Result">
+        select <include refid="cols"/> from qxx_md_item_batch_config where config_id = #{configId}
+    </select>
+
+    <insert id="insertMdItemBatchConfig" parameterType="com.ruoyi.system.domain.mes.md.MdItemBatchConfig" useGeneratedKeys="true" keyProperty="configId">
+        insert into qxx_md_item_batch_config
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="itemId != null">item_id,</if>
+            produce_date_flag,expire_date_flag,recpt_date_flag,vendor_flag,client_flag,
+            co_code_flag,po_code_flag,workorder_flag,task_flag,workstation_flag,tool_flag,
+            mold_flag,lot_number_flag,quality_status_flag,paper_roll_flag,paper_width_flag,
+            <if test="enableFlag != null">enable_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="itemId != null">#{itemId},</if>
+            #{produceDateFlag},#{expireDateFlag},#{recptDateFlag},#{vendorFlag},#{clientFlag},
+            #{coCodeFlag},#{poCodeFlag},#{workorderFlag},#{taskFlag},#{workstationFlag},#{toolFlag},
+            #{moldFlag},#{lotNumberFlag},#{qualityStatusFlag},#{paperRollFlag},#{paperWidthFlag},
+            <if test="enableFlag != null">#{enableFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateMdItemBatchConfig" parameterType="com.ruoyi.system.domain.mes.md.MdItemBatchConfig">
+        update qxx_md_item_batch_config
+        <trim prefix="SET" suffixOverrides=",">
+            produce_date_flag = #{produceDateFlag}, expire_date_flag = #{expireDateFlag},
+            recpt_date_flag = #{recptDateFlag}, vendor_flag = #{vendorFlag},
+            client_flag = #{clientFlag}, co_code_flag = #{coCodeFlag},
+            po_code_flag = #{poCodeFlag}, workorder_flag = #{workorderFlag},
+            task_flag = #{taskFlag}, workstation_flag = #{workstationFlag},
+            tool_flag = #{toolFlag}, mold_flag = #{moldFlag},
+            lot_number_flag = #{lotNumberFlag}, quality_status_flag = #{qualityStatusFlag},
+            paper_roll_flag = #{paperRollFlag}, paper_width_flag = #{paperWidthFlag},
+            <if test="enableFlag != null">enable_flag = #{enableFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where config_id = #{configId}
+    </update>
+
+    <delete id="deleteMdItemBatchConfigById" parameterType="Long">
+        delete from qxx_md_item_batch_config where config_id = #{configId}
+    </delete>
+
+    <delete id="deleteMdItemBatchConfigByIds" parameterType="String">
+        delete from qxx_md_item_batch_config where config_id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">#{id}</foreach>
+    </delete>
+
+    <delete id="deleteByItemId" parameterType="Long">
+        delete from qxx_md_item_batch_config where item_id = #{itemId}
+    </delete>
+</mapper>

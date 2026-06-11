@@ -6,6 +6,18 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 > **只允许修改本项目的文件！** VS Code workspace 中其他目录均为只读参考，**严禁修改**。
 
+## ⚠️ 编辑前必须 Read
+
+> **Vue 模板 / XML / HTML 等嵌套结构，编辑前务必 Read 上下文！** 
+> 闭着眼睛盲改 `<el-row>` / `<el-col>` / `<template>` 等嵌套标签极易破坏结构，
+> 导致 "Element is missing end tag" 等编译错误。
+> 
+> **规则**：
+> 1. 编辑 Vue 模板前，先 Read 目标区域 + 前后各 10 行确认标签嵌套
+> 2. 用最小化 diff — 增加/删除字段时优先改一行而非替换整个块
+> 3. 编辑后 grep 检查 `</el-row>` / `</template>` 等闭合标签数量是否平衡
+> 4. Vite HMR 编译错误会即时反馈 — 看到红色报错立刻修，别继续堆代码
+
 | 项目 | 路径 | 说明 |
 |------|------|------|
 | **qixiaoxia-mes** (当前) | `/Users/huangwenhua/company/self/qixiaoxia-mes/` | ✅ 唯一开发项目，可修改 |

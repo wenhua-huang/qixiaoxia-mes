@@ -197,6 +197,12 @@
   width: inherit;
 }
 
+/* 表格操作列 link 按钮对齐 */
+.el-table .fixed-width .el-button.is-link {
+  margin: 0 2px;
+  vertical-align: middle;
+}
+
 /* horizontal el menu */
 .el-menu--horizontal .el-menu-item .svg-icon + span,
 .el-menu--horizontal .el-sub-menu__title .svg-icon + span {

@@ -5,6 +5,12 @@
 -- 数据库: MySQL 8.0+, 字符集 utf8mb4
 -- 表前缀: qxx_dv_ (Device 设备管理)
 -- 说明: 设备类型/台账/点检/保养/维修等设备全生命周期管理
+--
+-- ╔════════════════════════════════════════════════════════════╗
+-- ║  实施阶段说明                                            ║
+-- ║  Phase 1 (当前): 表1 设备类型 + 表2 设备台账               ║
+-- ║  Phase 2 (后续): 表3-12 点检/保养/维修 — 暂不实现         ║
+-- ╚════════════════════════════════════════════════════════════╝
 -- ============================================================
 
 SET NAMES utf8mb4;
@@ -21,7 +27,7 @@ create table qxx_dv_machinery_type (
   machinery_type_code varchar(64)     not null                   comment '设备类型编码',
   machinery_type_name varchar(255)    not null                   comment '设备类型名称',
   parent_type_id      bigint(20)      default 0 not null         comment '父类型ID(0表示根节点)',
-  ancestors           varchar(500)    not null                   comment '所有层级父节点ID(用逗号分隔,如0,100,200)',
+  order_num           int(4)          default 0                  comment '同级排序号',
   enable_flag         char(1)         default '1' not null       comment '是否启用(1-是,0-否)',
   remark              varchar(500)    default ''                 comment '备注',
   create_by           varchar(64)     default ''                 comment '创建者',
@@ -64,8 +70,13 @@ create table qxx_dv_machinery (
   unique key uk_machinery_code (machinery_code)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '设备台账表';
 
+-- ============================================================
+-- ⚠️ 以下表 3-12（点检/保养/维修）暂不实现，Phase 2 再启用
+--    其他模块无依赖，不影响系统功能完整性
+-- ============================================================
+
 -- ----------------------------
--- 3、点检保养项目表
+-- 3、点检保养项目表 [暂不实现]
 -- 用途：定义设备点检和保养的标准项目，支持按不同周期类型配置
 -- ----------------------------
 drop table if exists qxx_dv_subject;
@@ -89,7 +100,7 @@ create table qxx_dv_subject (
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '点检保养项目表';
 
 -- ----------------------------
--- 4、点检保养计划头表
+-- 4、点检保养计划头表 [暂不实现]
 -- 用途：定义点检/保养计划的计划周期和有效期
 -- ----------------------------
 drop table if exists qxx_dv_check_plan;
@@ -116,7 +127,7 @@ create table qxx_dv_check_plan (
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '点检保养计划头表';
 
 -- ----------------------------
--- 5、计划-设备关联表
+-- 5、计划-设备关联表 [暂不实现]
 -- 用途：关联点检保养计划与具体设备，一个计划可关联多台设备
 -- ----------------------------
 drop table if exists qxx_dv_check_machinery;
@@ -137,7 +148,7 @@ create table qxx_dv_check_machinery (
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '计划-设备关联表';
 
 -- ----------------------------
--- 6、计划-项目关联表
+-- 6、计划-项目关联表 [暂不实现]
 -- 用途：关联点检保养计划与检查项目，一个计划可包含多个检查项目
 -- ----------------------------
 drop table if exists qxx_dv_check_subject;
@@ -158,7 +169,7 @@ create table qxx_dv_check_subject (
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '计划-项目关联表';
 
 -- ----------------------------
--- 7、点检记录表
+-- 7、点检记录表 [暂不实现]
 -- 用途：记录每次设备点检的执行情况和整体结果
 -- ----------------------------
 drop table if exists qxx_dv_check_record;
@@ -184,7 +195,7 @@ create table qxx_dv_check_record (
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '点检记录表';
 
 -- ----------------------------
--- 8、点检记录行表
+-- 8、点检记录行表 [暂不实现]
 -- 用途：点检记录的明细行，逐项记录每个检查项目的检查结果
 -- ----------------------------
 drop table if exists qxx_dv_check_record_line;
@@ -208,7 +219,7 @@ create table qxx_dv_check_record_line (
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '点检记录行表';
 
 -- ----------------------------
--- 9、保养记录表
+-- 9、保养记录表 [暂不实现]
 -- 用途：记录每次设备保养的执行情况和整体结果
 -- ----------------------------
 drop table if exists qxx_dv_mainten_record;
@@ -234,7 +245,7 @@ create table qxx_dv_mainten_record (
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '保养记录表';
 
 -- ----------------------------
--- 10、保养记录行表
+-- 10、保养记录行表 [暂不实现]
 -- 用途：保养记录的明细行，逐项记录每个保养项目的执行结果
 -- ----------------------------
 drop table if exists qxx_dv_mainten_record_line;
@@ -258,7 +269,7 @@ create table qxx_dv_mainten_record_line (
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '保养记录行表';
 
 -- ----------------------------
--- 11、设备维修单表
+-- 11、设备维修单表 [暂不实现]
 -- 用途：管理设备故障报修、维修过程和验收确认的完整流程
 -- ----------------------------
 drop table if exists qxx_dv_repair;
@@ -287,7 +298,7 @@ create table qxx_dv_repair (
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '设备维修单表';
 
 -- ----------------------------
--- 12、维修单行表
+-- 12、维修单行表 [暂不实现]
 -- 用途：维修单明细行，记录维修过程中的具体操作内容、更换配件和费用
 -- ----------------------------
 drop table if exists qxx_dv_repair_line;

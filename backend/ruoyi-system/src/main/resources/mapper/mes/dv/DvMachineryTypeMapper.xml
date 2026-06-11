@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.dv.DvMachineryTypeMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.dv.DvMachineryType" id="DvMachineryTypeResult">
+        <result property="machineryTypeId"   column="machinery_type_id"   />
+        <result property="factoryId"         column="factory_id"          />
+        <result property="machineryTypeCode" column="machinery_type_code" />
+        <result property="machineryTypeName" column="machinery_type_name" />
+        <result property="parentTypeId"      column="parent_type_id"      />
+        <result property="orderNum"          column="order_num"           />
+        <result property="enableFlag"        column="enable_flag"         />
+        <result property="remark"            column="remark"              />
+        <result property="createBy"          column="create_by"           />
+        <result property="createTime"        column="create_time"         />
+        <result property="updateBy"          column="update_by"           />
+        <result property="updateTime"        column="update_time"         />
+    </resultMap>
+
+    <sql id="selectDvMachineryTypeVo">
+        select machinery_type_id, factory_id, machinery_type_code, machinery_type_name,
+               parent_type_id, order_num, enable_flag, remark, create_by, create_time,
+               update_by, update_time
+        from qxx_dv_machinery_type
+    </sql>
+
+    <select id="selectDvMachineryTypeList" parameterType="com.ruoyi.system.domain.mes.dv.DvMachineryType" resultMap="DvMachineryTypeResult">
+        <include refid="selectDvMachineryTypeVo"/>
+        <where>
+            <if test="machineryTypeCode != null and machineryTypeCode != ''"> and machinery_type_code like concat('%', #{machineryTypeCode}, '%')</if>
+            <if test="machineryTypeName != null and machineryTypeName != ''"> and machinery_type_name like concat('%', #{machineryTypeName}, '%')</if>
+            <if test="enableFlag != null and enableFlag != ''"> and enable_flag = #{enableFlag}</if>
+        </where>
+        order by order_num, machinery_type_id
+    </select>
+
+    <select id="selectDvMachineryTypeById" parameterType="Long" resultMap="DvMachineryTypeResult">
+        <include refid="selectDvMachineryTypeVo"/>
+        where machinery_type_id = #{machineryTypeId}
+    </select>
+
+    <select id="selectDvMachineryTypeByParentId" parameterType="Long" resultMap="DvMachineryTypeResult">
+        <include refid="selectDvMachineryTypeVo"/>
+        where parent_type_id = #{parentTypeId}
+        order by order_num, machinery_type_id
+    </select>
+
+    <select id="selectDescendantIds" parameterType="Long" resultType="Long">
+        WITH RECURSIVE cte AS (
+            SELECT machinery_type_id FROM qxx_dv_machinery_type WHERE machinery_type_id = #{machineryTypeId}
+            UNION ALL
+            SELECT t.machinery_type_id FROM qxx_dv_machinery_type t
+            INNER JOIN cte ON t.parent_type_id = cte.machinery_type_id
+        )
+        SELECT machinery_type_id FROM cte
+    </select>
+
+    <select id="checkMachineryTypeCodeUnique" parameterType="com.ruoyi.system.domain.mes.dv.DvMachineryType" resultMap="DvMachineryTypeResult">
+        <include refid="selectDvMachineryTypeVo"/>
+        where machinery_type_code = #{machineryTypeCode} limit 1
+    </select>
+
+    <insert id="insertDvMachineryType" parameterType="com.ruoyi.system.domain.mes.dv.DvMachineryType" useGeneratedKeys="true" keyProperty="machineryTypeId">
+        insert into qxx_dv_machinery_type
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="machineryTypeCode != null and machineryTypeCode != ''">machinery_type_code,</if>
+            <if test="machineryTypeName != null and machineryTypeName != ''">machinery_type_name,</if>
+            <if test="parentTypeId != null">parent_type_id,</if>
+            <if test="orderNum != null">order_num,</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="machineryTypeCode != null and machineryTypeCode != ''">#{machineryTypeCode},</if>
+            <if test="machineryTypeName != null and machineryTypeName != ''">#{machineryTypeName},</if>
+            <if test="parentTypeId != null">#{parentTypeId},</if>
+            <if test="orderNum != null">#{orderNum},</if>
+            <if test="enableFlag != null and enableFlag != ''">#{enableFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateDvMachineryType" parameterType="com.ruoyi.system.domain.mes.dv.DvMachineryType">
+        update qxx_dv_machinery_type
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="machineryTypeCode != null and machineryTypeCode != ''">machinery_type_code = #{machineryTypeCode},</if>
+            <if test="machineryTypeName != null and machineryTypeName != ''">machinery_type_name = #{machineryTypeName},</if>
+            <if test="parentTypeId != null">parent_type_id = #{parentTypeId},</if>
+            <if test="orderNum != null">order_num = #{orderNum},</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag = #{enableFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where machinery_type_id = #{machineryTypeId}
+    </update>
+
+    <delete id="deleteDvMachineryTypeById" parameterType="Long">
+        delete from qxx_dv_machinery_type where machinery_type_id = #{machineryTypeId}
+    </delete>
+
+    <delete id="deleteDvMachineryTypeByIds" parameterType="String">
+        delete from qxx_dv_machinery_type where machinery_type_id in
+        <foreach item="machineryTypeId" collection="array" open="(" separator="," close=")">
+            #{machineryTypeId}
+        </foreach>
+    </delete>
+</mapper>

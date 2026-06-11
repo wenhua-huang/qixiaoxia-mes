@@ -201,11 +201,12 @@ INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component,
 (2403, '缺陷管理', 2004, 4, 'defect',   'mes/qc/defect/index',   1, 0, 'C', '0', '0', 'mes:qc:defect:list',   '#', 'admin', sysdate()),
 (2404, '检验模板', 2004, 5, 'template', 'mes/qc/template/index', 1, 0, 'C', '0', '0', 'mes:qc:template:list', '#', 'admin', sysdate());
 
--- ### 8.7 设备管理(dv) 子菜单（2500-2502）###
+-- ### 8.7 设备管理(dv) 子菜单（2505 设备类型 + 2500-2502）###
 INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time) VALUES
-(2500, '设备台账', 2005, 1, 'machinery', 'mes/dv/machinery/index', 1, 0, 'C', '0', '0', 'mes:dv:machinery:list', '#', 'admin', sysdate()),
-(2501, '点检计划', 2005, 2, 'checkplan', 'mes/dv/checkplan/index', 1, 0, 'C', '0', '0', 'mes:dv:checkplan:list', '#', 'admin', sysdate()),
-(2502, '维修记录', 2005, 3, 'repair',     'mes/dv/repair/index',    1, 0, 'C', '0', '0', 'mes:dv:repair:list',     '#', 'admin', sysdate());
+(2505, '设备类型', 2005, 1, 'machinerytype', 'mes/dv/machinerytype/index', 1, 0, 'C', '0', '0', 'mes:dv:machinerytype:list', '#', 'admin', sysdate()),
+(2500, '设备台账', 2005, 2, 'machinery',     'mes/dv/machinery/index',     1, 0, 'C', '0', '0', 'mes:dv:machinery:list',     '#', 'admin', sysdate()),
+(2501, '点检计划', 2005, 3, 'checkplan',     'mes/dv/checkplan/index',     1, 0, 'C', '0', '0', 'mes:dv:checkplan:list',     '#', 'admin', sysdate()),
+(2502, '维修记录', 2005, 4, 'repair',         'mes/dv/repair/index',        1, 0, 'C', '0', '0', 'mes:dv:repair:list',         '#', 'admin', sysdate());
 
 -- ### 8.8 采购管理(pur) 子菜单（2600）###
 INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time) VALUES
@@ -363,6 +364,11 @@ INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, menu_type, visib
 
 -- 9.5 设备管理(dv) 按钮
 INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, menu_type, visible, status, perms, create_by, create_time) VALUES
+-- 设备类型 2505
+(25051, '设备类型查询', 2505, 1, 'F', '0', '0', 'mes:dv:machinerytype:query',  'admin', sysdate()),
+(25052, '设备类型新增', 2505, 2, 'F', '0', '0', 'mes:dv:machinerytype:add',    'admin', sysdate()),
+(25053, '设备类型修改', 2505, 3, 'F', '0', '0', 'mes:dv:machinerytype:edit',   'admin', sysdate()),
+(25054, '设备类型删除', 2505, 4, 'F', '0', '0', 'mes:dv:machinerytype:remove', 'admin', sysdate()),
 -- 设备台账 2500
 (25001, '设备查询', 2500, 1, 'F', '0', '0', 'mes:dv:machinery:query',  'admin', sysdate()),
 (25002, '设备新增', 2500, 2, 'F', '0', '0', 'mes:dv:machinery:add',    'admin', sysdate()),

@@ -188,6 +188,43 @@ LOCK TABLES `qxx_md_product_sip` WRITE;
 /*!40000 ALTER TABLE `qxx_md_product_sip` DISABLE KEYS */;
 /*!40000 ALTER TABLE `qxx_md_product_sip` ENABLE KEYS */;
 UNLOCK TABLES;
+
+--
+-- Dumping data for table `qxx_dv_machinery_type` (设备类型 — 圣享工厂)
+--
+
+LOCK TABLES `qxx_dv_machinery_type` WRITE;
+/*!40000 ALTER TABLE `qxx_dv_machinery_type` DISABLE KEYS */;
+INSERT IGNORE INTO `qxx_dv_machinery_type` (`machinery_type_id`, `factory_id`, `machinery_type_code`, `machinery_type_name`, `parent_type_id`, `order_num`, `enable_flag`, `remark`, `create_by`, `create_time`, `update_by`, `update_time`) VALUES
+(199,1,'ROOT','总设备',0,0,'1','','admin',NOW(),'',NOW()),
+(200,1,'PRINT','印刷机',199,1,'1','','admin',NOW(),'',NOW()),
+(201,1,'BAG','制袋机',199,2,'1','','admin',NOW(),'',NOW()),
+(202,1,'BAG-AUTO','全自动制袋机',201,1,'1','','admin',NOW(),'',NOW()),
+(203,1,'BAG-SEMI','半自动制袋机',201,2,'1','','admin',NOW(),'',NOW());
+/*!40000 ALTER TABLE `qxx_dv_machinery_type` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Dumping data for table `qxx_dv_machinery` (设备台账 — 圣享工厂)
+--
+
+LOCK TABLES `qxx_dv_machinery` WRITE;
+/*!40000 ALTER TABLE `qxx_dv_machinery` DISABLE KEYS */;
+INSERT IGNORE INTO `qxx_dv_machinery` (`machinery_id`, `factory_id`, `machinery_code`, `machinery_name`, `machinery_brand`, `machinery_spec`, `machinery_type_id`, `machinery_type_code`, `machinery_type_name`, `workshop_id`, `workshop_code`, `workshop_name`, `status`, `enable_flag`, `remark`, `create_by`, `create_time`, `update_by`, `update_time`) VALUES
+(200,1,'PRINT-01','1号印刷机','海德堡',NULL,200,'PRINT','印刷机',202,'PRINT','印刷车间','RUNNING','1','','admin',NOW(),'',NOW()),
+(201,1,'PRINT-02','2号印刷机','海德堡',NULL,200,'PRINT','印刷机',202,'PRINT','印刷车间','IDLE','1','','admin',NOW(),'',NOW()),
+(202,1,'BAG-01','1号制袋机','正博',NULL,203,'BAG-SEMI','半自动制袋机',203,'BAG','制袋车间','IDLE','1','','admin',NOW(),'',NOW()),
+(203,1,'BAG-02','2号制袋机','正博',NULL,203,'BAG-SEMI','半自动制袋机',203,'BAG','制袋车间','IDLE','1','','admin',NOW(),'',NOW()),
+(204,1,'BAG-03','3号制袋机（全自动）','正博',NULL,202,'BAG-AUTO','全自动制袋机',203,'BAG','制袋车间','RUNNING','1','','admin',NOW(),'',NOW()),
+(205,1,'BAG-04','4号制袋机','正博',NULL,203,'BAG-SEMI','半自动制袋机',203,'BAG','制袋车间','IDLE','1','','admin',NOW(),'',NOW()),
+(206,1,'BAG-05','5号制袋机（全自动）','正博',NULL,202,'BAG-AUTO','全自动制袋机',203,'BAG','制袋车间','RUNNING','1','','admin',NOW(),'',NOW()),
+(207,1,'BAG-06','6号制袋机','正博',NULL,203,'BAG-SEMI','半自动制袋机',203,'BAG','制袋车间','IDLE','1','','admin',NOW(),'',NOW()),
+(208,1,'BAG-07','7号制袋机（全自动）','正博',NULL,202,'BAG-AUTO','全自动制袋机',203,'BAG','制袋车间','RUNNING','1','','admin',NOW(),'',NOW()),
+(209,1,'BAG-08','8号制袋机（全自动）','正博',NULL,202,'BAG-AUTO','全自动制袋机',203,'BAG','制袋车间','IDLE','1','','admin',NOW(),'',NOW()),
+(210,1,'BAG-09','9号制袋机（半自动）','正博',NULL,203,'BAG-SEMI','半自动制袋机',203,'BAG','制袋车间','IDLE','1','','admin',NOW(),'',NOW());
+/*!40000 ALTER TABLE `qxx_dv_machinery` ENABLE KEYS */;
+UNLOCK TABLES;
+
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;

@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.wm.WmRtSalesMapper">
+
+    <resultMap type="WmRtSales" id="WmRtSalesResult">
+        <id property="rtId" column="rt_id" />
+        <result property="factoryId" column="factory_id" />
+        <result property="rtCode" column="rt_code" />
+        <result property="rtName" column="rt_name" />
+        <result property="salesId" column="sales_id" />
+        <result property="salesCode" column="sales_code" />
+        <result property="clientId" column="client_id" />
+        <result property="clientCode" column="client_code" />
+        <result property="clientName" column="client_name" />
+        <result property="warehouseId" column="warehouse_id" />
+        <result property="warehouseCode" column="warehouse_code" />
+        <result property="warehouseName" column="warehouse_name" />
+        <result property="rtDate" column="rt_date" />
+        <result property="totalQuantity" column="total_quantity" />
+        <result property="rqcId" column="rqc_id" />
+        <result property="rqcCode" column="rqc_code" />
+        <result property="status" column="status" />
+        <result property="remark" column="remark" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <sql id="selectWmRtSalesVo">
+        select rt_id, factory_id, rt_code, rt_name, sales_id, sales_code, client_id, client_code, client_name, warehouse_id, warehouse_code, warehouse_name, rt_date, total_quantity, rqc_id, rqc_code, status, remark, create_by, create_time, update_by, update_time from qxx_wm_rt_sales
+    </sql>
+
+    <select id="selectWmRtSalesList" parameterType="WmRtSales" resultMap="WmRtSalesResult">
+        <include refid="selectWmRtSalesVo"/>
+        <where>
+            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
+            <if test="rtCode != null and rtCode != ''"> and rt_code like concat('%', #{rtCode}, '%')</if>
+            <if test="rtName != null and rtName != ''"> and rt_name like concat('%', #{rtName}, '%')</if>
+            <if test="salesId != null"> and sales_id = #{salesId}</if>
+            <if test="salesCode != null and salesCode != ''"> and sales_code like concat('%', #{salesCode}, '%')</if>
+            <if test="clientId != null"> and client_id = #{clientId}</if>
+            <if test="clientCode != null and clientCode != ''"> and client_code like concat('%', #{clientCode}, '%')</if>
+            <if test="clientName != null and clientName != ''"> and client_name like concat('%', #{clientName}, '%')</if>
+            <if test="warehouseId != null"> and warehouse_id = #{warehouseId}</if>
+            <if test="warehouseCode != null and warehouseCode != ''"> and warehouse_code like concat('%', #{warehouseCode}, '%')</if>
+            <if test="warehouseName != null and warehouseName != ''"> and warehouse_name like concat('%', #{warehouseName}, '%')</if>
+            <if test="rqcId != null"> and rqc_id = #{rqcId}</if>
+            <if test="rqcCode != null and rqcCode != ''"> and rqc_code like concat('%', #{rqcCode}, '%')</if>
+            <if test="status != null and status != ''"> and status like concat('%', #{status}, '%')</if>
+            <if test="createBy != null and createBy != ''"> and create_by like concat('%', #{createBy}, '%')</if>
+            <if test="updateBy != null and updateBy != ''"> and update_by like concat('%', #{updateBy}, '%')</if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <select id="selectWmRtSalesAll" resultMap="WmRtSalesResult">
+        <include refid="selectWmRtSalesVo"/>
+    </select>
+
+    <select id="selectWmRtSalesByRtId" parameterType="Long" resultMap="WmRtSalesResult">
+        <include refid="selectWmRtSalesVo"/>
+        where rt_id = #{rtId}
+    </select>
+
+    <insert id="insertWmRtSales" parameterType="WmRtSales" useGeneratedKeys="true" keyProperty="rtId">
+        insert into qxx_wm_rt_sales
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="rtCode != null">rt_code,</if>
+            <if test="rtName != null">rt_name,</if>
+            <if test="salesId != null">sales_id,</if>
+            <if test="salesCode != null">sales_code,</if>
+            <if test="clientId != null">client_id,</if>
+            <if test="clientCode != null">client_code,</if>
+            <if test="clientName != null">client_name,</if>
+            <if test="warehouseId != null">warehouse_id,</if>
+            <if test="warehouseCode != null">warehouse_code,</if>
+            <if test="warehouseName != null">warehouse_name,</if>
+            <if test="rtDate != null">rt_date,</if>
+            <if test="totalQuantity != null">total_quantity,</if>
+            <if test="rqcId != null">rqc_id,</if>
+            <if test="rqcCode != null">rqc_code,</if>
+            <if test="status != null">status,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="rtCode != null">#{rtCode},</if>
+            <if test="rtName != null">#{rtName},</if>
+            <if test="salesId != null">#{salesId},</if>
+            <if test="salesCode != null">#{salesCode},</if>
+            <if test="clientId != null">#{clientId},</if>
+            <if test="clientCode != null">#{clientCode},</if>
+            <if test="clientName != null">#{clientName},</if>
+            <if test="warehouseId != null">#{warehouseId},</if>
+            <if test="warehouseCode != null">#{warehouseCode},</if>
+            <if test="warehouseName != null">#{warehouseName},</if>
+            <if test="rtDate != null">#{rtDate},</if>
+            <if test="totalQuantity != null">#{totalQuantity},</if>
+            <if test="rqcId != null">#{rqcId},</if>
+            <if test="rqcCode != null">#{rqcCode},</if>
+            <if test="status != null">#{status},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateWmRtSales" parameterType="WmRtSales">
+        update qxx_wm_rt_sales
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="rtCode != null">rt_code = #{rtCode},</if>
+            <if test="rtName != null">rt_name = #{rtName},</if>
+            <if test="salesId != null">sales_id = #{salesId},</if>
+            <if test="salesCode != null">sales_code = #{salesCode},</if>
+            <if test="clientId != null">client_id = #{clientId},</if>
+            <if test="clientCode != null">client_code = #{clientCode},</if>
+            <if test="clientName != null">client_name = #{clientName},</if>
+            <if test="warehouseId != null">warehouse_id = #{warehouseId},</if>
+            <if test="warehouseCode != null">warehouse_code = #{warehouseCode},</if>
+            <if test="warehouseName != null">warehouse_name = #{warehouseName},</if>
+            <if test="rtDate != null">rt_date = #{rtDate},</if>
+            <if test="totalQuantity != null">total_quantity = #{totalQuantity},</if>
+            <if test="rqcId != null">rqc_id = #{rqcId},</if>
+            <if test="rqcCode != null">rqc_code = #{rqcCode},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where rt_id = #{rtId}
+    </update>
+
+    <delete id="deleteWmRtSalesByRtId" parameterType="Long">
+        delete from qxx_wm_rt_sales where rt_id = #{rtId}
+    </delete>
+
+    <delete id="deleteWmRtSalesByRtIds" parameterType="String">
+        delete from qxx_wm_rt_sales where rt_id in
+        <foreach item="rtId" collection="array" open="(" separator="," close=")">
+            #{rtId}
+        </foreach>
+    </delete>
+
+</mapper>

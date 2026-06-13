@@ -104,9 +104,18 @@
     <!-- 添加或修改车间对话框 -->
     <el-dialog :title="title" v-model="open" width="600px" append-to-body>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
-        <el-form-item label="车间编码" prop="workshopCode">
-          <el-input v-model="form.workshopCode" placeholder="请输入车间编码" />
-        </el-form-item>
+        <el-row>
+          <el-col :span="16">
+            <el-form-item label="车间编码" prop="workshopCode">
+              <el-input v-model="form.workshopCode" placeholder="请输入车间编码" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label-width="70" v-if="!form.workshopId">
+              <el-switch v-model="autoGenFlag" active-color="#13ce66" size="small" @change="handleAutoGenChange" /><span style="margin-left:6px;font-size:12px;color:#13ce66">自动生成</span>
+            </el-form-item>
+          </el-col>
+        </el-row>
         <el-form-item label="车间名称" prop="workshopName">
           <el-input v-model="form.workshopName" placeholder="请输入车间名称" />
         </el-form-item>
@@ -139,6 +148,7 @@
 <script setup lang="ts" name="Workshop">
 import { ref, reactive, toRefs } from 'vue'
 import { getCurrentInstance } from 'vue'
+import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import type { MdWorkshop, WorkshopQueryParams } from '@/types/api/mes/md/workshop'
 import { listWorkshop, getWorkshop, delWorkshop, addWorkshop, updateWorkshop } from '@/api/mes/md/workshop'
 
@@ -154,6 +164,7 @@ const single = ref<boolean>(true)
 const multiple = ref<boolean>(true)
 const total = ref<number>(0)
 const title = ref<string>('')
+const autoGenFlag = ref(false)
 
 const data = reactive({
   form: {} as MdWorkshop,
@@ -195,7 +206,12 @@ function cancel() {
   reset()
 }
 
+function handleAutoGenChange(flag: boolean) {
+  if (flag) genSerialCode('WORKSHOP_CODE').then((r: any) => { form.value.workshopCode = r.data })
+  else form.value.workshopCode = ''
+}
 function reset() {
+  autoGenFlag.value = false
   form.value = {
     workshopId: undefined,
     factoryId: undefined,
@@ -279,3 +295,7 @@ function handleExport() {
 
 getList()
 </script>
+
+<style scoped>
+:deep(.el-form-item__label) { padding-right: 16px !important; }
+</style>

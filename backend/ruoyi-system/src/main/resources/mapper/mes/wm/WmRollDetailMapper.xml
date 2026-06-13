@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.wm.WmRollDetailMapper">
+
+    <resultMap type="WmRollDetail" id="WmRollDetailResult">
+        <id property="rollId" column="roll_id" />
+        <result property="factoryId" column="factory_id" />
+        <result property="rollCode" column="roll_code" />
+        <result property="itemId" column="item_id" />
+        <result property="itemCode" column="item_code" />
+        <result property="itemName" column="item_name" />
+        <result property="specification" column="specification" />
+        <result property="batchId" column="batch_id" />
+        <result property="batchCode" column="batch_code" />
+        <result property="recptId" column="recpt_id" />
+        <result property="recptDetailId" column="recpt_detail_id" />
+        <result property="vendorId" column="vendor_id" />
+        <result property="vendorCode" column="vendor_code" />
+        <result property="vendorName" column="vendor_name" />
+        <result property="vendorRollNo" column="vendor_roll_no" />
+        <result property="parentRollId" column="parent_roll_id" />
+        <result property="actualWidth" column="actual_width" />
+        <result property="actualWeightGsm" column="actual_weight_gsm" />
+        <result property="actualLength" column="actual_length" />
+        <result property="actualWeight" column="actual_weight" />
+        <result property="unitOfMeasure" column="unit_of_measure" />
+        <result property="originalQuantity" column="original_quantity" />
+        <result property="remainingQuantity" column="remaining_quantity" />
+        <result property="warehouseId" column="warehouse_id" />
+        <result property="warehouseCode" column="warehouse_code" />
+        <result property="warehouseName" column="warehouse_name" />
+        <result property="locationId" column="location_id" />
+        <result property="areaId" column="area_id" />
+        <result property="materialStockId" column="material_stock_id" />
+        <result property="lastIssueId" column="last_issue_id" />
+        <result property="lastWorkorderId" column="last_workorder_id" />
+        <result property="lastWorkorderCode" column="last_workorder_code" />
+        <result property="status" column="status" />
+        <result property="remark" column="remark" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <sql id="selectWmRollDetailVo">
+        select roll_id, factory_id, roll_code, item_id, item_code, item_name, specification, batch_id, batch_code, recpt_id, recpt_detail_id, vendor_id, vendor_code, vendor_name, vendor_roll_no, parent_roll_id, actual_width, actual_weight_gsm, actual_length, actual_weight, unit_of_measure, original_quantity, remaining_quantity, warehouse_id, warehouse_code, warehouse_name, location_id, area_id, material_stock_id, last_issue_id, last_workorder_id, last_workorder_code, status, remark, create_by, create_time, update_by, update_time from qxx_wm_roll_detail
+    </sql>
+
+    <select id="selectWmRollDetailList" parameterType="WmRollDetail" resultMap="WmRollDetailResult">
+        <include refid="selectWmRollDetailVo"/>
+        <where>
+            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
+            <if test="rollCode != null and rollCode != ''"> and roll_code like concat('%', #{rollCode}, '%')</if>
+            <if test="itemId != null"> and item_id = #{itemId}</if>
+            <if test="itemCode != null and itemCode != ''"> and item_code like concat('%', #{itemCode}, '%')</if>
+            <if test="itemName != null and itemName != ''"> and item_name like concat('%', #{itemName}, '%')</if>
+            <if test="specification != null and specification != ''"> and specification like concat('%', #{specification}, '%')</if>
+            <if test="batchId != null"> and batch_id = #{batchId}</if>
+            <if test="batchCode != null and batchCode != ''"> and batch_code like concat('%', #{batchCode}, '%')</if>
+            <if test="recptId != null"> and recpt_id = #{recptId}</if>
+            <if test="recptDetailId != null"> and recpt_detail_id = #{recptDetailId}</if>
+            <if test="vendorId != null"> and vendor_id = #{vendorId}</if>
+            <if test="vendorCode != null and vendorCode != ''"> and vendor_code like concat('%', #{vendorCode}, '%')</if>
+            <if test="vendorName != null and vendorName != ''"> and vendor_name like concat('%', #{vendorName}, '%')</if>
+            <if test="vendorRollNo != null and vendorRollNo != ''"> and vendor_roll_no like concat('%', #{vendorRollNo}, '%')</if>
+            <if test="parentRollId != null"> and parent_roll_id = #{parentRollId}</if>
+            <if test="actualWidth != null and actualWidth != ''"> and actual_width like concat('%', #{actualWidth}, '%')</if>
+            <if test="actualWeightGsm != null and actualWeightGsm != ''"> and actual_weight_gsm like concat('%', #{actualWeightGsm}, '%')</if>
+            <if test="unitOfMeasure != null and unitOfMeasure != ''"> and unit_of_measure like concat('%', #{unitOfMeasure}, '%')</if>
+            <if test="warehouseId != null"> and warehouse_id = #{warehouseId}</if>
+            <if test="warehouseCode != null and warehouseCode != ''"> and warehouse_code like concat('%', #{warehouseCode}, '%')</if>
+            <if test="warehouseName != null and warehouseName != ''"> and warehouse_name like concat('%', #{warehouseName}, '%')</if>
+            <if test="locationId != null"> and location_id = #{locationId}</if>
+            <if test="areaId != null"> and area_id = #{areaId}</if>
+            <if test="materialStockId != null"> and material_stock_id = #{materialStockId}</if>
+            <if test="lastIssueId != null"> and last_issue_id = #{lastIssueId}</if>
+            <if test="lastWorkorderId != null"> and last_workorder_id = #{lastWorkorderId}</if>
+            <if test="lastWorkorderCode != null and lastWorkorderCode != ''"> and last_workorder_code like concat('%', #{lastWorkorderCode}, '%')</if>
+            <if test="status != null and status != ''"> and status like concat('%', #{status}, '%')</if>
+            <if test="createBy != null and createBy != ''"> and create_by like concat('%', #{createBy}, '%')</if>
+            <if test="updateBy != null and updateBy != ''"> and update_by like concat('%', #{updateBy}, '%')</if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <select id="selectWmRollDetailAll" resultMap="WmRollDetailResult">
+        <include refid="selectWmRollDetailVo"/>
+    </select>
+
+    <select id="selectWmRollDetailByRollId" parameterType="Long" resultMap="WmRollDetailResult">
+        <include refid="selectWmRollDetailVo"/>
+        where roll_id = #{rollId}
+    </select>
+
+    <insert id="insertWmRollDetail" parameterType="WmRollDetail" useGeneratedKeys="true" keyProperty="rollId">
+        insert into qxx_wm_roll_detail
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="rollCode != null">roll_code,</if>
+            <if test="itemId != null">item_id,</if>
+            <if test="itemCode != null">item_code,</if>
+            <if test="itemName != null">item_name,</if>
+            <if test="specification != null">specification,</if>
+            <if test="batchId != null">batch_id,</if>
+            <if test="batchCode != null">batch_code,</if>
+            <if test="recptId != null">recpt_id,</if>
+            <if test="recptDetailId != null">recpt_detail_id,</if>
+            <if test="vendorId != null">vendor_id,</if>
+            <if test="vendorCode != null">vendor_code,</if>
+            <if test="vendorName != null">vendor_name,</if>
+            <if test="vendorRollNo != null">vendor_roll_no,</if>
+            <if test="parentRollId != null">parent_roll_id,</if>
+            <if test="actualWidth != null">actual_width,</if>
+            <if test="actualWeightGsm != null">actual_weight_gsm,</if>
+            <if test="actualLength != null">actual_length,</if>
+            <if test="actualWeight != null">actual_weight,</if>
+            <if test="unitOfMeasure != null">unit_of_measure,</if>
+            <if test="originalQuantity != null">original_quantity,</if>
+            <if test="remainingQuantity != null">remaining_quantity,</if>
+            <if test="warehouseId != null">warehouse_id,</if>
+            <if test="warehouseCode != null">warehouse_code,</if>
+            <if test="warehouseName != null">warehouse_name,</if>
+            <if test="locationId != null">location_id,</if>
+            <if test="areaId != null">area_id,</if>
+            <if test="materialStockId != null">material_stock_id,</if>
+            <if test="lastIssueId != null">last_issue_id,</if>
+            <if test="lastWorkorderId != null">last_workorder_id,</if>
+            <if test="lastWorkorderCode != null">last_workorder_code,</if>
+            <if test="status != null">status,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="rollCode != null">#{rollCode},</if>
+            <if test="itemId != null">#{itemId},</if>
+            <if test="itemCode != null">#{itemCode},</if>
+            <if test="itemName != null">#{itemName},</if>
+            <if test="specification != null">#{specification},</if>
+            <if test="batchId != null">#{batchId},</if>
+            <if test="batchCode != null">#{batchCode},</if>
+            <if test="recptId != null">#{recptId},</if>
+            <if test="recptDetailId != null">#{recptDetailId},</if>
+            <if test="vendorId != null">#{vendorId},</if>
+            <if test="vendorCode != null">#{vendorCode},</if>
+            <if test="vendorName != null">#{vendorName},</if>
+            <if test="vendorRollNo != null">#{vendorRollNo},</if>
+            <if test="parentRollId != null">#{parentRollId},</if>
+            <if test="actualWidth != null">#{actualWidth},</if>
+            <if test="actualWeightGsm != null">#{actualWeightGsm},</if>
+            <if test="actualLength != null">#{actualLength},</if>
+            <if test="actualWeight != null">#{actualWeight},</if>
+            <if test="unitOfMeasure != null">#{unitOfMeasure},</if>
+            <if test="originalQuantity != null">#{originalQuantity},</if>
+            <if test="remainingQuantity != null">#{remainingQuantity},</if>
+            <if test="warehouseId != null">#{warehouseId},</if>
+            <if test="warehouseCode != null">#{warehouseCode},</if>
+            <if test="warehouseName != null">#{warehouseName},</if>
+            <if test="locationId != null">#{locationId},</if>
+            <if test="areaId != null">#{areaId},</if>
+            <if test="materialStockId != null">#{materialStockId},</if>
+            <if test="lastIssueId != null">#{lastIssueId},</if>
+            <if test="lastWorkorderId != null">#{lastWorkorderId},</if>
+            <if test="lastWorkorderCode != null">#{lastWorkorderCode},</if>
+            <if test="status != null">#{status},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateWmRollDetail" parameterType="WmRollDetail">
+        update qxx_wm_roll_detail
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="rollCode != null">roll_code = #{rollCode},</if>
+            <if test="itemId != null">item_id = #{itemId},</if>
+            <if test="itemCode != null">item_code = #{itemCode},</if>
+            <if test="itemName != null">item_name = #{itemName},</if>
+            <if test="specification != null">specification = #{specification},</if>
+            <if test="batchId != null">batch_id = #{batchId},</if>
+            <if test="batchCode != null">batch_code = #{batchCode},</if>
+            <if test="recptId != null">recpt_id = #{recptId},</if>
+            <if test="recptDetailId != null">recpt_detail_id = #{recptDetailId},</if>
+            <if test="vendorId != null">vendor_id = #{vendorId},</if>
+            <if test="vendorCode != null">vendor_code = #{vendorCode},</if>
+            <if test="vendorName != null">vendor_name = #{vendorName},</if>
+            <if test="vendorRollNo != null">vendor_roll_no = #{vendorRollNo},</if>
+            <if test="parentRollId != null">parent_roll_id = #{parentRollId},</if>
+            <if test="actualWidth != null">actual_width = #{actualWidth},</if>
+            <if test="actualWeightGsm != null">actual_weight_gsm = #{actualWeightGsm},</if>
+            <if test="actualLength != null">actual_length = #{actualLength},</if>
+            <if test="actualWeight != null">actual_weight = #{actualWeight},</if>
+            <if test="unitOfMeasure != null">unit_of_measure = #{unitOfMeasure},</if>
+            <if test="originalQuantity != null">original_quantity = #{originalQuantity},</if>
+            <if test="remainingQuantity != null">remaining_quantity = #{remainingQuantity},</if>
+            <if test="warehouseId != null">warehouse_id = #{warehouseId},</if>
+            <if test="warehouseCode != null">warehouse_code = #{warehouseCode},</if>
+            <if test="warehouseName != null">warehouse_name = #{warehouseName},</if>
+            <if test="locationId != null">location_id = #{locationId},</if>
+            <if test="areaId != null">area_id = #{areaId},</if>
+            <if test="materialStockId != null">material_stock_id = #{materialStockId},</if>
+            <if test="lastIssueId != null">last_issue_id = #{lastIssueId},</if>
+            <if test="lastWorkorderId != null">last_workorder_id = #{lastWorkorderId},</if>
+            <if test="lastWorkorderCode != null">last_workorder_code = #{lastWorkorderCode},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where roll_id = #{rollId}
+    </update>
+
+    <delete id="deleteWmRollDetailByRollId" parameterType="Long">
+        delete from qxx_wm_roll_detail where roll_id = #{rollId}
+    </delete>
+
+    <delete id="deleteWmRollDetailByRollIds" parameterType="String">
+        delete from qxx_wm_roll_detail where roll_id in
+        <foreach item="rollId" collection="array" open="(" separator="," close=")">
+            #{rollId}
+        </foreach>
+    </delete>
+
+</mapper>

@@ -28,6 +28,11 @@
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
         <el-row>
           <el-col :span="12"><el-form-item label="编码" prop="workstationCode"><el-input v-model="form.workstationCode" /></el-form-item></el-col>
+          <el-col :span="12">
+            <el-form-item label-width="70" v-if="!form.workstationId">
+              <el-switch v-model="autoGenFlag" active-color="#13ce66" @change="handleAutoGenChange" /><span style="margin-left:6px;font-size:12px;color:#13ce66">自动生成</span>
+            </el-form-item>
+          </el-col>
           <el-col :span="12"><el-form-item label="名称" prop="workstationName"><el-input v-model="form.workstationName" /></el-form-item></el-col>
         </el-row>
         <el-row>
@@ -63,6 +68,7 @@
 <script setup lang="ts" name="Workstation">
 import { ref, reactive, toRefs } from 'vue'
 import { getCurrentInstance } from 'vue'
+import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import type { MdWorkstation, WorkstationQueryParams, MdWorkstationMachine, MdWorkstationWorker } from '@/types/api/mes/md/workstation'
 import { listWorkstation, getWorkstation, delWorkstation, addWorkstation, updateWorkstation, listMachines, addMachine, delMachine, listWorkers, addWorker, delWorker } from '@/api/mes/md/workstation'
 import { listAllWorkshop } from '@/api/mes/md/workshop'
@@ -70,6 +76,7 @@ import { listAllWorkshop } from '@/api/mes/md/workshop'
 const { proxy } = getCurrentInstance() as any; const { sys_yes_no } = useDict('sys_yes_no')
 const list = ref<MdWorkstation[]>([]); const open = ref(false); const loading = ref(true); const showSearch = ref(true)
 const ids = ref<number[]>([]); const single = ref(true); const multiple = ref(true); const total = ref(0); const title = ref('')
+const autoGenFlag = ref(false)
 const workshopOptions = ref<any[]>([]); const machineList = ref<MdWorkstationMachine[]>([]); const workerList = ref<MdWorkstationWorker[]>([])
 const data = reactive({ form: { enableFlag: '1', status: 'IDLE' } as MdWorkstation, queryParams: { pageNum: 1, pageSize: 10 } as WorkstationQueryParams, rules: { workstationCode: [{ required: true, message: '编码不能为空' }], workstationName: [{ required: true, message: '名称不能为空' }], workshopId: [{ required: true, message: '请选择车间' }] } })
 const { queryParams, form, rules } = toRefs(data)
@@ -77,7 +84,11 @@ const { queryParams, form, rules } = toRefs(data)
 function loadSubData(id: number) { listMachines(id).then(r => { machineList.value = r.data || [] }); listWorkers(id).then(r => { workerList.value = r.data || [] }) }
 function getList() { loading.value = true; listWorkstation(queryParams.value).then(r => { list.value = r.rows; total.value = r.total; loading.value = false }) }
 function cancel() { open.value = false; reset() }
-function reset() { form.value = { enableFlag: '1', status: 'IDLE' } as MdWorkstation; machineList.value = []; workerList.value = []; proxy.resetForm('formRef') }
+function handleAutoGenChange(flag: boolean) {
+  if (flag) genSerialCode('WORKSTATION_CODE').then((r: any) => { form.value.workstationCode = r.data })
+  else form.value.workstationCode = ''
+}
+function reset() { autoGenFlag.value = false; form.value = { enableFlag: '1', status: 'IDLE' } as MdWorkstation; machineList.value = []; workerList.value = []; proxy.resetForm('formRef') }
 function handleQuery() { queryParams.value.pageNum = 1; getList() }
 function resetQuery() { proxy.resetForm('queryRef'); handleQuery() }
 function handleSelectionChange(s: MdWorkstation[]) { ids.value = s.map(i => i.workstationId!); single.value = s.length !== 1; multiple.value = !s.length }
@@ -94,3 +105,7 @@ function handleDelWorker(row: MdWorkstationWorker) { delWorker(row.recordId!).th
 
 getList()
 </script>
+
+<style scoped>
+:deep(.el-form-item__label) { padding-right: 16px !important; }
+</style>

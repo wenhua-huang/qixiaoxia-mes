@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.wm.WmBarcodeMapper">
+
+    <resultMap type="WmBarcode" id="WmBarcodeResult">
+        <id property="barcodeId" column="barcode_id" />
+        <result property="factoryId" column="factory_id" />
+        <result property="barcodeCode" column="barcode_code" />
+        <result property="barcodeType" column="barcode_type" />
+        <result property="itemId" column="item_id" />
+        <result property="itemCode" column="item_code" />
+        <result property="itemName" column="item_name" />
+        <result property="workorderId" column="workorder_id" />
+        <result property="workorderCode" column="workorder_code" />
+        <result property="quantity" column="quantity" />
+        <result property="unitOfMeasure" column="unit_of_measure" />
+        <result property="batchCode" column="batch_code" />
+        <result property="printCount" column="print_count" />
+        <result property="lastPrintTime" column="last_print_time" />
+        <result property="enableFlag" column="enable_flag" />
+        <result property="remark" column="remark" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <sql id="selectWmBarcodeVo">
+        select barcode_id, factory_id, barcode_code, barcode_type, item_id, item_code, item_name, workorder_id, workorder_code, quantity, unit_of_measure, batch_code, print_count, last_print_time, enable_flag, remark, create_by, create_time, update_by, update_time from qxx_wm_barcode
+    </sql>
+
+    <select id="selectWmBarcodeList" parameterType="WmBarcode" resultMap="WmBarcodeResult">
+        <include refid="selectWmBarcodeVo"/>
+        <where>
+            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
+            <if test="barcodeCode != null and barcodeCode != ''"> and barcode_code like concat('%', #{barcodeCode}, '%')</if>
+            <if test="barcodeType != null and barcodeType != ''"> and barcode_type like concat('%', #{barcodeType}, '%')</if>
+            <if test="itemId != null"> and item_id = #{itemId}</if>
+            <if test="itemCode != null and itemCode != ''"> and item_code like concat('%', #{itemCode}, '%')</if>
+            <if test="itemName != null and itemName != ''"> and item_name like concat('%', #{itemName}, '%')</if>
+            <if test="workorderId != null"> and workorder_id = #{workorderId}</if>
+            <if test="workorderCode != null and workorderCode != ''"> and workorder_code like concat('%', #{workorderCode}, '%')</if>
+            <if test="unitOfMeasure != null and unitOfMeasure != ''"> and unit_of_measure like concat('%', #{unitOfMeasure}, '%')</if>
+            <if test="batchCode != null and batchCode != ''"> and batch_code like concat('%', #{batchCode}, '%')</if>
+            <if test="printCount != null"> and print_count = #{printCount}</if>
+            <if test="enableFlag != null and enableFlag != ''"> and enable_flag like concat('%', #{enableFlag}, '%')</if>
+            <if test="createBy != null and createBy != ''"> and create_by like concat('%', #{createBy}, '%')</if>
+            <if test="updateBy != null and updateBy != ''"> and update_by like concat('%', #{updateBy}, '%')</if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <select id="selectWmBarcodeAll" resultMap="WmBarcodeResult">
+        <include refid="selectWmBarcodeVo"/>
+    </select>
+
+    <select id="selectWmBarcodeByBarcodeId" parameterType="Long" resultMap="WmBarcodeResult">
+        <include refid="selectWmBarcodeVo"/>
+        where barcode_id = #{barcodeId}
+    </select>
+
+    <insert id="insertWmBarcode" parameterType="WmBarcode" useGeneratedKeys="true" keyProperty="barcodeId">
+        insert into qxx_wm_barcode
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="barcodeCode != null">barcode_code,</if>
+            <if test="barcodeType != null">barcode_type,</if>
+            <if test="itemId != null">item_id,</if>
+            <if test="itemCode != null">item_code,</if>
+            <if test="itemName != null">item_name,</if>
+            <if test="workorderId != null">workorder_id,</if>
+            <if test="workorderCode != null">workorder_code,</if>
+            <if test="quantity != null">quantity,</if>
+            <if test="unitOfMeasure != null">unit_of_measure,</if>
+            <if test="batchCode != null">batch_code,</if>
+            <if test="printCount != null">print_count,</if>
+            <if test="lastPrintTime != null">last_print_time,</if>
+            <if test="enableFlag != null">enable_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="barcodeCode != null">#{barcodeCode},</if>
+            <if test="barcodeType != null">#{barcodeType},</if>
+            <if test="itemId != null">#{itemId},</if>
+            <if test="itemCode != null">#{itemCode},</if>
+            <if test="itemName != null">#{itemName},</if>
+            <if test="workorderId != null">#{workorderId},</if>
+            <if test="workorderCode != null">#{workorderCode},</if>
+            <if test="quantity != null">#{quantity},</if>
+            <if test="unitOfMeasure != null">#{unitOfMeasure},</if>
+            <if test="batchCode != null">#{batchCode},</if>
+            <if test="printCount != null">#{printCount},</if>
+            <if test="lastPrintTime != null">#{lastPrintTime},</if>
+            <if test="enableFlag != null">#{enableFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateWmBarcode" parameterType="WmBarcode">
+        update qxx_wm_barcode
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="barcodeCode != null">barcode_code = #{barcodeCode},</if>
+            <if test="barcodeType != null">barcode_type = #{barcodeType},</if>
+            <if test="itemId != null">item_id = #{itemId},</if>
+            <if test="itemCode != null">item_code = #{itemCode},</if>
+            <if test="itemName != null">item_name = #{itemName},</if>
+            <if test="workorderId != null">workorder_id = #{workorderId},</if>
+            <if test="workorderCode != null">workorder_code = #{workorderCode},</if>
+            <if test="quantity != null">quantity = #{quantity},</if>
+            <if test="unitOfMeasure != null">unit_of_measure = #{unitOfMeasure},</if>
+            <if test="batchCode != null">batch_code = #{batchCode},</if>
+            <if test="printCount != null">print_count = #{printCount},</if>
+            <if test="lastPrintTime != null">last_print_time = #{lastPrintTime},</if>
+            <if test="enableFlag != null">enable_flag = #{enableFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where barcode_id = #{barcodeId}
+    </update>
+
+    <delete id="deleteWmBarcodeByBarcodeId" parameterType="Long">
+        delete from qxx_wm_barcode where barcode_id = #{barcodeId}
+    </delete>
+
+    <delete id="deleteWmBarcodeByBarcodeIds" parameterType="String">
+        delete from qxx_wm_barcode where barcode_id in
+        <foreach item="barcodeId" collection="array" open="(" separator="," close=")">
+            #{barcodeId}
+        </foreach>
+    </delete>
+
+</mapper>

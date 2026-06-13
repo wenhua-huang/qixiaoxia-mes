@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.wm.WmStockTakingPlanMapper">
+
+    <resultMap type="WmStockTakingPlan" id="WmStockTakingPlanResult">
+        <id property="planId" column="plan_id" />
+        <result property="factoryId" column="factory_id" />
+        <result property="planCode" column="plan_code" />
+        <result property="planName" column="plan_name" />
+        <result property="planType" column="plan_type" />
+        <result property="warehouseId" column="warehouse_id" />
+        <result property="warehouseName" column="warehouse_name" />
+        <result property="planDate" column="plan_date" />
+        <result property="status" column="status" />
+        <result property="remark" column="remark" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <sql id="selectWmStockTakingPlanVo">
+        select plan_id, factory_id, plan_code, plan_name, plan_type, warehouse_id, warehouse_name, plan_date, status, remark, create_by, create_time, update_by, update_time from qxx_wm_stock_taking_plan
+    </sql>
+
+    <select id="selectWmStockTakingPlanList" parameterType="WmStockTakingPlan" resultMap="WmStockTakingPlanResult">
+        <include refid="selectWmStockTakingPlanVo"/>
+        <where>
+            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
+            <if test="planCode != null and planCode != ''"> and plan_code like concat('%', #{planCode}, '%')</if>
+            <if test="planName != null and planName != ''"> and plan_name like concat('%', #{planName}, '%')</if>
+            <if test="planType != null and planType != ''"> and plan_type like concat('%', #{planType}, '%')</if>
+            <if test="warehouseId != null"> and warehouse_id = #{warehouseId}</if>
+            <if test="warehouseName != null and warehouseName != ''"> and warehouse_name like concat('%', #{warehouseName}, '%')</if>
+            <if test="status != null and status != ''"> and status like concat('%', #{status}, '%')</if>
+            <if test="createBy != null and createBy != ''"> and create_by like concat('%', #{createBy}, '%')</if>
+            <if test="updateBy != null and updateBy != ''"> and update_by like concat('%', #{updateBy}, '%')</if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <select id="selectWmStockTakingPlanAll" resultMap="WmStockTakingPlanResult">
+        <include refid="selectWmStockTakingPlanVo"/>
+    </select>
+
+    <select id="selectWmStockTakingPlanByPlanId" parameterType="Long" resultMap="WmStockTakingPlanResult">
+        <include refid="selectWmStockTakingPlanVo"/>
+        where plan_id = #{planId}
+    </select>
+
+    <insert id="insertWmStockTakingPlan" parameterType="WmStockTakingPlan" useGeneratedKeys="true" keyProperty="planId">
+        insert into qxx_wm_stock_taking_plan
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="planCode != null">plan_code,</if>
+            <if test="planName != null">plan_name,</if>
+            <if test="planType != null">plan_type,</if>
+            <if test="warehouseId != null">warehouse_id,</if>
+            <if test="warehouseName != null">warehouse_name,</if>
+            <if test="planDate != null">plan_date,</if>
+            <if test="status != null">status,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="planCode != null">#{planCode},</if>
+            <if test="planName != null">#{planName},</if>
+            <if test="planType != null">#{planType},</if>
+            <if test="warehouseId != null">#{warehouseId},</if>
+            <if test="warehouseName != null">#{warehouseName},</if>
+            <if test="planDate != null">#{planDate},</if>
+            <if test="status != null">#{status},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateWmStockTakingPlan" parameterType="WmStockTakingPlan">
+        update qxx_wm_stock_taking_plan
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="planCode != null">plan_code = #{planCode},</if>
+            <if test="planName != null">plan_name = #{planName},</if>
+            <if test="planType != null">plan_type = #{planType},</if>
+            <if test="warehouseId != null">warehouse_id = #{warehouseId},</if>
+            <if test="warehouseName != null">warehouse_name = #{warehouseName},</if>
+            <if test="planDate != null">plan_date = #{planDate},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where plan_id = #{planId}
+    </update>
+
+    <delete id="deleteWmStockTakingPlanByPlanId" parameterType="Long">
+        delete from qxx_wm_stock_taking_plan where plan_id = #{planId}
+    </delete>
+
+    <delete id="deleteWmStockTakingPlanByPlanIds" parameterType="String">
+        delete from qxx_wm_stock_taking_plan where plan_id in
+        <foreach item="planId" collection="array" open="(" separator="," close=")">
+            #{planId}
+        </foreach>
+    </delete>
+
+</mapper>

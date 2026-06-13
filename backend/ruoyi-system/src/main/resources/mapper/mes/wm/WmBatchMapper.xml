@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.wm.WmBatchMapper">
+
+    <resultMap type="WmBatch" id="WmBatchResult">
+        <id property="batchId" column="batch_id" />
+        <result property="factoryId" column="factory_id" />
+        <result property="batchCode" column="batch_code" />
+        <result property="batchName" column="batch_name" />
+        <result property="itemId" column="item_id" />
+        <result property="itemCode" column="item_code" />
+        <result property="itemName" column="item_name" />
+        <result property="specification" column="specification" />
+        <result property="produceDate" column="produce_date" />
+        <result property="expireDate" column="expire_date" />
+        <result property="lotNumber" column="lot_number" />
+        <result property="recptDate" column="recpt_date" />
+        <result property="vendorId" column="vendor_id" />
+        <result property="vendorCode" column="vendor_code" />
+        <result property="vendorName" column="vendor_name" />
+        <result property="workorderId" column="workorder_id" />
+        <result property="workorderCode" column="workorder_code" />
+        <result property="qualityStatus" column="quality_status" />
+        <result property="status" column="status" />
+        <result property="remark" column="remark" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <sql id="selectWmBatchVo">
+        select batch_id, factory_id, batch_code, batch_name, item_id, item_code, item_name, specification, produce_date, expire_date, recpt_date, vendor_id, vendor_code, vendor_name, workorder_id, workorder_code, lot_number, quality_status, status, remark, create_by, create_time, update_by, update_time from qxx_wm_batch
+    </sql>
+
+    <select id="selectWmBatchList" parameterType="WmBatch" resultMap="WmBatchResult">
+        <include refid="selectWmBatchVo"/>
+        <where>
+            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
+            <if test="batchCode != null and batchCode != ''"> and batch_code like concat('%', #{batchCode}, '%')</if>
+            <if test="batchName != null and batchName != ''"> and batch_name like concat('%', #{batchName}, '%')</if>
+            <if test="itemId != null"> and item_id = #{itemId}</if>
+            <if test="itemCode != null and itemCode != ''"> and item_code like concat('%', #{itemCode}, '%')</if>
+            <if test="itemName != null and itemName != ''"> and item_name like concat('%', #{itemName}, '%')</if>
+            <if test="specification != null and specification != ''"> and specification like concat('%', #{specification}, '%')</if>
+            <if test="vendorId != null"> and vendor_id = #{vendorId}</if>
+            <if test="vendorCode != null and vendorCode != ''"> and vendor_code like concat('%', #{vendorCode}, '%')</if>
+            <if test="vendorName != null and vendorName != ''"> and vendor_name like concat('%', #{vendorName}, '%')</if>
+            <if test="workorderId != null"> and workorder_id = #{workorderId}</if>
+            <if test="workorderCode != null and workorderCode != ''"> and workorder_code like concat('%', #{workorderCode}, '%')</if>
+            <if test="qualityStatus != null and qualityStatus != ''"> and quality_status like concat('%', #{qualityStatus}, '%')</if>
+            <if test="status != null and status != ''"> and status like concat('%', #{status}, '%')</if>
+            <if test="createBy != null and createBy != ''"> and create_by like concat('%', #{createBy}, '%')</if>
+            <if test="updateBy != null and updateBy != ''"> and update_by like concat('%', #{updateBy}, '%')</if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <select id="selectWmBatchAll" resultMap="WmBatchResult">
+        <include refid="selectWmBatchVo"/>
+    </select>
+
+    <select id="selectWmBatchByBatchId" parameterType="Long" resultMap="WmBatchResult">
+        <include refid="selectWmBatchVo"/>
+        where batch_id = #{batchId}
+    </select>
+
+    <insert id="insertWmBatch" parameterType="WmBatch" useGeneratedKeys="true" keyProperty="batchId">
+        insert into qxx_wm_batch
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="batchCode != null">batch_code,</if>
+            <if test="batchName != null">batch_name,</if>
+            <if test="itemId != null">item_id,</if>
+            <if test="itemCode != null">item_code,</if>
+            <if test="itemName != null">item_name,</if>
+            <if test="specification != null">specification,</if>
+            <if test="produceDate != null">produce_date,</if>
+            <if test="expireDate != null">expire_date,</if>
+            <if test="lotNumber != null and lotNumber != ''">lot_number,</if>
+            <if test="recptDate != null">recpt_date,</if>
+            <if test="vendorId != null">vendor_id,</if>
+            <if test="vendorCode != null">vendor_code,</if>
+            <if test="vendorName != null">vendor_name,</if>
+            <if test="workorderId != null">workorder_id,</if>
+            <if test="workorderCode != null">workorder_code,</if>
+            <if test="qualityStatus != null">quality_status,</if>
+            <if test="status != null">status,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="batchCode != null">#{batchCode},</if>
+            <if test="batchName != null">#{batchName},</if>
+            <if test="itemId != null">#{itemId},</if>
+            <if test="itemCode != null">#{itemCode},</if>
+            <if test="itemName != null">#{itemName},</if>
+            <if test="specification != null">#{specification},</if>
+            <if test="produceDate != null">#{produceDate},</if>
+            <if test="expireDate != null">#{expireDate},</if>
+            <if test="lotNumber != null and lotNumber != ''">#{lotNumber},</if>
+            <if test="recptDate != null">#{recptDate},</if>
+            <if test="vendorId != null">#{vendorId},</if>
+            <if test="vendorCode != null">#{vendorCode},</if>
+            <if test="vendorName != null">#{vendorName},</if>
+            <if test="workorderId != null">#{workorderId},</if>
+            <if test="workorderCode != null">#{workorderCode},</if>
+            <if test="qualityStatus != null">#{qualityStatus},</if>
+            <if test="status != null">#{status},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateWmBatch" parameterType="WmBatch">
+        update qxx_wm_batch
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="batchCode != null">batch_code = #{batchCode},</if>
+            <if test="batchName != null">batch_name = #{batchName},</if>
+            <if test="itemId != null">item_id = #{itemId},</if>
+            <if test="itemCode != null">item_code = #{itemCode},</if>
+            <if test="itemName != null">item_name = #{itemName},</if>
+            <if test="specification != null">specification = #{specification},</if>
+            <if test="produceDate != null">produce_date = #{produceDate},</if>
+            <if test="expireDate != null">expire_date = #{expireDate},</if>
+            <if test="lotNumber != null and lotNumber != ''">lot_number = #{lotNumber},</if>
+            <if test="recptDate != null">recpt_date = #{recptDate},</if>
+            <if test="vendorId != null">vendor_id = #{vendorId},</if>
+            <if test="vendorCode != null">vendor_code = #{vendorCode},</if>
+            <if test="vendorName != null">vendor_name = #{vendorName},</if>
+            <if test="workorderId != null">workorder_id = #{workorderId},</if>
+            <if test="workorderCode != null">workorder_code = #{workorderCode},</if>
+            <if test="qualityStatus != null">quality_status = #{qualityStatus},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where batch_id = #{batchId}
+    </update>
+
+    <delete id="deleteWmBatchByBatchId" parameterType="Long">
+        delete from qxx_wm_batch where batch_id = #{batchId}
+    </delete>
+
+    <delete id="deleteWmBatchByBatchIds" parameterType="String">
+        delete from qxx_wm_batch where batch_id in
+        <foreach item="batchId" collection="array" open="(" separator="," close=")">
+            #{batchId}
+        </foreach>
+    </delete>
+
+    <!-- 按批次属性查重 -->
+    <select id="selectBatchByAttributes" parameterType="WmBatch" resultMap="WmBatchResult">
+        <include refid="selectWmBatchVo"/>
+        where item_id = #{itemId}
+          and vendor_id = #{vendorId}
+          <if test="produceDate != null"> and produce_date = #{produceDate}</if>
+          <if test="expireDate != null"> and expire_date = #{expireDate}</if>
+          <if test="lotNumber != null and lotNumber != ''"> and lot_number = #{lotNumber}</if>
+        limit 1
+    </select>
+
+</mapper>

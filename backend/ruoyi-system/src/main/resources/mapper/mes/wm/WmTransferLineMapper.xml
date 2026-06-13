@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.wm.WmTransferLineMapper">
+
+    <resultMap type="WmTransferLine" id="WmTransferLineResult">
+        <id property="lineId" column="line_id" />
+        <result property="factoryId" column="factory_id" />
+        <result property="transferId" column="transfer_id" />
+        <result property="itemId" column="item_id" />
+        <result property="itemCode" column="item_code" />
+        <result property="itemName" column="item_name" />
+        <result property="specification" column="specification" />
+        <result property="unitOfMeasure" column="unit_of_measure" />
+        <result property="unitName" column="unit_name" />
+        <result property="quantityTransfer" column="quantity_transfer" />
+        <result property="batchId" column="batch_id" />
+        <result property="batchCode" column="batch_code" />
+        <result property="sourceLocationId" column="source_location_id" />
+        <result property="sourceAreaId" column="source_area_id" />
+        <result property="targetLocationId" column="target_location_id" />
+        <result property="targetAreaId" column="target_area_id" />
+        <result property="remark" column="remark" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <sql id="selectWmTransferLineVo">
+        select line_id, factory_id, transfer_id, item_id, item_code, item_name, specification, unit_of_measure, unit_name, quantity_transfer, batch_id, batch_code, source_location_id, source_area_id, target_location_id, target_area_id, remark, create_by, create_time, update_by, update_time from qxx_wm_transfer_line
+    </sql>
+
+    <select id="selectWmTransferLineList" parameterType="WmTransferLine" resultMap="WmTransferLineResult">
+        <include refid="selectWmTransferLineVo"/>
+        <where>
+            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
+            <if test="transferId != null"> and transfer_id = #{transferId}</if>
+            <if test="itemId != null"> and item_id = #{itemId}</if>
+            <if test="itemCode != null and itemCode != ''"> and item_code like concat('%', #{itemCode}, '%')</if>
+            <if test="itemName != null and itemName != ''"> and item_name like concat('%', #{itemName}, '%')</if>
+            <if test="specification != null and specification != ''"> and specification like concat('%', #{specification}, '%')</if>
+            <if test="unitOfMeasure != null and unitOfMeasure != ''"> and unit_of_measure like concat('%', #{unitOfMeasure}, '%')</if>
+            <if test="unitName != null and unitName != ''"> and unit_name like concat('%', #{unitName}, '%')</if>
+            <if test="batchId != null"> and batch_id = #{batchId}</if>
+            <if test="batchCode != null and batchCode != ''"> and batch_code like concat('%', #{batchCode}, '%')</if>
+            <if test="sourceLocationId != null"> and source_location_id = #{sourceLocationId}</if>
+            <if test="sourceAreaId != null"> and source_area_id = #{sourceAreaId}</if>
+            <if test="targetLocationId != null"> and target_location_id = #{targetLocationId}</if>
+            <if test="targetAreaId != null"> and target_area_id = #{targetAreaId}</if>
+            <if test="createBy != null and createBy != ''"> and create_by like concat('%', #{createBy}, '%')</if>
+            <if test="updateBy != null and updateBy != ''"> and update_by like concat('%', #{updateBy}, '%')</if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <select id="selectWmTransferLineAll" resultMap="WmTransferLineResult">
+        <include refid="selectWmTransferLineVo"/>
+    </select>
+
+    <select id="selectWmTransferLineByLineId" parameterType="Long" resultMap="WmTransferLineResult">
+        <include refid="selectWmTransferLineVo"/>
+        where line_id = #{lineId}
+    </select>
+
+    <insert id="insertWmTransferLine" parameterType="WmTransferLine" useGeneratedKeys="true" keyProperty="lineId">
+        insert into qxx_wm_transfer_line
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="transferId != null">transfer_id,</if>
+            <if test="itemId != null">item_id,</if>
+            <if test="itemCode != null">item_code,</if>
+            <if test="itemName != null">item_name,</if>
+            <if test="specification != null">specification,</if>
+            <if test="unitOfMeasure != null">unit_of_measure,</if>
+            <if test="unitName != null">unit_name,</if>
+            <if test="quantityTransfer != null">quantity_transfer,</if>
+            <if test="batchId != null">batch_id,</if>
+            <if test="batchCode != null">batch_code,</if>
+            <if test="sourceLocationId != null">source_location_id,</if>
+            <if test="sourceAreaId != null">source_area_id,</if>
+            <if test="targetLocationId != null">target_location_id,</if>
+            <if test="targetAreaId != null">target_area_id,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="transferId != null">#{transferId},</if>
+            <if test="itemId != null">#{itemId},</if>
+            <if test="itemCode != null">#{itemCode},</if>
+            <if test="itemName != null">#{itemName},</if>
+            <if test="specification != null">#{specification},</if>
+            <if test="unitOfMeasure != null">#{unitOfMeasure},</if>
+            <if test="unitName != null">#{unitName},</if>
+            <if test="quantityTransfer != null">#{quantityTransfer},</if>
+            <if test="batchId != null">#{batchId},</if>
+            <if test="batchCode != null">#{batchCode},</if>
+            <if test="sourceLocationId != null">#{sourceLocationId},</if>
+            <if test="sourceAreaId != null">#{sourceAreaId},</if>
+            <if test="targetLocationId != null">#{targetLocationId},</if>
+            <if test="targetAreaId != null">#{targetAreaId},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateWmTransferLine" parameterType="WmTransferLine">
+        update qxx_wm_transfer_line
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="transferId != null">transfer_id = #{transferId},</if>
+            <if test="itemId != null">item_id = #{itemId},</if>
+            <if test="itemCode != null">item_code = #{itemCode},</if>
+            <if test="itemName != null">item_name = #{itemName},</if>
+            <if test="specification != null">specification = #{specification},</if>
+            <if test="unitOfMeasure != null">unit_of_measure = #{unitOfMeasure},</if>
+            <if test="unitName != null">unit_name = #{unitName},</if>
+            <if test="quantityTransfer != null">quantity_transfer = #{quantityTransfer},</if>
+            <if test="batchId != null">batch_id = #{batchId},</if>
+            <if test="batchCode != null">batch_code = #{batchCode},</if>
+            <if test="sourceLocationId != null">source_location_id = #{sourceLocationId},</if>
+            <if test="sourceAreaId != null">source_area_id = #{sourceAreaId},</if>
+            <if test="targetLocationId != null">target_location_id = #{targetLocationId},</if>
+            <if test="targetAreaId != null">target_area_id = #{targetAreaId},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where line_id = #{lineId}
+    </update>
+
+    <delete id="deleteWmTransferLineByLineId" parameterType="Long">
+        delete from qxx_wm_transfer_line where line_id = #{lineId}
+    </delete>
+
+    <delete id="deleteWmTransferLineByLineIds" parameterType="String">
+        delete from qxx_wm_transfer_line where line_id in
+        <foreach item="lineId" collection="array" open="(" separator="," close=")">
+            #{lineId}
+        </foreach>
+    </delete>
+
+</mapper>

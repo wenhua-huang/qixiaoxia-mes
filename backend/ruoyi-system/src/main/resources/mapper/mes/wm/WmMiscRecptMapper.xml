@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.wm.WmMiscRecptMapper">
+
+    <resultMap type="WmMiscRecpt" id="WmMiscRecptResult">
+        <id property="recptId" column="recpt_id" />
+        <result property="factoryId" column="factory_id" />
+        <result property="recptCode" column="recpt_code" />
+        <result property="recptName" column="recpt_name" />
+        <result property="recptType" column="recpt_type" />
+        <result property="warehouseId" column="warehouse_id" />
+        <result property="warehouseName" column="warehouse_name" />
+        <result property="recptDate" column="recpt_date" />
+        <result property="totalQuantity" column="total_quantity" />
+        <result property="status" column="status" />
+        <result property="remark" column="remark" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <sql id="selectWmMiscRecptVo">
+        select recpt_id, factory_id, recpt_code, recpt_name, recpt_type, warehouse_id, warehouse_name, recpt_date, total_quantity, status, remark, create_by, create_time, update_by, update_time from qxx_wm_misc_recpt
+    </sql>
+
+    <select id="selectWmMiscRecptList" parameterType="WmMiscRecpt" resultMap="WmMiscRecptResult">
+        <include refid="selectWmMiscRecptVo"/>
+        <where>
+            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
+            <if test="recptCode != null and recptCode != ''"> and recpt_code like concat('%', #{recptCode}, '%')</if>
+            <if test="recptName != null and recptName != ''"> and recpt_name like concat('%', #{recptName}, '%')</if>
+            <if test="recptType != null and recptType != ''"> and recpt_type like concat('%', #{recptType}, '%')</if>
+            <if test="warehouseId != null"> and warehouse_id = #{warehouseId}</if>
+            <if test="warehouseName != null and warehouseName != ''"> and warehouse_name like concat('%', #{warehouseName}, '%')</if>
+            <if test="status != null and status != ''"> and status like concat('%', #{status}, '%')</if>
+            <if test="createBy != null and createBy != ''"> and create_by like concat('%', #{createBy}, '%')</if>
+            <if test="updateBy != null and updateBy != ''"> and update_by like concat('%', #{updateBy}, '%')</if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <select id="selectWmMiscRecptAll" resultMap="WmMiscRecptResult">
+        <include refid="selectWmMiscRecptVo"/>
+    </select>
+
+    <select id="selectWmMiscRecptByRecptId" parameterType="Long" resultMap="WmMiscRecptResult">
+        <include refid="selectWmMiscRecptVo"/>
+        where recpt_id = #{recptId}
+    </select>
+
+    <insert id="insertWmMiscRecpt" parameterType="WmMiscRecpt" useGeneratedKeys="true" keyProperty="recptId">
+        insert into qxx_wm_misc_recpt
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="recptCode != null">recpt_code,</if>
+            <if test="recptName != null">recpt_name,</if>
+            <if test="recptType != null">recpt_type,</if>
+            <if test="warehouseId != null">warehouse_id,</if>
+            <if test="warehouseName != null">warehouse_name,</if>
+            <if test="recptDate != null">recpt_date,</if>
+            <if test="totalQuantity != null">total_quantity,</if>
+            <if test="status != null">status,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="recptCode != null">#{recptCode},</if>
+            <if test="recptName != null">#{recptName},</if>
+            <if test="recptType != null">#{recptType},</if>
+            <if test="warehouseId != null">#{warehouseId},</if>
+            <if test="warehouseName != null">#{warehouseName},</if>
+            <if test="recptDate != null">#{recptDate},</if>
+            <if test="totalQuantity != null">#{totalQuantity},</if>
+            <if test="status != null">#{status},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateWmMiscRecpt" parameterType="WmMiscRecpt">
+        update qxx_wm_misc_recpt
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="recptCode != null">recpt_code = #{recptCode},</if>
+            <if test="recptName != null">recpt_name = #{recptName},</if>
+            <if test="recptType != null">recpt_type = #{recptType},</if>
+            <if test="warehouseId != null">warehouse_id = #{warehouseId},</if>
+            <if test="warehouseName != null">warehouse_name = #{warehouseName},</if>
+            <if test="recptDate != null">recpt_date = #{recptDate},</if>
+            <if test="totalQuantity != null">total_quantity = #{totalQuantity},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where recpt_id = #{recptId}
+    </update>
+
+    <delete id="deleteWmMiscRecptByRecptId" parameterType="Long">
+        delete from qxx_wm_misc_recpt where recpt_id = #{recptId}
+    </delete>
+
+    <delete id="deleteWmMiscRecptByRecptIds" parameterType="String">
+        delete from qxx_wm_misc_recpt where recpt_id in
+        <foreach item="recptId" collection="array" open="(" separator="," close=")">
+            #{recptId}
+        </foreach>
+    </delete>
+
+</mapper>

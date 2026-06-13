@@ -47,6 +47,11 @@
       <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
         <el-row>
           <el-col :span="12"><el-form-item label="供应商编码" prop="vendorCode"><el-input v-model="form.vendorCode" placeholder="自动生成或手动输入" /></el-form-item></el-col>
+          <el-col :span="12">
+            <el-form-item label-width="70" v-if="!form.vendorId">
+              <el-switch v-model="autoGenFlag" active-color="#13ce66" size="small" @change="handleAutoGenChange" /><span style="margin-left:6px;font-size:12px;color:#13ce66">自动生成</span>
+            </el-form-item>
+          </el-col>
           <el-col :span="12"><el-form-item label="供应商全称" prop="vendorName"><el-input v-model="form.vendorName" placeholder="请输入" /></el-form-item></el-col>
         </el-row>
         <el-row>
@@ -132,6 +137,7 @@
 <script setup lang="ts" name="Vendor">
 import { ref, reactive, toRefs } from 'vue'
 import { getCurrentInstance } from 'vue'
+import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import type { MdVendor, VendorQueryParams } from '@/types/api/mes/md/vendor'
 import { listVendor, getVendor, delVendor, addVendor, updateVendor } from '@/api/mes/md/vendor'
 import { listAllFactory } from '@/api/mes/md/factory'
@@ -145,6 +151,7 @@ const coopStatusMap: Record<string, string> = { ACTIVE: '合作中', INACTIVE: '
 
 const vendorList = ref<MdVendor[]>([]); const open = ref(false); const loading = ref(true); const showSearch = ref(true)
 const ids = ref<number[]>([]); const single = ref(true); const multiple = ref(true); const total = ref(0); const title = ref('')
+const autoGenFlag = ref(false)
 const factoryOptions = ref<any[]>([])
 
 const data = reactive({
@@ -156,7 +163,11 @@ const { queryParams, form, rules } = toRefs(data)
 
 function getList() { loading.value = true; listVendor(queryParams.value).then(r => { vendorList.value = r.rows; total.value = r.total; loading.value = false }) }
 function cancel() { open.value = false; reset() }
-function reset() { form.value = { enableFlag: '1', coopStatus: 'ACTIVE', vendorType: 'MATERIAL', vendorLevel: 'C' } as MdVendor; proxy.resetForm('formRef') }
+function handleAutoGenChange(flag: boolean) {
+  if (flag) genSerialCode('VENDOR_CODE').then((r: any) => { form.value.vendorCode = r.data })
+  else form.value.vendorCode = ''
+}
+function reset() { autoGenFlag.value = false; form.value = { enableFlag: '1', coopStatus: 'ACTIVE', vendorType: 'MATERIAL', vendorLevel: 'C' } as MdVendor; proxy.resetForm('formRef') }
 function handleQuery() { queryParams.value.pageNum = 1; getList() }
 function resetQuery() { proxy.resetForm('queryRef'); handleQuery() }
 function handleSelectionChange(s: MdVendor[]) { ids.value = s.map(i => i.vendorId!); single.value = s.length !== 1; multiple.value = !s.length }
@@ -167,3 +178,7 @@ function handleDelete(row?: MdVendor) { const ids_ = row?.vendorId || ids.value;
 function handleExport() { proxy.download('mes/md/vendor/export', { ...queryParams.value }, `vendor_${Date.now()}.xlsx`) }
 getList()
 </script>
+
+<style scoped>
+:deep(.el-form-item__label) { padding-right: 16px !important; }
+</style>

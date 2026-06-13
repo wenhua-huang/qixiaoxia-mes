@@ -160,7 +160,98 @@ INSERT INTO qxx_wm_item_recpt (factory_id, recpt_code, ...) VALUES (?, ?, ...);
 
 **为什么不选 AOP**：AOP 只拦 Service 方法，Mapper 直接调用、动态 SQL 拼接都拦不到。MyBatis Interceptor 在 SQL 执行层，100% 覆盖。
 
+### Redis 分布式锁 ✅ 已实现
+
+> 凡是需要保证**跨实例库存一致性**的操作（入库/出库/调拨/退货），必须使用 Redisson 分布式锁，**禁止用 `synchronized`**（仅限单 JVM，无法水平扩展）。
+
+**实现文件**：
+- `ruoyi-common/.../redis/RedisLockTemplate.java` — 锁模板，封装 tryLock/finally/unlock 样板（~50 行）
+- `ruoyi-common/.../enums/TransactionTypeEnum.java` — 库存事务类型枚举（8 种）
+- `ruoyi-framework/.../config/RedissonConfig.java` — 手动创建 `RedissonClient` Bean（~35 行，读 `spring.data.redis.*`）
+- `ruoyi-common/pom.xml` — `redisson` 3.27.2（**非** starter，避免与 Spring Boot 4.0 自动配置冲突）
+
+**强制规则**：
+- 库存变更**必须先锁后事务**：`lockTemplate.execute(lockKey, () -> txTemplate.execute(status -> doWork()))`，锁内的 lambda 第一行就是开事务。**禁止**用 `@Transactional` 注解（`@Transactional` 在方法入口就 `setAutoCommit(false)`，导致事务先于锁）
+- TX Bean 新增类型**必须实现 `TxBean` 接口**，否则 `copyCommonFields` 静默跳过导致数据丢失
+- TX Bean 的 `vendorId`/`workorderId` 等维度字段**必须正确传递**，禁止硬编码 0L
+
+**为什么用 plain redisson 而非 redisson-spring-boot-starter**：
+Spring Boot 4.0 移除了 `org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration`，starter 的 `RedissonAutoConfigurationV2` 引用该类导致启动报 `ClassNotFoundException`。手动 `@Bean` 配置绕过此问题。
+
+**标准用法**：
+
+```java
+@Autowired private RedisLockTemplate lockTemplate;
+@Autowired private PlatformTransactionManager txManager;
+
+public WmTransaction processStock(WmTransaction tx) {
+    TransactionTemplate tt = new TransactionTemplate(txManager);
+    tt.setTimeout(30);
+    return lockTemplate.execute("wm:stock:lock:" + itemId,
+        () -> tt.execute(status -> doProcessTransaction(tx)));  // 🔒先锁 → 再开事务
+}
+```
+
+关键：`lockTemplate.execute()` 的 lambda **第一行**就是 `tt.execute()`，确保 DB 事务在锁之后才开始。
+
+**设计要点**：
+
+| 要点 | 说明 |
+|------|------|
+| **Watchdog 自动续期** | `tryLock(waitTime, TimeUnit)` 不设 leaseTime，Redisson 每 10s 自动续期，DB 卡再久锁也不丢 |
+| **锁粒度** | 与 `material_stock.uk_stock` 唯一键对齐：`item:batch:warehouse:vendor:workorder:quality`，不同库存记录可并发 |
+| **`isHeldByCurrentThread()`** | finally 中先判断再 unlock，防止锁已过期时抛 `IllegalMonitorStateException` |
+| **`tryLock` 超时** | 等待最多 5s，避免请求堆积；获取失败抛 `ServiceException` 让调用方决定重试 |
+
+**`@Transactional` 与锁的顺序**（必须遵守：**先锁后事务**）：
+
+```
+processTransaction(tx)
+  validate() / initStock()          ← 纯内存
+  lockTemplate.execute(lockKey, () -> {     ← 🔒 先拿锁
+      txTemplate.execute(status -> {        ← 再显式开事务（status = new TX）
+          loadMaterialStock()               ← 快照在锁内产生
+          updateStock() / insertTx()
+          return result;
+      });                                   ← COMMIT
+  });                                       ← 🔓 放锁
+```
+
+**为什么不用 `@Transactional` 声明式事务？`@Transactional` 在方法入口就 `setAutoCommit(false)`，实际先于锁。** 改用 `TransactionTemplate` 显式控制：`new TransactionTemplate(transactionManager).execute(status -> ...)`，事务在锁内才开始，彻底消除 REPEATABLE_READ 快照时序隐患。
+
+```java
+@Autowired
+private PlatformTransactionManager transactionManager;
+
+public WmTransaction processTransaction(WmTransaction tx) {
+    TransactionTemplate tt = new TransactionTemplate(transactionManager);
+    return lockTemplate.execute(lockKey,
+        () -> tt.execute(status -> doProcessTransaction(tx, stock)));
+}
+```
+
+**强制规则**：
+- 库存变更**必须**先锁后事务，用 `TransactionTemplate` 显式开 TX，**禁止**用 `@Transactional` 注解
+- 锁内除了 DB 操作外不能有远程调用/耗时逻辑
+- `lockTemplate.execute` 的 lambda 内第一行就是 `txTemplate.execute`
+
+**选择 Redisson 而非手写 RedisLock 的原因**：
+
+| 对比 | 手写 SET NX EX | Redisson RLock |
+|------|---------------|----------------|
+| 锁过期 | 固定 TTL，DB 卡了锁会丢 ❌ | Watchdog 自动续期 ✅ |
+| 可重入 | 需自己实现计数器 | 内置支持 |
+| 锁释放安全 | 需 Lua 脚本保证原子性 | `isHeldByCurrentThread()` |
+| 代码量 | ~90 行 | 10 行 |
+| 额外依赖 | 0 | redisson.jar ~5MB，Netty 已通过 lettuce 存在 |
+
 ### Adding a New MES Feature (Full Stack)
+
+> ⚠️ **做计划前必须检查 DB 字段是否齐备。** 任何新功能计划的第一步是：
+> ```bash
+> docker exec -i qxx-mysql mysql -uroot -pqxx123456 mes -e "DESCRIBE <table>"
+> ```
+> 对照 DDL 设计文档确认目标字段是否存在。缺失字段必须在计划中列为独立的 DDL Step（ALTER TABLE），不能假设字段存在就跳过。**这是 AI 做计划时最容易漏的环节。**
 
 **标准 CRUD 操作优先用 RuoYi 代码生成器**，不要手写。
 
@@ -181,6 +272,48 @@ INSERT INTO qxx_wm_item_recpt (factory_id, recpt_code, ...) VALUES (?, ?, ...);
 4. **PC前端页面**: `frontend/src/views/mes/{domain}/{entity}/`
 5. **PC前端 API**: `frontend/src/api/mes/{domain}/`
 6. **移动端页面**: `app/pages/mes/{domain}/`(如需要)
+7. **自动编码规则**: 任一需要编码的实体/单据，**必须**同步创建 `sys_auto_code_rule` + `sys_auto_code_part`（FIXCHAR前缀 + NOWDATE日期 + SERIALNO流水号），并在前端表单中加 `autoGenFlag` 开关调用 `genSerialCode`
+
+### 自动编码接入步骤
+
+任一新增 MES 实体（物料/客户/供应商/仓库/库区/单据等）必须有自动编码功能：
+
+**Step 1 — 创建编码规则** (SQL)：
+```sql
+INSERT INTO sys_auto_code_rule (factory_id, rule_code, rule_name, rule_desc, max_length, is_padded, padded_char, padded_method, enable_flag)
+VALUES (1, '{RULE_CODE}', '{规则名称}', '{描述}', 20, 'N', '0', 'L', '1');
+
+-- 三部分：固定前缀 + 日期 + 流水号
+INSERT INTO sys_auto_code_part (factory_id, rule_id, part_index, part_type, part_code, part_name, part_length, fix_character)
+VALUES (1, @rid, 1, 'FIXCHAR', 'PREFIX', '{前缀}', {前缀长度}, '{前缀}');
+INSERT INTO sys_auto_code_part (factory_id, rule_id, part_index, part_type, part_code, part_name, part_length, date_format)
+VALUES (1, @rid, 2, 'NOWDATE', 'DATE_PART', '日期', 8, 'yyyyMMdd');
+INSERT INTO sys_auto_code_part (factory_id, rule_id, part_index, part_type, part_code, part_name, part_length, seria_start_no, seria_step, cycle_flag, cycle_method)
+VALUES (1, @rid, 3, 'SERIALNO', 'SERIAL_PART', '流水号', 3, 1, 1, 'Y', 'DAY');
+```
+
+**Step 2 — 前端 Vue 页面** (必须包含 4 处修改)：
+```typescript
+// ① import
+import { genSerialCode } from '@/api/mes/sys/autocoderule'
+
+// ② ref
+const autoGenFlag = ref(false)
+
+// ③ 模板 switch（放在编码 input 旁边）
+<el-col :span="8">
+  <el-form-item label-width="70" v-if="!form.xxxId">
+    <el-switch v-model="autoGenFlag" active-color="#13ce66" active-text="自动生成" @change="handleAutoGenChange" />
+  </el-form-item>
+</el-col>
+
+// ④ handler + reset 中重置 autoGenFlag
+function handleAutoGenChange(flag: boolean) {
+  if (flag) genSerialCode('RULE_CODE').then((r: any) => { form.value.xxxCode = r.data })
+  else form.value.xxxCode = ''
+}
+function reset() { autoGenFlag.value = false; form.value = {} as ...; ... }
+```
 
 ## Environment Versions
 
@@ -225,6 +358,22 @@ curl -s http://localhost:8081/getInfo -H "Authorization: Bearer $TOKEN" | python
 
 - **每次任务必须有明确完成标准**：任务开始前列出 Done 条件，完成时逐条对照
 - **输出必须可验证**：每个产出都能被客观验证（测试通过 / 页面可操作 / 接口返回正确）
+
+## AI 提交前自检清单
+
+每完成一个开发任务，AI 必须自查：
+
+- [ ] 类型检查通过（frontend: `npx vue-tsc --noEmit`，backend: `mvn compile`）
+- [ ] 测试通过（前端 `npm test`，后端 `mvn test`）
+- [ ] SQL: 所有 WHERE 条件带 `factory_id`
+- [ ] 权限: Controller 有 `@PreAuthorize`，前端页面有权限指令
+- [ ] 无硬编码魔法数字/字符串
+- [ ] 新文件命名符合项目规范
+- [ ] API 变更已同步更新前端 API 模块
+
+### 前端开发规范
+
+> 📁 **详见 `frontend/CLAUDE.md`** — Vue 3 + TS + Element Plus 编码规范、组件模式、表单校验、自动编码前端接入、提交前自检清单、label 间距、日期格式等。
 
 ## 代码质量约束
 
@@ -352,18 +501,6 @@ curl -s -o /dev/null -w "HTTP %{http_code}" http://localhost/
 - 修改非本项目文件（参考 workspace 约束）
 - 跳过类型检查/lint 直接提交代码
 
-## AI 提交前自检清单
-
-每完成一个开发任务，AI 必须自查：
-
-- [ ] 类型检查通过（frontend: `npx vue-tsc --noEmit`，backend: `mvn compile`）
-- [ ] 测试通过（前端 `npm test`，后端 `mvn test`）
-- [ ] SQL: 所有 WHERE 条件带 `factory_id`
-- [ ] 权限: Controller 有 `@PreAuthorize`，前端页面有权限指令
-- [ ] 无硬编码魔法数字/字符串
-- [ ] 新文件命名符合项目规范
-- [ ] API 变更已同步更新前端 API 模块
-
 ## API 契约规范
 
 ### 后端响应格式（统一）
@@ -373,9 +510,7 @@ curl -s -o /dev/null -w "HTTP %{http_code}" http://localhost/
 
 ### 前端 API 调用
 
-- 封装在 `src/api/mes/{domain}/{entity}.ts`
-- 函数命名: `listXxx`, `getXxx`, `addXxx`, `updateXxx`, `delXxx`
-- 参数类型必须在 `src/types/` 定义
+> 📁 **详见 `frontend/CLAUDE.md`** — API 模块封装规范、类型定义、函数命名。
 
 ### 前后端同步规则
 

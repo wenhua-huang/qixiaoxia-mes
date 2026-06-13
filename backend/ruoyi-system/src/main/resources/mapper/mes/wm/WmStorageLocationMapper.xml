@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.wm.WmStorageLocationMapper">
+
+    <resultMap type="WmStorageLocation" id="WmStorageLocationResult">
+        <id property="locationId" column="location_id" />
+        <result property="factoryId" column="factory_id" />
+        <result property="locationCode" column="location_code" />
+        <result property="locationName" column="location_name" />
+        <result property="warehouseId" column="warehouse_id" />
+        <result property="warehouseCode" column="warehouse_code" />
+        <result property="warehouseName" column="warehouse_name" />
+        <result property="area" column="area" />
+        <result property="enableFlag" column="enable_flag" />
+        <result property="remark" column="remark" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <sql id="selectWmStorageLocationVo">
+        select location_id, factory_id, location_code, location_name, warehouse_id, warehouse_code, warehouse_name, area, enable_flag, remark, create_by, create_time, update_by, update_time from qxx_wm_storage_location
+    </sql>
+
+    <select id="selectWmStorageLocationList" parameterType="WmStorageLocation" resultMap="WmStorageLocationResult">
+        <include refid="selectWmStorageLocationVo"/>
+        <where>
+            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
+            <if test="locationCode != null and locationCode != ''"> and location_code like concat('%', #{locationCode}, '%')</if>
+            <if test="locationName != null and locationName != ''"> and location_name like concat('%', #{locationName}, '%')</if>
+            <if test="warehouseId != null"> and warehouse_id = #{warehouseId}</if>
+            <if test="warehouseCode != null and warehouseCode != ''"> and warehouse_code like concat('%', #{warehouseCode}, '%')</if>
+            <if test="warehouseName != null and warehouseName != ''"> and warehouse_name like concat('%', #{warehouseName}, '%')</if>
+            <if test="enableFlag != null and enableFlag != ''"> and enable_flag like concat('%', #{enableFlag}, '%')</if>
+            <if test="createBy != null and createBy != ''"> and create_by like concat('%', #{createBy}, '%')</if>
+            <if test="updateBy != null and updateBy != ''"> and update_by like concat('%', #{updateBy}, '%')</if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <select id="selectWmStorageLocationAll" resultMap="WmStorageLocationResult">
+        <include refid="selectWmStorageLocationVo"/>
+    </select>
+
+    <select id="selectWmStorageLocationByLocationId" parameterType="Long" resultMap="WmStorageLocationResult">
+        <include refid="selectWmStorageLocationVo"/>
+        where location_id = #{locationId}
+    </select>
+
+    <insert id="insertWmStorageLocation" parameterType="WmStorageLocation" useGeneratedKeys="true" keyProperty="locationId">
+        insert into qxx_wm_storage_location
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="locationCode != null">location_code,</if>
+            <if test="locationName != null">location_name,</if>
+            <if test="warehouseId != null">warehouse_id,</if>
+            <if test="warehouseCode != null">warehouse_code,</if>
+            <if test="warehouseName != null">warehouse_name,</if>
+            <if test="area != null">area,</if>
+            <if test="enableFlag != null">enable_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="locationCode != null">#{locationCode},</if>
+            <if test="locationName != null">#{locationName},</if>
+            <if test="warehouseId != null">#{warehouseId},</if>
+            <if test="warehouseCode != null">#{warehouseCode},</if>
+            <if test="warehouseName != null">#{warehouseName},</if>
+            <if test="area != null">#{area},</if>
+            <if test="enableFlag != null">#{enableFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateWmStorageLocation" parameterType="WmStorageLocation">
+        update qxx_wm_storage_location
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="locationCode != null">location_code = #{locationCode},</if>
+            <if test="locationName != null">location_name = #{locationName},</if>
+            <if test="warehouseId != null">warehouse_id = #{warehouseId},</if>
+            <if test="warehouseCode != null">warehouse_code = #{warehouseCode},</if>
+            <if test="warehouseName != null">warehouse_name = #{warehouseName},</if>
+            <if test="area != null">area = #{area},</if>
+            <if test="enableFlag != null">enable_flag = #{enableFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where location_id = #{locationId}
+    </update>
+
+    <delete id="deleteWmStorageLocationByLocationId" parameterType="Long">
+        delete from qxx_wm_storage_location where location_id = #{locationId}
+    </delete>
+
+    <delete id="deleteWmStorageLocationByLocationIds" parameterType="String">
+        delete from qxx_wm_storage_location where location_id in
+        <foreach item="locationId" collection="array" open="(" separator="," close=")">
+            #{locationId}
+        </foreach>
+    </delete>
+
+</mapper>

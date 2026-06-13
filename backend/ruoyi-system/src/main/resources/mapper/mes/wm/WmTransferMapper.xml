@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.wm.WmTransferMapper">
+
+    <resultMap type="WmTransfer" id="WmTransferResult">
+        <id property="transferId" column="transfer_id" />
+        <result property="factoryId" column="factory_id" />
+        <result property="transferCode" column="transfer_code" />
+        <result property="transferName" column="transfer_name" />
+        <result property="sourceWarehouseId" column="source_warehouse_id" />
+        <result property="sourceWarehouseCode" column="source_warehouse_code" />
+        <result property="sourceWarehouseName" column="source_warehouse_name" />
+        <result property="targetWarehouseId" column="target_warehouse_id" />
+        <result property="targetWarehouseCode" column="target_warehouse_code" />
+        <result property="targetWarehouseName" column="target_warehouse_name" />
+        <result property="transferDate" column="transfer_date" />
+        <result property="totalQuantity" column="total_quantity" />
+        <result property="status" column="status" />
+        <result property="remark" column="remark" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <sql id="selectWmTransferVo">
+        select transfer_id, factory_id, transfer_code, transfer_name, source_warehouse_id, source_warehouse_code, source_warehouse_name, target_warehouse_id, target_warehouse_code, target_warehouse_name, transfer_date, total_quantity, status, remark, create_by, create_time, update_by, update_time from qxx_wm_transfer
+    </sql>
+
+    <select id="selectWmTransferList" parameterType="WmTransfer" resultMap="WmTransferResult">
+        <include refid="selectWmTransferVo"/>
+        <where>
+            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
+            <if test="transferCode != null and transferCode != ''"> and transfer_code like concat('%', #{transferCode}, '%')</if>
+            <if test="transferName != null and transferName != ''"> and transfer_name like concat('%', #{transferName}, '%')</if>
+            <if test="sourceWarehouseId != null"> and source_warehouse_id = #{sourceWarehouseId}</if>
+            <if test="sourceWarehouseCode != null and sourceWarehouseCode != ''"> and source_warehouse_code like concat('%', #{sourceWarehouseCode}, '%')</if>
+            <if test="sourceWarehouseName != null and sourceWarehouseName != ''"> and source_warehouse_name like concat('%', #{sourceWarehouseName}, '%')</if>
+            <if test="targetWarehouseId != null"> and target_warehouse_id = #{targetWarehouseId}</if>
+            <if test="targetWarehouseCode != null and targetWarehouseCode != ''"> and target_warehouse_code like concat('%', #{targetWarehouseCode}, '%')</if>
+            <if test="targetWarehouseName != null and targetWarehouseName != ''"> and target_warehouse_name like concat('%', #{targetWarehouseName}, '%')</if>
+            <if test="status != null and status != ''"> and status like concat('%', #{status}, '%')</if>
+            <if test="createBy != null and createBy != ''"> and create_by like concat('%', #{createBy}, '%')</if>
+            <if test="updateBy != null and updateBy != ''"> and update_by like concat('%', #{updateBy}, '%')</if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <select id="selectWmTransferAll" resultMap="WmTransferResult">
+        <include refid="selectWmTransferVo"/>
+    </select>
+
+    <select id="selectWmTransferByTransferId" parameterType="Long" resultMap="WmTransferResult">
+        <include refid="selectWmTransferVo"/>
+        where transfer_id = #{transferId}
+    </select>
+
+    <insert id="insertWmTransfer" parameterType="WmTransfer" useGeneratedKeys="true" keyProperty="transferId">
+        insert into qxx_wm_transfer
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="transferCode != null">transfer_code,</if>
+            <if test="transferName != null">transfer_name,</if>
+            <if test="sourceWarehouseId != null">source_warehouse_id,</if>
+            <if test="sourceWarehouseCode != null">source_warehouse_code,</if>
+            <if test="sourceWarehouseName != null">source_warehouse_name,</if>
+            <if test="targetWarehouseId != null">target_warehouse_id,</if>
+            <if test="targetWarehouseCode != null">target_warehouse_code,</if>
+            <if test="targetWarehouseName != null">target_warehouse_name,</if>
+            <if test="transferDate != null">transfer_date,</if>
+            <if test="totalQuantity != null">total_quantity,</if>
+            <if test="status != null">status,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="transferCode != null">#{transferCode},</if>
+            <if test="transferName != null">#{transferName},</if>
+            <if test="sourceWarehouseId != null">#{sourceWarehouseId},</if>
+            <if test="sourceWarehouseCode != null">#{sourceWarehouseCode},</if>
+            <if test="sourceWarehouseName != null">#{sourceWarehouseName},</if>
+            <if test="targetWarehouseId != null">#{targetWarehouseId},</if>
+            <if test="targetWarehouseCode != null">#{targetWarehouseCode},</if>
+            <if test="targetWarehouseName != null">#{targetWarehouseName},</if>
+            <if test="transferDate != null">#{transferDate},</if>
+            <if test="totalQuantity != null">#{totalQuantity},</if>
+            <if test="status != null">#{status},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateWmTransfer" parameterType="WmTransfer">
+        update qxx_wm_transfer
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="transferCode != null">transfer_code = #{transferCode},</if>
+            <if test="transferName != null">transfer_name = #{transferName},</if>
+            <if test="sourceWarehouseId != null">source_warehouse_id = #{sourceWarehouseId},</if>
+            <if test="sourceWarehouseCode != null">source_warehouse_code = #{sourceWarehouseCode},</if>
+            <if test="sourceWarehouseName != null">source_warehouse_name = #{sourceWarehouseName},</if>
+            <if test="targetWarehouseId != null">target_warehouse_id = #{targetWarehouseId},</if>
+            <if test="targetWarehouseCode != null">target_warehouse_code = #{targetWarehouseCode},</if>
+            <if test="targetWarehouseName != null">target_warehouse_name = #{targetWarehouseName},</if>
+            <if test="transferDate != null">transfer_date = #{transferDate},</if>
+            <if test="totalQuantity != null">total_quantity = #{totalQuantity},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where transfer_id = #{transferId}
+    </update>
+
+    <delete id="deleteWmTransferByTransferId" parameterType="Long">
+        delete from qxx_wm_transfer where transfer_id = #{transferId}
+    </delete>
+
+    <delete id="deleteWmTransferByTransferIds" parameterType="String">
+        delete from qxx_wm_transfer where transfer_id in
+        <foreach item="transferId" collection="array" open="(" separator="," close=")">
+            #{transferId}
+        </foreach>
+    </delete>
+
+</mapper>

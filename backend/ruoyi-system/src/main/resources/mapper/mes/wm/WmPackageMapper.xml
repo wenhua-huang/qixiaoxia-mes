@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.wm.WmPackageMapper">
+
+    <resultMap type="WmPackage" id="WmPackageResult">
+        <id property="packageId" column="package_id" />
+        <result property="factoryId" column="factory_id" />
+        <result property="packageCode" column="package_code" />
+        <result property="packageName" column="package_name" />
+        <result property="parentId" column="parent_id" />
+        <result property="ancestors" column="ancestors" />
+        <result property="packageType" column="package_type" />
+        <result property="workorderId" column="workorder_id" />
+        <result property="workorderCode" column="workorder_code" />
+        <result property="quantityPerBox" column="quantity_per_box" />
+        <result property="boxCount" column="box_count" />
+        <result property="totalQuantity" column="total_quantity" />
+        <result property="weight" column="weight" />
+        <result property="length" column="length" />
+        <result property="width" column="width" />
+        <result property="height" column="height" />
+        <result property="volume" column="volume" />
+        <result property="boxLabel" column="box_label" />
+        <result property="status" column="status" />
+        <result property="remark" column="remark" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <sql id="selectWmPackageVo">
+        select package_id, factory_id, package_code, package_name, parent_id, ancestors, package_type, workorder_id, workorder_code, quantity_per_box, box_count, total_quantity, weight, length, width, height, volume, box_label, status, remark, create_by, create_time, update_by, update_time from qxx_wm_package
+    </sql>
+
+    <select id="selectWmPackageList" parameterType="WmPackage" resultMap="WmPackageResult">
+        <include refid="selectWmPackageVo"/>
+        <where>
+            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
+            <if test="packageCode != null and packageCode != ''"> and package_code like concat('%', #{packageCode}, '%')</if>
+            <if test="packageName != null and packageName != ''"> and package_name like concat('%', #{packageName}, '%')</if>
+            <if test="parentId != null"> and parent_id = #{parentId}</if>
+            <if test="ancestors != null and ancestors != ''"> and ancestors like concat('%', #{ancestors}, '%')</if>
+            <if test="packageType != null and packageType != ''"> and package_type like concat('%', #{packageType}, '%')</if>
+            <if test="workorderId != null"> and workorder_id = #{workorderId}</if>
+            <if test="workorderCode != null and workorderCode != ''"> and workorder_code like concat('%', #{workorderCode}, '%')</if>
+            <if test="quantityPerBox != null"> and quantity_per_box = #{quantityPerBox}</if>
+            <if test="boxCount != null"> and box_count = #{boxCount}</if>
+            <if test="boxLabel != null and boxLabel != ''"> and box_label like concat('%', #{boxLabel}, '%')</if>
+            <if test="status != null and status != ''"> and status like concat('%', #{status}, '%')</if>
+            <if test="createBy != null and createBy != ''"> and create_by like concat('%', #{createBy}, '%')</if>
+            <if test="updateBy != null and updateBy != ''"> and update_by like concat('%', #{updateBy}, '%')</if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <select id="selectWmPackageAll" resultMap="WmPackageResult">
+        <include refid="selectWmPackageVo"/>
+    </select>
+
+    <select id="selectWmPackageByPackageId" parameterType="Long" resultMap="WmPackageResult">
+        <include refid="selectWmPackageVo"/>
+        where package_id = #{packageId}
+    </select>
+
+    <insert id="insertWmPackage" parameterType="WmPackage" useGeneratedKeys="true" keyProperty="packageId">
+        insert into qxx_wm_package
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="packageCode != null">package_code,</if>
+            <if test="packageName != null">package_name,</if>
+            <if test="parentId != null">parent_id,</if>
+            <if test="ancestors != null">ancestors,</if>
+            <if test="packageType != null">package_type,</if>
+            <if test="workorderId != null">workorder_id,</if>
+            <if test="workorderCode != null">workorder_code,</if>
+            <if test="quantityPerBox != null">quantity_per_box,</if>
+            <if test="boxCount != null">box_count,</if>
+            <if test="totalQuantity != null">total_quantity,</if>
+            <if test="weight != null">weight,</if>
+            <if test="length != null">length,</if>
+            <if test="width != null">width,</if>
+            <if test="height != null">height,</if>
+            <if test="volume != null">volume,</if>
+            <if test="boxLabel != null">box_label,</if>
+            <if test="status != null">status,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="packageCode != null">#{packageCode},</if>
+            <if test="packageName != null">#{packageName},</if>
+            <if test="parentId != null">#{parentId},</if>
+            <if test="ancestors != null">#{ancestors},</if>
+            <if test="packageType != null">#{packageType},</if>
+            <if test="workorderId != null">#{workorderId},</if>
+            <if test="workorderCode != null">#{workorderCode},</if>
+            <if test="quantityPerBox != null">#{quantityPerBox},</if>
+            <if test="boxCount != null">#{boxCount},</if>
+            <if test="totalQuantity != null">#{totalQuantity},</if>
+            <if test="weight != null">#{weight},</if>
+            <if test="length != null">#{length},</if>
+            <if test="width != null">#{width},</if>
+            <if test="height != null">#{height},</if>
+            <if test="volume != null">#{volume},</if>
+            <if test="boxLabel != null">#{boxLabel},</if>
+            <if test="status != null">#{status},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateWmPackage" parameterType="WmPackage">
+        update qxx_wm_package
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="packageCode != null">package_code = #{packageCode},</if>
+            <if test="packageName != null">package_name = #{packageName},</if>
+            <if test="parentId != null">parent_id = #{parentId},</if>
+            <if test="ancestors != null">ancestors = #{ancestors},</if>
+            <if test="packageType != null">package_type = #{packageType},</if>
+            <if test="workorderId != null">workorder_id = #{workorderId},</if>
+            <if test="workorderCode != null">workorder_code = #{workorderCode},</if>
+            <if test="quantityPerBox != null">quantity_per_box = #{quantityPerBox},</if>
+            <if test="boxCount != null">box_count = #{boxCount},</if>
+            <if test="totalQuantity != null">total_quantity = #{totalQuantity},</if>
+            <if test="weight != null">weight = #{weight},</if>
+            <if test="length != null">length = #{length},</if>
+            <if test="width != null">width = #{width},</if>
+            <if test="height != null">height = #{height},</if>
+            <if test="volume != null">volume = #{volume},</if>
+            <if test="boxLabel != null">box_label = #{boxLabel},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where package_id = #{packageId}
+    </update>
+
+    <delete id="deleteWmPackageByPackageId" parameterType="Long">
+        delete from qxx_wm_package where package_id = #{packageId}
+    </delete>
+
+    <delete id="deleteWmPackageByPackageIds" parameterType="String">
+        delete from qxx_wm_package where package_id in
+        <foreach item="packageId" collection="array" open="(" separator="," close=")">
+            #{packageId}
+        </foreach>
+    </delete>
+
+</mapper>

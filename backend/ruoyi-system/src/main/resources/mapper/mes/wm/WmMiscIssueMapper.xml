@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.wm.WmMiscIssueMapper">
+
+    <resultMap type="WmMiscIssue" id="WmMiscIssueResult">
+        <id property="issueId" column="issue_id" />
+        <result property="factoryId" column="factory_id" />
+        <result property="issueCode" column="issue_code" />
+        <result property="issueName" column="issue_name" />
+        <result property="issueType" column="issue_type" />
+        <result property="warehouseId" column="warehouse_id" />
+        <result property="warehouseName" column="warehouse_name" />
+        <result property="issueDate" column="issue_date" />
+        <result property="totalQuantity" column="total_quantity" />
+        <result property="status" column="status" />
+        <result property="remark" column="remark" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <sql id="selectWmMiscIssueVo">
+        select issue_id, factory_id, issue_code, issue_name, issue_type, warehouse_id, warehouse_name, issue_date, total_quantity, status, remark, create_by, create_time, update_by, update_time from qxx_wm_misc_issue
+    </sql>
+
+    <select id="selectWmMiscIssueList" parameterType="WmMiscIssue" resultMap="WmMiscIssueResult">
+        <include refid="selectWmMiscIssueVo"/>
+        <where>
+            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
+            <if test="issueCode != null and issueCode != ''"> and issue_code like concat('%', #{issueCode}, '%')</if>
+            <if test="issueName != null and issueName != ''"> and issue_name like concat('%', #{issueName}, '%')</if>
+            <if test="issueType != null and issueType != ''"> and issue_type like concat('%', #{issueType}, '%')</if>
+            <if test="warehouseId != null"> and warehouse_id = #{warehouseId}</if>
+            <if test="warehouseName != null and warehouseName != ''"> and warehouse_name like concat('%', #{warehouseName}, '%')</if>
+            <if test="status != null and status != ''"> and status like concat('%', #{status}, '%')</if>
+            <if test="createBy != null and createBy != ''"> and create_by like concat('%', #{createBy}, '%')</if>
+            <if test="updateBy != null and updateBy != ''"> and update_by like concat('%', #{updateBy}, '%')</if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <select id="selectWmMiscIssueAll" resultMap="WmMiscIssueResult">
+        <include refid="selectWmMiscIssueVo"/>
+    </select>
+
+    <select id="selectWmMiscIssueByIssueId" parameterType="Long" resultMap="WmMiscIssueResult">
+        <include refid="selectWmMiscIssueVo"/>
+        where issue_id = #{issueId}
+    </select>
+
+    <insert id="insertWmMiscIssue" parameterType="WmMiscIssue" useGeneratedKeys="true" keyProperty="issueId">
+        insert into qxx_wm_misc_issue
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="issueCode != null">issue_code,</if>
+            <if test="issueName != null">issue_name,</if>
+            <if test="issueType != null">issue_type,</if>
+            <if test="warehouseId != null">warehouse_id,</if>
+            <if test="warehouseName != null">warehouse_name,</if>
+            <if test="issueDate != null">issue_date,</if>
+            <if test="totalQuantity != null">total_quantity,</if>
+            <if test="status != null">status,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="issueCode != null">#{issueCode},</if>
+            <if test="issueName != null">#{issueName},</if>
+            <if test="issueType != null">#{issueType},</if>
+            <if test="warehouseId != null">#{warehouseId},</if>
+            <if test="warehouseName != null">#{warehouseName},</if>
+            <if test="issueDate != null">#{issueDate},</if>
+            <if test="totalQuantity != null">#{totalQuantity},</if>
+            <if test="status != null">#{status},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateWmMiscIssue" parameterType="WmMiscIssue">
+        update qxx_wm_misc_issue
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="issueCode != null">issue_code = #{issueCode},</if>
+            <if test="issueName != null">issue_name = #{issueName},</if>
+            <if test="issueType != null">issue_type = #{issueType},</if>
+            <if test="warehouseId != null">warehouse_id = #{warehouseId},</if>
+            <if test="warehouseName != null">warehouse_name = #{warehouseName},</if>
+            <if test="issueDate != null">issue_date = #{issueDate},</if>
+            <if test="totalQuantity != null">total_quantity = #{totalQuantity},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where issue_id = #{issueId}
+    </update>
+
+    <delete id="deleteWmMiscIssueByIssueId" parameterType="Long">
+        delete from qxx_wm_misc_issue where issue_id = #{issueId}
+    </delete>
+
+    <delete id="deleteWmMiscIssueByIssueIds" parameterType="String">
+        delete from qxx_wm_misc_issue where issue_id in
+        <foreach item="issueId" collection="array" open="(" separator="," close=")">
+            #{issueId}
+        </foreach>
+    </delete>
+
+</mapper>

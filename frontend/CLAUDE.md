@@ -376,3 +376,65 @@ onMounted(() => getList())
 - 关键页面（登录、CRUD 核心流程）组件测试覆盖率 ≥ 60%
 - 生成器生成的页面可不测（框架内），手写业务组件必须测
 - 测试文件放在 `__tests__/` 与组件同目录
+
+## 前端自检清单（AI 高频遗漏项）
+
+> ⚠️ **前端页面完成后必须逐项检查，这是最容易出低级错误的地方。**
+
+1. **`useDict` 字典引用** — `proxy.useDict(...)` 返回的 dicts.xxx 在模板渲染时可能为 `undefined`（异步加载）。**必须**：
+   - 用 `v-if="dicts.xxx"` 包裹依赖字典的 DOM，或直接硬编码固定选项
+   - 确认字典名称在 `sys_dict_data` 表中存在
+
+2. **弹窗初始状态** — `v-if="form.id"` 包裹整个表单会导致新增时弹窗为空。**必须**：
+   - header 表单始终渲染（不受 `v-if` 限制），line/detail tab 才按需显示
+
+3. **操作栏按钮样式** — 统一用 `el-button link type="primary" size="small"`，列宽 ≥180px，`class-name="small-padding fixed-width"`
+
+4. **Element Plus Icon** — 不要用 Element UI 的图标名（如 `el-icon-edit`），用 Element Plus 的 `Edit` / `Delete` 等。不确定图标是否存在时直接去掉 `icon` 属性，纯文字按钮
+
+5. **路由导航** — `router.push({ path: '/mes/wm/xxx', query: { id } })` 前确认目标路径的菜单 `visible='0'`（菜单隐藏则路由未注册，push 失效）
+
+6. **确认弹窗** — `proxy.$modal.confirm(...)` 必须加 `.catch(() => {})` 处理取消操作，避免 unhandled rejection
+
+7. **Label 间距** — 所有 dialog 表单统一加 `<style scoped> :deep(.el-form-item__label) { padding-right: 16px !important; } </style>`，避免 label 文字和输入框紧贴
+
+8. **自动生成开关** — 用 `<el-switch size="small" />` + 独立 `<span>自动生成</span>` 标签，**不用** `active-text` 属性（会竖向排列）
+
+9. **日期格式** — `el-date-picker` 的 `value-format` **必须**为 `YYYY-MM-DD HH:mm:ss`，不能是 `YYYY-MM-DD`（后端 Jackson 解析报错）
+
+## 前端修改后自验证（AI 必须执行，禁止直接让用户检查）
+
+> ⚠️ **修改任何 Vue/TS 文件后，必须自己先验证，不能丢给用户去试。**
+
+1. **编译验证** — `npx vue-tsc --noEmit` 确保 0 类型错误
+2. **Vite 热更新验证** — `curl -s http://localhost:5173/src/views/.../index.vue | grep "关键新增代码"` 确认 Vite 提供的是修改后的文件
+3. **API 数据流验证** — 用 `curl`/`python3` 调后端 API，模拟前端操作流程，确认数据结构匹配
+4. **日期格式验证** — 每次改 `el-date-picker` 后，**必须**用 curl 模拟提交确认 `YYYY-MM-DD HH:mm:ss` 格式后端能解析
+5. **仅前 4 步全部通过后**，才让用户刷新浏览器验证
+
+## 自动编码前端接入
+
+任一新增 MES 实体的前端页面**必须**包含：
+
+```typescript
+// ① import
+import { genSerialCode } from '@/api/mes/sys/autocoderule'
+
+// ② ref
+const autoGenFlag = ref(false)
+
+// ③ 模板 — 编码输入旁放开关（size="small"，不用 active-text）
+<el-col :span="6" v-if="!form.xxxId">
+  <el-form-item>
+    <el-switch v-model="autoGenFlag" active-color="#13ce66" size="small" @change="handleAutoGenChange" />
+    <span style="margin-left:6px;font-size:12px;color:#13ce66">自动生成</span>
+  </el-form-item>
+</el-col>
+
+// ④ handler + reset
+function handleAutoGenChange(flag: boolean) {
+  if (flag) genSerialCode('RULE_CODE').then((r: any) => { form.value.xxxCode = r.data })
+  else form.value.xxxCode = ''
+}
+function reset() { autoGenFlag.value = false; form.value = {} as ...; ... }
+```

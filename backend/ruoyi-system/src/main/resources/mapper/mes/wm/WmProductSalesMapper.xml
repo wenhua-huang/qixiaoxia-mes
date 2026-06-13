@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.wm.WmProductSalesMapper">
+
+    <resultMap type="WmProductSales" id="WmProductSalesResult">
+        <id property="salesId" column="sales_id" />
+        <result property="factoryId" column="factory_id" />
+        <result property="salesCode" column="sales_code" />
+        <result property="salesName" column="sales_name" />
+        <result property="clientId" column="client_id" />
+        <result property="clientCode" column="client_code" />
+        <result property="clientName" column="client_name" />
+        <result property="clientOrderCode" column="client_order_code" />
+        <result property="salesperson" column="salesperson" />
+        <result property="warehouseId" column="warehouse_id" />
+        <result property="warehouseCode" column="warehouse_code" />
+        <result property="warehouseName" column="warehouse_name" />
+        <result property="salesDate" column="sales_date" />
+        <result property="totalQuantity" column="total_quantity" />
+        <result property="totalBox" column="total_box" />
+        <result property="totalVolume" column="total_volume" />
+        <result property="totalWeight" column="total_weight" />
+        <result property="logisticsCompany" column="logistics_company" />
+        <result property="trackingNo" column="tracking_no" />
+        <result property="logisticsFee" column="logistics_fee" />
+        <result property="shippingAddress" column="shipping_address" />
+        <result property="receiverName" column="receiver_name" />
+        <result property="receiverTel" column="receiver_tel" />
+        <result property="palletFlag" column="pallet_flag" />
+        <result property="boxLabel" column="box_label" />
+        <result property="salesType" column="sales_type" />
+        <result property="oqcId" column="oqc_id" />
+        <result property="oqcCode" column="oqc_code" />
+        <result property="status" column="status" />
+        <result property="remark" column="remark" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <sql id="selectWmProductSalesVo">
+        select sales_id, factory_id, sales_code, sales_name, client_id, client_code, client_name, client_order_code, salesperson, warehouse_id, warehouse_code, warehouse_name, sales_date, total_quantity, total_box, total_volume, total_weight, logistics_company, tracking_no, logistics_fee, shipping_address, receiver_name, receiver_tel, pallet_flag, box_label, sales_type, oqc_id, oqc_code, status, remark, create_by, create_time, update_by, update_time from qxx_wm_product_sales
+    </sql>
+
+    <select id="selectWmProductSalesList" parameterType="WmProductSales" resultMap="WmProductSalesResult">
+        <include refid="selectWmProductSalesVo"/>
+        <where>
+            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
+            <if test="salesCode != null and salesCode != ''"> and sales_code like concat('%', #{salesCode}, '%')</if>
+            <if test="salesName != null and salesName != ''"> and sales_name like concat('%', #{salesName}, '%')</if>
+            <if test="clientId != null"> and client_id = #{clientId}</if>
+            <if test="clientCode != null and clientCode != ''"> and client_code like concat('%', #{clientCode}, '%')</if>
+            <if test="clientName != null and clientName != ''"> and client_name like concat('%', #{clientName}, '%')</if>
+            <if test="clientOrderCode != null and clientOrderCode != ''"> and client_order_code like concat('%', #{clientOrderCode}, '%')</if>
+            <if test="salesperson != null and salesperson != ''"> and salesperson like concat('%', #{salesperson}, '%')</if>
+            <if test="warehouseId != null"> and warehouse_id = #{warehouseId}</if>
+            <if test="warehouseCode != null and warehouseCode != ''"> and warehouse_code like concat('%', #{warehouseCode}, '%')</if>
+            <if test="warehouseName != null and warehouseName != ''"> and warehouse_name like concat('%', #{warehouseName}, '%')</if>
+            <if test="totalBox != null"> and total_box = #{totalBox}</if>
+            <if test="logisticsCompany != null and logisticsCompany != ''"> and logistics_company like concat('%', #{logisticsCompany}, '%')</if>
+            <if test="trackingNo != null and trackingNo != ''"> and tracking_no like concat('%', #{trackingNo}, '%')</if>
+            <if test="shippingAddress != null and shippingAddress != ''"> and shipping_address like concat('%', #{shippingAddress}, '%')</if>
+            <if test="receiverName != null and receiverName != ''"> and receiver_name like concat('%', #{receiverName}, '%')</if>
+            <if test="receiverTel != null and receiverTel != ''"> and receiver_tel like concat('%', #{receiverTel}, '%')</if>
+            <if test="palletFlag != null and palletFlag != ''"> and pallet_flag like concat('%', #{palletFlag}, '%')</if>
+            <if test="boxLabel != null and boxLabel != ''"> and box_label like concat('%', #{boxLabel}, '%')</if>
+            <if test="salesType != null and salesType != ''"> and sales_type like concat('%', #{salesType}, '%')</if>
+            <if test="oqcId != null"> and oqc_id = #{oqcId}</if>
+            <if test="oqcCode != null and oqcCode != ''"> and oqc_code like concat('%', #{oqcCode}, '%')</if>
+            <if test="status != null and status != ''"> and status like concat('%', #{status}, '%')</if>
+            <if test="createBy != null and createBy != ''"> and create_by like concat('%', #{createBy}, '%')</if>
+            <if test="updateBy != null and updateBy != ''"> and update_by like concat('%', #{updateBy}, '%')</if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <select id="selectWmProductSalesAll" resultMap="WmProductSalesResult">
+        <include refid="selectWmProductSalesVo"/>
+    </select>
+
+    <select id="selectWmProductSalesBySalesId" parameterType="Long" resultMap="WmProductSalesResult">
+        <include refid="selectWmProductSalesVo"/>
+        where sales_id = #{salesId}
+    </select>
+
+    <insert id="insertWmProductSales" parameterType="WmProductSales" useGeneratedKeys="true" keyProperty="salesId">
+        insert into qxx_wm_product_sales
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="salesCode != null">sales_code,</if>
+            <if test="salesName != null">sales_name,</if>
+            <if test="clientId != null">client_id,</if>
+            <if test="clientCode != null">client_code,</if>
+            <if test="clientName != null">client_name,</if>
+            <if test="clientOrderCode != null">client_order_code,</if>
+            <if test="salesperson != null">salesperson,</if>
+            <if test="warehouseId != null">warehouse_id,</if>
+            <if test="warehouseCode != null">warehouse_code,</if>
+            <if test="warehouseName != null">warehouse_name,</if>
+            <if test="salesDate != null">sales_date,</if>
+            <if test="totalQuantity != null">total_quantity,</if>
+            <if test="totalBox != null">total_box,</if>
+            <if test="totalVolume != null">total_volume,</if>
+            <if test="totalWeight != null">total_weight,</if>
+            <if test="logisticsCompany != null">logistics_company,</if>
+            <if test="trackingNo != null">tracking_no,</if>
+            <if test="logisticsFee != null">logistics_fee,</if>
+            <if test="shippingAddress != null">shipping_address,</if>
+            <if test="receiverName != null">receiver_name,</if>
+            <if test="receiverTel != null">receiver_tel,</if>
+            <if test="palletFlag != null">pallet_flag,</if>
+            <if test="boxLabel != null">box_label,</if>
+            <if test="salesType != null">sales_type,</if>
+            <if test="oqcId != null">oqc_id,</if>
+            <if test="oqcCode != null">oqc_code,</if>
+            <if test="status != null">status,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="salesCode != null">#{salesCode},</if>
+            <if test="salesName != null">#{salesName},</if>
+            <if test="clientId != null">#{clientId},</if>
+            <if test="clientCode != null">#{clientCode},</if>
+            <if test="clientName != null">#{clientName},</if>
+            <if test="clientOrderCode != null">#{clientOrderCode},</if>
+            <if test="salesperson != null">#{salesperson},</if>
+            <if test="warehouseId != null">#{warehouseId},</if>
+            <if test="warehouseCode != null">#{warehouseCode},</if>
+            <if test="warehouseName != null">#{warehouseName},</if>
+            <if test="salesDate != null">#{salesDate},</if>
+            <if test="totalQuantity != null">#{totalQuantity},</if>
+            <if test="totalBox != null">#{totalBox},</if>
+            <if test="totalVolume != null">#{totalVolume},</if>
+            <if test="totalWeight != null">#{totalWeight},</if>
+            <if test="logisticsCompany != null">#{logisticsCompany},</if>
+            <if test="trackingNo != null">#{trackingNo},</if>
+            <if test="logisticsFee != null">#{logisticsFee},</if>
+            <if test="shippingAddress != null">#{shippingAddress},</if>
+            <if test="receiverName != null">#{receiverName},</if>
+            <if test="receiverTel != null">#{receiverTel},</if>
+            <if test="palletFlag != null">#{palletFlag},</if>
+            <if test="boxLabel != null">#{boxLabel},</if>
+            <if test="salesType != null">#{salesType},</if>
+            <if test="oqcId != null">#{oqcId},</if>
+            <if test="oqcCode != null">#{oqcCode},</if>
+            <if test="status != null">#{status},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateWmProductSales" parameterType="WmProductSales">
+        update qxx_wm_product_sales
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="salesCode != null">sales_code = #{salesCode},</if>
+            <if test="salesName != null">sales_name = #{salesName},</if>
+            <if test="clientId != null">client_id = #{clientId},</if>
+            <if test="clientCode != null">client_code = #{clientCode},</if>
+            <if test="clientName != null">client_name = #{clientName},</if>
+            <if test="clientOrderCode != null">client_order_code = #{clientOrderCode},</if>
+            <if test="salesperson != null">salesperson = #{salesperson},</if>
+            <if test="warehouseId != null">warehouse_id = #{warehouseId},</if>
+            <if test="warehouseCode != null">warehouse_code = #{warehouseCode},</if>
+            <if test="warehouseName != null">warehouse_name = #{warehouseName},</if>
+            <if test="salesDate != null">sales_date = #{salesDate},</if>
+            <if test="totalQuantity != null">total_quantity = #{totalQuantity},</if>
+            <if test="totalBox != null">total_box = #{totalBox},</if>
+            <if test="totalVolume != null">total_volume = #{totalVolume},</if>
+            <if test="totalWeight != null">total_weight = #{totalWeight},</if>
+            <if test="logisticsCompany != null">logistics_company = #{logisticsCompany},</if>
+            <if test="trackingNo != null">tracking_no = #{trackingNo},</if>
+            <if test="logisticsFee != null">logistics_fee = #{logisticsFee},</if>
+            <if test="shippingAddress != null">shipping_address = #{shippingAddress},</if>
+            <if test="receiverName != null">receiver_name = #{receiverName},</if>
+            <if test="receiverTel != null">receiver_tel = #{receiverTel},</if>
+            <if test="palletFlag != null">pallet_flag = #{palletFlag},</if>
+            <if test="boxLabel != null">box_label = #{boxLabel},</if>
+            <if test="salesType != null">sales_type = #{salesType},</if>
+            <if test="oqcId != null">oqc_id = #{oqcId},</if>
+            <if test="oqcCode != null">oqc_code = #{oqcCode},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where sales_id = #{salesId}
+    </update>
+
+    <delete id="deleteWmProductSalesBySalesId" parameterType="Long">
+        delete from qxx_wm_product_sales where sales_id = #{salesId}
+    </delete>
+
+    <delete id="deleteWmProductSalesBySalesIds" parameterType="String">
+        delete from qxx_wm_product_sales where sales_id in
+        <foreach item="salesId" collection="array" open="(" separator="," close=")">
+            #{salesId}
+        </foreach>
+    </delete>
+
+</mapper>

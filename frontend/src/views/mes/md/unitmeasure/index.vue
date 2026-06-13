@@ -313,3 +313,7 @@ function handleExport() {
 
 getList()
 </script>
+
+<style scoped>
+:deep(.el-form-item__label) { padding-right: 16px !important; }
+</style>

@@ -65,12 +65,19 @@
         <el-tab-pane label="基本信息" name="basic">
           <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" size="default">
             <el-row>
-              <el-col :span="12">
+              <el-col :span="16">
                 <el-form-item label="物料编码" prop="itemCode">
                   <el-input v-model="form.itemCode" placeholder="请输入物料编码" />
                 </el-form-item>
               </el-col>
-              <el-col :span="12">
+              <el-col :span="8">
+                <el-form-item label-width="70" v-if="!form.itemId">
+                  <el-switch v-model="autoGenFlag" active-color="#13ce66" @change="handleAutoGenChange" /><span style="margin-left:6px;font-size:12px;color:#13ce66">自动生成</span>
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row>
+              <el-col :span="24">
                 <el-form-item label="物料名称" prop="itemName">
                   <el-input v-model="form.itemName" placeholder="请输入物料名称" />
                 </el-form-item>
@@ -199,6 +206,7 @@
 <script setup lang="ts" name="Item">
 import { ref, reactive, toRefs, computed, watch, nextTick } from 'vue'
 import { getCurrentInstance } from 'vue'
+import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import type { MdItem, ItemQueryParams, MdItemAttrPaper, MdItemAttrPaperBag } from '@/types/api/mes/md/item'
 import type { TreeSelect } from '@/types/api/common'
 import { listItem, getItem, delItem, addItem, updateItem } from '@/api/mes/md/item'
@@ -219,6 +227,7 @@ const single = ref<boolean>(true)
 const multiple = ref<boolean>(true)
 const total = ref<number>(0)
 const title = ref<string>('')
+const autoGenFlag = ref(false)
 const activeTab = ref<string>('basic')
 const treeData = ref<TreeSelect[]>([])
 const itemTypeTree = ref<TreeSelect[]>([])
@@ -308,7 +317,12 @@ function getList() {
 
 function cancel() { open.value = false; reset() }
 
+function handleAutoGenChange(flag: boolean) {
+  if (flag) genSerialCode('ITEM_CODE').then((r: any) => { form.value.itemCode = r.data })
+  else form.value.itemCode = ''
+}
 function reset() {
+  autoGenFlag.value = false
   form.value = { enableFlag: '1', batchFlag: '1', safeStockFlag: '0', highValue: '0', conversionRate: 1.0, parentId: 0,
     attrPaper: {} as MdItemAttrPaper, attrPaperBag: {} as MdItemAttrPaperBag } as MdItem
   activeTab.value = 'basic'
@@ -366,3 +380,7 @@ function handleExport() {
 loadTree()
 getList()
 </script>
+
+<style scoped>
+:deep(.el-form-item__label) { padding-right: 16px !important; }
+</style>

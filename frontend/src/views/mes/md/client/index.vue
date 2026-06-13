@@ -31,6 +31,11 @@
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
         <el-row>
           <el-col :span="12"><el-form-item label="客户编码" prop="clientCode"><el-input v-model="form.clientCode" /></el-form-item></el-col>
+          <el-col :span="12">
+            <el-form-item label-width="70" v-if="!form.clientId">
+              <el-switch v-model="autoGenFlag" active-color="#13ce66" size="small" @change="handleAutoGenChange" /><span style="margin-left:6px;font-size:12px;color:#13ce66">自动生成</span>
+            </el-form-item>
+          </el-col>
           <el-col :span="12"><el-form-item label="客户全称" prop="clientName"><el-input v-model="form.clientName" /></el-form-item></el-col>
         </el-row>
         <el-row>
@@ -58,17 +63,23 @@
 <script setup lang="ts" name="Client">
 import { ref, reactive, toRefs } from 'vue'
 import { getCurrentInstance } from 'vue'
+import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import type { MdClient, ClientQueryParams } from '@/types/api/mes/md/client'
 import { listClient, getClient, delClient, addClient, updateClient } from '@/api/mes/md/client'
 const { proxy } = getCurrentInstance() as any; const { sys_yes_no } = useDict('sys_yes_no')
 const clientTypeMap: Record<string, string> = { DOMESTIC: '内贸', FOREIGN: '外贸', SPOT: '现货' }
 const clientList = ref<MdClient[]>([]); const open = ref(false); const loading = ref(true); const showSearch = ref(true)
 const ids = ref<number[]>([]); const single = ref(true); const multiple = ref(true); const total = ref(0); const title = ref('')
+const autoGenFlag = ref(false)
 const data = reactive({ form: {} as MdClient, queryParams: { pageNum: 1, pageSize: 10 } as ClientQueryParams, rules: { clientCode: [{ required: true, message: '编码不能为空' }], clientName: [{ required: true, message: '名称不能为空' }] } })
 const { queryParams, form, rules } = toRefs(data)
 function getList() { loading.value = true; listClient(queryParams.value).then(r => { clientList.value = r.rows; total.value = r.total; loading.value = false }) }
 function cancel() { open.value = false; reset() }
-function reset() { form.value = { enableFlag: '1' } as MdClient; proxy.resetForm('formRef') }
+function handleAutoGenChange(flag: boolean) {
+  if (flag) genSerialCode('CLIENT_CODE').then((r: any) => { form.value.clientCode = r.data })
+  else form.value.clientCode = ''
+}
+function reset() { autoGenFlag.value = false; form.value = { enableFlag: '1' } as MdClient; proxy.resetForm('formRef') }
 function handleQuery() { queryParams.value.pageNum = 1; getList() }
 function resetQuery() { proxy.resetForm('queryRef'); handleQuery() }
 function handleSelectionChange(s: MdClient[]) { ids.value = s.map(i => i.clientId!); single.value = s.length !== 1; multiple.value = !s.length }
@@ -79,3 +90,7 @@ function handleDelete(row?: MdClient) { const ids_ = row?.clientId || ids.value;
 function handleExport() { proxy.download('mes/md/client/export', { ...queryParams.value }, `client_${Date.now()}.xlsx`) }
 getList()
 </script>
+
+<style scoped>
+:deep(.el-form-item__label) { padding-right: 16px !important; }
+</style>

@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.wm.WmMaterialStockMapper">
+
+    <resultMap type="WmMaterialStock" id="WmMaterialStockResult">
+        <id property="materialStockId" column="material_stock_id" />
+        <result property="factoryId" column="factory_id" />
+        <result property="itemId" column="item_id" />
+        <result property="itemCode" column="item_code" />
+        <result property="itemName" column="item_name" />
+        <result property="specification" column="specification" />
+        <result property="unitOfMeasure" column="unit_of_measure" />
+        <result property="unitName" column="unit_name" />
+        <result property="unit2" column="unit2" />
+        <result property="unit2Name" column="unit2_name" />
+        <result property="conversionRate" column="conversion_rate" />
+        <result property="quantityOnhand" column="quantity_onhand" />
+        <result property="quantityOnhand2" column="quantity_onhand2" />
+        <result property="quantityAvailable" column="quantity_available" />
+        <result property="batchId" column="batch_id" />
+        <result property="batchCode" column="batch_code" />
+        <result property="warehouseId" column="warehouse_id" />
+        <result property="warehouseCode" column="warehouse_code" />
+        <result property="warehouseName" column="warehouse_name" />
+        <result property="locationId" column="location_id" />
+        <result property="locationCode" column="location_code" />
+        <result property="locationName" column="location_name" />
+        <result property="areaId" column="area_id" />
+        <result property="areaCode" column="area_code" />
+        <result property="areaName" column="area_name" />
+        <result property="vendorId" column="vendor_id" />
+        <result property="vendorCode" column="vendor_code" />
+        <result property="vendorName" column="vendor_name" />
+        <result property="workorderId" column="workorder_id" />
+        <result property="workorderCode" column="workorder_code" />
+        <result property="expireDate" column="expire_date" />
+        <result property="lotNumber" column="lot_number" />
+        <result property="qualityStatus" column="quality_status" />
+        <result property="status" column="status" />
+        <result property="enableFlag" column="enable_flag" />
+        <result property="remark" column="remark" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <sql id="selectWmMaterialStockVo">
+        select material_stock_id, factory_id, item_id, item_code, item_name, specification, unit_of_measure, unit_name, unit2, unit2_name, conversion_rate, quantity_onhand, quantity_onhand2, quantity_available, batch_id, batch_code, warehouse_id, warehouse_code, warehouse_name, location_id, location_code, location_name, area_id, area_code, area_name, vendor_id, vendor_code, vendor_name, workorder_id, workorder_code, expire_date, lot_number, quality_status, status, enable_flag, remark, create_by, create_time, update_by, update_time from qxx_wm_material_stock
+    </sql>
+
+    <select id="selectWmMaterialStockList" parameterType="WmMaterialStock" resultMap="WmMaterialStockResult">
+        <include refid="selectWmMaterialStockVo"/>
+        <where>
+            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
+            <if test="itemId != null"> and item_id = #{itemId}</if>
+            <if test="itemCode != null and itemCode != ''"> and item_code like concat('%', #{itemCode}, '%')</if>
+            <if test="itemName != null and itemName != ''"> and item_name like concat('%', #{itemName}, '%')</if>
+            <if test="specification != null and specification != ''"> and specification like concat('%', #{specification}, '%')</if>
+            <if test="unitOfMeasure != null and unitOfMeasure != ''"> and unit_of_measure like concat('%', #{unitOfMeasure}, '%')</if>
+            <if test="unitName != null and unitName != ''"> and unit_name like concat('%', #{unitName}, '%')</if>
+            <if test="unit2 != null and unit2 != ''"> and unit2 like concat('%', #{unit2}, '%')</if>
+            <if test="unit2Name != null and unit2Name != ''"> and unit2_name like concat('%', #{unit2Name}, '%')</if>
+            <if test="batchId != null"> and batch_id = #{batchId}</if>
+            <if test="batchCode != null and batchCode != ''"> and batch_code like concat('%', #{batchCode}, '%')</if>
+            <if test="warehouseId != null"> and warehouse_id = #{warehouseId}</if>
+            <if test="warehouseCode != null and warehouseCode != ''"> and warehouse_code like concat('%', #{warehouseCode}, '%')</if>
+            <if test="warehouseName != null and warehouseName != ''"> and warehouse_name like concat('%', #{warehouseName}, '%')</if>
+            <if test="locationId != null"> and location_id = #{locationId}</if>
+            <if test="locationCode != null and locationCode != ''"> and location_code like concat('%', #{locationCode}, '%')</if>
+            <if test="locationName != null and locationName != ''"> and location_name like concat('%', #{locationName}, '%')</if>
+            <if test="areaId != null"> and area_id = #{areaId}</if>
+            <if test="areaCode != null and areaCode != ''"> and area_code like concat('%', #{areaCode}, '%')</if>
+            <if test="areaName != null and areaName != ''"> and area_name like concat('%', #{areaName}, '%')</if>
+            <if test="vendorId != null"> and vendor_id = #{vendorId}</if>
+            <if test="vendorCode != null and vendorCode != ''"> and vendor_code like concat('%', #{vendorCode}, '%')</if>
+            <if test="vendorName != null and vendorName != ''"> and vendor_name like concat('%', #{vendorName}, '%')</if>
+            <if test="workorderId != null"> and workorder_id = #{workorderId}</if>
+            <if test="workorderCode != null and workorderCode != ''"> and workorder_code like concat('%', #{workorderCode}, '%')</if>
+            <if test="lotNumber != null and lotNumber != ''"> and lot_number like concat('%', #{lotNumber}, '%')</if>
+            <if test="qualityStatus != null and qualityStatus != ''"> and quality_status like concat('%', #{qualityStatus}, '%')</if>
+            <if test="status != null and status != ''"> and status like concat('%', #{status}, '%')</if>
+            <if test="enableFlag != null and enableFlag != ''"> and enable_flag like concat('%', #{enableFlag}, '%')</if>
+            <if test="createBy != null and createBy != ''"> and create_by like concat('%', #{createBy}, '%')</if>
+            <if test="updateBy != null and updateBy != ''"> and update_by like concat('%', #{updateBy}, '%')</if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <select id="selectWmMaterialStockAll" resultMap="WmMaterialStockResult">
+        <include refid="selectWmMaterialStockVo"/>
+    </select>
+
+    <select id="selectWmMaterialStockByMaterialStockId" parameterType="Long" resultMap="WmMaterialStockResult">
+        <include refid="selectWmMaterialStockVo"/>
+        where material_stock_id = #{materialStockId}
+    </select>
+
+    <insert id="insertWmMaterialStock" parameterType="WmMaterialStock" useGeneratedKeys="true" keyProperty="materialStockId">
+        insert into qxx_wm_material_stock
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="itemId != null">item_id,</if>
+            <if test="itemCode != null">item_code,</if>
+            <if test="itemName != null">item_name,</if>
+            <if test="specification != null">specification,</if>
+            <if test="unitOfMeasure != null">unit_of_measure,</if>
+            <if test="unitName != null">unit_name,</if>
+            <if test="unit2 != null">unit2,</if>
+            <if test="unit2Name != null">unit2_name,</if>
+            <if test="conversionRate != null">conversion_rate,</if>
+            <if test="quantityOnhand != null">quantity_onhand,</if>
+            <if test="quantityOnhand2 != null">quantity_onhand2,</if>
+            <if test="quantityAvailable != null">quantity_available,</if>
+            <if test="batchId != null">batch_id,</if>
+            <if test="batchCode != null">batch_code,</if>
+            <if test="warehouseId != null">warehouse_id,</if>
+            <if test="warehouseCode != null">warehouse_code,</if>
+            <if test="warehouseName != null">warehouse_name,</if>
+            <if test="locationId != null">location_id,</if>
+            <if test="locationCode != null">location_code,</if>
+            <if test="locationName != null">location_name,</if>
+            <if test="areaId != null">area_id,</if>
+            <if test="areaCode != null">area_code,</if>
+            <if test="areaName != null">area_name,</if>
+            <if test="vendorId != null">vendor_id,</if>
+            <if test="vendorCode != null">vendor_code,</if>
+            <if test="vendorName != null">vendor_name,</if>
+            <if test="workorderId != null">workorder_id,</if>
+            <if test="workorderCode != null">workorder_code,</if>
+            <if test="expireDate != null">expire_date,</if>
+            <if test="lotNumber != null">lot_number,</if>
+            <if test="qualityStatus != null">quality_status,</if>
+            <if test="status != null">status,</if>
+            <if test="enableFlag != null">enable_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="itemId != null">#{itemId},</if>
+            <if test="itemCode != null">#{itemCode},</if>
+            <if test="itemName != null">#{itemName},</if>
+            <if test="specification != null">#{specification},</if>
+            <if test="unitOfMeasure != null">#{unitOfMeasure},</if>
+            <if test="unitName != null">#{unitName},</if>
+            <if test="unit2 != null">#{unit2},</if>
+            <if test="unit2Name != null">#{unit2Name},</if>
+            <if test="conversionRate != null">#{conversionRate},</if>
+            <if test="quantityOnhand != null">#{quantityOnhand},</if>
+            <if test="quantityOnhand2 != null">#{quantityOnhand2},</if>
+            <if test="quantityAvailable != null">#{quantityAvailable},</if>
+            <if test="batchId != null">#{batchId},</if>
+            <if test="batchCode != null">#{batchCode},</if>
+            <if test="warehouseId != null">#{warehouseId},</if>
+            <if test="warehouseCode != null">#{warehouseCode},</if>
+            <if test="warehouseName != null">#{warehouseName},</if>
+            <if test="locationId != null">#{locationId},</if>
+            <if test="locationCode != null">#{locationCode},</if>
+            <if test="locationName != null">#{locationName},</if>
+            <if test="areaId != null">#{areaId},</if>
+            <if test="areaCode != null">#{areaCode},</if>
+            <if test="areaName != null">#{areaName},</if>
+            <if test="vendorId != null">#{vendorId},</if>
+            <if test="vendorCode != null">#{vendorCode},</if>
+            <if test="vendorName != null">#{vendorName},</if>
+            <if test="workorderId != null">#{workorderId},</if>
+            <if test="workorderCode != null">#{workorderCode},</if>
+            <if test="expireDate != null">#{expireDate},</if>
+            <if test="lotNumber != null">#{lotNumber},</if>
+            <if test="qualityStatus != null">#{qualityStatus},</if>
+            <if test="status != null">#{status},</if>
+            <if test="enableFlag != null">#{enableFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateWmMaterialStock" parameterType="WmMaterialStock">
+        update qxx_wm_material_stock
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="itemId != null">item_id = #{itemId},</if>
+            <if test="itemCode != null">item_code = #{itemCode},</if>
+            <if test="itemName != null">item_name = #{itemName},</if>
+            <if test="specification != null">specification = #{specification},</if>
+            <if test="unitOfMeasure != null">unit_of_measure = #{unitOfMeasure},</if>
+            <if test="unitName != null">unit_name = #{unitName},</if>
+            <if test="unit2 != null">unit2 = #{unit2},</if>
+            <if test="unit2Name != null">unit2_name = #{unit2Name},</if>
+            <if test="conversionRate != null">conversion_rate = #{conversionRate},</if>
+            <if test="quantityOnhand != null">quantity_onhand = #{quantityOnhand},</if>
+            <if test="quantityOnhand2 != null">quantity_onhand2 = #{quantityOnhand2},</if>
+            <if test="quantityAvailable != null">quantity_available = #{quantityAvailable},</if>
+            <if test="batchId != null">batch_id = #{batchId},</if>
+            <if test="batchCode != null">batch_code = #{batchCode},</if>
+            <if test="warehouseId != null">warehouse_id = #{warehouseId},</if>
+            <if test="warehouseCode != null">warehouse_code = #{warehouseCode},</if>
+            <if test="warehouseName != null">warehouse_name = #{warehouseName},</if>
+            <if test="locationId != null">location_id = #{locationId},</if>
+            <if test="locationCode != null">location_code = #{locationCode},</if>
+            <if test="locationName != null">location_name = #{locationName},</if>
+            <if test="areaId != null">area_id = #{areaId},</if>
+            <if test="areaCode != null">area_code = #{areaCode},</if>
+            <if test="areaName != null">area_name = #{areaName},</if>
+            <if test="vendorId != null">vendor_id = #{vendorId},</if>
+            <if test="vendorCode != null">vendor_code = #{vendorCode},</if>
+            <if test="vendorName != null">vendor_name = #{vendorName},</if>
+            <if test="workorderId != null">workorder_id = #{workorderId},</if>
+            <if test="workorderCode != null">workorder_code = #{workorderCode},</if>
+            <if test="expireDate != null">expire_date = #{expireDate},</if>
+            <if test="lotNumber != null">lot_number = #{lotNumber},</if>
+            <if test="qualityStatus != null">quality_status = #{qualityStatus},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="enableFlag != null">enable_flag = #{enableFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where material_stock_id = #{materialStockId}
+    </update>
+
+    <delete id="deleteWmMaterialStockByMaterialStockId" parameterType="Long">
+        delete from qxx_wm_material_stock where material_stock_id = #{materialStockId}
+    </delete>
+
+    <delete id="deleteWmMaterialStockByMaterialStockIds" parameterType="String">
+        delete from qxx_wm_material_stock where material_stock_id in
+        <foreach item="materialStockId" collection="array" open="(" separator="," close=")">
+            #{materialStockId}
+        </foreach>
+    </delete>
+
+    <!-- 根据唯一键查询库存记录（UPSERT 查重用） -->
+    <select id="loadMaterialStock" parameterType="WmMaterialStock" resultMap="WmMaterialStockResult">
+        <include refid="selectWmMaterialStockVo"/>
+        where item_id = #{itemId}
+          and batch_id = #{batchId}
+          and warehouse_id = #{warehouseId}
+          and vendor_id = #{vendorId}
+          and workorder_id = #{workorderId}
+          and quality_status = #{qualityStatus}
+        limit 1
+    </select>
+
+</mapper>

@@ -219,25 +219,28 @@
     />
 
     <!-- 添加或修改采购订单头对话框 -->
-    <el-dialog :title="title" v-model="open" width="500px" append-to-body>
-      <el-form ref="form" :model="form" :rules="rules" label-width="110px">
+    <el-dialog :title="title" v-model="open" width="800px" append-to-body :close-on-click-modal="false">
+      <el-form ref="form" :model="form" :rules="rules" label-width="100px">
         <el-row>
-          <el-col :span="24">
-            <el-form-item label="订单编码">
-              <el-switch v-model="autoGenFlag" active-color="#13ce66" active-text="自动生成" @change="handleAutoGenChange" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="24">
-            <el-form-item label="" prop="orderCode">
+          <el-col :span="8">
+            <el-form-item label="订单编码" prop="orderCode">
               <el-input v-model="form.orderCode" placeholder="PO20260614001" :disabled="autoGenFlag" />
             </el-form-item>
           </el-col>
-          <el-col :span="24">
-            <el-form-item label="订单名称" prop="orderName">
-              <el-input v-model="form.orderName" placeholder="请输入采购订单名称" />
+          <el-col :span="6" v-if="!form.orderId">
+            <el-form-item>
+              <el-switch v-model="autoGenFlag" active-color="#13ce66" size="small" @change="handleAutoGenChange" />
+              <span style="margin-left:6px;font-size:12px;color:#13ce66">自动生成</span>
             </el-form-item>
           </el-col>
-          <el-col :span="24">
+          <el-col :span="10">
+            <el-form-item label="订单名称" prop="orderName">
+              <el-input v-model="form.orderName" placeholder="订单名称" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row>
+          <el-col :span="8">
             <el-form-item label="供应商" prop="vendorName">
               <el-input v-model="form.vendorName" readonly placeholder="请选择供应商">
                 <template #append><el-button icon="Search" @click="handleSelectVendor" /></template>
@@ -245,67 +248,77 @@
             </el-form-item>
             <VendorSelect ref="vendorSelectRef" @onSelected="onVendorSelected" />
           </el-col>
-          <el-col :span="24">
+          <el-col :span="8">
+            <el-form-item label="采购类型" prop="purchaseType">
+              <el-select v-model="form.purchaseType" placeholder="请选择" style="width:100%">
+                <el-option label="纸张" value="PAPER" />
+                <el-option label="辅料" value="AUX" />
+                <el-option label="包材" value="PACK" />
+                <el-option label="其他" value="OTHER" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
             <el-form-item label="下单日期" prop="orderDate">
-              <el-date-picker clearable
-                v-model="form.orderDate"
-                type="date"
-                value-format="yyyy-MM-dd"
-                placeholder="请选择下单日期">
-              </el-date-picker>
+              <el-date-picker v-model="form.orderDate" type="date" placeholder="选择日期" style="width:100%" value-format="yyyy-MM-dd" />
             </el-form-item>
           </el-col>
-          <el-col :span="24">
+        </el-row>
+        <el-row>
+          <el-col :span="8">
             <el-form-item label="预计到货" prop="expectedDate">
-              <el-date-picker clearable
-                v-model="form.expectedDate"
-                type="date"
-                value-format="yyyy-MM-dd"
-                placeholder="请选择预计到货日期">
-              </el-date-picker>
+              <el-date-picker v-model="form.expectedDate" type="date" placeholder="选择日期" style="width:100%" value-format="yyyy-MM-dd" />
             </el-form-item>
           </el-col>
-          <el-col :span="24">
-            <el-form-item label="采购员" prop="purchaser">
-              <el-input v-model="form.purchaser" placeholder="请输入采购员(申购人)" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="24">
-            <el-form-item label="审批人" prop="approver">
-              <el-input v-model="form.approver" placeholder="请输入审批人" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="24">
-            <el-form-item label="采购数量" prop="totalQuantity">
-              <el-input v-model="form.totalQuantity" placeholder="请输入采购总数量(主单位)" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="24">
-            <el-form-item label="采购金额" prop="totalAmount">
-              <el-input v-model="form.totalAmount" placeholder="请输入采购总金额(元)" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="24">
+          <el-col :span="8">
             <el-form-item label="币种" prop="currency">
-              <el-input v-model="form.currency" placeholder="请输入币种:CNY-人民币,USD-美元" />
+              <el-select v-model="form.currency" placeholder="请选择" style="width:100%">
+                <el-option label="人民币" value="CNY" />
+                <el-option label="美元" value="USD" />
+              </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="24">
+          <el-col :span="8">
+            <el-form-item label="状态" prop="status">
+              <el-select v-model="form.status" placeholder="请选择" style="width:100%">
+                <el-option label="草稿" value="DRAFT" />
+                <el-option label="已审批" value="APPROVED" />
+                <el-option label="已下单" value="ORDERED" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row>
+          <el-col :span="8">
+            <el-form-item label="采购员" prop="purchaser">
+              <el-input v-model="form.purchaser" placeholder="采购员" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="审批人" prop="approver">
+              <el-input v-model="form.approver" placeholder="审批人" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
             <el-form-item label="关联客户订单" prop="sourceOrderCode">
-              <el-input v-model="form.sourceOrderCode" placeholder="请输入关联客户订单号(如PO#ORD66003MT)" />
+              <el-input v-model="form.sourceOrderCode" placeholder="如PO#ORD66003MT" />
             </el-form-item>
           </el-col>
-          <el-col :span="24">
+        </el-row>
+        <el-row>
+          <el-col :span="16">
             <el-form-item label="备注" prop="remark">
-              <el-input v-model="form.remark" type="textarea" placeholder="请输入内容" />
+              <el-input v-model="form.remark" type="textarea" placeholder="备注" />
             </el-form-item>
           </el-col>
         </el-row>
       </el-form>
-      <div slot="footer" class="dialog-footer">
-        <el-button type="primary" @click="submitForm">确 定</el-button>
-        <el-button @click="cancel">取 消</el-button>
-      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button type="primary" @click="submitForm">保存单据</el-button>
+          <el-button @click="cancel">关 闭</el-button>
+        </div>
+      </template>
     </el-dialog>
   </div>
 </template>
@@ -347,6 +360,8 @@ export default {
         vendorCode: null,
         vendorName: null,
         purchaseType: null,
+        status: "DRAFT",
+        currency: "CNY",
         orderDate: new Date().toISOString().slice(0,10),
         expectedDate: null,
         purchaser: null,
@@ -406,6 +421,8 @@ export default {
         vendorCode: null,
         vendorName: null,
         purchaseType: null,
+        status: "DRAFT",
+        currency: "CNY",
         orderDate: new Date().toISOString().slice(0,10),
         expectedDate: null,
         purchaser: null,
@@ -442,7 +459,6 @@ export default {
     /** 新增按钮操作 */
     handleAutoGenChange(val) {
       if (val) {
-        // 自动生成编码预览
         const now = new Date()
         const y = now.getFullYear()
         const m = String(now.getMonth()+1).padStart(2,'0')

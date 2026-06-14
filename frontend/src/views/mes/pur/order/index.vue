@@ -225,7 +225,7 @@
           <el-col :span="24">          </el-col>
           <el-col :span="24">
             <el-form-item label="订单编码" prop="orderCode">
-              <el-input v-model="form.orderCode" placeholder="请输入采购订单编码(唯一)" />
+              <el-input v-model="form.orderCode" placeholder="留空自动生成(PO+日期+流水号)" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -361,7 +361,6 @@ export default {
       form: {},
       // 表单校验
       rules: {        orderCode: [
-          { required: true, message: "采购订单编码(唯一)不能为空", trigger: "blur" }
         ],
         vendorId: [
           { required: true, message: "供应商ID(关联qxx_md_vendor,vendor_type=MATERIAL)不能为空", trigger: "blur" }

@@ -1,7 +1,7 @@
 <template>
   <div class="app-container">
     <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
-      <el-form-item label="工厂ID(关联qxx_md_factory)" prop="factoryId">
+      <el-form-item label="工厂" prop="factoryId">
         <el-input
           v-model="queryParams.factoryId"
           placeholder="请输入工厂ID(关联qxx_md_factory)"
@@ -9,7 +9,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="工装夹具编码(唯一)" prop="toolCode">
+      <el-form-item label="编码" prop="toolCode">
         <el-input
           v-model="queryParams.toolCode"
           placeholder="请输入工装夹具编码(唯一)"
@@ -17,7 +17,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="工装夹具名称" prop="toolName">
+      <el-form-item label="名称" prop="toolName">
         <el-input
           v-model="queryParams.toolName"
           placeholder="请输入工装夹具名称"
@@ -33,7 +33,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="工装夹具类型ID(关联qxx_tm_tool_type)" prop="toolTypeId">
+      <el-form-item label="类型ID" prop="toolTypeId">
         <el-input
           v-model="queryParams.toolTypeId"
           placeholder="请输入工装夹具类型ID(关联qxx_tm_tool_type)"
@@ -41,7 +41,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="工装夹具类型编码" prop="toolTypeCode">
+      <el-form-item label="类型编码" prop="toolTypeCode">
         <el-input
           v-model="queryParams.toolTypeCode"
           placeholder="请输入工装夹具类型编码"
@@ -49,7 +49,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="工装夹具类型名称" prop="toolTypeName">
+      <el-form-item label="类型名称" prop="toolTypeName">
         <el-input
           v-model="queryParams.toolTypeName"
           placeholder="请输入工装夹具类型名称"
@@ -65,7 +65,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="可用数量(总数量减去使用中和保养中的数量)" prop="availableQuantity">
+      <el-form-item label="可用数量" prop="availableQuantity">
         <el-input
           v-model="queryParams.availableQuantity"
           placeholder="请输入可用数量(总数量减去使用中和保养中的数量)"
@@ -73,7 +73,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="下次保养日期" prop="nextMaintenDate">
+      <el-form-item label="下次保养" prop="nextMaintenDate">
         <el-date-picker clearable
           v-model="queryParams.nextMaintenDate"
           type="date"
@@ -81,7 +81,7 @@
           placeholder="请选择下次保养日期">
         </el-date-picker>
       </el-form-item>
-      <el-form-item label="是否启用(1-是,0-否)" prop="enableFlag">
+      <el-form-item label="启用" prop="enableFlag">
         <el-input
           v-model="queryParams.enableFlag"
           placeholder="请输入是否启用(1-是,0-否)"
@@ -143,25 +143,37 @@
 
     <el-table v-loading="loading" :data="toolList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="工装夹具ID" align="center" prop="toolId" />
-      <el-table-column label="工厂ID(关联qxx_md_factory)" align="center" prop="factoryId" />
-      <el-table-column label="工装夹具编码(唯一)" align="center" prop="toolCode" />
-      <el-table-column label="工装夹具名称" align="center" prop="toolName" />
+      <el-table-column label="ID" align="center" prop="toolId" />
+      <el-table-column label="工厂" align="center" prop="factoryId" />
+      <el-table-column label="编码" align="center" prop="toolCode" />
+      <el-table-column label="名称" align="center" prop="toolName" />
       <el-table-column label="品牌" align="center" prop="brand" />
-      <el-table-column label="规格型号" align="center" prop="spec" />
-      <el-table-column label="工装夹具类型ID(关联qxx_tm_tool_type)" align="center" prop="toolTypeId" />
-      <el-table-column label="工装夹具类型编码" align="center" prop="toolTypeCode" />
-      <el-table-column label="工装夹具类型名称" align="center" prop="toolTypeName" />
+      <el-table-column label="规格" align="center" prop="spec" />
+      <el-table-column label="类型ID" align="center" prop="toolTypeId" />
+      <el-table-column label="类型编码" align="center" prop="toolTypeCode" />
+      <el-table-column label="类型名称" align="center" prop="toolTypeName" />
       <el-table-column label="总数量" align="center" prop="quantity" />
-      <el-table-column label="可用数量(总数量减去使用中和保养中的数量)" align="center" prop="availableQuantity" />
-      <el-table-column label="保养类型:DAY-每天,WEEK-每周,MONTH-每月,QUARTER-每季,HALFYEAR-每半年,YEAR-每年,USAGE-按使用次数" align="center" prop="maintenType" />
-      <el-table-column label="下次保养日期" align="center" prop="nextMaintenDate" width="180">
+      <el-table-column label="可用数量" align="center" prop="availableQuantity" />
+      <el-table-column label="保养类型" align="center" prop="maintenType" width="120">
+          <template #default="scope">
+            <dict-tag :options="maintenTypeOptions" :value="scope.row.maintenType" />
+          </template>
+        </el-table-column>
+      <el-table-column label="下次保养" align="center" prop="nextMaintenDate" width="180">
         <template #default="scope">
           <span>{{ parseTime(scope.row.nextMaintenDate, '{y}-{m}-{d}') }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="状态:STORE-在库,USING-使用中,MAINTENANCE-保养中,SCRAPPED-报废" align="center" prop="status" />
-      <el-table-column label="是否启用(1-是,0-否)" align="center" prop="enableFlag" />
+      <el-table-column label="状态" align="center" prop="status" width="100">
+          <template #default="scope">
+            <dict-tag :options="statusOptions" :value="scope.row.status" />
+          </template>
+        </el-table-column>
+      <el-table-column label="启用" align="center" prop="enableFlag" width="80">
+          <template #default="scope">
+            <dict-tag :options="sys_yes_no" :value="scope.row.enableFlag" />
+          </template>
+        </el-table-column>
       <el-table-column label="备注" align="center" prop="remark" />
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
         <template #default="scope">
@@ -196,17 +208,17 @@
       <el-form ref="form" :model="form" :rules="rules" label-width="100px">
         <el-row>
           <el-col :span="24">
-            <el-form-item label="工厂ID(关联qxx_md_factory)" prop="factoryId">
+            <el-form-item label="工厂" prop="factoryId">
               <el-input v-model="form.factoryId" placeholder="请输入工厂ID(关联qxx_md_factory)" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="工装夹具编码(唯一)" prop="toolCode">
+            <el-form-item label="编码" prop="toolCode">
               <el-input v-model="form.toolCode" placeholder="请输入工装夹具编码(唯一)" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="工装夹具名称" prop="toolName">
+            <el-form-item label="名称" prop="toolName">
               <el-input v-model="form.toolName" placeholder="请输入工装夹具名称" />
             </el-form-item>
           </el-col>
@@ -216,22 +228,22 @@
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="规格型号" prop="spec">
+            <el-form-item label="规格" prop="spec">
               <el-input v-model="form.spec" type="textarea" placeholder="请输入内容" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="工装夹具类型ID(关联qxx_tm_tool_type)" prop="toolTypeId">
+            <el-form-item label="类型ID" prop="toolTypeId">
               <el-input v-model="form.toolTypeId" placeholder="请输入工装夹具类型ID(关联qxx_tm_tool_type)" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="工装夹具类型编码" prop="toolTypeCode">
+            <el-form-item label="类型编码" prop="toolTypeCode">
               <el-input v-model="form.toolTypeCode" placeholder="请输入工装夹具类型编码" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="工装夹具类型名称" prop="toolTypeName">
+            <el-form-item label="类型名称" prop="toolTypeName">
               <el-input v-model="form.toolTypeName" placeholder="请输入工装夹具类型名称" />
             </el-form-item>
           </el-col>
@@ -241,12 +253,12 @@
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="可用数量(总数量减去使用中和保养中的数量)" prop="availableQuantity">
+            <el-form-item label="可用数量" prop="availableQuantity">
               <el-input v-model="form.availableQuantity" placeholder="请输入可用数量(总数量减去使用中和保养中的数量)" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="下次保养日期" prop="nextMaintenDate">
+            <el-form-item label="下次保养" prop="nextMaintenDate">
               <el-date-picker clearable
                 v-model="form.nextMaintenDate"
                 type="date"
@@ -256,7 +268,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="是否启用(1-是,0-否)" prop="enableFlag">
+            <el-form-item label="启用" prop="enableFlag">
               <el-input v-model="form.enableFlag" placeholder="请输入是否启用(1-是,0-否)" />
             </el-form-item>
           </el-col>
@@ -282,6 +294,8 @@ export default {
   name: "Tool",
   data() {
     return {
+      maintenTypeMap: { DAY: "每天", WEEK: "每周", MONTH: "每月", QUARTER: "每季", HALFYEAR: "每半年", YEAR: "每年", USAGE: "按使用次数" },
+      statusMap: { STORE: "在库", USING: "使用中", MAINTENANCE: "保养中", SCRAPPED: "报废" },
       // 遮罩层
       loading: true,
       // 选中数组

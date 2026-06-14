@@ -1,7 +1,7 @@
 <template>
   <div class="app-container">
     <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
-      <el-form-item label="工厂ID(关联qxx_md_factory)" prop="factoryId">
+      <el-form-item label="工厂" prop="factoryId">
         <el-input
           v-model="queryParams.factoryId"
           placeholder="请输入工厂ID(关联qxx_md_factory)"
@@ -9,7 +9,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="类型编码(唯一)" prop="toolTypeCode">
+      <el-form-item label="编码" prop="toolTypeCode">
         <el-input
           v-model="queryParams.toolTypeCode"
           placeholder="请输入类型编码(唯一)"
@@ -17,7 +17,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="类型名称" prop="toolTypeName">
+      <el-form-item label="名称" prop="toolTypeName">
         <el-input
           v-model="queryParams.toolTypeName"
           placeholder="请输入类型名称"
@@ -25,7 +25,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="是否需要编码(1-需要,0-不需要)" prop="needCodeFlag">
+      <el-form-item label="编码要求" prop="needCodeFlag">
         <el-input
           v-model="queryParams.needCodeFlag"
           placeholder="请输入是否需要编码(1-需要,0-不需要)"
@@ -33,7 +33,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="保养周期(与保养类型配合,如:月+3=每3个月保养一次)" prop="maintenCycle">
+      <el-form-item label="保养周期" prop="maintenCycle">
         <el-input
           v-model="queryParams.maintenCycle"
           placeholder="请输入保养周期(与保养类型配合,如:月+3=每3个月保养一次)"
@@ -41,7 +41,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="是否启用(1-是,0-否)" prop="enableFlag">
+      <el-form-item label="启用" prop="enableFlag">
         <el-input
           v-model="queryParams.enableFlag"
           placeholder="请输入是否启用(1-是,0-否)"
@@ -103,14 +103,14 @@
 
     <el-table v-loading="loading" :data="typeList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="工装夹具类型ID" align="center" prop="toolTypeId" />
-      <el-table-column label="工厂ID(关联qxx_md_factory)" align="center" prop="factoryId" />
-      <el-table-column label="类型编码(唯一)" align="center" prop="toolTypeCode" />
-      <el-table-column label="类型名称" align="center" prop="toolTypeName" />
-      <el-table-column label="是否需要编码(1-需要,0-不需要)" align="center" prop="needCodeFlag" />
+      <el-table-column label="ID" align="center" prop="toolTypeId" />
+      <el-table-column label="工厂" align="center" prop="factoryId" />
+      <el-table-column label="编码" align="center" prop="toolTypeCode" />
+      <el-table-column label="名称" align="center" prop="toolTypeName" />
+      <el-table-column label="编码要求" align="center" prop="needCodeFlag" />
       <el-table-column label="保养类型:DAY-每天,WEEK-每周,MONTH-每月,QUARTER-每季,HALFYEAR-每半年,YEAR-每年,USAGE-按使用次数" align="center" prop="maintenType" />
-      <el-table-column label="保养周期(与保养类型配合,如:月+3=每3个月保养一次)" align="center" prop="maintenCycle" />
-      <el-table-column label="是否启用(1-是,0-否)" align="center" prop="enableFlag" />
+      <el-table-column label="保养周期" align="center" prop="maintenCycle" />
+      <el-table-column label="启用" align="center" prop="enableFlag" />
       <el-table-column label="备注" align="center" prop="remark" />
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
         <template #default="scope">
@@ -145,32 +145,32 @@
       <el-form ref="form" :model="form" :rules="rules" label-width="100px">
         <el-row>
           <el-col :span="24">
-            <el-form-item label="工厂ID(关联qxx_md_factory)" prop="factoryId">
+            <el-form-item label="工厂" prop="factoryId">
               <el-input v-model="form.factoryId" placeholder="请输入工厂ID(关联qxx_md_factory)" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="类型编码(唯一)" prop="toolTypeCode">
+            <el-form-item label="编码" prop="toolTypeCode">
               <el-input v-model="form.toolTypeCode" placeholder="请输入类型编码(唯一)" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="类型名称" prop="toolTypeName">
+            <el-form-item label="名称" prop="toolTypeName">
               <el-input v-model="form.toolTypeName" placeholder="请输入类型名称" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="是否需要编码(1-需要,0-不需要)" prop="needCodeFlag">
+            <el-form-item label="编码要求" prop="needCodeFlag">
               <el-input v-model="form.needCodeFlag" placeholder="请输入是否需要编码(1-需要,0-不需要)" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="保养周期(与保养类型配合,如:月+3=每3个月保养一次)" prop="maintenCycle">
+            <el-form-item label="保养周期" prop="maintenCycle">
               <el-input v-model="form.maintenCycle" placeholder="请输入保养周期(与保养类型配合,如:月+3=每3个月保养一次)" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="是否启用(1-是,0-否)" prop="enableFlag">
+            <el-form-item label="启用" prop="enableFlag">
               <el-input v-model="form.enableFlag" placeholder="请输入是否启用(1-是,0-否)" />
             </el-form-item>
           </el-col>

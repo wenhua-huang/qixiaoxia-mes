@@ -329,6 +329,7 @@ import VendorSelect from "@/components/vendorSelect/single.vue"
 
 export default {
   name: "Order",
+  components: { VendorSelect },
   data() {
     return {
       // 遮罩层
@@ -381,8 +382,6 @@ export default {
         vendorName: null,},
       // 自动生成开关
       autoGenFlag: true,
-      // 供应商选择弹窗引用
-      vendorSelectRef: null,
       // 表单校验
       rules: {        orderCode: [
         ],

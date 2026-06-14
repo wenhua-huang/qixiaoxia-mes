@@ -315,6 +315,50 @@ function handleAutoGenChange(flag: boolean) {
 function reset() { autoGenFlag.value = false; form.value = {} as ...; ... }
 ```
 
+## E2E 测试
+
+**任何前端/全栈功能开发完成后，必须用 Playwright E2E 验证，禁止只用 curl 测试 API。**
+
+E2E 项目位于 `e2e/`，基于 Playwright + 已认证 storageState。
+
+### 运行命令
+```bash
+cd e2e
+
+# 运行全部测试
+npx playwright test
+
+# 运行指定模块测试
+npx playwright test tests/pur/order.spec.ts --project=chromium
+
+# 查看失败 trace
+npx playwright show-trace test-results/.../trace.zip
+```
+
+### 测试文件组织
+```
+e2e/tests/{module}/{entity}.spec.ts   # 按模块/实体组织
+e2e/setup/global-setup.ts             # 自动登录 + 保存 storageState
+e2e/setup/storageState.json           # 认证缓存（14天有效）
+```
+
+### E2E 必须覆盖的检查点
+1. **页面加载**：`await page.goto('/')` → 点击菜单 → 目标页面可见
+2. **新增弹窗**：点击新增 → 弹窗显示 → 表单字段存在 → 自动生成开关/下拉选择器正常工作
+3. **提交 JSON 验证**（关键！）：用 `page.waitForRequest` 拦截 POST 请求，检查 JSON body：
+   - `orderDate` 是 `yyyy-MM-dd` 格式字符串，不能是 Date 对象或格式字面量 `"yyyy-"`
+   - `orderCode` 自动编码格式正确
+   - 数值字段为 number 类型
+4. **curl 不能替代 E2E**：curl 直接调 API 绕过了 Vue 组件渲染、data() 类型转换、Element Plus 组件值序列化等前端问题，会漏掉 `new Date()` 被序列化为 `"yyyy-06-Su"` 这类 bug。
+
+### E2E 常见失败排查
+| 症状 | 原因 | 修复 |
+|------|------|------|
+| 页面空白/超时 | RuoYi 动态路由，需先访问首页加载菜单 | `page.goto('/')` → 等 2s → 再跳转 |
+| 菜单点击无效 | 侧边栏折叠、菜单未展开 | 直接 `page.goto('/{module}/{entity}')` 或用 `getByText` 匹配 |
+| 弹窗不显示 | Vue3 `v-model` 替代了 `:visible.sync`，组件名可能不一致 | 用 `page.locator('.el-dialog')` 通用匹配 |
+| 按钮点击无效 | 生成器产物 `el-button type="text"` 需改为 `el-button link` | grep 确认已全部替换 |
+
 ## Environment Versions
 
 | 组件 | 版本 | 备注 |

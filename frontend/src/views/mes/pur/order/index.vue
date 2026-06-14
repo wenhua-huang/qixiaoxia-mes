@@ -375,7 +375,7 @@ export default {
       },
       // 表单参数
       form: {
-        orderDate: new Date(),
+        orderDate: new Date().toISOString().slice(0,10),
         expectedDate: null,
         vendorId: null,
         vendorCode: null,

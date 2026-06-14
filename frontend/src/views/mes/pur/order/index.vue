@@ -220,12 +220,16 @@
 
     <!-- 添加或修改采购订单头对话框 -->
     <el-dialog :title="title" v-model="open" width="500px" append-to-body>
-      <el-form ref="form" :model="form" :rules="rules" label-width="100px">
+      <el-form ref="form" :model="form" :rules="rules" label-width="110px">
         <el-row>
-          <el-col :span="24">          </el-col>
           <el-col :span="24">
-            <el-form-item label="订单编码" prop="orderCode">
-              <el-input v-model="form.orderCode" placeholder="留空自动生成(PO+日期+流水号)" />
+            <el-form-item label="订单编码">
+              <el-switch v-model="autoGenFlag" active-color="#13ce66" active-text="自动生成" @change="handleAutoGenChange" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item label="" prop="orderCode">
+              <el-input v-model="form.orderCode" placeholder="PO20260614001" :disabled="autoGenFlag" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -234,19 +238,12 @@
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="供应商ID" prop="vendorId">
-              <el-input v-model="form.vendorId" placeholder="请输入供应商ID(关联qxx_md_vendor,vendor_type=MATERIAL)" />
+            <el-form-item label="供应商" prop="vendorName">
+              <el-input v-model="form.vendorName" readonly placeholder="请选择供应商">
+                <template #append><el-button icon="Search" @click="handleSelectVendor" /></template>
+              </el-input>
             </el-form-item>
-          </el-col>
-          <el-col :span="24">
-            <el-form-item label="供应商编码" prop="vendorCode">
-              <el-input v-model="form.vendorCode" placeholder="请输入供应商编码" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="24">
-            <el-form-item label="供应商名称" prop="vendorName">
-              <el-input v-model="form.vendorName" placeholder="请输入供应商名称" />
-            </el-form-item>
+            <VendorSelect ref="vendorSelectRef" @onSelected="onVendorSelected" />
           </el-col>
           <el-col :span="24">
             <el-form-item label="下单日期" prop="orderDate">
@@ -315,6 +312,7 @@
 
 <script>
 import { listOrder, getOrder, delOrder, addOrder, updateOrder } from "@/api/mes/pur/order"
+import VendorSelect from "@/components/vendorSelect/single.vue"
 
 export default {
   name: "Order",
@@ -345,6 +343,8 @@ export default {
         orderName: null,
         vendorId: null,
         vendorCode: null,
+        vendorId: null,
+        vendorCode: null,
         vendorName: null,
         purchaseType: null,
         orderDate: null,
@@ -358,12 +358,21 @@ export default {
         status: null,
       },
       // 表单参数
-      form: {},
+      form: {
+        orderDate: new Date(),
+        expectedDate: null,
+        vendorId: null,
+        vendorCode: null,
+        vendorName: null,},
+      // 自动生成开关
+      autoGenFlag: true,
+      // 供应商选择弹窗引用
+      vendorSelectRef: null,
       // 表单校验
       rules: {        orderCode: [
         ],
-        vendorId: [
-          { required: true, message: "供应商ID(关联qxx_md_vendor,vendor_type=MATERIAL)不能为空", trigger: "blur" }
+        vendorName: [
+          { required: true, message: "供应商不能为空", trigger: "change" }
         ],
       }
     }
@@ -391,6 +400,8 @@ export default {
       this.form = {
         orderId: null,        orderCode: null,
         orderName: null,
+        vendorId: null,
+        vendorCode: null,
         vendorId: null,
         vendorCode: null,
         vendorName: null,
@@ -429,8 +440,29 @@ export default {
       this.multiple = !selection.length
     },
     /** 新增按钮操作 */
+    handleAutoGenChange(val) {
+      if (val) {
+        // 自动生成编码预览
+        const now = new Date()
+        const y = now.getFullYear()
+        const m = String(now.getMonth()+1).padStart(2,'0')
+        const d = String(now.getDate()).padStart(2,'0')
+        this.form.orderCode = 'PO' + y + m + d + 'xxx'
+      } else {
+        this.form.orderCode = ''
+      }
+    },
+    handleSelectVendor() { this.$refs.vendorSelectRef.open() },
+    onVendorSelected(row) {
+      this.form.vendorId = row.vendorId
+      this.form.vendorName = row.vendorName
+      this.form.vendorCode = row.vendorCode
+    },
     handleAdd() {
       this.reset()
+      this.autoGenFlag = true
+      // 触发编码预览
+      this.handleAutoGenChange(true)
       this.open = true
       this.title = "添加采购订单头"
     },

@@ -63,7 +63,7 @@
           icon="el-icon-plus"
           size="mini"
           @click="handleAdd"
-          v-hasPermi="['mes:tm:tool-type:add']"
+          v-hasPermi="['mes:tm:tooltype:add']"
         >新增</el-button>
       </el-col>
       <el-col :span="1.5">
@@ -74,7 +74,7 @@
           size="mini"
           :disabled="single"
           @click="handleUpdate"
-          v-hasPermi="['mes:tm:tool-type:edit']"
+          v-hasPermi="['mes:tm:tooltype:edit']"
         >修改</el-button>
       </el-col>
       <el-col :span="1.5">
@@ -85,7 +85,7 @@
           size="mini"
           :disabled="multiple"
           @click="handleDelete"
-          v-hasPermi="['mes:tm:tool-type:remove']"
+          v-hasPermi="['mes:tm:tooltype:remove']"
         >删除</el-button>
       </el-col>
       <el-col :span="1.5">
@@ -95,7 +95,7 @@
           icon="el-icon-download"
           size="mini"
           @click="handleExport"
-          v-hasPermi="['mes:tm:tool-type:export']"
+          v-hasPermi="['mes:tm:tooltype:export']"
         >导出</el-button>
       </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
@@ -119,14 +119,14 @@
             type="text"
             icon="el-icon-edit"
             @click="handleUpdate(scope.row)"
-            v-hasPermi="['mes:tm:tool-type:edit']"
+            v-hasPermi="['mes:tm:tooltype:edit']"
           >修改</el-button>
           <el-button
             size="mini"
             type="text"
             icon="el-icon-delete"
             @click="handleDelete(scope.row)"
-            v-hasPermi="['mes:tm:tool-type:remove']"
+            v-hasPermi="['mes:tm:tooltype:remove']"
           >删除</el-button>
         </template>
       </el-table-column>
@@ -190,7 +190,7 @@
 </template>
 
 <script>
-import { listType, getType, delType, addType, updateType } from "@/api/mes/tm/tool-type"
+import { listType, getType, delType, addType, updateType } from "@/api/mes/tm/tooltype"
 
 export default {
   name: "Type",
@@ -349,7 +349,7 @@ export default {
     },
     /** 导出按钮操作 */
     handleExport() {
-      this.download('mes/tm/tool-type/export', {
+      this.download('mes/tm/tooltype/export', {
         ...this.queryParams
       }, `type_${new Date().getTime()}.xlsx`)
     }

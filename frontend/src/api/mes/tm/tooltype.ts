@@ -3,7 +3,7 @@ import request from '@/utils/request'
 // 查询工装夹具类型列表
 export function listType(query) {
   return request({
-    url: '/mes/tm/tool-type/list',
+    url: '/mes/tm/tooltype/list',
     method: 'get',
     params: query
   })
@@ -12,7 +12,7 @@ export function listType(query) {
 // 查询工装夹具类型详细
 export function getType(toolTypeId) {
   return request({
-    url: '/mes/tm/tool-type/' + toolTypeId,
+    url: '/mes/tm/tooltype/' + toolTypeId,
     method: 'get'
   })
 }
@@ -20,7 +20,7 @@ export function getType(toolTypeId) {
 // 新增工装夹具类型
 export function addType(data) {
   return request({
-    url: '/mes/tm/tool-type',
+    url: '/mes/tm/tooltype',
     method: 'post',
     data: data
   })
@@ -29,7 +29,7 @@ export function addType(data) {
 // 修改工装夹具类型
 export function updateType(data) {
   return request({
-    url: '/mes/tm/tool-type',
+    url: '/mes/tm/tooltype',
     method: 'put',
     data: data
   })
@@ -38,7 +38,7 @@ export function updateType(data) {
 // 删除工装夹具类型
 export function delType(toolTypeId) {
   return request({
-    url: '/mes/tm/tool-type/' + toolTypeId,
+    url: '/mes/tm/tooltype/' + toolTypeId,
     method: 'delete'
   })
 }

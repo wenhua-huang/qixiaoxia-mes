@@ -28,7 +28,7 @@ import com.ruoyi.common.core.page.TableDataInfo;
  * @date 2026-06-14
  */
 @RestController
-@RequestMapping("/mes/tm/tool-type")
+@RequestMapping("/mes/tm/tooltype")
 public class TmToolTypeController extends BaseController
 {
     @Autowired
@@ -37,7 +37,7 @@ public class TmToolTypeController extends BaseController
     /**
      * 查询工装夹具类型列表
      */
-    @PreAuthorize("@ss.hasPermi('mes:tm:tool-type:list')")
+    @PreAuthorize("@ss.hasPermi('mes:tm:tooltype:list')")
     @GetMapping("/list")
     public TableDataInfo list(TmToolType tmToolType)
     {
@@ -49,7 +49,7 @@ public class TmToolTypeController extends BaseController
     /**
      * 导出工装夹具类型列表
      */
-    @PreAuthorize("@ss.hasPermi('mes:tm:tool-type:export')")
+    @PreAuthorize("@ss.hasPermi('mes:tm:tooltype:export')")
     @Log(title = "工装夹具类型", businessType = BusinessType.EXPORT)
     @PostMapping("/export")
     public void export(HttpServletResponse response, TmToolType tmToolType)
@@ -62,7 +62,7 @@ public class TmToolTypeController extends BaseController
     /**
      * 获取工装夹具类型详细信息
      */
-    @PreAuthorize("@ss.hasPermi('mes:tm:tool-type:query')")
+    @PreAuthorize("@ss.hasPermi('mes:tm:tooltype:query')")
     @GetMapping(value = "/{toolTypeId}")
     public AjaxResult getInfo(@PathVariable("toolTypeId") Long toolTypeId)
     {
@@ -72,7 +72,7 @@ public class TmToolTypeController extends BaseController
     /**
      * 新增工装夹具类型
      */
-    @PreAuthorize("@ss.hasPermi('mes:tm:tool-type:add')")
+    @PreAuthorize("@ss.hasPermi('mes:tm:tooltype:add')")
     @Log(title = "工装夹具类型", businessType = BusinessType.INSERT)
     @PostMapping
     public AjaxResult add(@RequestBody TmToolType tmToolType)
@@ -84,7 +84,7 @@ public class TmToolTypeController extends BaseController
     /**
      * 修改工装夹具类型
      */
-    @PreAuthorize("@ss.hasPermi('mes:tm:tool-type:edit')")
+    @PreAuthorize("@ss.hasPermi('mes:tm:tooltype:edit')")
     @Log(title = "工装夹具类型", businessType = BusinessType.UPDATE)
     @PutMapping
     public AjaxResult edit(@RequestBody TmToolType tmToolType)
@@ -95,7 +95,7 @@ public class TmToolTypeController extends BaseController
     /**
      * 删除工装夹具类型
      */
-    @PreAuthorize("@ss.hasPermi('mes:tm:tool-type:remove')")
+    @PreAuthorize("@ss.hasPermi('mes:tm:tooltype:remove')")
     @Log(title = "工装夹具类型", businessType = BusinessType.DELETE)
 	@DeleteMapping("/{toolTypeIds}")
     public AjaxResult remove(@PathVariable Long[] toolTypeIds)

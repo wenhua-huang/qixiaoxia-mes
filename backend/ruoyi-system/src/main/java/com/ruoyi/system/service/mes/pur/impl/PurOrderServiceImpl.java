@@ -3,12 +3,14 @@ package com.ruoyi.system.service.mes.pur.impl;
 import java.util.List;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
+import com.ruoyi.common.utils.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
 import com.ruoyi.system.mapper.mes.pur.PurOrderMapper;
 import com.ruoyi.system.domain.mes.pur.PurOrder;
 import com.ruoyi.system.service.mes.pur.IPurOrderService;
+import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 
 /**
  * 采购订单头Service业务层处理
@@ -21,6 +23,9 @@ public class PurOrderServiceImpl implements IPurOrderService
 {
     @Autowired
     private PurOrderMapper purOrderMapper;
+
+    @Autowired
+    private AutoCodeGenerator autoCodeGenerator;
 
     /**
      * 查询采购订单头
@@ -56,6 +61,10 @@ public class PurOrderServiceImpl implements IPurOrderService
     @Transactional
     public int insertPurOrder(PurOrder purOrder)
     {
+        // 订单编码自动生成
+        if (StringUtils.isEmpty(purOrder.getOrderCode())) {
+            purOrder.setOrderCode(autoCodeGenerator.genSerialCode("PUR_ORDER_CODE", ""));
+        }
         purOrder.setCreateTime(DateUtils.getNowDate());
         purOrder.setCreateBy(SecurityUtils.getUsername());
         return purOrderMapper.insertPurOrder(purOrder);

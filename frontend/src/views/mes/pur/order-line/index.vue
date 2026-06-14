@@ -1,15 +1,6 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
-      <el-form-item label="工厂ID(关联qxx_md_factory)" prop="factoryId">
-        <el-input
-          v-model="queryParams.factoryId"
-          placeholder="请输入工厂ID(关联qxx_md_factory)"
-          clearable
-          @keyup.enter="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="采购订单ID(关联qxx_pur_order)" prop="orderId">
+    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">      <el-form-item label="订单ID" prop="orderId">
         <el-input
           v-model="queryParams.orderId"
           placeholder="请输入采购订单ID(关联qxx_pur_order)"
@@ -17,7 +8,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="物料ID(关联qxx_md_item)" prop="itemId">
+      <el-form-item label="物料ID" prop="itemId">
         <el-input
           v-model="queryParams.itemId"
           placeholder="请输入物料ID(关联qxx_md_item)"
@@ -41,7 +32,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="主单位编码(如TON-吨,ROLL-卷,PCS-个,KG-千克)" prop="unitOfMeasure">
+      <el-form-item label="主单位" prop="unitOfMeasure">
         <el-input
           v-model="queryParams.unitOfMeasure"
           placeholder="请输入主单位编码(如TON-吨,ROLL-卷,PCS-个,KG-千克)"
@@ -49,7 +40,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="主单位名称" prop="unitName">
+      <el-form-item label="主单位名" prop="unitName">
         <el-input
           v-model="queryParams.unitName"
           placeholder="请输入主单位名称"
@@ -57,7 +48,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="辅助单位编码(如ROLL-卷,与主单位联动)" prop="unit2">
+      <el-form-item label="辅助单位" prop="unit2">
         <el-input
           v-model="queryParams.unit2"
           placeholder="请输入辅助单位编码(如ROLL-卷,与主单位联动)"
@@ -65,7 +56,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="辅助单位名称" prop="unit2Name">
+      <el-form-item label="辅助单位名" prop="unit2Name">
         <el-input
           v-model="queryParams.unit2Name"
           placeholder="请输入辅助单位名称"
@@ -73,7 +64,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="主单位→辅助单位换算率" prop="conversionRate">
+      <el-form-item label="换算率" prop="conversionRate">
         <el-input
           v-model="queryParams.conversionRate"
           placeholder="请输入主单位→辅助单位换算率"
@@ -81,7 +72,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="订购数量(主单位)" prop="quantityOrdered">
+      <el-form-item label="订购数量" prop="quantityOrdered">
         <el-input
           v-model="queryParams.quantityOrdered"
           placeholder="请输入订购数量(主单位)"
@@ -89,7 +80,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="订购数量(辅助单位,如卷数)" prop="quantityOrdered2">
+      <el-form-item label="辅助数量" prop="quantityOrdered2">
         <el-input
           v-model="queryParams.quantityOrdered2"
           placeholder="请输入订购数量(辅助单位,如卷数)"
@@ -97,7 +88,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="已收货数量(主单位)" prop="quantityReceived">
+      <el-form-item label="已收货数" prop="quantityReceived">
         <el-input
           v-model="queryParams.quantityReceived"
           placeholder="请输入已收货数量(主单位)"
@@ -105,7 +96,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="已收货数量(辅助单位)" prop="quantityReceived2">
+      <el-form-item label="辅助已收" prop="quantityReceived2">
         <el-input
           v-model="queryParams.quantityReceived2"
           placeholder="请输入已收货数量(辅助单位)"
@@ -113,7 +104,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="单价(元/主单位,如元/吨)" prop="unitPrice">
+      <el-form-item label="单价" prop="unitPrice">
         <el-input
           v-model="queryParams.unitPrice"
           placeholder="请输入单价(元/主单位,如元/吨)"
@@ -121,7 +112,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="行金额(不含税)" prop="amount">
+      <el-form-item label="行金额" prop="amount">
         <el-input
           v-model="queryParams.amount"
           placeholder="请输入行金额(不含税)"
@@ -129,7 +120,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="税率(%)" prop="taxRate">
+      <el-form-item label="税率" prop="taxRate">
         <el-input
           v-model="queryParams.taxRate"
           placeholder="请输入税率(%)"
@@ -137,7 +128,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="门幅要求(mm),如925mm" prop="paperWidth">
+      <el-form-item label="门幅(mm)" prop="paperWidth">
         <el-input
           v-model="queryParams.paperWidth"
           placeholder="请输入门幅要求(mm),如925mm"
@@ -145,7 +136,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="克重要求(g),如120g" prop="paperWeight">
+      <el-form-item label="克重(g)" prop="paperWeight">
         <el-input
           v-model="queryParams.paperWeight"
           placeholder="请输入克重要求(g),如120g"
@@ -153,7 +144,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="预计卷数(纸张行业用，其他行业=0)" prop="rollCount">
+      <el-form-item label="卷数" prop="rollCount">
         <el-input
           v-model="queryParams.rollCount"
           placeholder="请输入预计卷数(纸张行业用，其他行业=0)"
@@ -161,7 +152,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="关联客户订单号" prop="sourceOrderCode">
+      <el-form-item label="客户订单号" prop="sourceOrderCode">
         <el-input
           v-model="queryParams.sourceOrderCode"
           placeholder="请输入关联客户订单号"
@@ -177,7 +168,7 @@
           placeholder="请选择预计到货日期">
         </el-date-picker>
       </el-form-item>
-      <el-form-item label="到货通知单ID(关联qxx_wm_arrival_notice,收货后回写)" prop="arrivalNoticeId">
+      <el-form-item label="到货通知" prop="arrivalNoticeId">
         <el-input
           v-model="queryParams.arrivalNoticeId"
           placeholder="请输入到货通知单ID(关联qxx_wm_arrival_notice,收货后回写)"
@@ -239,37 +230,39 @@
 
     <el-table v-loading="loading" :data="lineList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="行ID" align="center" prop="lineId" />
-      <el-table-column label="工厂ID(关联qxx_md_factory)" align="center" prop="factoryId" />
-      <el-table-column label="采购订单ID(关联qxx_pur_order)" align="center" prop="orderId" />
-      <el-table-column label="物料ID(关联qxx_md_item)" align="center" prop="itemId" />
+      <el-table-column label="ID" align="center" prop="lineId" />      <el-table-column label="订单ID" align="center" prop="orderId" />
+      <el-table-column label="物料ID" align="center" prop="itemId" />
       <el-table-column label="物料编码" align="center" prop="itemCode" />
       <el-table-column label="物料名称" align="center" prop="itemName" />
-      <el-table-column label="规格型号" align="center" prop="specification" />
-      <el-table-column label="主单位编码(如TON-吨,ROLL-卷,PCS-个,KG-千克)" align="center" prop="unitOfMeasure" />
-      <el-table-column label="主单位名称" align="center" prop="unitName" />
-      <el-table-column label="辅助单位编码(如ROLL-卷,与主单位联动)" align="center" prop="unit2" />
-      <el-table-column label="辅助单位名称" align="center" prop="unit2Name" />
-      <el-table-column label="主单位→辅助单位换算率" align="center" prop="conversionRate" />
-      <el-table-column label="订购数量(主单位)" align="center" prop="quantityOrdered" />
-      <el-table-column label="订购数量(辅助单位,如卷数)" align="center" prop="quantityOrdered2" />
-      <el-table-column label="已收货数量(主单位)" align="center" prop="quantityReceived" />
-      <el-table-column label="已收货数量(辅助单位)" align="center" prop="quantityReceived2" />
-      <el-table-column label="单价(元/主单位,如元/吨)" align="center" prop="unitPrice" />
-      <el-table-column label="行金额(不含税)" align="center" prop="amount" />
-      <el-table-column label="税率(%)" align="center" prop="taxRate" />
-      <el-table-column label="门幅要求(mm),如925mm" align="center" prop="paperWidth" />
-      <el-table-column label="克重要求(g),如120g" align="center" prop="paperWeight" />
-      <el-table-column label="纸张种类:乌卡/俄卡/箱板纸/白牛皮/TC箱板纸/瑞典赤牛" align="center" prop="paperType" />
-      <el-table-column label="预计卷数(纸张行业用，其他行业=0)" align="center" prop="rollCount" />
-      <el-table-column label="关联客户订单号" align="center" prop="sourceOrderCode" />
+      <el-table-column label="规格" align="center" prop="specification" />
+      <el-table-column label="主单位" align="center" prop="unitOfMeasure" />
+      <el-table-column label="主单位名" align="center" prop="unitName" />
+      <el-table-column label="辅助单位" align="center" prop="unit2" />
+      <el-table-column label="辅助单位名" align="center" prop="unit2Name" />
+      <el-table-column label="换算率" align="center" prop="conversionRate" />
+      <el-table-column label="订购数量" align="center" prop="quantityOrdered" />
+      <el-table-column label="辅助数量" align="center" prop="quantityOrdered2" />
+      <el-table-column label="已收货数" align="center" prop="quantityReceived" />
+      <el-table-column label="辅助已收" align="center" prop="quantityReceived2" />
+      <el-table-column label="单价" align="center" prop="unitPrice" />
+      <el-table-column label="行金额" align="center" prop="amount" />
+      <el-table-column label="税率" align="center" prop="taxRate" />
+      <el-table-column label="门幅(mm)" align="center" prop="paperWidth" />
+      <el-table-column label="克重(g)" align="center" prop="paperWeight" />
+      <el-table-column label="纸张种类" align="center" prop="paperType" />
+      <el-table-column label="卷数" align="center" prop="rollCount" />
+      <el-table-column label="客户订单号" align="center" prop="sourceOrderCode" />
       <el-table-column label="预计到货日期" align="center" prop="expectedDate" width="180">
         <template #default="scope">
           <span>{{ parseTime(scope.row.expectedDate, '{y}-{m}-{d}') }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="到货通知单ID(关联qxx_wm_arrival_notice,收货后回写)" align="center" prop="arrivalNoticeId" />
-      <el-table-column label="行状态:ORDERED-已下单,RECEIVING-收货中,RECEIVED-已收货,CLOSED-已关闭" align="center" prop="status" />
+      <el-table-column label="到货通知" align="center" prop="arrivalNoticeId" />
+      <el-table-column label="状态" align="center" prop="status" width="90">
+          <template #default="scope">
+            <span>{{ statusMap[scope.row.status] || scope.row.status }}</span>
+          </template>
+        </el-table-column>
       <el-table-column label="备注" align="center" prop="remark" />
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
         <template #default="scope">
@@ -303,18 +296,14 @@
     <el-dialog :title="title" v-model="open" width="500px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="100px">
         <el-row>
+          <el-col :span="24">          </el-col>
           <el-col :span="24">
-            <el-form-item label="工厂ID(关联qxx_md_factory)" prop="factoryId">
-              <el-input v-model="form.factoryId" placeholder="请输入工厂ID(关联qxx_md_factory)" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="24">
-            <el-form-item label="采购订单ID(关联qxx_pur_order)" prop="orderId">
+            <el-form-item label="订单ID" prop="orderId">
               <el-input v-model="form.orderId" placeholder="请输入采购订单ID(关联qxx_pur_order)" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="物料ID(关联qxx_md_item)" prop="itemId">
+            <el-form-item label="物料ID" prop="itemId">
               <el-input v-model="form.itemId" placeholder="请输入物料ID(关联qxx_md_item)" />
             </el-form-item>
           </el-col>
@@ -329,87 +318,87 @@
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="规格型号" prop="specification">
+            <el-form-item label="规格" prop="specification">
               <el-input v-model="form.specification" type="textarea" placeholder="请输入内容" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="主单位编码(如TON-吨,ROLL-卷,PCS-个,KG-千克)" prop="unitOfMeasure">
+            <el-form-item label="主单位" prop="unitOfMeasure">
               <el-input v-model="form.unitOfMeasure" placeholder="请输入主单位编码(如TON-吨,ROLL-卷,PCS-个,KG-千克)" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="主单位名称" prop="unitName">
+            <el-form-item label="主单位名" prop="unitName">
               <el-input v-model="form.unitName" placeholder="请输入主单位名称" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="辅助单位编码(如ROLL-卷,与主单位联动)" prop="unit2">
+            <el-form-item label="辅助单位" prop="unit2">
               <el-input v-model="form.unit2" placeholder="请输入辅助单位编码(如ROLL-卷,与主单位联动)" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="辅助单位名称" prop="unit2Name">
+            <el-form-item label="辅助单位名" prop="unit2Name">
               <el-input v-model="form.unit2Name" placeholder="请输入辅助单位名称" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="主单位→辅助单位换算率" prop="conversionRate">
+            <el-form-item label="换算率" prop="conversionRate">
               <el-input v-model="form.conversionRate" placeholder="请输入主单位→辅助单位换算率" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="订购数量(主单位)" prop="quantityOrdered">
+            <el-form-item label="订购数量" prop="quantityOrdered">
               <el-input v-model="form.quantityOrdered" placeholder="请输入订购数量(主单位)" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="订购数量(辅助单位,如卷数)" prop="quantityOrdered2">
+            <el-form-item label="辅助数量" prop="quantityOrdered2">
               <el-input v-model="form.quantityOrdered2" placeholder="请输入订购数量(辅助单位,如卷数)" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="已收货数量(主单位)" prop="quantityReceived">
+            <el-form-item label="已收货数" prop="quantityReceived">
               <el-input v-model="form.quantityReceived" placeholder="请输入已收货数量(主单位)" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="已收货数量(辅助单位)" prop="quantityReceived2">
+            <el-form-item label="辅助已收" prop="quantityReceived2">
               <el-input v-model="form.quantityReceived2" placeholder="请输入已收货数量(辅助单位)" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="单价(元/主单位,如元/吨)" prop="unitPrice">
+            <el-form-item label="单价" prop="unitPrice">
               <el-input v-model="form.unitPrice" placeholder="请输入单价(元/主单位,如元/吨)" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="行金额(不含税)" prop="amount">
+            <el-form-item label="行金额" prop="amount">
               <el-input v-model="form.amount" placeholder="请输入行金额(不含税)" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="税率(%)" prop="taxRate">
+            <el-form-item label="税率" prop="taxRate">
               <el-input v-model="form.taxRate" placeholder="请输入税率(%)" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="门幅要求(mm),如925mm" prop="paperWidth">
+            <el-form-item label="门幅(mm)" prop="paperWidth">
               <el-input v-model="form.paperWidth" placeholder="请输入门幅要求(mm),如925mm" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="克重要求(g),如120g" prop="paperWeight">
+            <el-form-item label="克重(g)" prop="paperWeight">
               <el-input v-model="form.paperWeight" placeholder="请输入克重要求(g),如120g" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="预计卷数(纸张行业用，其他行业=0)" prop="rollCount">
+            <el-form-item label="卷数" prop="rollCount">
               <el-input v-model="form.rollCount" placeholder="请输入预计卷数(纸张行业用，其他行业=0)" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="关联客户订单号" prop="sourceOrderCode">
+            <el-form-item label="客户订单号" prop="sourceOrderCode">
               <el-input v-model="form.sourceOrderCode" placeholder="请输入关联客户订单号" />
             </el-form-item>
           </el-col>
@@ -424,7 +413,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="到货通知单ID(关联qxx_wm_arrival_notice,收货后回写)" prop="arrivalNoticeId">
+            <el-form-item label="到货通知" prop="arrivalNoticeId">
               <el-input v-model="form.arrivalNoticeId" placeholder="请输入到货通知单ID(关联qxx_wm_arrival_notice,收货后回写)" />
             </el-form-item>
           </el-col>
@@ -471,9 +460,7 @@ export default {
       // 查询参数
       queryParams: {
         pageNum: 1,
-        pageSize: 10,
-        factoryId: null,
-        orderId: null,
+        pageSize: 10,        orderId: null,
         itemId: null,
         itemCode: null,
         itemName: null,
@@ -502,11 +489,7 @@ export default {
       // 表单参数
       form: {},
       // 表单校验
-      rules: {
-        factoryId: [
-          { required: true, message: "工厂ID(关联qxx_md_factory)不能为空", trigger: "blur" }
-        ],
-        orderId: [
+      rules: {        orderId: [
           { required: true, message: "采购订单ID(关联qxx_pur_order)不能为空", trigger: "blur" }
         ],
         itemId: [
@@ -548,9 +531,7 @@ export default {
     // 表单重置
     reset() {
       this.form = {
-        lineId: null,
-        factoryId: null,
-        orderId: null,
+        lineId: null,        orderId: null,
         itemId: null,
         itemCode: null,
         itemName: null,

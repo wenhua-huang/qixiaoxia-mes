@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.cal.CalShiftMapper">
+    
+    <resultMap type="CalShift" id="CalShiftResult">
+        <result property="shiftId"    column="shift_id"    />
+        <result property="factoryId"    column="factory_id"    />
+        <result property="planId"    column="plan_id"    />
+        <result property="shiftSeq"    column="shift_seq"    />
+        <result property="shiftName"    column="shift_name"    />
+        <result property="startTime"    column="start_time"    />
+        <result property="endTime"    column="end_time"    />
+        <result property="remark"    column="remark"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectCalShiftVo">
+        select shift_id, factory_id, plan_id, shift_seq, shift_name, start_time, end_time, remark, create_by, create_time, update_by, update_time from qxx_cal_shift
+    </sql>
+
+    <select id="selectCalShiftList" parameterType="CalShift" resultMap="CalShiftResult">
+        <include refid="selectCalShiftVo"/>
+        <where>  
+            <if test="factoryId != null "> and factory_id = #{factoryId}</if>
+            <if test="planId != null "> and plan_id = #{planId}</if>
+            <if test="shiftSeq != null "> and shift_seq = #{shiftSeq}</if>
+            <if test="shiftName != null  and shiftName != ''"> and shift_name like concat('%', #{shiftName}, '%')</if>
+            <if test="startTime != null "> and start_time = #{startTime}</if>
+            <if test="endTime != null "> and end_time = #{endTime}</if>
+        </where>
+    </select>
+    
+    <select id="selectCalShiftByShiftId" parameterType="Long" resultMap="CalShiftResult">
+        <include refid="selectCalShiftVo"/>
+        where shift_id = #{shiftId}
+    </select>
+
+    <insert id="insertCalShift" parameterType="CalShift" useGeneratedKeys="true" keyProperty="shiftId">
+        insert into qxx_cal_shift
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="planId != null">plan_id,</if>
+            <if test="shiftSeq != null">shift_seq,</if>
+            <if test="shiftName != null and shiftName != ''">shift_name,</if>
+            <if test="startTime != null">start_time,</if>
+            <if test="endTime != null">end_time,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="planId != null">#{planId},</if>
+            <if test="shiftSeq != null">#{shiftSeq},</if>
+            <if test="shiftName != null and shiftName != ''">#{shiftName},</if>
+            <if test="startTime != null">#{startTime},</if>
+            <if test="endTime != null">#{endTime},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>         </trim>
+    </insert>
+
+    <update id="updateCalShift" parameterType="CalShift">
+        update qxx_cal_shift
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="planId != null">plan_id = #{planId},</if>
+            <if test="shiftSeq != null">shift_seq = #{shiftSeq},</if>
+            <if test="shiftName != null and shiftName != ''">shift_name = #{shiftName},</if>
+            <if test="startTime != null">start_time = #{startTime},</if>
+            <if test="endTime != null">end_time = #{endTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where shift_id = #{shiftId}
+    </update>
+
+    <delete id="deleteCalShiftByShiftId" parameterType="Long">
+        delete from qxx_cal_shift where shift_id = #{shiftId}
+    </delete>
+
+    <delete id="deleteCalShiftByShiftIds" >
+        delete from qxx_cal_shift where shift_id in 
+        <foreach item="shiftId" collection="array" open="(" separator="," close=")">
+            #{shiftId}
+        </foreach>
+    </delete>
+</mapper>

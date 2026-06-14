@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.cal.CalTeamMapper">
+    
+    <resultMap type="CalTeam" id="CalTeamResult">
+        <result property="teamId"    column="team_id"    />
+        <result property="factoryId"    column="factory_id"    />
+        <result property="teamCode"    column="team_code"    />
+        <result property="teamName"    column="team_name"    />
+        <result property="teamType"    column="team_type"    />
+        <result property="enableFlag"    column="enable_flag"    />
+        <result property="remark"    column="remark"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectCalTeamVo">
+        select team_id, factory_id, team_code, team_name, team_type, enable_flag, remark, create_by, create_time, update_by, update_time from qxx_cal_team
+    </sql>
+
+    <select id="selectCalTeamList" parameterType="CalTeam" resultMap="CalTeamResult">
+        <include refid="selectCalTeamVo"/>
+        <where>  
+            <if test="factoryId != null "> and factory_id = #{factoryId}</if>
+            <if test="teamCode != null  and teamCode != ''"> and team_code = #{teamCode}</if>
+            <if test="teamName != null  and teamName != ''"> and team_name like concat('%', #{teamName}, '%')</if>
+            <if test="teamType != null  and teamType != ''"> and team_type = #{teamType}</if>
+            <if test="enableFlag != null  and enableFlag != ''"> and enable_flag = #{enableFlag}</if>
+        </where>
+    </select>
+    
+    <select id="selectCalTeamByTeamId" parameterType="Long" resultMap="CalTeamResult">
+        <include refid="selectCalTeamVo"/>
+        where team_id = #{teamId}
+    </select>
+
+    <insert id="insertCalTeam" parameterType="CalTeam" useGeneratedKeys="true" keyProperty="teamId">
+        insert into qxx_cal_team
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="teamCode != null and teamCode != ''">team_code,</if>
+            <if test="teamName != null and teamName != ''">team_name,</if>
+            <if test="teamType != null">team_type,</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="teamCode != null and teamCode != ''">#{teamCode},</if>
+            <if test="teamName != null and teamName != ''">#{teamName},</if>
+            <if test="teamType != null">#{teamType},</if>
+            <if test="enableFlag != null and enableFlag != ''">#{enableFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>         </trim>
+    </insert>
+
+    <update id="updateCalTeam" parameterType="CalTeam">
+        update qxx_cal_team
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="teamCode != null and teamCode != ''">team_code = #{teamCode},</if>
+            <if test="teamName != null and teamName != ''">team_name = #{teamName},</if>
+            <if test="teamType != null">team_type = #{teamType},</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag = #{enableFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where team_id = #{teamId}
+    </update>
+
+    <delete id="deleteCalTeamByTeamId" parameterType="Long">
+        delete from qxx_cal_team where team_id = #{teamId}
+    </delete>
+
+    <delete id="deleteCalTeamByTeamIds" >
+        delete from qxx_cal_team where team_id in 
+        <foreach item="teamId" collection="array" open="(" separator="," close=")">
+            #{teamId}
+        </foreach>
+    </delete>
+</mapper>

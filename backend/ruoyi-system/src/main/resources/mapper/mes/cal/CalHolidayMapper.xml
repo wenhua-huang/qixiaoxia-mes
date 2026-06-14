@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.cal.CalHolidayMapper">
+    
+    <resultMap type="CalHoliday" id="CalHolidayResult">
+        <result property="holidayId"    column="holiday_id"    />
+        <result property="factoryId"    column="factory_id"    />
+        <result property="holidayDate"    column="holiday_date"    />
+        <result property="holidayName"    column="holiday_name"    />
+        <result property="holidayType"    column="holiday_type"    />
+        <result property="enableFlag"    column="enable_flag"    />
+        <result property="remark"    column="remark"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectCalHolidayVo">
+        select holiday_id, factory_id, holiday_date, holiday_name, holiday_type, enable_flag, remark, create_by, create_time, update_by, update_time from qxx_cal_holiday
+    </sql>
+
+    <select id="selectCalHolidayList" parameterType="CalHoliday" resultMap="CalHolidayResult">
+        <include refid="selectCalHolidayVo"/>
+        <where>  
+            <if test="factoryId != null "> and factory_id = #{factoryId}</if>
+            <if test="holidayDate != null "> and holiday_date = #{holidayDate}</if>
+            <if test="holidayName != null  and holidayName != ''"> and holiday_name like concat('%', #{holidayName}, '%')</if>
+            <if test="holidayType != null  and holidayType != ''"> and holiday_type = #{holidayType}</if>
+            <if test="enableFlag != null  and enableFlag != ''"> and enable_flag = #{enableFlag}</if>
+        </where>
+    </select>
+    
+    <select id="selectCalHolidayByHolidayId" parameterType="Long" resultMap="CalHolidayResult">
+        <include refid="selectCalHolidayVo"/>
+        where holiday_id = #{holidayId}
+    </select>
+
+    <insert id="insertCalHoliday" parameterType="CalHoliday" useGeneratedKeys="true" keyProperty="holidayId">
+        insert into qxx_cal_holiday
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="holidayDate != null">holiday_date,</if>
+            <if test="holidayName != null and holidayName != ''">holiday_name,</if>
+            <if test="holidayType != null and holidayType != ''">holiday_type,</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="holidayDate != null">#{holidayDate},</if>
+            <if test="holidayName != null and holidayName != ''">#{holidayName},</if>
+            <if test="holidayType != null and holidayType != ''">#{holidayType},</if>
+            <if test="enableFlag != null and enableFlag != ''">#{enableFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>         </trim>
+    </insert>
+
+    <update id="updateCalHoliday" parameterType="CalHoliday">
+        update qxx_cal_holiday
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="holidayDate != null">holiday_date = #{holidayDate},</if>
+            <if test="holidayName != null and holidayName != ''">holiday_name = #{holidayName},</if>
+            <if test="holidayType != null and holidayType != ''">holiday_type = #{holidayType},</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag = #{enableFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where holiday_id = #{holidayId}
+    </update>
+
+    <delete id="deleteCalHolidayByHolidayId" parameterType="Long">
+        delete from qxx_cal_holiday where holiday_id = #{holidayId}
+    </delete>
+
+    <delete id="deleteCalHolidayByHolidayIds" >
+        delete from qxx_cal_holiday where holiday_id in 
+        <foreach item="holidayId" collection="array" open="(" separator="," close=")">
+            #{holidayId}
+        </foreach>
+    </delete>
+</mapper>

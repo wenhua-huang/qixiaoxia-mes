@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.cal.CalTeamshiftMapper">
+    
+    <resultMap type="CalTeamshift" id="CalTeamshiftResult">
+        <result property="teamshiftId"    column="teamshift_id"    />
+        <result property="factoryId"    column="factory_id"    />
+        <result property="shiftDate"    column="shift_date"    />
+        <result property="teamId"    column="team_id"    />
+        <result property="teamCode"    column="team_code"    />
+        <result property="teamName"    column="team_name"    />
+        <result property="shiftId"    column="shift_id"    />
+        <result property="shiftName"    column="shift_name"    />
+        <result property="planId"    column="plan_id"    />
+        <result property="planCode"    column="plan_code"    />
+        <result property="planName"    column="plan_name"    />
+        <result property="remark"    column="remark"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectCalTeamshiftVo">
+        select teamshift_id, factory_id, shift_date, team_id, team_code, team_name, shift_id, shift_name, plan_id, plan_code, plan_name, remark, create_by, create_time, update_by, update_time from qxx_cal_teamshift
+    </sql>
+
+    <select id="selectCalTeamshiftList" parameterType="CalTeamshift" resultMap="CalTeamshiftResult">
+        <include refid="selectCalTeamshiftVo"/>
+        <where>  
+            <if test="factoryId != null "> and factory_id = #{factoryId}</if>
+            <if test="shiftDate != null "> and shift_date = #{shiftDate}</if>
+            <if test="teamId != null "> and team_id = #{teamId}</if>
+            <if test="teamCode != null  and teamCode != ''"> and team_code = #{teamCode}</if>
+            <if test="teamName != null  and teamName != ''"> and team_name like concat('%', #{teamName}, '%')</if>
+            <if test="shiftId != null "> and shift_id = #{shiftId}</if>
+            <if test="shiftName != null  and shiftName != ''"> and shift_name like concat('%', #{shiftName}, '%')</if>
+            <if test="planId != null "> and plan_id = #{planId}</if>
+            <if test="planCode != null  and planCode != ''"> and plan_code = #{planCode}</if>
+            <if test="planName != null  and planName != ''"> and plan_name like concat('%', #{planName}, '%')</if>
+        </where>
+    </select>
+    
+    <select id="selectCalTeamshiftByTeamshiftId" parameterType="Long" resultMap="CalTeamshiftResult">
+        <include refid="selectCalTeamshiftVo"/>
+        where teamshift_id = #{teamshiftId}
+    </select>
+
+    <insert id="insertCalTeamshift" parameterType="CalTeamshift" useGeneratedKeys="true" keyProperty="teamshiftId">
+        insert into qxx_cal_teamshift
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="shiftDate != null">shift_date,</if>
+            <if test="teamId != null">team_id,</if>
+            <if test="teamCode != null">team_code,</if>
+            <if test="teamName != null">team_name,</if>
+            <if test="shiftId != null">shift_id,</if>
+            <if test="shiftName != null">shift_name,</if>
+            <if test="planId != null">plan_id,</if>
+            <if test="planCode != null">plan_code,</if>
+            <if test="planName != null">plan_name,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="shiftDate != null">#{shiftDate},</if>
+            <if test="teamId != null">#{teamId},</if>
+            <if test="teamCode != null">#{teamCode},</if>
+            <if test="teamName != null">#{teamName},</if>
+            <if test="shiftId != null">#{shiftId},</if>
+            <if test="shiftName != null">#{shiftName},</if>
+            <if test="planId != null">#{planId},</if>
+            <if test="planCode != null">#{planCode},</if>
+            <if test="planName != null">#{planName},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>         </trim>
+    </insert>
+
+    <update id="updateCalTeamshift" parameterType="CalTeamshift">
+        update qxx_cal_teamshift
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="shiftDate != null">shift_date = #{shiftDate},</if>
+            <if test="teamId != null">team_id = #{teamId},</if>
+            <if test="teamCode != null">team_code = #{teamCode},</if>
+            <if test="teamName != null">team_name = #{teamName},</if>
+            <if test="shiftId != null">shift_id = #{shiftId},</if>
+            <if test="shiftName != null">shift_name = #{shiftName},</if>
+            <if test="planId != null">plan_id = #{planId},</if>
+            <if test="planCode != null">plan_code = #{planCode},</if>
+            <if test="planName != null">plan_name = #{planName},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where teamshift_id = #{teamshiftId}
+    </update>
+
+    <delete id="deleteCalTeamshiftByTeamshiftId" parameterType="Long">
+        delete from qxx_cal_teamshift where teamshift_id = #{teamshiftId}
+    </delete>
+
+    <delete id="deleteCalTeamshiftByTeamshiftIds" >
+        delete from qxx_cal_teamshift where teamshift_id in 
+        <foreach item="teamshiftId" collection="array" open="(" separator="," close=")">
+            #{teamshiftId}
+        </foreach>
+    </delete>
+</mapper>

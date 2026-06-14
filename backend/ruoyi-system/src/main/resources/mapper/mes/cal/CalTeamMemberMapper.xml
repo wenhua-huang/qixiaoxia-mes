@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.cal.CalTeamMemberMapper">
+    
+    <resultMap type="CalTeamMember" id="CalTeamMemberResult">
+        <result property="memberId"    column="member_id"    />
+        <result property="factoryId"    column="factory_id"    />
+        <result property="teamId"    column="team_id"    />
+        <result property="teamCode"    column="team_code"    />
+        <result property="teamName"    column="team_name"    />
+        <result property="userId"    column="user_id"    />
+        <result property="userName"    column="user_name"    />
+        <result property="phone"    column="phone"    />
+        <result property="remark"    column="remark"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectCalTeamMemberVo">
+        select member_id, factory_id, team_id, team_code, team_name, user_id, user_name, phone, remark, create_by, create_time, update_by, update_time from qxx_cal_team_member
+    </sql>
+
+    <select id="selectCalTeamMemberList" parameterType="CalTeamMember" resultMap="CalTeamMemberResult">
+        <include refid="selectCalTeamMemberVo"/>
+        <where>  
+            <if test="factoryId != null "> and factory_id = #{factoryId}</if>
+            <if test="teamId != null "> and team_id = #{teamId}</if>
+            <if test="teamCode != null  and teamCode != ''"> and team_code = #{teamCode}</if>
+            <if test="teamName != null  and teamName != ''"> and team_name like concat('%', #{teamName}, '%')</if>
+            <if test="userId != null "> and user_id = #{userId}</if>
+            <if test="userName != null  and userName != ''"> and user_name like concat('%', #{userName}, '%')</if>
+            <if test="phone != null  and phone != ''"> and phone = #{phone}</if>
+        </where>
+    </select>
+    
+    <select id="selectCalTeamMemberByMemberId" parameterType="Long" resultMap="CalTeamMemberResult">
+        <include refid="selectCalTeamMemberVo"/>
+        where member_id = #{memberId}
+    </select>
+
+    <insert id="insertCalTeamMember" parameterType="CalTeamMember" useGeneratedKeys="true" keyProperty="memberId">
+        insert into qxx_cal_team_member
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="teamId != null">team_id,</if>
+            <if test="teamCode != null">team_code,</if>
+            <if test="teamName != null">team_name,</if>
+            <if test="userId != null">user_id,</if>
+            <if test="userName != null and userName != ''">user_name,</if>
+            <if test="phone != null">phone,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="teamId != null">#{teamId},</if>
+            <if test="teamCode != null">#{teamCode},</if>
+            <if test="teamName != null">#{teamName},</if>
+            <if test="userId != null">#{userId},</if>
+            <if test="userName != null and userName != ''">#{userName},</if>
+            <if test="phone != null">#{phone},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>         </trim>
+    </insert>
+
+    <update id="updateCalTeamMember" parameterType="CalTeamMember">
+        update qxx_cal_team_member
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="teamId != null">team_id = #{teamId},</if>
+            <if test="teamCode != null">team_code = #{teamCode},</if>
+            <if test="teamName != null">team_name = #{teamName},</if>
+            <if test="userId != null">user_id = #{userId},</if>
+            <if test="userName != null and userName != ''">user_name = #{userName},</if>
+            <if test="phone != null">phone = #{phone},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where member_id = #{memberId}
+    </update>
+
+    <delete id="deleteCalTeamMemberByMemberId" parameterType="Long">
+        delete from qxx_cal_team_member where member_id = #{memberId}
+    </delete>
+
+    <delete id="deleteCalTeamMemberByMemberIds" >
+        delete from qxx_cal_team_member where member_id in 
+        <foreach item="memberId" collection="array" open="(" separator="," close=")">
+            #{memberId}
+        </foreach>
+    </delete>
+</mapper>

@@ -1,6 +1,6 @@
 -- 菜单 SQL
 insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, update_by, update_time, remark)
-values('计划班组关联', '3', '1', 'team', 'mes/team/index', 1, 0, 'C', '0', '0', 'mes:cal:plan-team:list', '#', 'admin', sysdate(), '', null, '计划班组关联菜单');
+values('计划班组关联', '3', '1', 'team', 'mes/cal/plan-team/index', 1, 0, 'C', '0', '0', 'mes:cal:plan-team:list', '#', 'admin', sysdate(), '', null, '计划班组关联菜单');
 
 -- 按钮父菜单ID
 SELECT @parentId := LAST_INSERT_ID();

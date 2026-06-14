@@ -1,15 +1,6 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
-      <el-form-item label="工厂ID(关联qxx_md_factory)" prop="factoryId">
-        <el-input
-          v-model="queryParams.factoryId"
-          placeholder="请输入工厂ID(关联qxx_md_factory)"
-          clearable
-          @keyup.enter="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="采购订单编码(唯一)" prop="orderCode">
+    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">      <el-form-item label="订单编码" prop="orderCode">
         <el-input
           v-model="queryParams.orderCode"
           placeholder="请输入采购订单编码(唯一)"
@@ -17,7 +8,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="采购订单名称" prop="orderName">
+      <el-form-item label="订单名称" prop="orderName">
         <el-input
           v-model="queryParams.orderName"
           placeholder="请输入采购订单名称"
@@ -25,7 +16,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="供应商ID(关联qxx_md_vendor,vendor_type=MATERIAL)" prop="vendorId">
+      <el-form-item label="供应商ID" prop="vendorId">
         <el-input
           v-model="queryParams.vendorId"
           placeholder="请输入供应商ID(关联qxx_md_vendor,vendor_type=MATERIAL)"
@@ -57,7 +48,7 @@
           placeholder="请选择下单日期">
         </el-date-picker>
       </el-form-item>
-      <el-form-item label="预计到货日期" prop="expectedDate">
+      <el-form-item label="预计到货" prop="expectedDate">
         <el-date-picker clearable
           v-model="queryParams.expectedDate"
           type="date"
@@ -65,7 +56,7 @@
           placeholder="请选择预计到货日期">
         </el-date-picker>
       </el-form-item>
-      <el-form-item label="采购员(申购人)" prop="purchaser">
+      <el-form-item label="采购员" prop="purchaser">
         <el-input
           v-model="queryParams.purchaser"
           placeholder="请输入采购员(申购人)"
@@ -81,7 +72,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="采购总数量(主单位)" prop="totalQuantity">
+      <el-form-item label="采购数量" prop="totalQuantity">
         <el-input
           v-model="queryParams.totalQuantity"
           placeholder="请输入采购总数量(主单位)"
@@ -89,7 +80,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="采购总金额(元)" prop="totalAmount">
+      <el-form-item label="采购金额" prop="totalAmount">
         <el-input
           v-model="queryParams.totalAmount"
           placeholder="请输入采购总金额(元)"
@@ -97,7 +88,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="币种:CNY-人民币,USD-美元" prop="currency">
+      <el-form-item label="币种" prop="currency">
         <el-input
           v-model="queryParams.currency"
           placeholder="请输入币种:CNY-人民币,USD-美元"
@@ -105,7 +96,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="关联客户订单号(如PO#ORD66003MT)" prop="sourceOrderCode">
+      <el-form-item label="关联客户订单" prop="sourceOrderCode">
         <el-input
           v-model="queryParams.sourceOrderCode"
           placeholder="请输入关联客户订单号(如PO#ORD66003MT)"
@@ -167,31 +158,37 @@
 
     <el-table v-loading="loading" :data="orderList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="采购订单ID" align="center" prop="orderId" />
-      <el-table-column label="工厂ID(关联qxx_md_factory)" align="center" prop="factoryId" />
-      <el-table-column label="采购订单编码(唯一)" align="center" prop="orderCode" />
-      <el-table-column label="采购订单名称" align="center" prop="orderName" />
-      <el-table-column label="供应商ID(关联qxx_md_vendor,vendor_type=MATERIAL)" align="center" prop="vendorId" />
-      <el-table-column label="供应商编码" align="center" prop="vendorCode" />
+      <el-table-column label="ID" align="center" prop="orderId" />      <el-table-column label="订单编码" align="center" prop="orderCode" />
+      <el-table-column label="订单名称" align="center" prop="orderName" />
+      
+      
       <el-table-column label="供应商名称" align="center" prop="vendorName" />
-      <el-table-column label="采购类型:PAPER-纸张,AUX-辅料(绳子/胶水/油墨),PACK-包材(纸箱),OTHER-其他" align="center" prop="purchaseType" />
+      <el-table-column label="采购类型" align="center" prop="purchaseType" width="100">
+          <template #default="scope">
+            <span>{{ purchaseTypeMap[scope.row.purchaseType] || scope.row.purchaseType }}</span>
+          </template>
+        </el-table-column>
       <el-table-column label="下单日期" align="center" prop="orderDate" width="180">
         <template #default="scope">
           <span>{{ parseTime(scope.row.orderDate, '{y}-{m}-{d}') }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="预计到货日期" align="center" prop="expectedDate" width="180">
+      <el-table-column label="预计到货" align="center" prop="expectedDate" width="180">
         <template #default="scope">
           <span>{{ parseTime(scope.row.expectedDate, '{y}-{m}-{d}') }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="采购员(申购人)" align="center" prop="purchaser" />
+      <el-table-column label="采购员" align="center" prop="purchaser" />
       <el-table-column label="审批人" align="center" prop="approver" />
-      <el-table-column label="采购总数量(主单位)" align="center" prop="totalQuantity" />
-      <el-table-column label="采购总金额(元)" align="center" prop="totalAmount" />
-      <el-table-column label="币种:CNY-人民币,USD-美元" align="center" prop="currency" />
-      <el-table-column label="关联客户订单号(如PO#ORD66003MT)" align="center" prop="sourceOrderCode" />
-      <el-table-column label="状态:DRAFT-草稿,APPROVED-已审批,ORDERED-已下单,RECEIVING-收货中,RECEIVED-已收货,CLOSED-已关闭,CANCEL-已取消" align="center" prop="status" />
+      <el-table-column label="采购数量" align="center" prop="totalQuantity" />
+      <el-table-column label="采购金额" align="center" prop="totalAmount" />
+      <el-table-column label="币种" align="center" prop="currency" />
+      <el-table-column label="关联客户订单" align="center" prop="sourceOrderCode" />
+      <el-table-column label="状态" align="center" prop="status" width="90">
+          <template #default="scope">
+            <span>{{ statusMap[scope.row.status] || scope.row.status }}</span>
+          </template>
+        </el-table-column>
       <el-table-column label="备注" align="center" prop="remark" />
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
         <template #default="scope">
@@ -225,23 +222,19 @@
     <el-dialog :title="title" v-model="open" width="500px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="100px">
         <el-row>
+          <el-col :span="24">          </el-col>
           <el-col :span="24">
-            <el-form-item label="工厂ID(关联qxx_md_factory)" prop="factoryId">
-              <el-input v-model="form.factoryId" placeholder="请输入工厂ID(关联qxx_md_factory)" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="24">
-            <el-form-item label="采购订单编码(唯一)" prop="orderCode">
+            <el-form-item label="订单编码" prop="orderCode">
               <el-input v-model="form.orderCode" placeholder="请输入采购订单编码(唯一)" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="采购订单名称" prop="orderName">
+            <el-form-item label="订单名称" prop="orderName">
               <el-input v-model="form.orderName" placeholder="请输入采购订单名称" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="供应商ID(关联qxx_md_vendor,vendor_type=MATERIAL)" prop="vendorId">
+            <el-form-item label="供应商ID" prop="vendorId">
               <el-input v-model="form.vendorId" placeholder="请输入供应商ID(关联qxx_md_vendor,vendor_type=MATERIAL)" />
             </el-form-item>
           </el-col>
@@ -266,7 +259,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="预计到货日期" prop="expectedDate">
+            <el-form-item label="预计到货" prop="expectedDate">
               <el-date-picker clearable
                 v-model="form.expectedDate"
                 type="date"
@@ -276,7 +269,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="采购员(申购人)" prop="purchaser">
+            <el-form-item label="采购员" prop="purchaser">
               <el-input v-model="form.purchaser" placeholder="请输入采购员(申购人)" />
             </el-form-item>
           </el-col>
@@ -286,22 +279,22 @@
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="采购总数量(主单位)" prop="totalQuantity">
+            <el-form-item label="采购数量" prop="totalQuantity">
               <el-input v-model="form.totalQuantity" placeholder="请输入采购总数量(主单位)" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="采购总金额(元)" prop="totalAmount">
+            <el-form-item label="采购金额" prop="totalAmount">
               <el-input v-model="form.totalAmount" placeholder="请输入采购总金额(元)" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="币种:CNY-人民币,USD-美元" prop="currency">
+            <el-form-item label="币种" prop="currency">
               <el-input v-model="form.currency" placeholder="请输入币种:CNY-人民币,USD-美元" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="关联客户订单号(如PO#ORD66003MT)" prop="sourceOrderCode">
+            <el-form-item label="关联客户订单" prop="sourceOrderCode">
               <el-input v-model="form.sourceOrderCode" placeholder="请输入关联客户订单号(如PO#ORD66003MT)" />
             </el-form-item>
           </el-col>
@@ -348,9 +341,7 @@ export default {
       // 查询参数
       queryParams: {
         pageNum: 1,
-        pageSize: 10,
-        factoryId: null,
-        orderCode: null,
+        pageSize: 10,        orderCode: null,
         orderName: null,
         vendorId: null,
         vendorCode: null,
@@ -369,11 +360,7 @@ export default {
       // 表单参数
       form: {},
       // 表单校验
-      rules: {
-        factoryId: [
-          { required: true, message: "工厂ID(关联qxx_md_factory)不能为空", trigger: "blur" }
-        ],
-        orderCode: [
+      rules: {        orderCode: [
           { required: true, message: "采购订单编码(唯一)不能为空", trigger: "blur" }
         ],
         vendorId: [
@@ -403,9 +390,7 @@ export default {
     // 表单重置
     reset() {
       this.form = {
-        orderId: null,
-        factoryId: null,
-        orderCode: null,
+        orderId: null,        orderCode: null,
         orderName: null,
         vendorId: null,
         vendorCode: null,

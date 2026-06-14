@@ -1,7 +1,7 @@
 <template>
   <div class="app-container">
     <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
-      <el-form-item label="工厂ID(关联qxx_md_factory)" prop="factoryId">
+      <el-form-item label="工厂" prop="factoryId">
         <el-input
           v-model="queryParams.factoryId"
           placeholder="请输入工厂ID(关联qxx_md_factory)"
@@ -112,7 +112,7 @@
     <el-table v-loading="loading" :data="memberList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="成员关联ID" align="center" prop="memberId" />
-      <el-table-column label="工厂ID(关联qxx_md_factory)" align="center" prop="factoryId" />
+      <el-table-column label="工厂" align="center" prop="factoryId" />
       <el-table-column label="班组ID(关联qxx_cal_team)" align="center" prop="teamId" />
       <el-table-column label="班组编码" align="center" prop="teamCode" />
       <el-table-column label="班组名称" align="center" prop="teamName" />
@@ -153,7 +153,7 @@
       <el-form ref="form" :model="form" :rules="rules" label-width="100px">
         <el-row>
           <el-col :span="24">
-            <el-form-item label="工厂ID(关联qxx_md_factory)" prop="factoryId">
+            <el-form-item label="工厂" prop="factoryId">
               <el-input v-model="form.factoryId" placeholder="请输入工厂ID(关联qxx_md_factory)" />
             </el-form-item>
           </el-col>

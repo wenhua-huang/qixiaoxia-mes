@@ -1,7 +1,7 @@
 <template>
   <div class="app-container">
     <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
-      <el-form-item label="工厂ID(关联qxx_md_factory)" prop="factoryId">
+      <el-form-item label="工厂" prop="factoryId">
         <el-input
           v-model="queryParams.factoryId"
           placeholder="请输入工厂ID(关联qxx_md_factory)"
@@ -25,7 +25,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="是否启用(1-是,0-否)" prop="enableFlag">
+      <el-form-item label="启用" prop="enableFlag">
         <el-input
           v-model="queryParams.enableFlag"
           placeholder="请输入是否启用(1-是,0-否)"
@@ -88,7 +88,7 @@
     <el-table v-loading="loading" :data="holidayList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="节假日设置ID" align="center" prop="holidayId" />
-      <el-table-column label="工厂ID(关联qxx_md_factory)" align="center" prop="factoryId" />
+      <el-table-column label="工厂" align="center" prop="factoryId" />
       <el-table-column label="日期" align="center" prop="holidayDate" width="180">
         <template #default="scope">
           <span>{{ parseTime(scope.row.holidayDate, '{y}-{m}-{d}') }}</span>
@@ -96,7 +96,7 @@
       </el-table-column>
       <el-table-column label="节假日名称" align="center" prop="holidayName" />
       <el-table-column label="类型:HOLIDAY-节假日,WORKDAY-调休工作日" align="center" prop="holidayType" />
-      <el-table-column label="是否启用(1-是,0-否)" align="center" prop="enableFlag" />
+      <el-table-column label="启用" align="center" prop="enableFlag" />
       <el-table-column label="备注" align="center" prop="remark" />
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
         <template #default="scope">
@@ -131,7 +131,7 @@
       <el-form ref="form" :model="form" :rules="rules" label-width="100px">
         <el-row>
           <el-col :span="24">
-            <el-form-item label="工厂ID(关联qxx_md_factory)" prop="factoryId">
+            <el-form-item label="工厂" prop="factoryId">
               <el-input v-model="form.factoryId" placeholder="请输入工厂ID(关联qxx_md_factory)" />
             </el-form-item>
           </el-col>
@@ -151,7 +151,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="是否启用(1-是,0-否)" prop="enableFlag">
+            <el-form-item label="启用" prop="enableFlag">
               <el-input v-model="form.enableFlag" placeholder="请输入是否启用(1-是,0-否)" />
             </el-form-item>
           </el-col>

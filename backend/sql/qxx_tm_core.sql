@@ -20,6 +20,7 @@ create table qxx_tm_tool_type (
   factory_id          bigint(20)      not null                   comment '工厂ID',
   tool_type_code      varchar(64)     not null                   comment '类型编码(唯一)',
   tool_type_name      varchar(255)    not null                   comment '类型名称',
+  need_code_flag      char(1)         default '1'                 comment '是否需要编码(1-是,0-否)',
   mainten_type        varchar(20)     default null               comment '保养类型: DAY-每天, WEEK-每周, MONTH-每月, QUARTER-每季, HALFYEAR-每半年, YEAR-每年',
   mainten_cycle       int(11)         default 0                  comment '保养周期(与保养类型配合, 如: MONTH+3=每3个月保养一次)',
   enable_flag         char(1)         default '1' not null       comment '是否启用(1-是, 0-否)',

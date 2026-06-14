@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.tm.TmToolMapper">
+    
+    <resultMap type="TmTool" id="TmToolResult">
+        <result property="toolId"    column="tool_id"    />
+        <result property="factoryId"    column="factory_id"    />
+        <result property="toolCode"    column="tool_code"    />
+        <result property="toolName"    column="tool_name"    />
+        <result property="brand"    column="brand"    />
+        <result property="spec"    column="spec"    />
+        <result property="toolTypeId"    column="tool_type_id"    />
+        <result property="toolTypeCode"    column="tool_type_code"    />
+        <result property="toolTypeName"    column="tool_type_name"    />
+        <result property="quantity"    column="quantity"    />
+        <result property="availableQuantity"    column="available_quantity"    />
+        <result property="maintenType"    column="mainten_type"    />
+        <result property="nextMaintenDate"    column="next_mainten_date"    />
+        <result property="status"    column="status"    />
+        <result property="enableFlag"    column="enable_flag"    />
+        <result property="remark"    column="remark"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectTmToolVo">
+        select tool_id, factory_id, tool_code, tool_name, brand, spec, tool_type_id, tool_type_code, tool_type_name, quantity, available_quantity, mainten_type, next_mainten_date, status, enable_flag, remark, create_by, create_time, update_by, update_time from qxx_tm_tool
+    </sql>
+
+    <select id="selectTmToolList" parameterType="TmTool" resultMap="TmToolResult">
+        <include refid="selectTmToolVo"/>
+        <where>  
+            <if test="factoryId != null "> and factory_id = #{factoryId}</if>
+            <if test="toolCode != null  and toolCode != ''"> and tool_code = #{toolCode}</if>
+            <if test="toolName != null  and toolName != ''"> and tool_name like concat('%', #{toolName}, '%')</if>
+            <if test="brand != null  and brand != ''"> and brand = #{brand}</if>
+            <if test="spec != null  and spec != ''"> and spec = #{spec}</if>
+            <if test="toolTypeId != null "> and tool_type_id = #{toolTypeId}</if>
+            <if test="toolTypeCode != null  and toolTypeCode != ''"> and tool_type_code = #{toolTypeCode}</if>
+            <if test="toolTypeName != null  and toolTypeName != ''"> and tool_type_name like concat('%', #{toolTypeName}, '%')</if>
+            <if test="quantity != null "> and quantity = #{quantity}</if>
+            <if test="availableQuantity != null "> and available_quantity = #{availableQuantity}</if>
+            <if test="maintenType != null  and maintenType != ''"> and mainten_type = #{maintenType}</if>
+            <if test="nextMaintenDate != null "> and next_mainten_date = #{nextMaintenDate}</if>
+            <if test="status != null  and status != ''"> and status = #{status}</if>
+            <if test="enableFlag != null  and enableFlag != ''"> and enable_flag = #{enableFlag}</if>
+        </where>
+    </select>
+    
+    <select id="selectTmToolByToolId" parameterType="Long" resultMap="TmToolResult">
+        <include refid="selectTmToolVo"/>
+        where tool_id = #{toolId}
+    </select>
+
+    <insert id="insertTmTool" parameterType="TmTool" useGeneratedKeys="true" keyProperty="toolId">
+        insert into qxx_tm_tool
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="toolCode != null and toolCode != ''">tool_code,</if>
+            <if test="toolName != null and toolName != ''">tool_name,</if>
+            <if test="brand != null">brand,</if>
+            <if test="spec != null">spec,</if>
+            <if test="toolTypeId != null">tool_type_id,</if>
+            <if test="toolTypeCode != null">tool_type_code,</if>
+            <if test="toolTypeName != null">tool_type_name,</if>
+            <if test="quantity != null">quantity,</if>
+            <if test="availableQuantity != null">available_quantity,</if>
+            <if test="maintenType != null">mainten_type,</if>
+            <if test="nextMaintenDate != null">next_mainten_date,</if>
+            <if test="status != null and status != ''">status,</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="toolCode != null and toolCode != ''">#{toolCode},</if>
+            <if test="toolName != null and toolName != ''">#{toolName},</if>
+            <if test="brand != null">#{brand},</if>
+            <if test="spec != null">#{spec},</if>
+            <if test="toolTypeId != null">#{toolTypeId},</if>
+            <if test="toolTypeCode != null">#{toolTypeCode},</if>
+            <if test="toolTypeName != null">#{toolTypeName},</if>
+            <if test="quantity != null">#{quantity},</if>
+            <if test="availableQuantity != null">#{availableQuantity},</if>
+            <if test="maintenType != null">#{maintenType},</if>
+            <if test="nextMaintenDate != null">#{nextMaintenDate},</if>
+            <if test="status != null and status != ''">#{status},</if>
+            <if test="enableFlag != null and enableFlag != ''">#{enableFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>         </trim>
+    </insert>
+
+    <update id="updateTmTool" parameterType="TmTool">
+        update qxx_tm_tool
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="toolCode != null and toolCode != ''">tool_code = #{toolCode},</if>
+            <if test="toolName != null and toolName != ''">tool_name = #{toolName},</if>
+            <if test="brand != null">brand = #{brand},</if>
+            <if test="spec != null">spec = #{spec},</if>
+            <if test="toolTypeId != null">tool_type_id = #{toolTypeId},</if>
+            <if test="toolTypeCode != null">tool_type_code = #{toolTypeCode},</if>
+            <if test="toolTypeName != null">tool_type_name = #{toolTypeName},</if>
+            <if test="quantity != null">quantity = #{quantity},</if>
+            <if test="availableQuantity != null">available_quantity = #{availableQuantity},</if>
+            <if test="maintenType != null">mainten_type = #{maintenType},</if>
+            <if test="nextMaintenDate != null">next_mainten_date = #{nextMaintenDate},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag = #{enableFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where tool_id = #{toolId}
+    </update>
+
+    <delete id="deleteTmToolByToolId" parameterType="Long">
+        delete from qxx_tm_tool where tool_id = #{toolId}
+    </delete>
+
+    <delete id="deleteTmToolByToolIds" >
+        delete from qxx_tm_tool where tool_id in 
+        <foreach item="toolId" collection="array" open="(" separator="," close=")">
+            #{toolId}
+        </foreach>
+    </delete>
+</mapper>

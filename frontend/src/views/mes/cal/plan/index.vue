@@ -1,7 +1,7 @@
 <template>
   <div class="app-container">
     <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
-      <el-form-item label="工厂ID(关联qxx_md_factory)" prop="factoryId">
+      <el-form-item label="工厂" prop="factoryId">
         <el-input
           v-model="queryParams.factoryId"
           placeholder="请输入工厂ID(关联qxx_md_factory)"
@@ -41,7 +41,7 @@
           placeholder="请选择排班结束日期">
         </el-date-picker>
       </el-form-item>
-      <el-form-item label="是否启用(1-是,0-否)" prop="enableFlag">
+      <el-form-item label="启用" prop="enableFlag">
         <el-input
           v-model="queryParams.enableFlag"
           placeholder="请输入是否启用(1-是,0-否)"
@@ -104,7 +104,7 @@
     <el-table v-loading="loading" :data="planList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="排班计划ID" align="center" prop="planId" />
-      <el-table-column label="工厂ID(关联qxx_md_factory)" align="center" prop="factoryId" />
+      <el-table-column label="工厂" align="center" prop="factoryId" />
       <el-table-column label="排班计划编码(唯一)" align="center" prop="planCode" />
       <el-table-column label="排班计划名称" align="center" prop="planName" />
       <el-table-column label="日历类型:WEEKLY-周历,MONTHLY-月历,QUARTERLY-季历,YEARLY-年历,CUSTOM-自定义" align="center" prop="calendarType" />
@@ -120,7 +120,7 @@
       </el-table-column>
       <el-table-column label="班次类型:TWOSHIFT-两班倒,THREESHIFT-三班倒,DAYONLY-常白班,CUSTOM-自定义" align="center" prop="shiftType" />
       <el-table-column label="计划状态:DRAFT-草稿,ACTIVE-生效中,CLOSED-已关闭" align="center" prop="status" />
-      <el-table-column label="是否启用(1-是,0-否)" align="center" prop="enableFlag" />
+      <el-table-column label="启用" align="center" prop="enableFlag" />
       <el-table-column label="备注" align="center" prop="remark" />
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
         <template #default="scope">
@@ -155,7 +155,7 @@
       <el-form ref="form" :model="form" :rules="rules" label-width="100px">
         <el-row>
           <el-col :span="24">
-            <el-form-item label="工厂ID(关联qxx_md_factory)" prop="factoryId">
+            <el-form-item label="工厂" prop="factoryId">
               <el-input v-model="form.factoryId" placeholder="请输入工厂ID(关联qxx_md_factory)" />
             </el-form-item>
           </el-col>
@@ -190,7 +190,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="是否启用(1-是,0-否)" prop="enableFlag">
+            <el-form-item label="启用" prop="enableFlag">
               <el-input v-model="form.enableFlag" placeholder="请输入是否启用(1-是,0-否)" />
             </el-form-item>
           </el-col>

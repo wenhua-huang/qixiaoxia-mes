@@ -161,20 +161,8 @@
       <el-table-column label="备注" align="center" prop="remark" />
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
         <template #default="scope">
-          <el-button
-            size="small"
-            type="text"
-            
-            @click="handleUpdate(scope.row)"
-            v-hasPermi="['mes:pur:order:edit']"
-          >修改</el-button>
-          <el-button
-            size="small"
-            type="text"
-            
-            @click="handleDelete(scope.row)"
-            v-hasPermi="['mes:pur:order:remove']"
-          >删除</el-button>
+          <el-button link type="primary" size="small" @click="handleUpdate(scope.row)" v-hasPermi="['mes:pur:order:edit']">修改</el-button>
+          <el-button link type="danger" size="small" @click="handleDelete(scope.row)" v-hasPermi="['mes:pur:order:remove']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>

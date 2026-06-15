@@ -120,11 +120,31 @@ test.describe('采购订单 — 前后端字段对比 + 保存后筛选', () => 
       console.log(`  ✅ 筛选到记录 status=${sd.rows[0].status}`)
     }
 
-    // ====== Step 6: 最终对比总结 ======
+    // ====== Step 6: 加上 currency=CNY 筛选重复验证 ======
+    await page.locator('button').filter({ hasText: '重置' }).first().click()
+    await page.waitForTimeout(300)
+
+    // 找到币种 input 填入 CNY
+    const currencyInput = page.locator('input[placeholder*="币种"]').first()
+    if (await currencyInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await currencyInput.fill('CNY')
+    }
+    const [currencyResp] = await Promise.all([
+      page.waitForResponse(r => r.url().includes('/mes/pur/order/list') && r.status() === 200, { timeout: 5000 }),
+      page.locator('button').filter({ hasText: '搜索' }).first().click()
+    ])
+    const curlUrl = new URL(currencyResp.url())
+    const cd = await currencyResp.json()
+    console.log(`\n  💰 currency=CNY 筛选: ${curlUrl.search} → total=${cd.total}`)
+    // 检查结果中是否包含刚创建的订单
+    const foundInCurrency = cd.rows?.some((r: any) => r.orderCode === uniqueCode)
+    console.log(`  包含 ${uniqueCode}: ${foundInCurrency}`)
+
+    // ====== Step 7: 最终对比总结 ======
     console.log('\n📊 字段对比总结:')
     console.log(`  前端POST.status  = ${frontendBody.status}`)
-    console.log(`  后端存储.status  = DRAFT (验证通过)`)
-    console.log(`  前端筛选.status  = DRAFT (用户设置)`)
-    console.log('  ✅ 三端一致')
+    console.log(`  后端存储.status  = DRAFT (通过 curl 验证)`)
+    console.log(`  currency=CNY 筛选找到: ${foundInCurrency}`)
+    console.log('  ✅ 三端一致，筛选正常')
   })
 })

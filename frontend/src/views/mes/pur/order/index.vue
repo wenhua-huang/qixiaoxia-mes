@@ -357,8 +357,6 @@ export default {
         orderName: null,
         vendorId: null,
         vendorCode: null,
-        vendorId: null,
-        vendorCode: null,
         vendorName: null,
         purchaseType: null,
         status: "DRAFT",
@@ -369,17 +367,11 @@ export default {
         approver: null,
         totalQuantity: null,
         totalAmount: null,
-        currency: null,
         sourceOrderCode: null,
-        status: null,
+        status: "DRAFT",
       },
       // 表单参数
-      form: {
-        orderDate: new Date().toISOString().slice(0,10),
-        expectedDate: null,
-        vendorId: null,
-        vendorCode: null,
-        vendorName: null,},
+      form: {},
       // 自动生成开关
       autoGenFlag: true,
       // 表单校验
@@ -416,8 +408,6 @@ export default {
         orderName: null,
         vendorId: null,
         vendorCode: null,
-        vendorId: null,
-        vendorCode: null,
         vendorName: null,
         purchaseType: null,
         status: "DRAFT",
@@ -428,9 +418,8 @@ export default {
         approver: null,
         totalQuantity: null,
         totalAmount: null,
-        currency: null,
         sourceOrderCode: null,
-        status: null,
+        status: "DRAFT",
         remark: null,
         createBy: null,
         createTime: null,
@@ -476,6 +465,12 @@ export default {
     handleAdd() {
       this.reset()
       this.autoGenFlag = true
+      // 确保日期为字符串（防止 data()/el-date-picker 序列化异常）
+      const today = new Date()
+      const y = today.getFullYear()
+      const m = String(today.getMonth() + 1).padStart(2, '0')
+      const d = String(today.getDate()).padStart(2, '0')
+      this.form.orderDate = y + '-' + m + '-' + d
       // 触发编码预览
       this.handleAutoGenChange(true)
       this.open = true

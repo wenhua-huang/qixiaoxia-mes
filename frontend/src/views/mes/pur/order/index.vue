@@ -459,8 +459,8 @@ export default {
             })
           } else {
             addOrder(this.form).then(response => {
-              this.$modal.msgSuccess("新增成功")
-              this.open = false
+              this.$modal.msgSuccess("新增成功，请添加订单行")
+              this.form.orderId = response.data.orderId || response.orderId
               this.getList()
             })
           }

@@ -105,8 +105,8 @@
         />
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
+        <el-button type="primary"  size="small" @click="handleQuery">搜索</el-button>
+        <el-button  size="small" @click="resetQuery">重置</el-button>
       </el-form-item>
     </el-form>
 
@@ -115,8 +115,8 @@
         <el-button
           type="primary"
           plain
-          icon="el-icon-plus"
-          size="mini"
+          
+          size="small"
           @click="handleAdd"
           v-hasPermi="['mes:pur:order:add']"
         >新增</el-button>
@@ -125,8 +125,8 @@
         <el-button
           type="success"
           plain
-          icon="el-icon-edit"
-          size="mini"
+          
+          size="small"
           :disabled="single"
           @click="handleUpdate"
           v-hasPermi="['mes:pur:order:edit']"
@@ -136,8 +136,8 @@
         <el-button
           type="danger"
           plain
-          icon="el-icon-delete"
-          size="mini"
+          
+          size="small"
           :disabled="multiple"
           @click="handleDelete"
           v-hasPermi="['mes:pur:order:remove']"
@@ -147,8 +147,8 @@
         <el-button
           type="warning"
           plain
-          icon="el-icon-download"
-          size="mini"
+          
+          size="small"
           @click="handleExport"
           v-hasPermi="['mes:pur:order:export']"
         >导出</el-button>
@@ -193,16 +193,16 @@
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button
-            size="mini"
+            size="small"
             type="text"
-            icon="el-icon-edit"
+            
             @click="handleUpdate(scope.row)"
             v-hasPermi="['mes:pur:order:edit']"
           >修改</el-button>
           <el-button
-            size="mini"
+            size="small"
             type="text"
-            icon="el-icon-delete"
+            
             @click="handleDelete(scope.row)"
             v-hasPermi="['mes:pur:order:remove']"
           >删除</el-button>
@@ -333,6 +333,8 @@ export default {
   components: { VendorSelect },
   data() {
     return {
+      purchaseTypeMap: { PAPER: "纸张", AUX: "辅料", PACK: "包材", OTHER: "其他" },
+      statusMap: { DRAFT: "草稿", APPROVED: "已审批", ORDERED: "已下单", RECEIVING: "收货中", RECEIVED: "已收货", CLOSED: "已关闭", CANCEL: "已取消" },
       // 遮罩层
       loading: true,
       // 选中数组

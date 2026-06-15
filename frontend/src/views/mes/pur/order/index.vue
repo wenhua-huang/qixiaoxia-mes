@@ -260,14 +260,14 @@
           </el-col>
           <el-col :span="8">
             <el-form-item label="下单日期" prop="orderDate">
-              <el-date-picker v-model="form.orderDate" type="date" placeholder="选择日期" style="width:100%" value-format="yyyy-MM-dd" />
+              <el-input v-model="form.orderDate" type="date" placeholder="yyyy-MM-dd" style="width:100%" />
             </el-form-item>
           </el-col>
         </el-row>
         <el-row>
           <el-col :span="8">
             <el-form-item label="预计到货" prop="expectedDate">
-              <el-date-picker v-model="form.expectedDate" type="date" placeholder="选择日期" style="width:100%" value-format="yyyy-MM-dd" />
+              <el-input v-model="form.expectedDate" type="date" placeholder="yyyy-MM-dd" style="width:100%" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
@@ -363,8 +363,7 @@ export default {
         status: "DRAFT",
         currency: "CNY",
         orderDate: new Date().toISOString().slice(0,10),
-        expectedDate: null,
-        purchaser: null,
+        expectedDate: new Date().toISOString().slice(0,10),
         approver: null,
         totalQuantity: null,
         totalAmount: null,
@@ -414,8 +413,7 @@ export default {
         status: "DRAFT",
         currency: "CNY",
         orderDate: new Date().toISOString().slice(0,10),
-        expectedDate: null,
-        purchaser: null,
+        expectedDate: new Date().toISOString().slice(0,10),
         approver: null,
         totalQuantity: null,
         totalAmount: null,

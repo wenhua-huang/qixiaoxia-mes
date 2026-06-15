@@ -43,7 +43,6 @@
             </el-form-item>
             <ItemSelect ref="itemSelectRef" @onSelected="onItemSelected" />
           </el-col>
-          </el-col>
         </el-row>
         <el-row>
           <el-col :span="12">

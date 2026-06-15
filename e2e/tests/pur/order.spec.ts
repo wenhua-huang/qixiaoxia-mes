@@ -74,7 +74,9 @@ test.describe('采购订单 — 前后端字段对比 + 保存后筛选', () => 
     ])
     const frontendBody = postReq.postDataJSON()
     console.log(`  📤 前端POST status=${frontendBody.status}`)
-    await expect(dialog).not.toBeVisible({ timeout: 10000 })
+    // 新增后弹窗不关（显示订单行编辑区），手动点"关 闭"
+    await page.locator('.el-dialog button').filter({ hasText: '关 闭' }).first().click()
+    await expect(dialog).not.toBeVisible({ timeout: 8000 })
 
     // ====== Step 4: curl 查后端实际存储的 status ======
     const token = await page.evaluate(() => {

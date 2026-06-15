@@ -448,7 +448,7 @@ export default {
     /** 新增按钮操作 */
     handleAutoGenChange(val) {
       if (val) {
-        genSerialCode('PUR_ORDER_CODE').then((r: any) => {
+        genSerialCode('PUR_ORDER_CODE').then(r => {
           this.form.orderCode = r.data
         })
       } else {

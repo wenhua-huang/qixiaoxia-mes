@@ -448,11 +448,9 @@ export default {
     /** 新增按钮操作 */
     handleAutoGenChange(val) {
       if (val) {
-        const now = new Date()
-        const y = now.getFullYear()
-        const m = String(now.getMonth()+1).padStart(2,'0')
-        const d = String(now.getDate()).padStart(2,'0')
-        this.form.orderCode = 'PO' + y + m + d + 'xxx'
+        genSerialCode('PUR_ORDER_CODE').then((r: any) => {
+          this.form.orderCode = r.data
+        })
       } else {
         this.form.orderCode = ''
       }

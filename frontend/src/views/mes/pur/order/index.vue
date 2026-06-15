@@ -40,11 +40,15 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="下单日期" prop="orderDate">
-        <el-input v-model="queryParams.orderDate" type="date" placeholder="yyyy-MM-dd" clearable style="width:100%" />
+      <el-form-item label="下单日期">
+        <el-date-picker v-model="orderDateRange" type="daterange" range-separator="至"
+          start-placeholder="开始" end-placeholder="结束" value-format="YYYY-MM-DD" style="width:100%"
+          @change="onOrderDateRangeChange" />
       </el-form-item>
-      <el-form-item label="预计到货" prop="expectedDate">
-        <el-input v-model="queryParams.expectedDate" type="date" placeholder="yyyy-MM-dd" clearable style="width:100%" />
+      <el-form-item label="预计到货">
+        <el-date-picker v-model="expectedDateRange" type="daterange" range-separator="至"
+          start-placeholder="开始" end-placeholder="结束" value-format="YYYY-MM-DD" style="width:100%"
+          @change="onExpectedDateRangeChange" />
       </el-form-item>
       <el-form-item label="采购员" prop="purchaser">
         <el-input
@@ -327,8 +331,7 @@ export default {
         purchaseType: null,
         status: null,
         currency: null,
-        orderDate: null,
-        expectedDate: null,
+        
         approver: null,
         totalQuantity: null,
         totalAmount: null,
@@ -338,6 +341,8 @@ export default {
       form: {},
       // 自动生成开关
       autoGenFlag: true,
+      orderDateRange: null,
+      expectedDateRange: null,
       // 表单校验
       rules: {        orderCode: [
         ],
@@ -395,6 +400,16 @@ export default {
     handleQuery() {
       this.queryParams.pageNum = 1
       this.getList()
+    },
+    onOrderDateRangeChange(val) {
+      this.queryParams.params = this.queryParams.params || {}
+      this.queryParams.params.beginOrderDate = val?.[0] || null
+      this.queryParams.params.endOrderDate = val?.[1] || null
+    },
+    onExpectedDateRangeChange(val) {
+      this.queryParams.params = this.queryParams.params || {}
+      this.queryParams.params.beginExpectedDate = val?.[0] || null
+      this.queryParams.params.endExpectedDate = val?.[1] || null
     },
     /** 重置按钮操作 */
     resetQuery() {

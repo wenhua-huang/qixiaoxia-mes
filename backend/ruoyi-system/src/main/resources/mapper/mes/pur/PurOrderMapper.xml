@@ -43,8 +43,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="vendorCode != null  and vendorCode != ''"> and vendor_code = #{vendorCode}</if>
             <if test="vendorName != null  and vendorName != ''"> and vendor_name like concat('%', #{vendorName}, '%')</if>
             <if test="purchaseType != null  and purchaseType != ''"> and purchase_type = #{purchaseType}</if>
-            <if test="orderDate != null "> and order_date = #{orderDate}</if>
-            <if test="expectedDate != null "> and expected_date = #{expectedDate}</if>
+            <if test="params.beginOrderDate != null and params.beginOrderDate != ''"> and order_date &gt;= #{params.beginOrderDate}</if>
+            <if test="params.endOrderDate != null and params.endOrderDate != ''"> and order_date &lt;= #{params.endOrderDate}</if>
+            <if test="params.beginExpectedDate != null and params.beginExpectedDate != ''"> and expected_date &gt;= #{params.beginExpectedDate}</if>
+            <if test="params.endExpectedDate != null and params.endExpectedDate != ''"> and expected_date &lt;= #{params.endExpectedDate}</if>
             <if test="purchaser != null  and purchaser != ''"> and purchaser = #{purchaser}</if>
             <if test="approver != null  and approver != ''"> and approver = #{approver}</if>
             <if test="totalQuantity != null "> and total_quantity = #{totalQuantity}</if>

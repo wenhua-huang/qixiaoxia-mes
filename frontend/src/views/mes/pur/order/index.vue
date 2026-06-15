@@ -325,6 +325,7 @@
 
 <script>
 import { listOrder, getOrder, delOrder, addOrder, updateOrder } from "@/api/mes/pur/order"
+import { genSerialCode } from "@/api/mes/sys/autocoderule"
 import VendorSelect from "@/components/vendorSelect/single.vue"
 
 export default {

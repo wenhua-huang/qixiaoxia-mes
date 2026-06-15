@@ -36,14 +36,13 @@
       <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
         <el-row>
           <el-col :span="12">
-            <el-form-item label="物料编码" prop="itemCode">
-              <el-input v-model="form.itemCode" placeholder="物料编码" />
+            <el-form-item label="物料" prop="itemName">
+              <el-input v-model="form.itemName" readonly placeholder="请选择物料">
+                <template #append><el-button @click="handleSelectItem">搜索</el-button></template>
+              </el-input>
             </el-form-item>
+            <ItemSelect ref="itemSelectRef" @onSelected="onItemSelected" />
           </el-col>
-          <el-col :span="12">
-            <el-form-item label="物料名称" prop="itemName">
-              <el-input v-model="form.itemName" placeholder="物料名称" />
-            </el-form-item>
           </el-col>
         </el-row>
         <el-row>
@@ -119,9 +118,11 @@
 
 <script>
 import { listLine, delLine, addLine, updateLine } from "@/api/mes/pur/order-line"
+import ItemSelect from "@/components/itemSelect/single.vue"
 
 export default {
   name: "PurOrderLine",
+  components: { ItemSelect },
   props: { orderId: { type: Number, default: null } },
   data() {
     return {
@@ -130,8 +131,7 @@ export default {
       statusMap: { ORDERED: "已下单", RECEIVING: "收货中", RECEIVED: "已收货", CLOSED: "已关闭" },
       form: {},
       rules: {
-        itemCode: [{ required: true, message: "物料编码不能为空", trigger: "blur" }],
-        itemName: [{ required: true, message: "物料名称不能为空", trigger: "blur" }],
+        itemName: [{ required: true, message: "请选择物料", trigger: "change" }],
         quantityOrdered: [{ required: true, message: "订购数量不能为空", trigger: "blur" }],
         unitName: [{ required: true, message: "单位不能为空", trigger: "blur" }],
       }
@@ -149,6 +149,12 @@ export default {
     },
     reset() { this.form = { itemId: 201, unitOfMeasure: "TON", unitName: "吨", quantityOrdered: 0, unitPrice: 0, amount: 0, taxRate: 0, status: "ORDERED" } },
     handleSelectionChange(s) { this.ids = s.map(i => i.lineId); this.single = s.length !== 1; this.multiple = !s.length },
+    handleSelectItem() { this.$refs.itemSelectRef.open() },
+    onItemSelected(row) {
+      this.form.itemId = row.itemId; this.form.itemCode = row.itemCode || row.itemCode
+      this.form.itemName = row.itemName; this.form.specification = row.specification || row.spec
+      this.form.unitOfMeasure = row.unitOfMeasure || ""; this.form.unitName = row.unitName || ""
+    },
     handleAdd() { this.reset(); this.open = true; this.title = "新增采购订单行" },
     handleUpdate(row) {
       this.reset()

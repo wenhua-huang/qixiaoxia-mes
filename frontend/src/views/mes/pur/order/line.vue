@@ -64,7 +64,15 @@ export default {
     },
     handleSelectionChange(s) { this.ids = s.map(i => i.lineId); this.single = s.length !== 1; this.multiple = !s.length },
     handleAdd() {
-      const line = { orderId: this.orderId, status: "ORDERED", quantityOrdered: 0, unitPrice: 0, amount: 0 }
+      const itemCode = prompt("物料编码", "PAPER-XBZ-A")
+      const itemName = prompt("物料名称", "箱板纸A级")
+      const qty = prompt("订购数量", "1")
+      if (!itemCode || !itemName || !qty) return
+      const line = {
+        orderId: this.orderId, itemId: 201, itemCode, itemName,
+        unitOfMeasure: "TON", unitName: "吨",
+        status: "ORDERED", quantityOrdered: parseFloat(qty), unitPrice: 0, amount: 0
+      }
       addLine(line).then(() => { this.getList(); this.$modal.msgSuccess("新增成功") })
     },
     handleUpdate(row) {

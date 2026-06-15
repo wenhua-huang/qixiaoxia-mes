@@ -271,6 +271,10 @@
           </el-col>
         </el-row>
       </el-form>
+      <template v-if="form.orderId">
+        <el-divider content-position="center">采购订单行</el-divider>
+        <PurOrderLine :orderId="form.orderId" ref="orderLineRef" />
+      </template>
       <template #footer>
         <div class="dialog-footer">
           <el-button type="primary" @click="submitForm">保存单据</el-button>
@@ -285,10 +289,11 @@
 import { listOrder, getOrder, delOrder, addOrder, updateOrder } from "@/api/mes/pur/order"
 import { genSerialCode } from "@/api/mes/sys/autocoderule"
 import VendorSelect from "@/components/vendorSelect/single.vue"
+import PurOrderLine from "./line.vue"
 
 export default {
   name: "Order",
-  components: { VendorSelect },
+  components: { VendorSelect, PurOrderLine },
   data() {
     return {
       purchaseTypeMap: { PAPER: "纸张", AUX: "辅料", PACK: "包材", OTHER: "其他" },

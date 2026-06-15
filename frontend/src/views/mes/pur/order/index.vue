@@ -41,20 +41,10 @@
         />
       </el-form-item>
       <el-form-item label="下单日期" prop="orderDate">
-        <el-date-picker clearable
-          v-model="queryParams.orderDate"
-          type="date"
-          value-format="yyyy-MM-dd"
-          placeholder="请选择下单日期">
-        </el-date-picker>
+        <el-input v-model="queryParams.orderDate" type="date" placeholder="yyyy-MM-dd" clearable style="width:100%" />
       </el-form-item>
       <el-form-item label="预计到货" prop="expectedDate">
-        <el-date-picker clearable
-          v-model="queryParams.expectedDate"
-          type="date"
-          value-format="yyyy-MM-dd"
-          placeholder="请选择预计到货日期">
-        </el-date-picker>
+        <el-input v-model="queryParams.expectedDate" type="date" placeholder="yyyy-MM-dd" clearable style="width:100%" />
       </el-form-item>
       <el-form-item label="采购员" prop="purchaser">
         <el-input
@@ -71,32 +61,7 @@
           clearable
           @keyup.enter="handleQuery"
         />
-      </el-form-item>
-      <el-form-item label="采购数量" prop="totalQuantity">
-        <el-input
-          v-model="queryParams.totalQuantity"
-          placeholder="请输入采购总数量(主单位)"
-          clearable
-          @keyup.enter="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="采购金额" prop="totalAmount">
-        <el-input
-          v-model="queryParams.totalAmount"
-          placeholder="请输入采购总金额(元)"
-          clearable
-          @keyup.enter="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="币种" prop="currency">
-        <el-input
-          v-model="queryParams.currency"
-          placeholder="请输入币种:CNY-人民币,USD-美元"
-          clearable
-          @keyup.enter="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="关联客户订单" prop="sourceOrderCode">
+      </el-form-item>      <el-form-item label="关联客户订单" prop="sourceOrderCode">
         <el-input
           v-model="queryParams.sourceOrderCode"
           placeholder="请输入关联客户订单号(如PO#ORD66003MT)"
@@ -270,14 +235,7 @@
               <el-input v-model="form.expectedDate" type="date" placeholder="yyyy-MM-dd" style="width:100%" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
-            <el-form-item label="币种" prop="currency">
-              <el-select v-model="form.currency" placeholder="请选择" style="width:100%">
-                <el-option label="人民币" value="CNY" />
-                <el-option label="美元" value="USD" />
-              </el-select>
-            </el-form-item>
-          </el-col>
+          <el-col :span="8">          </el-col>
           <el-col :span="8">
             <el-form-item label="状态" prop="status">
               <el-select v-model="form.status" placeholder="请选择" style="width:100%">

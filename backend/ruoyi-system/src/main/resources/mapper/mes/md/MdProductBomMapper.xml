@@ -55,9 +55,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertMdProductBom" parameterType="com.ruoyi.system.domain.mes.md.MdProductBom" useGeneratedKeys="true" keyProperty="bomId">
         insert into qxx_md_product_bom
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="itemId != null">item_id,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="itemId != null">item_id,</if>
             <if test="bomItemId != null">bom_item_id,</if>
             <if test="unitOfMeasure != null">unit_of_measure,</if>
             <if test="quantity != null">quantity,</if>
@@ -69,9 +67,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="itemId != null">#{itemId},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="itemId != null">#{itemId},</if>
             <if test="bomItemId != null">#{bomItemId},</if>
             <if test="unitOfMeasure != null">#{unitOfMeasure},</if>
             <if test="quantity != null">#{quantity},</if>
@@ -87,9 +83,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateMdProductBom" parameterType="com.ruoyi.system.domain.mes.md.MdProductBom">
         update qxx_md_product_bom
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="itemId != null">item_id = #{itemId},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="itemId != null">item_id = #{itemId},</if>
             <if test="bomItemId != null">bom_item_id = #{bomItemId},</if>
             <if test="unitOfMeasure != null">unit_of_measure = #{unitOfMeasure},</if>
             <if test="quantity != null">quantity = #{quantity},</if>

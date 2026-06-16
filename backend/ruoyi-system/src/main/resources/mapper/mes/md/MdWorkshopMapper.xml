@@ -46,9 +46,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertMdWorkshop" parameterType="com.ruoyi.system.domain.mes.md.MdWorkshop" useGeneratedKeys="true" keyProperty="workshopId">
         insert into qxx_md_workshop
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="workshopCode != null and workshopCode != ''">workshop_code,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="workshopCode != null and workshopCode != ''">workshop_code,</if>
             <if test="workshopName != null and workshopName != ''">workshop_name,</if>
             <if test="address != null">address,</if>
             <if test="manager != null">manager,</if>
@@ -59,9 +57,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="workshopCode != null and workshopCode != ''">#{workshopCode},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="workshopCode != null and workshopCode != ''">#{workshopCode},</if>
             <if test="workshopName != null and workshopName != ''">#{workshopName},</if>
             <if test="address != null">#{address},</if>
             <if test="manager != null">#{manager},</if>
@@ -76,9 +72,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateMdWorkshop" parameterType="com.ruoyi.system.domain.mes.md.MdWorkshop">
         update qxx_md_workshop
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="workshopCode != null and workshopCode != ''">workshop_code = #{workshopCode},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="workshopCode != null and workshopCode != ''">workshop_code = #{workshopCode},</if>
             <if test="workshopName != null and workshopName != ''">workshop_name = #{workshopName},</if>
             <if test="address != null">address = #{address},</if>
             <if test="manager != null">manager = #{manager},</if>

@@ -41,9 +41,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertMdWorkstationWorker" parameterType="com.ruoyi.system.domain.mes.md.MdWorkstationWorker" useGeneratedKeys="true" keyProperty="recordId">
         insert into qxx_md_workstation_worker
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="workstationId != null">workstation_id,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="workstationId != null">workstation_id,</if>
             user_id,
             <if test="userName != null">user_name,</if>
             <if test="roleType != null">role_type,</if>
@@ -53,9 +51,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="workstationId != null">#{workstationId},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="workstationId != null">#{workstationId},</if>
             #{userId},
             <if test="userName != null">#{userName},</if>
             <if test="roleType != null">#{roleType},</if>
@@ -69,9 +65,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateMdWorkstationWorker" parameterType="com.ruoyi.system.domain.mes.md.MdWorkstationWorker">
         update qxx_md_workstation_worker
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="workstationId != null">workstation_id = #{workstationId},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="workstationId != null">workstation_id = #{workstationId},</if>
             <if test="userId != null">user_id = #{userId},</if>
             <if test="userName != null">user_name = #{userName},</if>
             <if test="roleType != null">role_type = #{roleType},</if>

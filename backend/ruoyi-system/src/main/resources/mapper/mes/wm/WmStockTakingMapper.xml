@@ -41,9 +41,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectWmStockTakingList" parameterType="WmStockTaking" resultMap="WmStockTakingResult">
         <include refid="selectWmStockTakingVo"/>
-        <where>
-            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
-            <if test="takingCode != null and takingCode != ''"> and taking_code like concat('%', #{takingCode}, '%')</if>
+        <where>            <if test="takingCode != null and takingCode != ''"> and taking_code like concat('%', #{takingCode}, '%')</if>
             <if test="planId != null"> and plan_id = #{planId}</if>
             <if test="planCode != null and planCode != ''"> and plan_code like concat('%', #{planCode}, '%')</if>
             <if test="itemId != null"> and item_id = #{itemId}</if>
@@ -77,9 +75,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertWmStockTaking" parameterType="WmStockTaking" useGeneratedKeys="true" keyProperty="takingId">
         insert into qxx_wm_stock_taking
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="takingCode != null">taking_code,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="takingCode != null">taking_code,</if>
             <if test="planId != null">plan_id,</if>
             <if test="planCode != null">plan_code,</if>
             <if test="itemId != null">item_id,</if>
@@ -106,9 +102,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="takingCode != null">#{takingCode},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="takingCode != null">#{takingCode},</if>
             <if test="planId != null">#{planId},</if>
             <if test="planCode != null">#{planCode},</if>
             <if test="itemId != null">#{itemId},</if>
@@ -139,9 +133,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateWmStockTaking" parameterType="WmStockTaking">
         update qxx_wm_stock_taking
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="takingCode != null">taking_code = #{takingCode},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="takingCode != null">taking_code = #{takingCode},</if>
             <if test="planId != null">plan_id = #{planId},</if>
             <if test="planCode != null">plan_code = #{planCode},</if>
             <if test="itemId != null">item_id = #{itemId},</if>

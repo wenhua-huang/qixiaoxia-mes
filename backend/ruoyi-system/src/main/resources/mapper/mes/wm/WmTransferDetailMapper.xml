@@ -32,9 +32,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectWmTransferDetailList" parameterType="WmTransferDetail" resultMap="WmTransferDetailResult">
         <include refid="selectWmTransferDetailVo"/>
-        <where>
-            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
-            <if test="transferId != null"> and transfer_id = #{transferId}</if>
+        <where>            <if test="transferId != null"> and transfer_id = #{transferId}</if>
             <if test="lineId != null"> and line_id = #{lineId}</if>
             <if test="itemId != null"> and item_id = #{itemId}</if>
             <if test="itemCode != null and itemCode != ''"> and item_code like concat('%', #{itemCode}, '%')</if>
@@ -62,9 +60,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertWmTransferDetail" parameterType="WmTransferDetail" useGeneratedKeys="true" keyProperty="detailId">
         insert into qxx_wm_transfer_detail
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="transferId != null">transfer_id,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="transferId != null">transfer_id,</if>
             <if test="lineId != null">line_id,</if>
             <if test="itemId != null">item_id,</if>
             <if test="itemCode != null">item_code,</if>
@@ -82,9 +78,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="transferId != null">#{transferId},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="transferId != null">#{transferId},</if>
             <if test="lineId != null">#{lineId},</if>
             <if test="itemId != null">#{itemId},</if>
             <if test="itemCode != null">#{itemCode},</if>
@@ -106,9 +100,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateWmTransferDetail" parameterType="WmTransferDetail">
         update qxx_wm_transfer_detail
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="transferId != null">transfer_id = #{transferId},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="transferId != null">transfer_id = #{transferId},</if>
             <if test="lineId != null">line_id = #{lineId},</if>
             <if test="itemId != null">item_id = #{itemId},</if>
             <if test="itemCode != null">item_code = #{itemCode},</if>

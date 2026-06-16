@@ -33,9 +33,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectTmToolList" parameterType="TmTool" resultMap="TmToolResult">
         <include refid="selectTmToolVo"/>
-        <where>  
-            <if test="factoryId != null "> and factory_id = #{factoryId}</if>
-            <if test="toolCode != null  and toolCode != ''"> and tool_code = #{toolCode}</if>
+        <where>            <if test="toolCode != null  and toolCode != ''"> and tool_code = #{toolCode}</if>
             <if test="toolName != null  and toolName != ''"> and tool_name like concat('%', #{toolName}, '%')</if>
             <if test="brand != null  and brand != ''"> and brand = #{brand}</if>
             <if test="spec != null  and spec != ''"> and spec = #{spec}</if>
@@ -58,9 +56,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertTmTool" parameterType="TmTool" useGeneratedKeys="true" keyProperty="toolId">
         insert into qxx_tm_tool
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="toolCode != null and toolCode != ''">tool_code,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="toolCode != null and toolCode != ''">tool_code,</if>
             <if test="toolName != null and toolName != ''">tool_name,</if>
             <if test="brand != null">brand,</if>
             <if test="spec != null">spec,</if>
@@ -79,9 +75,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
          </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="toolCode != null and toolCode != ''">#{toolCode},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="toolCode != null and toolCode != ''">#{toolCode},</if>
             <if test="toolName != null and toolName != ''">#{toolName},</if>
             <if test="brand != null">#{brand},</if>
             <if test="spec != null">#{spec},</if>
@@ -101,9 +95,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateTmTool" parameterType="TmTool">
         update qxx_tm_tool
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="toolCode != null and toolCode != ''">tool_code = #{toolCode},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="toolCode != null and toolCode != ''">tool_code = #{toolCode},</if>
             <if test="toolName != null and toolName != ''">tool_name = #{toolName},</if>
             <if test="brand != null">brand = #{brand},</if>
             <if test="spec != null">spec = #{spec},</if>

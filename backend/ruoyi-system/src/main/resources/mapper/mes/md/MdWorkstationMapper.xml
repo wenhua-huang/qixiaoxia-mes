@@ -54,9 +54,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertMdWorkstation" parameterType="com.ruoyi.system.domain.mes.md.MdWorkstation" useGeneratedKeys="true" keyProperty="workstationId">
         insert into qxx_md_workstation
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="workstationCode != null and workstationCode != ''">workstation_code,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="workstationCode != null and workstationCode != ''">workstation_code,</if>
             <if test="workstationName != null and workstationName != ''">workstation_name,</if>
             <if test="workshopId != null">workshop_id,</if>
             <if test="workstationType != null">workstation_type,</if>
@@ -70,9 +68,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="workstationCode != null and workstationCode != ''">#{workstationCode},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="workstationCode != null and workstationCode != ''">#{workstationCode},</if>
             <if test="workstationName != null and workstationName != ''">#{workstationName},</if>
             <if test="workshopId != null">#{workshopId},</if>
             <if test="workstationType != null">#{workstationType},</if>
@@ -90,9 +86,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateMdWorkstation" parameterType="com.ruoyi.system.domain.mes.md.MdWorkstation">
         update qxx_md_workstation
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="workstationCode != null and workstationCode != ''">workstation_code = #{workstationCode},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="workstationCode != null and workstationCode != ''">workstation_code = #{workstationCode},</if>
             <if test="workstationName != null and workstationName != ''">workstation_name = #{workstationName},</if>
             <if test="workshopId != null">workshop_id = #{workshopId},</if>
             <if test="workstationType != null">workstation_type = #{workstationType},</if>

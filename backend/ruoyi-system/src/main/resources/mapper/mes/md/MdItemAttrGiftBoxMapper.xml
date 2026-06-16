@@ -15,15 +15,11 @@
 
     <insert id="insert" parameterType="com.ruoyi.system.domain.mes.md.MdItemAttrGiftBox" useGeneratedKeys="true" keyProperty="attrId">
         insert into qxx_md_item_attr_gift_box
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="itemId != null">item_id,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="itemId != null">item_id,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="itemId != null">#{itemId},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="itemId != null">#{itemId},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
         </trim>

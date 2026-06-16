@@ -47,9 +47,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertSysMessage" parameterType="com.ruoyi.system.domain.mes.sys.SysMessage" useGeneratedKeys="true" keyProperty="messageId">
         insert into sys_message
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="userId != null">user_id,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="userId != null">user_id,</if>
             <if test="title != null">title,</if>
             <if test="content != null">content,</if>
             <if test="messageType != null">message_type,</if>
@@ -63,9 +61,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="userId != null">#{userId},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="userId != null">#{userId},</if>
             <if test="title != null">#{title},</if>
             <if test="content != null">#{content},</if>
             <if test="messageType != null">#{messageType},</if>

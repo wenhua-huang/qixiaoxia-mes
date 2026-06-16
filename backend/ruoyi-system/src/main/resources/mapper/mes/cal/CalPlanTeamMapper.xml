@@ -26,9 +26,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectCalPlanTeamList" parameterType="CalPlanTeam" resultMap="CalPlanTeamResult">
         <include refid="selectCalPlanTeamVo"/>
-        <where>  
-            <if test="factoryId != null "> and factory_id = #{factoryId}</if>
-            <if test="planId != null "> and plan_id = #{planId}</if>
+        <where>            <if test="planId != null "> and plan_id = #{planId}</if>
             <if test="planCode != null  and planCode != ''"> and plan_code = #{planCode}</if>
             <if test="planName != null  and planName != ''"> and plan_name like concat('%', #{planName}, '%')</if>
             <if test="teamId != null "> and team_id = #{teamId}</if>
@@ -44,9 +42,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertCalPlanTeam" parameterType="CalPlanTeam" useGeneratedKeys="true" keyProperty="recordId">
         insert into qxx_cal_plan_team
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="planId != null">plan_id,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="planId != null">plan_id,</if>
             <if test="planCode != null">plan_code,</if>
             <if test="planName != null">plan_name,</if>
             <if test="teamId != null">team_id,</if>
@@ -58,9 +54,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
          </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="planId != null">#{planId},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="planId != null">#{planId},</if>
             <if test="planCode != null">#{planCode},</if>
             <if test="planName != null">#{planName},</if>
             <if test="teamId != null">#{teamId},</if>
@@ -68,14 +62,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="teamName != null">#{teamName},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
-            <if test="createTime != null">#{createTime},</if>         </trim>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+         </trim>
     </insert>
 
     <update id="updateCalPlanTeam" parameterType="CalPlanTeam">
         update qxx_cal_plan_team
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="planId != null">plan_id = #{planId},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="planId != null">plan_id = #{planId},</if>
             <if test="planCode != null">plan_code = #{planCode},</if>
             <if test="planName != null">plan_name = #{planName},</if>
             <if test="teamId != null">team_id = #{teamId},</if>

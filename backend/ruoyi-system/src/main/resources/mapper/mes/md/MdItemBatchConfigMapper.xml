@@ -52,9 +52,7 @@
 
     <insert id="insertMdItemBatchConfig" parameterType="com.ruoyi.system.domain.mes.md.MdItemBatchConfig" useGeneratedKeys="true" keyProperty="configId">
         insert into qxx_md_item_batch_config
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="itemId != null">item_id,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="itemId != null">item_id,</if>
             produce_date_flag,expire_date_flag,recpt_date_flag,vendor_flag,client_flag,
             co_code_flag,po_code_flag,workorder_flag,task_flag,workstation_flag,tool_flag,
             mold_flag,lot_number_flag,quality_status_flag,paper_roll_flag,paper_width_flag,
@@ -63,9 +61,7 @@
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="itemId != null">#{itemId},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="itemId != null">#{itemId},</if>
             #{produceDateFlag},#{expireDateFlag},#{recptDateFlag},#{vendorFlag},#{clientFlag},
             #{coCodeFlag},#{poCodeFlag},#{workorderFlag},#{taskFlag},#{workstationFlag},#{toolFlag},
             #{moldFlag},#{lotNumberFlag},#{qualityStatusFlag},#{paperRollFlag},#{paperWidthFlag},

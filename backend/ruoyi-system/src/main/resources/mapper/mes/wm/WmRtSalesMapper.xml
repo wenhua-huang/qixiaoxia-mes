@@ -35,9 +35,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectWmRtSalesList" parameterType="WmRtSales" resultMap="WmRtSalesResult">
         <include refid="selectWmRtSalesVo"/>
-        <where>
-            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
-            <if test="rtCode != null and rtCode != ''"> and rt_code like concat('%', #{rtCode}, '%')</if>
+        <where>            <if test="rtCode != null and rtCode != ''"> and rt_code like concat('%', #{rtCode}, '%')</if>
             <if test="rtName != null and rtName != ''"> and rt_name like concat('%', #{rtName}, '%')</if>
             <if test="salesId != null"> and sales_id = #{salesId}</if>
             <if test="salesCode != null and salesCode != ''"> and sales_code like concat('%', #{salesCode}, '%')</if>
@@ -67,9 +65,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertWmRtSales" parameterType="WmRtSales" useGeneratedKeys="true" keyProperty="rtId">
         insert into qxx_wm_rt_sales
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="rtCode != null">rt_code,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="rtCode != null">rt_code,</if>
             <if test="rtName != null">rt_name,</if>
             <if test="salesId != null">sales_id,</if>
             <if test="salesCode != null">sales_code,</if>
@@ -90,9 +86,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="rtCode != null">#{rtCode},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="rtCode != null">#{rtCode},</if>
             <if test="rtName != null">#{rtName},</if>
             <if test="salesId != null">#{salesId},</if>
             <if test="salesCode != null">#{salesCode},</if>
@@ -117,9 +111,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateWmRtSales" parameterType="WmRtSales">
         update qxx_wm_rt_sales
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="rtCode != null">rt_code = #{rtCode},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="rtCode != null">rt_code = #{rtCode},</if>
             <if test="rtName != null">rt_name = #{rtName},</if>
             <if test="salesId != null">sales_id = #{salesId},</if>
             <if test="salesCode != null">sales_code = #{salesCode},</if>

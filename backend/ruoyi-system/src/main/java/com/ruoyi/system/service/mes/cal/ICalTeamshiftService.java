@@ -53,9 +53,17 @@ public interface ICalTeamshiftService
 
     /**
      * 删除班组排班明细信息
-     * 
+     *
      * @param teamshiftId 班组排班明细主键
      * @return 结果
      */
     public int deleteCalTeamshiftByTeamshiftId(Long teamshiftId);
+
+    /**
+     * 根据排班计划生成排班明细记录
+     * 当计划状态变为"已确认"时调用，按日期和班次为每个班组生成每日排班
+     *
+     * @param planId 排班计划ID
+     */
+    public void genRecords(Long planId);
 }

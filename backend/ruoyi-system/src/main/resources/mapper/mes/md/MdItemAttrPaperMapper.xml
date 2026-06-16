@@ -19,9 +19,7 @@
 
     <insert id="insert" parameterType="com.ruoyi.system.domain.mes.md.MdItemAttrPaper" useGeneratedKeys="true" keyProperty="attrId">
         insert into qxx_md_item_attr_paper
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="itemId != null">item_id,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="itemId != null">item_id,</if>
             <if test="paperWidth != null">paper_width,</if>
             <if test="paperWeight != null">paper_weight,</if>
             <if test="paperSource != null">paper_source,</if>
@@ -29,9 +27,7 @@
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="itemId != null">#{itemId},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="itemId != null">#{itemId},</if>
             <if test="paperWidth != null">#{paperWidth},</if>
             <if test="paperWeight != null">#{paperWeight},</if>
             <if test="paperSource != null">#{paperSource},</if>

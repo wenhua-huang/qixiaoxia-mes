@@ -75,9 +75,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertDvMachinery" parameterType="com.ruoyi.system.domain.mes.dv.DvMachinery" useGeneratedKeys="true" keyProperty="machineryId">
         insert into qxx_dv_machinery
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="machineryCode != null and machineryCode != ''">machinery_code,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="machineryCode != null and machineryCode != ''">machinery_code,</if>
             <if test="machineryName != null and machineryName != ''">machinery_name,</if>
             <if test="machineryBrand != null">machinery_brand,</if>
             <if test="machinerySpec != null">machinery_spec,</if>
@@ -97,9 +95,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="machineryCode != null and machineryCode != ''">#{machineryCode},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="machineryCode != null and machineryCode != ''">#{machineryCode},</if>
             <if test="machineryName != null and machineryName != ''">#{machineryName},</if>
             <if test="machineryBrand != null">#{machineryBrand},</if>
             <if test="machinerySpec != null">#{machinerySpec},</if>

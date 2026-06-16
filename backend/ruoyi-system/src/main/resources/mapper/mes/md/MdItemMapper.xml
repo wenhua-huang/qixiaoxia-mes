@@ -68,9 +68,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertMdItem" parameterType="com.ruoyi.system.domain.mes.md.MdItem" useGeneratedKeys="true" keyProperty="itemId">
         insert into qxx_md_item
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="itemCode != null and itemCode != ''">item_code,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="itemCode != null and itemCode != ''">item_code,</if>
             <if test="itemName != null and itemName != ''">item_name,</if>
             <if test="specification != null">specification,</if>
             <if test="unitOfMeasure != null and unitOfMeasure != ''">unit_of_measure,</if>
@@ -98,9 +96,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="itemCode != null and itemCode != ''">#{itemCode},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="itemCode != null and itemCode != ''">#{itemCode},</if>
             <if test="itemName != null and itemName != ''">#{itemName},</if>
             <if test="specification != null">#{specification},</if>
             <if test="unitOfMeasure != null and unitOfMeasure != ''">#{unitOfMeasure},</if>

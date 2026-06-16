@@ -40,9 +40,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertMdWorkstationMachine" parameterType="com.ruoyi.system.domain.mes.md.MdWorkstationMachine" useGeneratedKeys="true" keyProperty="recordId">
         insert into qxx_md_workstation_machine
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="workstationId != null">workstation_id,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="workstationId != null">workstation_id,</if>
             machinery_id,
             <if test="machineryCode != null">machinery_code,</if>
             <if test="machineryName != null">machinery_name,</if>
@@ -52,9 +50,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="workstationId != null">#{workstationId},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="workstationId != null">#{workstationId},</if>
             #{machineryId},
             <if test="machineryCode != null">#{machineryCode},</if>
             <if test="machineryName != null">#{machineryName},</if>
@@ -68,9 +64,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateMdWorkstationMachine" parameterType="com.ruoyi.system.domain.mes.md.MdWorkstationMachine">
         update qxx_md_workstation_machine
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="workstationId != null">workstation_id = #{workstationId},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="workstationId != null">workstation_id = #{workstationId},</if>
             <if test="machineryId != null">machinery_id = #{machineryId},</if>
             <if test="machineryCode != null">machinery_code = #{machineryCode},</if>
             <if test="machineryName != null">machinery_name = #{machineryName},</if>

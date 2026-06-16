@@ -40,9 +40,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectWmItemRecptDetailList" parameterType="WmItemRecptDetail" resultMap="WmItemRecptDetailResult">
         <include refid="selectWmItemRecptDetailVo"/>
-        <where>
-            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
-            <if test="recptId != null"> and recpt_id = #{recptId}</if>
+        <where>            <if test="recptId != null"> and recpt_id = #{recptId}</if>
             <if test="lineId != null"> and line_id = #{lineId}</if>
             <if test="itemId != null"> and item_id = #{itemId}</if>
             <if test="itemCode != null and itemCode != ''"> and item_code like concat('%', #{itemCode}, '%')</if>
@@ -77,9 +75,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertWmItemRecptDetail" parameterType="WmItemRecptDetail" useGeneratedKeys="true" keyProperty="detailId">
         insert into qxx_wm_item_recpt_detail
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="recptId != null">recpt_id,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="recptId != null">recpt_id,</if>
             <if test="lineId != null">line_id,</if>
             <if test="itemId != null">item_id,</if>
             <if test="itemCode != null">item_code,</if>
@@ -105,9 +101,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="recptId != null">#{recptId},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="recptId != null">#{recptId},</if>
             <if test="lineId != null">#{lineId},</if>
             <if test="itemId != null">#{itemId},</if>
             <if test="itemCode != null">#{itemCode},</if>
@@ -137,9 +131,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateWmItemRecptDetail" parameterType="WmItemRecptDetail">
         update qxx_wm_item_recpt_detail
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="recptId != null">recpt_id = #{recptId},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="recptId != null">recpt_id = #{recptId},</if>
             <if test="lineId != null">line_id = #{lineId},</if>
             <if test="itemId != null">item_id = #{itemId},</if>
             <if test="itemCode != null">item_code = #{itemCode},</if>

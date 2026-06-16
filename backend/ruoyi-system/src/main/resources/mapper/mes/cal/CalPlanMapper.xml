@@ -28,9 +28,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectCalPlanList" parameterType="CalPlan" resultMap="CalPlanResult">
         <include refid="selectCalPlanVo"/>
-        <where>  
-            <if test="factoryId != null "> and factory_id = #{factoryId}</if>
-            <if test="planCode != null  and planCode != ''"> and plan_code = #{planCode}</if>
+        <where>            <if test="planCode != null  and planCode != ''"> and plan_code = #{planCode}</if>
             <if test="planName != null  and planName != ''"> and plan_name like concat('%', #{planName}, '%')</if>
             <if test="calendarType != null  and calendarType != ''"> and calendar_type = #{calendarType}</if>
             <if test="startDate != null "> and start_date = #{startDate}</if>
@@ -48,9 +46,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertCalPlan" parameterType="CalPlan" useGeneratedKeys="true" keyProperty="planId">
         insert into qxx_cal_plan
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="planCode != null and planCode != ''">plan_code,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="planCode != null and planCode != ''">plan_code,</if>
             <if test="planName != null and planName != ''">plan_name,</if>
             <if test="calendarType != null">calendar_type,</if>
             <if test="startDate != null">start_date,</if>
@@ -64,9 +60,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
          </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="planCode != null and planCode != ''">#{planCode},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="planCode != null and planCode != ''">#{planCode},</if>
             <if test="planName != null and planName != ''">#{planName},</if>
             <if test="calendarType != null">#{calendarType},</if>
             <if test="startDate != null">#{startDate},</if>
@@ -76,14 +70,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="enableFlag != null and enableFlag != ''">#{enableFlag},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
-            <if test="createTime != null">#{createTime},</if>         </trim>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+         </trim>
     </insert>
 
     <update id="updateCalPlan" parameterType="CalPlan">
         update qxx_cal_plan
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="planCode != null and planCode != ''">plan_code = #{planCode},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="planCode != null and planCode != ''">plan_code = #{planCode},</if>
             <if test="planName != null and planName != ''">plan_name = #{planName},</if>
             <if test="calendarType != null">calendar_type = #{calendarType},</if>
             <if test="startDate != null">start_date = #{startDate},</if>

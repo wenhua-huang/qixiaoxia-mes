@@ -53,9 +53,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectWmMaterialStockList" parameterType="WmMaterialStock" resultMap="WmMaterialStockResult">
         <include refid="selectWmMaterialStockVo"/>
-        <where>
-            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
-            <if test="itemId != null"> and item_id = #{itemId}</if>
+        <where>            <if test="itemId != null"> and item_id = #{itemId}</if>
             <if test="itemCode != null and itemCode != ''"> and item_code like concat('%', #{itemCode}, '%')</if>
             <if test="itemName != null and itemName != ''"> and item_name like concat('%', #{itemName}, '%')</if>
             <if test="specification != null and specification != ''"> and specification like concat('%', #{specification}, '%')</if>
@@ -100,9 +98,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertWmMaterialStock" parameterType="WmMaterialStock" useGeneratedKeys="true" keyProperty="materialStockId">
         insert into qxx_wm_material_stock
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="itemId != null">item_id,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="itemId != null">item_id,</if>
             <if test="itemCode != null">item_code,</if>
             <if test="itemName != null">item_name,</if>
             <if test="specification != null">specification,</if>
@@ -141,9 +137,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="itemId != null">#{itemId},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="itemId != null">#{itemId},</if>
             <if test="itemCode != null">#{itemCode},</if>
             <if test="itemName != null">#{itemName},</if>
             <if test="specification != null">#{specification},</if>
@@ -186,9 +180,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateWmMaterialStock" parameterType="WmMaterialStock">
         update qxx_wm_material_stock
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="itemId != null">item_id = #{itemId},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="itemId != null">item_id = #{itemId},</if>
             <if test="itemCode != null">item_code = #{itemCode},</if>
             <if test="itemName != null">item_name = #{itemName},</if>
             <if test="specification != null">specification = #{specification},</if>

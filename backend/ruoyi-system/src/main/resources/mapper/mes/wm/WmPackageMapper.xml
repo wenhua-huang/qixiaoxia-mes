@@ -37,9 +37,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectWmPackageList" parameterType="WmPackage" resultMap="WmPackageResult">
         <include refid="selectWmPackageVo"/>
-        <where>
-            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
-            <if test="packageCode != null and packageCode != ''"> and package_code like concat('%', #{packageCode}, '%')</if>
+        <where>            <if test="packageCode != null and packageCode != ''"> and package_code like concat('%', #{packageCode}, '%')</if>
             <if test="packageName != null and packageName != ''"> and package_name like concat('%', #{packageName}, '%')</if>
             <if test="parentId != null"> and parent_id = #{parentId}</if>
             <if test="ancestors != null and ancestors != ''"> and ancestors like concat('%', #{ancestors}, '%')</if>
@@ -67,9 +65,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertWmPackage" parameterType="WmPackage" useGeneratedKeys="true" keyProperty="packageId">
         insert into qxx_wm_package
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="packageCode != null">package_code,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="packageCode != null">package_code,</if>
             <if test="packageName != null">package_name,</if>
             <if test="parentId != null">parent_id,</if>
             <if test="ancestors != null">ancestors,</if>
@@ -92,9 +88,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="packageCode != null">#{packageCode},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="packageCode != null">#{packageCode},</if>
             <if test="packageName != null">#{packageName},</if>
             <if test="parentId != null">#{parentId},</if>
             <if test="ancestors != null">#{ancestors},</if>
@@ -121,9 +115,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateWmPackage" parameterType="WmPackage">
         update qxx_wm_package
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="packageCode != null">package_code = #{packageCode},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="packageCode != null">package_code = #{packageCode},</if>
             <if test="packageName != null">package_name = #{packageName},</if>
             <if test="parentId != null">parent_id = #{parentId},</if>
             <if test="ancestors != null">ancestors = #{ancestors},</if>

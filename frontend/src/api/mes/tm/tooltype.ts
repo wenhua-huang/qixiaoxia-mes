@@ -9,6 +9,14 @@ export function listType(query) {
   })
 }
 
+// 查询所有启用的工装夹具类型（下拉框用）
+export function listAllType() {
+  return request({
+    url: '/mes/tm/tooltype/listAll',
+    method: 'get'
+  })
+}
+
 // 查询工装夹具类型详细
 export function getType(toolTypeId) {
   return request({

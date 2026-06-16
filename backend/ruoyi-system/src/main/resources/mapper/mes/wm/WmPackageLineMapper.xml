@@ -31,9 +31,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectWmPackageLineList" parameterType="WmPackageLine" resultMap="WmPackageLineResult">
         <include refid="selectWmPackageLineVo"/>
-        <where>
-            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
-            <if test="packageId != null"> and package_id = #{packageId}</if>
+        <where>            <if test="packageId != null"> and package_id = #{packageId}</if>
             <if test="itemId != null"> and item_id = #{itemId}</if>
             <if test="itemCode != null and itemCode != ''"> and item_code like concat('%', #{itemCode}, '%')</if>
             <if test="itemName != null and itemName != ''"> and item_name like concat('%', #{itemName}, '%')</if>
@@ -60,9 +58,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertWmPackageLine" parameterType="WmPackageLine" useGeneratedKeys="true" keyProperty="lineId">
         insert into qxx_wm_package_line
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="packageId != null">package_id,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="packageId != null">package_id,</if>
             <if test="itemId != null">item_id,</if>
             <if test="itemCode != null">item_code,</if>
             <if test="itemName != null">item_name,</if>
@@ -79,9 +75,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="packageId != null">#{packageId},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="packageId != null">#{packageId},</if>
             <if test="itemId != null">#{itemId},</if>
             <if test="itemCode != null">#{itemCode},</if>
             <if test="itemName != null">#{itemName},</if>
@@ -102,9 +96,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateWmPackageLine" parameterType="WmPackageLine">
         update qxx_wm_package_line
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="packageId != null">package_id = #{packageId},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="packageId != null">package_id = #{packageId},</if>
             <if test="itemId != null">item_id = #{itemId},</if>
             <if test="itemCode != null">item_code = #{itemCode},</if>
             <if test="itemName != null">item_name = #{itemName},</if>

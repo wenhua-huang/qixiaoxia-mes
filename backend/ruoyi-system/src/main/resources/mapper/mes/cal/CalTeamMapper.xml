@@ -24,9 +24,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectCalTeamList" parameterType="CalTeam" resultMap="CalTeamResult">
         <include refid="selectCalTeamVo"/>
-        <where>  
-            <if test="factoryId != null "> and factory_id = #{factoryId}</if>
-            <if test="teamCode != null  and teamCode != ''"> and team_code = #{teamCode}</if>
+        <where>            <if test="teamCode != null  and teamCode != ''"> and team_code = #{teamCode}</if>
             <if test="teamName != null  and teamName != ''"> and team_name like concat('%', #{teamName}, '%')</if>
             <if test="teamType != null  and teamType != ''"> and team_type = #{teamType}</if>
             <if test="enableFlag != null  and enableFlag != ''"> and enable_flag = #{enableFlag}</if>
@@ -40,9 +38,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertCalTeam" parameterType="CalTeam" useGeneratedKeys="true" keyProperty="teamId">
         insert into qxx_cal_team
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="teamCode != null and teamCode != ''">team_code,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="teamCode != null and teamCode != ''">team_code,</if>
             <if test="teamName != null and teamName != ''">team_name,</if>
             <if test="teamType != null">team_type,</if>
             <if test="enableFlag != null and enableFlag != ''">enable_flag,</if>
@@ -52,22 +48,21 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
          </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="teamCode != null and teamCode != ''">#{teamCode},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="teamCode != null and teamCode != ''">#{teamCode},</if>
             <if test="teamName != null and teamName != ''">#{teamName},</if>
             <if test="teamType != null">#{teamType},</if>
             <if test="enableFlag != null and enableFlag != ''">#{enableFlag},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
-            <if test="createTime != null">#{createTime},</if>         </trim>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+         </trim>
     </insert>
 
     <update id="updateCalTeam" parameterType="CalTeam">
         update qxx_cal_team
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="teamCode != null and teamCode != ''">team_code = #{teamCode},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="teamCode != null and teamCode != ''">team_code = #{teamCode},</if>
             <if test="teamName != null and teamName != ''">team_name = #{teamName},</if>
             <if test="teamType != null">team_type = #{teamType},</if>
             <if test="enableFlag != null and enableFlag != ''">enable_flag = #{enableFlag},</if>

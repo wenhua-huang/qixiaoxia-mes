@@ -57,9 +57,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertSysTodoList" parameterType="com.ruoyi.system.domain.mes.sys.SysTodoList" useGeneratedKeys="true" keyProperty="todoId">
         insert into sys_todo_list
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="userId != null">user_id,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="userId != null">user_id,</if>
             <if test="todoTitle != null">todo_title,</if>
             <if test="todoType != null">todo_type,</if>
             <if test="sourceDocId != null">source_doc_id,</if>
@@ -76,9 +74,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="userId != null">#{userId},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="userId != null">#{userId},</if>
             <if test="todoTitle != null">#{todoTitle},</if>
             <if test="todoType != null">#{todoType},</if>
             <if test="sourceDocId != null">#{sourceDocId},</if>

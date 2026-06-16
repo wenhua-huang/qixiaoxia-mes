@@ -16,6 +16,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="planId"    column="plan_id"    />
         <result property="planCode"    column="plan_code"    />
         <result property="planName"    column="plan_name"    />
+        <result property="orderNum"    column="order_num"    />
         <result property="remark"    column="remark"    />
         <result property="createBy"    column="create_by"    />
         <result property="createTime"    column="create_time"    />
@@ -24,14 +25,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectCalTeamshiftVo">
-        select teamshift_id, factory_id, shift_date, team_id, team_code, team_name, shift_id, shift_name, plan_id, plan_code, plan_name, remark, create_by, create_time, update_by, update_time from qxx_cal_teamshift
+        select teamshift_id, factory_id, shift_date, team_id, team_code, team_name, shift_id, shift_name, plan_id, plan_code, plan_name, order_num, remark, create_by, create_time, update_by, update_time from qxx_cal_teamshift
     </sql>
 
     <select id="selectCalTeamshiftList" parameterType="CalTeamshift" resultMap="CalTeamshiftResult">
         <include refid="selectCalTeamshiftVo"/>
-        <where>  
-            <if test="factoryId != null "> and factory_id = #{factoryId}</if>
-            <if test="shiftDate != null "> and shift_date = #{shiftDate}</if>
+        <where>            <if test="shiftDate != null "> and shift_date = #{shiftDate}</if>
             <if test="teamId != null "> and team_id = #{teamId}</if>
             <if test="teamCode != null  and teamCode != ''"> and team_code = #{teamCode}</if>
             <if test="teamName != null  and teamName != ''"> and team_name like concat('%', #{teamName}, '%')</if>
@@ -50,9 +49,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertCalTeamshift" parameterType="CalTeamshift" useGeneratedKeys="true" keyProperty="teamshiftId">
         insert into qxx_cal_teamshift
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="shiftDate != null">shift_date,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="shiftDate != null">shift_date,</if>
             <if test="teamId != null">team_id,</if>
             <if test="teamCode != null">team_code,</if>
             <if test="teamName != null">team_name,</if>
@@ -61,15 +58,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="planId != null">plan_id,</if>
             <if test="planCode != null">plan_code,</if>
             <if test="planName != null">plan_name,</if>
+            <if test="orderNum != null">order_num,</if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
          </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="shiftDate != null">#{shiftDate},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="shiftDate != null">#{shiftDate},</if>
             <if test="teamId != null">#{teamId},</if>
             <if test="teamCode != null">#{teamCode},</if>
             <if test="teamName != null">#{teamName},</if>
@@ -78,16 +74,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="planId != null">#{planId},</if>
             <if test="planCode != null">#{planCode},</if>
             <if test="planName != null">#{planName},</if>
+            <if test="orderNum != null">#{orderNum},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
-            <if test="createTime != null">#{createTime},</if>         </trim>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+         </trim>
     </insert>
 
     <update id="updateCalTeamshift" parameterType="CalTeamshift">
         update qxx_cal_teamshift
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="shiftDate != null">shift_date = #{shiftDate},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="shiftDate != null">shift_date = #{shiftDate},</if>
             <if test="teamId != null">team_id = #{teamId},</if>
             <if test="teamCode != null">team_code = #{teamCode},</if>
             <if test="teamName != null">team_name = #{teamName},</if>
@@ -96,6 +94,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="planId != null">plan_id = #{planId},</if>
             <if test="planCode != null">plan_code = #{planCode},</if>
             <if test="planName != null">plan_name = #{planName},</if>
+            <if test="orderNum != null">order_num = #{orderNum},</if>
             <if test="remark != null">remark = #{remark},</if>
             <if test="createBy != null">create_by = #{createBy},</if>
             <if test="createTime != null">create_time = #{createTime},</if>

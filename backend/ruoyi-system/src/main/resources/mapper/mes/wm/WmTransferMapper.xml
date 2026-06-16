@@ -31,9 +31,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectWmTransferList" parameterType="WmTransfer" resultMap="WmTransferResult">
         <include refid="selectWmTransferVo"/>
-        <where>
-            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
-            <if test="transferCode != null and transferCode != ''"> and transfer_code like concat('%', #{transferCode}, '%')</if>
+        <where>            <if test="transferCode != null and transferCode != ''"> and transfer_code like concat('%', #{transferCode}, '%')</if>
             <if test="transferName != null and transferName != ''"> and transfer_name like concat('%', #{transferName}, '%')</if>
             <if test="sourceWarehouseId != null"> and source_warehouse_id = #{sourceWarehouseId}</if>
             <if test="sourceWarehouseCode != null and sourceWarehouseCode != ''"> and source_warehouse_code like concat('%', #{sourceWarehouseCode}, '%')</if>
@@ -59,9 +57,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertWmTransfer" parameterType="WmTransfer" useGeneratedKeys="true" keyProperty="transferId">
         insert into qxx_wm_transfer
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="transferCode != null">transfer_code,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="transferCode != null">transfer_code,</if>
             <if test="transferName != null">transfer_name,</if>
             <if test="sourceWarehouseId != null">source_warehouse_id,</if>
             <if test="sourceWarehouseCode != null">source_warehouse_code,</if>
@@ -78,9 +74,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="transferCode != null">#{transferCode},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="transferCode != null">#{transferCode},</if>
             <if test="transferName != null">#{transferName},</if>
             <if test="sourceWarehouseId != null">#{sourceWarehouseId},</if>
             <if test="sourceWarehouseCode != null">#{sourceWarehouseCode},</if>
@@ -101,9 +95,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateWmTransfer" parameterType="WmTransfer">
         update qxx_wm_transfer
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="transferCode != null">transfer_code = #{transferCode},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="transferCode != null">transfer_code = #{transferCode},</if>
             <if test="transferName != null">transfer_name = #{transferName},</if>
             <if test="sourceWarehouseId != null">source_warehouse_id = #{sourceWarehouseId},</if>
             <if test="sourceWarehouseCode != null">source_warehouse_code = #{sourceWarehouseCode},</if>

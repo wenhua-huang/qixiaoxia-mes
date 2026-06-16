@@ -18,18 +18,14 @@
 
     <insert id="insert" parameterType="com.ruoyi.system.domain.mes.md.MdItemAttrPaperBag" useGeneratedKeys="true" keyProperty="attrId">
         insert into qxx_md_item_attr_paper_bag
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="itemId != null">item_id,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="itemId != null">item_id,</if>
             <if test="ropeSpec != null">rope_spec,</if>
             <if test="mouthType != null">mouth_type,</if>
             <if test="bottomType != null">bottom_type,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="itemId != null">#{itemId},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="itemId != null">#{itemId},</if>
             <if test="ropeSpec != null">#{ropeSpec},</if>
             <if test="mouthType != null">#{mouthType},</if>
             <if test="bottomType != null">#{bottomType},</if>

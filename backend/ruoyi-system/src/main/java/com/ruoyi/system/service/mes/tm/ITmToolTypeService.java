@@ -28,6 +28,13 @@ public interface ITmToolTypeService
     public List<TmToolType> selectTmToolTypeList(TmToolType tmToolType);
 
     /**
+     * 查询所有启用的工装夹具类型（下拉框用）
+     *
+     * @return 工装夹具类型集合
+     */
+    public List<TmToolType> selectTmToolTypeAll();
+
+    /**
      * 新增工装夹具类型
      * 
      * @param tmToolType 工装夹具类型

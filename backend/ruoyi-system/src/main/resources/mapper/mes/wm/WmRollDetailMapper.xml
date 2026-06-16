@@ -51,9 +51,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectWmRollDetailList" parameterType="WmRollDetail" resultMap="WmRollDetailResult">
         <include refid="selectWmRollDetailVo"/>
-        <where>
-            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
-            <if test="rollCode != null and rollCode != ''"> and roll_code like concat('%', #{rollCode}, '%')</if>
+        <where>            <if test="rollCode != null and rollCode != ''"> and roll_code like concat('%', #{rollCode}, '%')</if>
             <if test="itemId != null"> and item_id = #{itemId}</if>
             <if test="itemCode != null and itemCode != ''"> and item_code like concat('%', #{itemCode}, '%')</if>
             <if test="itemName != null and itemName != ''"> and item_name like concat('%', #{itemName}, '%')</if>
@@ -97,9 +95,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertWmRollDetail" parameterType="WmRollDetail" useGeneratedKeys="true" keyProperty="rollId">
         insert into qxx_wm_roll_detail
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="rollCode != null">roll_code,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="rollCode != null">roll_code,</if>
             <if test="itemId != null">item_id,</if>
             <if test="itemCode != null">item_code,</if>
             <if test="itemName != null">item_name,</if>
@@ -136,9 +132,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="rollCode != null">#{rollCode},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="rollCode != null">#{rollCode},</if>
             <if test="itemId != null">#{itemId},</if>
             <if test="itemCode != null">#{itemCode},</if>
             <if test="itemName != null">#{itemName},</if>
@@ -179,9 +173,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateWmRollDetail" parameterType="WmRollDetail">
         update qxx_wm_roll_detail
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="rollCode != null">roll_code = #{rollCode},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="rollCode != null">roll_code = #{rollCode},</if>
             <if test="itemId != null">item_id = #{itemId},</if>
             <if test="itemCode != null">item_code = #{itemCode},</if>
             <if test="itemName != null">item_name = #{itemName},</if>

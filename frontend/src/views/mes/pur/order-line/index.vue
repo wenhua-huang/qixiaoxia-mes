@@ -164,7 +164,7 @@
         <el-date-picker clearable
           v-model="queryParams.expectedDate"
           type="date"
-          value-format="yyyy-MM-dd"
+          value-format="YYYY-MM-DD"
           placeholder="请选择预计到货日期">
         </el-date-picker>
       </el-form-item>
@@ -407,7 +407,7 @@
               <el-date-picker clearable
                 v-model="form.expectedDate"
                 type="date"
-                value-format="yyyy-MM-dd"
+                value-format="YYYY-MM-DD"
                 placeholder="请选择预计到货日期">
               </el-date-picker>
             </el-form-item>

@@ -35,9 +35,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectPurOrderList" parameterType="PurOrder" resultMap="PurOrderResult">
         <include refid="selectPurOrderVo"/>
-        <where>  
-            <if test="factoryId != null "> and factory_id = #{factoryId}</if>
-            <if test="orderCode != null  and orderCode != ''"> and order_code = #{orderCode}</if>
+        <where>            <if test="orderCode != null  and orderCode != ''"> and order_code = #{orderCode}</if>
             <if test="orderName != null  and orderName != ''"> and order_name like concat('%', #{orderName}, '%')</if>
             <if test="vendorId != null "> and vendor_id = #{vendorId}</if>
             <if test="vendorCode != null  and vendorCode != ''"> and vendor_code = #{vendorCode}</if>
@@ -65,9 +63,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertPurOrder" parameterType="PurOrder" useGeneratedKeys="true" keyProperty="orderId">
         insert into qxx_pur_order
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="orderCode != null and orderCode != ''">order_code,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="orderCode != null and orderCode != ''">order_code,</if>
             <if test="orderName != null">order_name,</if>
             <if test="vendorId != null">vendor_id,</if>
             <if test="vendorCode != null">vendor_code,</if>
@@ -88,9 +84,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
          </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="orderCode != null and orderCode != ''">#{orderCode},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="orderCode != null and orderCode != ''">#{orderCode},</if>
             <if test="orderName != null">#{orderName},</if>
             <if test="vendorId != null">#{vendorId},</if>
             <if test="vendorCode != null">#{vendorCode},</if>
@@ -112,9 +106,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updatePurOrder" parameterType="PurOrder">
         update qxx_pur_order
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="orderCode != null and orderCode != ''">order_code = #{orderCode},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="orderCode != null and orderCode != ''">order_code = #{orderCode},</if>
             <if test="orderName != null">order_name = #{orderName},</if>
             <if test="vendorId != null">vendor_id = #{vendorId},</if>
             <if test="vendorCode != null">vendor_code = #{vendorCode},</if>

@@ -60,9 +60,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertSysAutoCodePart" parameterType="com.ruoyi.system.domain.mes.sys.SysAutoCodePart" useGeneratedKeys="true" keyProperty="partId">
         insert into sys_auto_code_part
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="ruleId != null">rule_id,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="ruleId != null">rule_id,</if>
             <if test="partIndex != null">part_index,</if>
             <if test="partType != null">part_type,</if>
             <if test="partCode != null">part_code,</if>
@@ -82,9 +80,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="ruleId != null">#{ruleId},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="ruleId != null">#{ruleId},</if>
             <if test="partIndex != null">#{partIndex},</if>
             <if test="partType != null">#{partType},</if>
             <if test="partCode != null">#{partCode},</if>
@@ -108,9 +104,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateSysAutoCodePart" parameterType="com.ruoyi.system.domain.mes.sys.SysAutoCodePart">
         update sys_auto_code_part
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="ruleId != null">rule_id = #{ruleId},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="ruleId != null">rule_id = #{ruleId},</if>
             <if test="partIndex != null">part_index = #{partIndex},</if>
             <if test="partType != null">part_type = #{partType},</if>
             <if test="partCode != null">part_code = #{partCode},</if>

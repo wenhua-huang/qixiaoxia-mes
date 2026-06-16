@@ -28,9 +28,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectWmMiscRecptList" parameterType="WmMiscRecpt" resultMap="WmMiscRecptResult">
         <include refid="selectWmMiscRecptVo"/>
-        <where>
-            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
-            <if test="recptCode != null and recptCode != ''"> and recpt_code like concat('%', #{recptCode}, '%')</if>
+        <where>            <if test="recptCode != null and recptCode != ''"> and recpt_code like concat('%', #{recptCode}, '%')</if>
             <if test="recptName != null and recptName != ''"> and recpt_name like concat('%', #{recptName}, '%')</if>
             <if test="recptType != null and recptType != ''"> and recpt_type like concat('%', #{recptType}, '%')</if>
             <if test="warehouseId != null"> and warehouse_id = #{warehouseId}</if>
@@ -53,9 +51,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertWmMiscRecpt" parameterType="WmMiscRecpt" useGeneratedKeys="true" keyProperty="recptId">
         insert into qxx_wm_misc_recpt
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="recptCode != null">recpt_code,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="recptCode != null">recpt_code,</if>
             <if test="recptName != null">recpt_name,</if>
             <if test="recptType != null">recpt_type,</if>
             <if test="warehouseId != null">warehouse_id,</if>
@@ -69,9 +65,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="recptCode != null">#{recptCode},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="recptCode != null">#{recptCode},</if>
             <if test="recptName != null">#{recptName},</if>
             <if test="recptType != null">#{recptType},</if>
             <if test="warehouseId != null">#{warehouseId},</if>
@@ -89,9 +83,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateWmMiscRecpt" parameterType="WmMiscRecpt">
         update qxx_wm_misc_recpt
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="recptCode != null">recpt_code = #{recptCode},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="recptCode != null">recpt_code = #{recptCode},</if>
             <if test="recptName != null">recpt_name = #{recptName},</if>
             <if test="recptType != null">recpt_type = #{recptType},</if>
             <if test="warehouseId != null">warehouse_id = #{warehouseId},</if>

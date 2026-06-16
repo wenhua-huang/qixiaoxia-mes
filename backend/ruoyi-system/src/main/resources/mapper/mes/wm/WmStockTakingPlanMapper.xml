@@ -27,9 +27,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectWmStockTakingPlanList" parameterType="WmStockTakingPlan" resultMap="WmStockTakingPlanResult">
         <include refid="selectWmStockTakingPlanVo"/>
-        <where>
-            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
-            <if test="planCode != null and planCode != ''"> and plan_code like concat('%', #{planCode}, '%')</if>
+        <where>            <if test="planCode != null and planCode != ''"> and plan_code like concat('%', #{planCode}, '%')</if>
             <if test="planName != null and planName != ''"> and plan_name like concat('%', #{planName}, '%')</if>
             <if test="planType != null and planType != ''"> and plan_type like concat('%', #{planType}, '%')</if>
             <if test="warehouseId != null"> and warehouse_id = #{warehouseId}</if>
@@ -52,9 +50,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertWmStockTakingPlan" parameterType="WmStockTakingPlan" useGeneratedKeys="true" keyProperty="planId">
         insert into qxx_wm_stock_taking_plan
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="planCode != null">plan_code,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="planCode != null">plan_code,</if>
             <if test="planName != null">plan_name,</if>
             <if test="planType != null">plan_type,</if>
             <if test="warehouseId != null">warehouse_id,</if>
@@ -67,9 +63,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="planCode != null">#{planCode},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="planCode != null">#{planCode},</if>
             <if test="planName != null">#{planName},</if>
             <if test="planType != null">#{planType},</if>
             <if test="warehouseId != null">#{warehouseId},</if>
@@ -86,9 +80,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateWmStockTakingPlan" parameterType="WmStockTakingPlan">
         update qxx_wm_stock_taking_plan
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="planCode != null">plan_code = #{planCode},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="planCode != null">plan_code = #{planCode},</if>
             <if test="planName != null">plan_name = #{planName},</if>
             <if test="planType != null">plan_type = #{planType},</if>
             <if test="warehouseId != null">warehouse_id = #{warehouseId},</if>

@@ -62,6 +62,17 @@ public class TmToolTypeController extends BaseController
     /**
      * 获取工装夹具类型详细信息
      */
+    /**
+     * 查询所有启用的工装夹具类型（下拉框用）
+     */
+    @PreAuthorize("@ss.hasPermi('mes:tm:tooltype:query')")
+    @GetMapping("/listAll")
+    public AjaxResult listAll()
+    {
+        List<TmToolType> list = tmToolTypeService.selectTmToolTypeAll();
+        return success(list);
+    }
+
     @PreAuthorize("@ss.hasPermi('mes:tm:tooltype:query')")
     @GetMapping(value = "/{toolTypeId}")
     public AjaxResult getInfo(@PathVariable("toolTypeId") Long toolTypeId)

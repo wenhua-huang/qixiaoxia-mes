@@ -79,9 +79,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertMdVendor" parameterType="com.ruoyi.system.domain.mes.md.MdVendor" useGeneratedKeys="true" keyProperty="vendorId">
         insert into qxx_md_vendor
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="vendorCode != null and vendorCode != ''">vendor_code,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="vendorCode != null and vendorCode != ''">vendor_code,</if>
             <if test="vendorName != null and vendorName != ''">vendor_name,</if>
             <if test="outsourceFactoryId != null">outsource_factory_id,</if>
             <if test="vendorNick != null">vendor_nick,</if>
@@ -112,9 +110,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="vendorCode != null and vendorCode != ''">#{vendorCode},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="vendorCode != null and vendorCode != ''">#{vendorCode},</if>
             <if test="vendorName != null and vendorName != ''">#{vendorName},</if>
             <if test="outsourceFactoryId != null">#{outsourceFactoryId},</if>
             <if test="vendorNick != null">#{vendorNick},</if>
@@ -149,9 +145,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateMdVendor" parameterType="com.ruoyi.system.domain.mes.md.MdVendor">
         update qxx_md_vendor
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="vendorCode != null and vendorCode != ''">vendor_code = #{vendorCode},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="vendorCode != null and vendorCode != ''">vendor_code = #{vendorCode},</if>
             <if test="vendorName != null and vendorName != ''">vendor_name = #{vendorName},</if>
             <if test="outsourceFactoryId != null">outsource_factory_id = #{outsourceFactoryId},</if>
             <if test="vendorNick != null">vendor_nick = #{vendorNick},</if>

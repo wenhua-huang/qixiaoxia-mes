@@ -64,9 +64,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertDvMachineryType" parameterType="com.ruoyi.system.domain.mes.dv.DvMachineryType" useGeneratedKeys="true" keyProperty="machineryTypeId">
         insert into qxx_dv_machinery_type
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="machineryTypeCode != null and machineryTypeCode != ''">machinery_type_code,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="machineryTypeCode != null and machineryTypeCode != ''">machinery_type_code,</if>
             <if test="machineryTypeName != null and machineryTypeName != ''">machinery_type_name,</if>
             <if test="parentTypeId != null">parent_type_id,</if>
             <if test="orderNum != null">order_num,</if>
@@ -77,9 +75,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="machineryTypeCode != null and machineryTypeCode != ''">#{machineryTypeCode},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="machineryTypeCode != null and machineryTypeCode != ''">#{machineryTypeCode},</if>
             <if test="machineryTypeName != null and machineryTypeName != ''">#{machineryTypeName},</if>
             <if test="parentTypeId != null">#{parentTypeId},</if>
             <if test="orderNum != null">#{orderNum},</if>
@@ -94,9 +90,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateDvMachineryType" parameterType="com.ruoyi.system.domain.mes.dv.DvMachineryType">
         update qxx_dv_machinery_type
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="machineryTypeCode != null and machineryTypeCode != ''">machinery_type_code = #{machineryTypeCode},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="machineryTypeCode != null and machineryTypeCode != ''">machinery_type_code = #{machineryTypeCode},</if>
             <if test="machineryTypeName != null and machineryTypeName != ''">machinery_type_name = #{machineryTypeName},</if>
             <if test="parentTypeId != null">parent_type_id = #{parentTypeId},</if>
             <if test="orderNum != null">order_num = #{orderNum},</if>

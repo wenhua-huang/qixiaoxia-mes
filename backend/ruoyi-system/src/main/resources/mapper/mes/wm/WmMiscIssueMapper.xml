@@ -28,9 +28,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectWmMiscIssueList" parameterType="WmMiscIssue" resultMap="WmMiscIssueResult">
         <include refid="selectWmMiscIssueVo"/>
-        <where>
-            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
-            <if test="issueCode != null and issueCode != ''"> and issue_code like concat('%', #{issueCode}, '%')</if>
+        <where>            <if test="issueCode != null and issueCode != ''"> and issue_code like concat('%', #{issueCode}, '%')</if>
             <if test="issueName != null and issueName != ''"> and issue_name like concat('%', #{issueName}, '%')</if>
             <if test="issueType != null and issueType != ''"> and issue_type like concat('%', #{issueType}, '%')</if>
             <if test="warehouseId != null"> and warehouse_id = #{warehouseId}</if>
@@ -53,9 +51,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertWmMiscIssue" parameterType="WmMiscIssue" useGeneratedKeys="true" keyProperty="issueId">
         insert into qxx_wm_misc_issue
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="issueCode != null">issue_code,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="issueCode != null">issue_code,</if>
             <if test="issueName != null">issue_name,</if>
             <if test="issueType != null">issue_type,</if>
             <if test="warehouseId != null">warehouse_id,</if>
@@ -69,9 +65,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="issueCode != null">#{issueCode},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="issueCode != null">#{issueCode},</if>
             <if test="issueName != null">#{issueName},</if>
             <if test="issueType != null">#{issueType},</if>
             <if test="warehouseId != null">#{warehouseId},</if>
@@ -89,9 +83,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateWmMiscIssue" parameterType="WmMiscIssue">
         update qxx_wm_misc_issue
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="issueCode != null">issue_code = #{issueCode},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="issueCode != null">issue_code = #{issueCode},</if>
             <if test="issueName != null">issue_name = #{issueName},</if>
             <if test="issueType != null">issue_type = #{issueType},</if>
             <if test="warehouseId != null">warehouse_id = #{warehouseId},</if>

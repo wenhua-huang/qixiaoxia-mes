@@ -54,9 +54,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertSysAutoCodeResult" parameterType="com.ruoyi.system.domain.mes.sys.SysAutoCodeResult" useGeneratedKeys="true" keyProperty="codeId">
         insert into sys_auto_code_result
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="ruleId != null">rule_id,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="ruleId != null">rule_id,</if>
             <if test="genDate != null">gen_date,</if>
             <if test="genIndex != null">gen_index,</if>
             <if test="lastResult != null">last_result,</if>
@@ -68,9 +66,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="ruleId != null">#{ruleId},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="ruleId != null">#{ruleId},</if>
             <if test="genDate != null">#{genDate},</if>
             <if test="genIndex != null">#{genIndex},</if>
             <if test="lastResult != null">#{lastResult},</if>
@@ -86,9 +82,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateSysAutoCodeResult" parameterType="com.ruoyi.system.domain.mes.sys.SysAutoCodeResult">
         update sys_auto_code_result
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="ruleId != null">rule_id = #{ruleId},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="ruleId != null">rule_id = #{ruleId},</if>
             <if test="genDate != null">gen_date = #{genDate},</if>
             <if test="genIndex != null">gen_index = #{genIndex},</if>
             <if test="lastResult != null">last_result = #{lastResult},</if>

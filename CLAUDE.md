@@ -317,47 +317,49 @@ function reset() { autoGenFlag.value = false; form.value = {} as ...; ... }
 
 ## E2E 测试
 
-**任何前端/全栈功能开发完成后，必须用 Playwright E2E 验证，禁止只用 curl 测试 API。**
+> **全栈功能完成后逐层验证，禁止用 curl 测 API 替代前端编译和完整流程检查。**
+> 详细测试分层见 [测试约定](docs/设计文档/测试约定.md)。
 
-E2E 项目位于 `e2e/`，基于 Playwright + 已认证 storageState。
+### ⚠️ 测到 bug 先停，别偷偷修
 
-### 运行命令
+| 发现 | 做法 |
+|------|------|
+| 本次改动引入的 bug | 直接修 + 告知 |
+| 项目既有问题（其他模块也有 / 需要改 >3 个文件） | **停下**："测到 X 报错，原因 Y。非本次范围，要我修吗？会波及 Z 个文件" |
+| 不确定是不是本次引入的 | 停下确认 |
+
+### 6 层清单（逐层过，不可跳）
+
+```
+① 服务    — curl 前后端端口
+② 编译    — curl Vite → import 无 "Failed to resolve"
+③ API     — curl CRUD 全流程（GET+POST+PUT+DELETE）
+④ 取值    — 查拦截器 → 确认业务层 .data / .rows 解包正确
+⑤ 关键    — 自动编码连调 3 次确认递增、类型联动、数量联动 ← 本条最易漏
+⑥ 流程    — 模拟用户：genCode → add → list 确认 → update → delete
+```
+
+| # | 怎么测 | 一条命令 |
+|---|--------|---------|
+| ① | 端口可达 | `curl -so /dev/null -w '%{http_code}' http://localhost:8081/ && curl -so /dev/null -w ' %{http_code}' http://localhost:81/` |
+| ② | import 全解析 | `curl -s http://localhost:81/src/views/mes/{M}/{E}/index.vue \| grep -o '/src/api/[^"]*' \| sort -u` |
+| ③ | CRUD 全流程 | `TOKEN=$(python3 backend/scripts/get_token.py); curl -s -H "Auth: Bearer $TOKEN" ...` → add → update → delete |
+| ④ | 拦截器解包 | `grep -A20 'response.use' frontend/src/utils/request.ts` → 确认 `resolve(res.data)` → 业务层是取 `.data` 还是直接用 |
+| ⑤ | genSerialCode | 连调 3 次确认流水号递增；编码规则+分段存在；`response.data` 取值正确 |
+| ⑥ | 全链路 | Playwright 或 curl 模拟：genCode → add → list 查回 → update → delete |
+
+### Playwright（`e2e/`）
+
 ```bash
 cd e2e
-
-# 运行全部测试
-npx playwright test
-
-# 运行指定模块测试
-npx playwright test tests/pur/order.spec.ts --project=chromium
-
-# 查看失败 trace
-npx playwright show-trace test-results/.../trace.zip
+npx playwright test                                    # 全量
+npx playwright test tests/pur/order.spec.ts            # 单模块
+npx playwright show-trace test-results/.../trace.zip   # 失败 trace
 ```
 
-### 测试文件组织
-```
-e2e/tests/{module}/{entity}.spec.ts   # 按模块/实体组织
-e2e/setup/global-setup.ts             # 自动登录 + 保存 storageState
-e2e/setup/storageState.json           # 认证缓存（14天有效）
-```
+Playwright 关键检查点：页面加载、弹窗显示、POST JSON body 格式（日期是 `yyyy-MM-dd` 字符串、编码格式正确、数值是 number）。
 
-### E2E 必须覆盖的检查点
-1. **页面加载**：`await page.goto('/')` → 点击菜单 → 目标页面可见
-2. **新增弹窗**：点击新增 → 弹窗显示 → 表单字段存在 → 自动生成开关/下拉选择器正常工作
-3. **提交 JSON 验证**（关键！）：用 `page.waitForRequest` 拦截 POST 请求，检查 JSON body：
-   - `orderDate` 是 `yyyy-MM-dd` 格式字符串，不能是 Date 对象或格式字面量 `"yyyy-"`
-   - `orderCode` 自动编码格式正确
-   - 数值字段为 number 类型
-4. **curl 不能替代 E2E**：curl 直接调 API 绕过了 Vue 组件渲染、data() 类型转换、Element Plus 组件值序列化等前端问题，会漏掉 `new Date()` 被序列化为 `"yyyy-06-Su"` 这类 bug。
-
-### E2E 常见失败排查
-| 症状 | 原因 | 修复 |
-|------|------|------|
-| 页面空白/超时 | RuoYi 动态路由，需先访问首页加载菜单 | `page.goto('/')` → 等 2s → 再跳转 |
-| 菜单点击无效 | 侧边栏折叠、菜单未展开 | 直接 `page.goto('/{module}/{entity}')` 或用 `getByText` 匹配 |
-| 弹窗不显示 | Vue3 `v-model` 替代了 `:visible.sync`，组件名可能不一致 | 用 `page.locator('.el-dialog')` 通用匹配 |
-| 按钮点击无效 | 生成器产物 `el-button type="text"` 需改为 `el-button link` | grep 确认已全部替换 |
+常见坑：动态路由需先 `page.goto('/')`、Vue3 `v-model` 替代了 `:visible.sync`、`el-button type="text"` 需改为 `link`。
 
 ## Environment Versions
 

@@ -55,9 +55,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertSysAutoCodeRule" parameterType="com.ruoyi.system.domain.mes.sys.SysAutoCodeRule" useGeneratedKeys="true" keyProperty="ruleId">
         insert into sys_auto_code_rule
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="ruleCode != null and ruleCode != ''">rule_code,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="ruleCode != null and ruleCode != ''">rule_code,</if>
             <if test="ruleName != null and ruleName != ''">rule_name,</if>
             <if test="ruleDesc != null">rule_desc,</if>
             <if test="maxLength != null">max_length,</if>
@@ -71,9 +69,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="ruleCode != null and ruleCode != ''">#{ruleCode},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="ruleCode != null and ruleCode != ''">#{ruleCode},</if>
             <if test="ruleName != null and ruleName != ''">#{ruleName},</if>
             <if test="ruleDesc != null">#{ruleDesc},</if>
             <if test="maxLength != null">#{maxLength},</if>
@@ -91,9 +87,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateSysAutoCodeRule" parameterType="com.ruoyi.system.domain.mes.sys.SysAutoCodeRule">
         update sys_auto_code_rule
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="ruleCode != null and ruleCode != ''">rule_code = #{ruleCode},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="ruleCode != null and ruleCode != ''">rule_code = #{ruleCode},</if>
             <if test="ruleName != null and ruleName != ''">rule_name = #{ruleName},</if>
             <if test="ruleDesc != null">rule_desc = #{ruleDesc},</if>
             <if test="maxLength != null">max_length = #{maxLength},</if>

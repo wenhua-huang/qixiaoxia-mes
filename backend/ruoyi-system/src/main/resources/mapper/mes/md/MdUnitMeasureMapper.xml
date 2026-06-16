@@ -52,9 +52,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertMdUnitMeasure" parameterType="com.ruoyi.system.domain.mes.md.MdUnitMeasure" useGeneratedKeys="true" keyProperty="unitId">
         insert into qxx_md_unit_measure
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="unitCode != null and unitCode != ''">unit_code,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="unitCode != null and unitCode != ''">unit_code,</if>
             <if test="unitName != null and unitName != ''">unit_name,</if>
             <if test="primaryUnit != null">primary_unit,</if>
             <if test="conversionRate != null">conversion_rate,</if>
@@ -65,9 +63,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="unitCode != null and unitCode != ''">#{unitCode},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="unitCode != null and unitCode != ''">#{unitCode},</if>
             <if test="unitName != null and unitName != ''">#{unitName},</if>
             <if test="primaryUnit != null">#{primaryUnit},</if>
             <if test="conversionRate != null">#{conversionRate},</if>
@@ -82,9 +78,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateMdUnitMeasure" parameterType="com.ruoyi.system.domain.mes.md.MdUnitMeasure">
         update qxx_md_unit_measure
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="unitCode != null and unitCode != ''">unit_code = #{unitCode},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="unitCode != null and unitCode != ''">unit_code = #{unitCode},</if>
             <if test="unitName != null and unitName != ''">unit_name = #{unitName},</if>
             <if test="primaryUnit != null">primary_unit = #{primaryUnit},</if>
             <if test="conversionRate != null">conversion_rate = #{conversionRate},</if>

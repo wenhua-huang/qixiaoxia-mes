@@ -66,9 +66,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertMdItemType" parameterType="com.ruoyi.system.domain.mes.md.MdItemType" useGeneratedKeys="true" keyProperty="itemTypeId">
         insert into qxx_md_item_type
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="itemTypeCode != null and itemTypeCode != ''">item_type_code,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="itemTypeCode != null and itemTypeCode != ''">item_type_code,</if>
             <if test="itemTypeName != null and itemTypeName != ''">item_type_name,</if>
             <if test="parentTypeId != null">parent_type_id,</if>
             <if test="itemOrProduct != null and itemOrProduct != ''">item_or_product,</if>
@@ -80,9 +78,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="itemTypeCode != null and itemTypeCode != ''">#{itemTypeCode},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="itemTypeCode != null and itemTypeCode != ''">#{itemTypeCode},</if>
             <if test="itemTypeName != null and itemTypeName != ''">#{itemTypeName},</if>
             <if test="parentTypeId != null">#{parentTypeId},</if>
             <if test="itemOrProduct != null and itemOrProduct != ''">#{itemOrProduct},</if>
@@ -98,9 +94,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateMdItemType" parameterType="com.ruoyi.system.domain.mes.md.MdItemType">
         update qxx_md_item_type
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="itemTypeCode != null and itemTypeCode != ''">item_type_code = #{itemTypeCode},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="itemTypeCode != null and itemTypeCode != ''">item_type_code = #{itemTypeCode},</if>
             <if test="itemTypeName != null and itemTypeName != ''">item_type_name = #{itemTypeName},</if>
             <if test="parentTypeId != null">parent_type_id = #{parentTypeId},</if>
             <if test="itemOrProduct != null and itemOrProduct != ''">item_or_product = #{itemOrProduct},</if>

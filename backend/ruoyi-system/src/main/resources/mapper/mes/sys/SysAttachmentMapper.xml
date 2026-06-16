@@ -51,9 +51,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertSysAttachment" parameterType="com.ruoyi.system.domain.mes.sys.SysAttachment" useGeneratedKeys="true" keyProperty="attachmentId">
         insert into sys_attachment
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="sourceDocId != null">source_doc_id,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="sourceDocId != null">source_doc_id,</if>
             <if test="sourceDocType != null">source_doc_type,</if>
             <if test="fileUrl != null">file_url,</if>
             <if test="basePath != null">base_path,</if>
@@ -67,9 +65,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="sourceDocId != null">#{sourceDocId},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="sourceDocId != null">#{sourceDocId},</if>
             <if test="sourceDocType != null">#{sourceDocType},</if>
             <if test="fileUrl != null">#{fileUrl},</if>
             <if test="basePath != null">#{basePath},</if>

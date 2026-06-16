@@ -70,9 +70,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertMdClient" parameterType="com.ruoyi.system.domain.mes.md.MdClient" useGeneratedKeys="true" keyProperty="clientId">
         insert into qxx_md_client
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="clientCode != null and clientCode != ''">client_code,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="clientCode != null and clientCode != ''">client_code,</if>
             <if test="clientName != null and clientName != ''">client_name,</if>
             <if test="clientNick != null">client_nick,</if>
             <if test="clientEn != null">client_en,</if>
@@ -97,9 +95,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="clientCode != null and clientCode != ''">#{clientCode},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="clientCode != null and clientCode != ''">#{clientCode},</if>
             <if test="clientName != null and clientName != ''">#{clientName},</if>
             <if test="clientNick != null">#{clientNick},</if>
             <if test="clientEn != null">#{clientEn},</if>
@@ -128,9 +124,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateMdClient" parameterType="com.ruoyi.system.domain.mes.md.MdClient">
         update qxx_md_client
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="clientCode != null and clientCode != ''">client_code = #{clientCode},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="clientCode != null and clientCode != ''">client_code = #{clientCode},</if>
             <if test="clientName != null and clientName != ''">client_name = #{clientName},</if>
             <if test="clientNick != null">client_nick = #{clientNick},</if>
             <if test="clientEn != null">client_en = #{clientEn},</if>

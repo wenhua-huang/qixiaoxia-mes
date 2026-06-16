@@ -24,9 +24,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectCalHolidayList" parameterType="CalHoliday" resultMap="CalHolidayResult">
         <include refid="selectCalHolidayVo"/>
-        <where>  
-            <if test="factoryId != null "> and factory_id = #{factoryId}</if>
-            <if test="holidayDate != null "> and holiday_date = #{holidayDate}</if>
+        <where>            <if test="holidayDate != null "> and holiday_date = #{holidayDate}</if>
             <if test="holidayName != null  and holidayName != ''"> and holiday_name like concat('%', #{holidayName}, '%')</if>
             <if test="holidayType != null  and holidayType != ''"> and holiday_type = #{holidayType}</if>
             <if test="enableFlag != null  and enableFlag != ''"> and enable_flag = #{enableFlag}</if>
@@ -40,9 +38,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertCalHoliday" parameterType="CalHoliday" useGeneratedKeys="true" keyProperty="holidayId">
         insert into qxx_cal_holiday
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="holidayDate != null">holiday_date,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="holidayDate != null">holiday_date,</if>
             <if test="holidayName != null and holidayName != ''">holiday_name,</if>
             <if test="holidayType != null and holidayType != ''">holiday_type,</if>
             <if test="enableFlag != null and enableFlag != ''">enable_flag,</if>
@@ -52,22 +48,21 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
          </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="holidayDate != null">#{holidayDate},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="holidayDate != null">#{holidayDate},</if>
             <if test="holidayName != null and holidayName != ''">#{holidayName},</if>
             <if test="holidayType != null and holidayType != ''">#{holidayType},</if>
             <if test="enableFlag != null and enableFlag != ''">#{enableFlag},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
-            <if test="createTime != null">#{createTime},</if>         </trim>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+         </trim>
     </insert>
 
     <update id="updateCalHoliday" parameterType="CalHoliday">
         update qxx_cal_holiday
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="holidayDate != null">holiday_date = #{holidayDate},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="holidayDate != null">holiday_date = #{holidayDate},</if>
             <if test="holidayName != null and holidayName != ''">holiday_name = #{holidayName},</if>
             <if test="holidayType != null and holidayType != ''">holiday_type = #{holidayType},</if>
             <if test="enableFlag != null and enableFlag != ''">enable_flag = #{enableFlag},</if>

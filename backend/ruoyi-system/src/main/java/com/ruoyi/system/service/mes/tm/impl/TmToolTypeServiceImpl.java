@@ -47,6 +47,17 @@ public class TmToolTypeServiceImpl implements ITmToolTypeService
     }
 
     /**
+     * 查询所有启用的工装夹具类型
+     *
+     * @return 工装夹具类型集合
+     */
+    @Override
+    public List<TmToolType> selectTmToolTypeAll()
+    {
+        return qxxTmToolTypeMapper.selectTmToolTypeAll();
+    }
+
+    /**
      * 新增工装夹具类型
      * 
      * @param tmToolType 工装夹具类型

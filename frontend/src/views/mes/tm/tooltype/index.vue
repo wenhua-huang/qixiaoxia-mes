@@ -1,53 +1,16 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
-      <el-form-item label="工厂" prop="factoryId">
-        <el-input
-          v-model="queryParams.factoryId"
-          placeholder="请输入工厂ID(关联qxx_md_factory)"
-          clearable
-          @keyup.enter="handleQuery"
-        />
+    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="80px">
+      <el-form-item label="类型编码" prop="toolTypeCode">
+        <el-input v-model="queryParams.toolTypeCode" placeholder="请输入类型编码" clearable @keyup.enter="handleQuery" />
       </el-form-item>
-      <el-form-item label="编码" prop="toolTypeCode">
-        <el-input
-          v-model="queryParams.toolTypeCode"
-          placeholder="请输入类型编码(唯一)"
-          clearable
-          @keyup.enter="handleQuery"
-        />
+      <el-form-item label="类型名称" prop="toolTypeName">
+        <el-input v-model="queryParams.toolTypeName" placeholder="请输入类型名称" clearable @keyup.enter="handleQuery" />
       </el-form-item>
-      <el-form-item label="名称" prop="toolTypeName">
-        <el-input
-          v-model="queryParams.toolTypeName"
-          placeholder="请输入类型名称"
-          clearable
-          @keyup.enter="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="编码要求" prop="needCodeFlag">
-        <el-input
-          v-model="queryParams.needCodeFlag"
-          placeholder="请输入是否需要编码(1-需要,0-不需要)"
-          clearable
-          @keyup.enter="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="保养周期" prop="maintenCycle">
-        <el-input
-          v-model="queryParams.maintenCycle"
-          placeholder="请输入保养周期(与保养类型配合,如:月+3=每3个月保养一次)"
-          clearable
-          @keyup.enter="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="启用" prop="enableFlag">
-        <el-input
-          v-model="queryParams.enableFlag"
-          placeholder="请输入是否启用(1-是,0-否)"
-          clearable
-          @keyup.enter="handleQuery"
-        />
+      <el-form-item label="保养类型" prop="maintenType">
+        <el-select v-model="queryParams.maintenType" placeholder="请选择保养类型" clearable>
+          <el-option v-for="dict in maintenTypeOptions" :key="dict.value" :label="dict.label" :value="dict.value" />
+        </el-select>
       </el-form-item>
       <el-form-item>
         <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
@@ -57,145 +20,160 @@
 
     <el-row :gutter="10" class="mb8">
       <el-col :span="1.5">
-        <el-button
-          type="primary"
-          plain
-          icon="el-icon-plus"
-          size="mini"
-          @click="handleAdd"
-          v-hasPermi="['mes:tm:tooltype:add']"
-        >新增</el-button>
+        <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd" v-hasPermi="['mes:tm:tooltype:add']">新增</el-button>
       </el-col>
       <el-col :span="1.5">
-        <el-button
-          type="success"
-          plain
-          icon="el-icon-edit"
-          size="mini"
-          :disabled="single"
-          @click="handleUpdate"
-          v-hasPermi="['mes:tm:tooltype:edit']"
-        >修改</el-button>
+        <el-button type="success" plain icon="el-icon-edit" size="mini" :disabled="single" @click="handleUpdate" v-hasPermi="['mes:tm:tooltype:edit']">修改</el-button>
       </el-col>
       <el-col :span="1.5">
-        <el-button
-          type="danger"
-          plain
-          icon="el-icon-delete"
-          size="mini"
-          :disabled="multiple"
-          @click="handleDelete"
-          v-hasPermi="['mes:tm:tooltype:remove']"
-        >删除</el-button>
+        <el-button type="danger" plain icon="el-icon-delete" size="mini" :disabled="multiple" @click="handleDelete" v-hasPermi="['mes:tm:tooltype:remove']">删除</el-button>
       </el-col>
       <el-col :span="1.5">
-        <el-button
-          type="warning"
-          plain
-          icon="el-icon-download"
-          size="mini"
-          @click="handleExport"
-          v-hasPermi="['mes:tm:tooltype:export']"
-        >导出</el-button>
+        <el-button type="warning" plain icon="el-icon-download" size="mini" @click="handleExport" v-hasPermi="['mes:tm:tooltype:export']">导出</el-button>
       </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
     <el-table v-loading="loading" :data="typeList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="ID" align="center" prop="toolTypeId" />
-      <el-table-column label="工厂" align="center" prop="factoryId" />
-      <el-table-column label="编码" align="center" prop="toolTypeCode" />
-      <el-table-column label="名称" align="center" prop="toolTypeName" />
-      <el-table-column label="编码要求" align="center" prop="needCodeFlag" />
-      <el-table-column label="保养类型:DAY-每天,WEEK-每周,MONTH-每月,QUARTER-每季,HALFYEAR-每半年,YEAR-每年,USAGE-按使用次数" align="center" prop="maintenType" />
-      <el-table-column label="保养周期" align="center" prop="maintenCycle" />
-      <el-table-column label="启用" align="center" prop="enableFlag" />
-      <el-table-column label="备注" align="center" prop="remark" />
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
+      <el-table-column label="类型编码" align="center" prop="toolTypeCode">
         <template #default="scope">
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-edit"
-            @click="handleUpdate(scope.row)"
-            v-hasPermi="['mes:tm:tooltype:edit']"
-          >修改</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-delete"
-            @click="handleDelete(scope.row)"
-            v-hasPermi="['mes:tm:tooltype:remove']"
-          >删除</el-button>
+          <el-button type="text" @click="handleView(scope.row)" v-hasPermi="['mes:tm:tooltype:query']">{{ scope.row.toolTypeCode }}</el-button>
+        </template>
+      </el-table-column>
+      <el-table-column label="类型名称" align="center" prop="toolTypeName" :show-overflow-tooltip="true" />
+      <el-table-column label="是否编码管理" align="center" prop="needCodeFlag" width="110">
+        <template #default="scope">
+          <dict-tag :options="sys_yes_no_options" :value="scope.row.needCodeFlag" />
+        </template>
+      </el-table-column>
+      <el-table-column label="保养类型" align="center" prop="maintenType" width="120">
+        <template #default="scope">
+          <span v-if="scope.row.needCodeFlag === '1'">{{ maintenTypeMap[scope.row.maintenType] || scope.row.maintenType }}</span>
+          <span v-else>无</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="保养周期" align="center" prop="maintenCycle" width="110">
+        <template #default="scope">
+          <span v-if="scope.row.needCodeFlag === '1' && scope.row.maintenType && maintenTypePeriodUnit[scope.row.maintenType]">
+            {{ scope.row.maintenCycle + maintenTypePeriodUnit[scope.row.maintenType] }}
+          </span>
+          <span v-else>无</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="是否启用" align="center" prop="enableFlag" width="80">
+        <template #default="scope">
+          <dict-tag :options="sys_yes_no_options" :value="scope.row.enableFlag" />
+        </template>
+      </el-table-column>
+      <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
+      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="150">
+        <template #default="scope">
+          <el-button size="mini" type="text" icon="el-icon-edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:tm:tooltype:edit']">修改</el-button>
+          <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:tm:tooltype:remove']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
-    
-    <pagination
-      v-show="total>0"
-      :total="total"
-      v-model:current-page="queryParams.pageNum"
-      v-model:page-size="queryParams.pageSize"
-      @pagination="getList"
-    />
+
+    <pagination v-show="total > 0" :total="total" v-model:current-page="queryParams.pageNum" v-model:page-size="queryParams.pageSize" @pagination="getList" />
 
     <!-- 添加或修改工装夹具类型对话框 -->
-    <el-dialog :title="title" v-model="open" width="500px" append-to-body>
-      <el-form ref="form" :model="form" :rules="rules" label-width="100px">
+    <el-dialog :title="title" v-model="open" width="960px" append-to-body>
+      <el-form ref="form" :model="form" :rules="rules" label-width="120px">
         <el-row>
-          <el-col :span="24">
-            <el-form-item label="工厂" prop="factoryId">
-              <el-input v-model="form.factoryId" placeholder="请输入工厂ID(关联qxx_md_factory)" />
+          <el-col :span="8">
+            <el-form-item label="类型编码" prop="toolTypeCode">
+              <el-input v-model="form.toolTypeCode" placeholder="请输入类型编码" :disabled="optType === 'view'" />
             </el-form-item>
           </el-col>
-          <el-col :span="24">
-            <el-form-item label="编码" prop="toolTypeCode">
-              <el-input v-model="form.toolTypeCode" placeholder="请输入类型编码(唯一)" />
+          <el-col :span="4">
+            <el-switch v-model="autoGenFlag" active-color="#13ce66" active-text="自动生成" @change="handleAutoGenChange" v-if="optType !== 'view'" />
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="类型名称" prop="toolTypeName">
+              <el-input v-model="form.toolTypeName" placeholder="请输入类型名称" :disabled="optType === 'view'" />
             </el-form-item>
           </el-col>
-          <el-col :span="24">
-            <el-form-item label="名称" prop="toolTypeName">
-              <el-input v-model="form.toolTypeName" placeholder="请输入类型名称" />
+        </el-row>
+        <el-row>
+          <el-col :span="8">
+            <el-form-item label="是否编码管理" prop="needCodeFlag">
+              <el-radio-group v-model="form.needCodeFlag" :disabled="optType === 'view'">
+                <el-radio v-for="dict in sys_yes_no_options" :key="dict.value" :label="dict.value">{{ dict.label }}</el-radio>
+              </el-radio-group>
             </el-form-item>
           </el-col>
-          <el-col :span="24">
-            <el-form-item label="编码要求" prop="needCodeFlag">
-              <el-input v-model="form.needCodeFlag" placeholder="请输入是否需要编码(1-需要,0-不需要)" />
+          <el-col :span="8" v-if="form.needCodeFlag === '1'">
+            <el-form-item label="保养类型" prop="maintenType">
+              <el-select v-model="form.maintenType" placeholder="请选择保养类型" :disabled="optType === 'view'">
+                <el-option v-for="dict in maintenTypeOptions" :key="dict.value" :label="dict.label" :value="dict.value" />
+              </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="24">
+          <el-col :span="8" v-if="form.needCodeFlag === '1'">
             <el-form-item label="保养周期" prop="maintenCycle">
-              <el-input v-model="form.maintenCycle" placeholder="请输入保养周期(与保养类型配合,如:月+3=每3个月保养一次)" />
+              <el-input v-model="form.maintenCycle" placeholder="请输入保养周期" :disabled="optType === 'view'" />
             </el-form-item>
           </el-col>
-          <el-col :span="24">
-            <el-form-item label="启用" prop="enableFlag">
-              <el-input v-model="form.enableFlag" placeholder="请输入是否启用(1-是,0-否)" />
+        </el-row>
+        <el-row>
+          <el-col :span="8">
+            <el-form-item label="是否启用" prop="enableFlag">
+              <el-radio-group v-model="form.enableFlag" :disabled="optType === 'view'">
+                <el-radio v-for="dict in sys_yes_no_options" :key="dict.value" :label="dict.value">{{ dict.label }}</el-radio>
+              </el-radio-group>
             </el-form-item>
           </el-col>
-          <el-col :span="24">
+          <el-col :span="16">
             <el-form-item label="备注" prop="remark">
-              <el-input v-model="form.remark" type="textarea" placeholder="请输入内容" />
+              <el-input v-model="form.remark" type="textarea" placeholder="请输入内容" :disabled="optType === 'view'" />
             </el-form-item>
           </el-col>
         </el-row>
       </el-form>
-      <div slot="footer" class="dialog-footer">
-        <el-button type="primary" @click="submitForm">确 定</el-button>
-        <el-button @click="cancel">取 消</el-button>
-      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button type="primary" @click="submitForm" v-if="optType !== 'view'">确 定</el-button>
+          <el-button @click="cancel">取 消</el-button>
+        </div>
+      </template>
     </el-dialog>
   </div>
 </template>
 
 <script>
-import { listType, getType, delType, addType, updateType } from "@/api/mes/tm/tooltype"
+import { listType, getType, delType, addType, updateType } from '@/api/mes/tm/tooltype'
+import { genSerialCode } from '@/api/mes/sys/autocoderule'
 
 export default {
-  name: "Type",
+  name: 'ToolType',
   data() {
     return {
+      // 保养类型中文映射
+      maintenTypeOptions: [
+        { label: '每天', value: 'DAY' },
+        { label: '每周', value: 'WEEK' },
+        { label: '每月', value: 'MONTH' },
+        { label: '每季', value: 'QUARTER' },
+        { label: '每半年', value: 'HALFYEAR' },
+        { label: '每年', value: 'YEAR' },
+        { label: '按使用次数', value: 'USAGE' },
+      ],
+      maintenTypeMap: {
+        DAY: '每天', WEEK: '每周', MONTH: '每月', QUARTER: '每季',
+        HALFYEAR: '每半年', YEAR: '每年', USAGE: '按使用次数',
+      },
+      maintenTypePeriodUnit: {
+        DAY: '天', WEEK: '周', MONTH: '月', QUARTER: '季',
+        HALFYEAR: '半年', YEAR: '年', USAGE: '次',
+      },
+      sys_yes_no_options: [
+        { label: '是', value: '1' },
+        { label: '否', value: '0' },
+      ],
+      // 自动生成编码
+      autoGenFlag: false,
+      optType: undefined,
       // 遮罩层
       loading: true,
       // 选中数组
@@ -211,48 +189,39 @@ export default {
       // 工装夹具类型表格数据
       typeList: [],
       // 弹出层标题
-      title: "",
+      title: '',
       // 是否显示弹出层
       open: false,
       // 查询参数
       queryParams: {
         pageNum: 1,
         pageSize: 10,
-        factoryId: null,
         toolTypeCode: null,
         toolTypeName: null,
-        needCodeFlag: null,
         maintenType: null,
-        maintenCycle: null,
-        enableFlag: null,
       },
       // 表单参数
       form: {},
       // 表单校验
       rules: {
-        factoryId: [
-          { required: true, message: "工厂ID(关联qxx_md_factory)不能为空", trigger: "blur" }
-        ],
         toolTypeCode: [
-          { required: true, message: "类型编码(唯一)不能为空", trigger: "blur" }
+          { required: true, message: '类型编码不能为空', trigger: 'blur' },
+          { max: 64, message: '字段过长', trigger: 'blur' },
         ],
         toolTypeName: [
-          { required: true, message: "类型名称不能为空", trigger: "blur" }
+          { required: true, message: '类型名称不能为空', trigger: 'blur' },
+          { max: 100, message: '字段过长', trigger: 'blur' },
         ],
-        needCodeFlag: [
-          { required: true, message: "是否需要编码(1-需要,0-不需要)不能为空", trigger: "blur" }
-        ],
-        enableFlag: [
-          { required: true, message: "是否启用(1-是,0-否)不能为空", trigger: "blur" }
-        ],
-      }
+        needCodeFlag: [{ required: true, message: '是否编码管理不能为空', trigger: 'change' }],
+        enableFlag: [{ required: true, message: '是否启用不能为空', trigger: 'change' }],
+        maintenCycle: [{ pattern: /^\d+$/, message: '必须为正整数', trigger: 'blur' }],
+      },
     }
   },
   created() {
     this.getList()
   },
   methods: {
-    /** 查询工装夹具类型列表 */
     getList() {
       this.loading = true
       listType(this.queryParams).then(response => {
@@ -261,75 +230,75 @@ export default {
         this.loading = false
       })
     },
-    // 取消按钮
     cancel() {
       this.open = false
       this.reset()
     },
-    // 表单重置
     reset() {
       this.form = {
         toolTypeId: null,
-        factoryId: null,
         toolTypeCode: null,
         toolTypeName: null,
-        needCodeFlag: null,
+        needCodeFlag: '1',
         maintenType: null,
         maintenCycle: null,
-        enableFlag: null,
+        enableFlag: '1',
         remark: null,
-        createBy: null,
-        createTime: null,
-        updateBy: null,
-        updateTime: null
       }
-      this.resetForm("form")
+      this.autoGenFlag = false
+      this.$refs.form?.resetFields()
     },
-    /** 搜索按钮操作 */
     handleQuery() {
       this.queryParams.pageNum = 1
       this.getList()
     },
-    /** 重置按钮操作 */
     resetQuery() {
-      this.resetForm("queryForm")
+      this.$refs.queryForm?.resetFields()
       this.handleQuery()
     },
-    // 多选框选中数据
     handleSelectionChange(selection) {
       this.ids = selection.map(item => item.toolTypeId)
       this.single = selection.length !== 1
       this.multiple = !selection.length
     },
-    /** 新增按钮操作 */
     handleAdd() {
       this.reset()
       this.open = true
-      this.title = "添加工装夹具类型"
+      this.title = '添加工装夹具类型'
+      this.optType = 'add'
     },
-    /** 修改按钮操作 */
-    handleUpdate(row) {
+    handleView(row) {
       this.reset()
-      const toolTypeId = row.toolTypeId || this.ids
+      const toolTypeId = row.toolTypeId || this.ids[0]
       getType(toolTypeId).then(response => {
         this.form = response.data
         this.open = true
-        this.title = "修改工装夹具类型"
+        this.title = '查看工装夹具类型'
+        this.optType = 'view'
       })
     },
-    /** 提交按钮 */
+    handleUpdate(row) {
+      this.reset()
+      const toolTypeId = row.toolTypeId || this.ids[0]
+      getType(toolTypeId).then(response => {
+        this.form = response.data
+        this.open = true
+        this.title = '修改工装夹具类型'
+        this.optType = 'edit'
+      })
+    },
     submitForm() {
-      this.$refs["form"].validate(valid => {
+      this.$refs.form.validate(valid => {
         if (valid) {
           if (this.form.toolTypeId != null) {
-            updateType(this.form).then(response => {
-              this.$modal.msgSuccess("修改成功")
+            updateType(this.form).then(() => {
+              this.$modal.msgSuccess('修改成功')
               this.open = false
               this.getList()
             })
           } else {
-            addType(this.form).then(response => {
-              this.$modal.msgSuccess("新增成功")
+            addType(this.form).then(() => {
+              this.$modal.msgSuccess('新增成功')
               this.open = false
               this.getList()
             })
@@ -337,22 +306,27 @@ export default {
         }
       })
     },
-    /** 删除按钮操作 */
     handleDelete(row) {
-      const toolTypeIds = row.toolTypeId || this.ids
-      this.$modal.confirm('是否确认删除工装夹具类型编号为"' + toolTypeIds + '"的数据项？').then(function() {
+      const toolTypeIds = row.toolTypeId || this.ids.join(',')
+      this.$modal.confirm('是否确认删除工装夹具类型编号为"' + toolTypeIds + '"的数据项？').then(() => {
         return delType(toolTypeIds)
       }).then(() => {
         this.getList()
-        this.$modal.msgSuccess("删除成功")
+        this.$modal.msgSuccess('删除成功')
       }).catch(() => {})
     },
-    /** 导出按钮操作 */
     handleExport() {
-      this.download('mes/tm/tooltype/export', {
-        ...this.queryParams
-      }, `type_${new Date().getTime()}.xlsx`)
-    }
-  }
+      this.download('mes/tm/tooltype/export', { ...this.queryParams }, `tooltype_${new Date().getTime()}.xlsx`)
+    },
+    handleAutoGenChange(autoGenFlag) {
+      if (autoGenFlag) {
+        genSerialCode('TOOL_TYPE_CODE').then(response => {
+          this.form.toolTypeCode = response.data
+        })
+      } else {
+        this.form.toolTypeCode = null
+      }
+    },
+  },
 }
 </script>

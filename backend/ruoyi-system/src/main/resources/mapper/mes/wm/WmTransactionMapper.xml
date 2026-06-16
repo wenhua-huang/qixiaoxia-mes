@@ -49,9 +49,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectWmTransactionList" parameterType="WmTransaction" resultMap="WmTransactionResult">
         <include refid="selectWmTransactionVo"/>
-        <where>
-            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
-            <if test="transactionType != null and transactionType != ''"> and transaction_type like concat('%', #{transactionType}, '%')</if>
+        <where>            <if test="transactionType != null and transactionType != ''"> and transaction_type like concat('%', #{transactionType}, '%')</if>
             <if test="sourceDocType != null and sourceDocType != ''"> and source_doc_type like concat('%', #{sourceDocType}, '%')</if>
             <if test="sourceDocId != null"> and source_doc_id = #{sourceDocId}</if>
             <if test="sourceDocCode != null and sourceDocCode != ''"> and source_doc_code like concat('%', #{sourceDocCode}, '%')</if>
@@ -94,9 +92,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertWmTransaction" parameterType="WmTransaction" useGeneratedKeys="true" keyProperty="transactionId">
         insert into qxx_wm_transaction
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="transactionType != null">transaction_type,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="transactionType != null">transaction_type,</if>
             <if test="sourceDocType != null">source_doc_type,</if>
             <if test="sourceDocId != null">source_doc_id,</if>
             <if test="sourceDocCode != null">source_doc_code,</if>
@@ -131,9 +127,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="transactionType != null">#{transactionType},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="transactionType != null">#{transactionType},</if>
             <if test="sourceDocType != null">#{sourceDocType},</if>
             <if test="sourceDocId != null">#{sourceDocId},</if>
             <if test="sourceDocCode != null">#{sourceDocCode},</if>
@@ -172,9 +166,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateWmTransaction" parameterType="WmTransaction">
         update qxx_wm_transaction
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="transactionType != null">transaction_type = #{transactionType},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="transactionType != null">transaction_type = #{transactionType},</if>
             <if test="sourceDocType != null">source_doc_type = #{sourceDocType},</if>
             <if test="sourceDocId != null">source_doc_id = #{sourceDocId},</if>
             <if test="sourceDocCode != null">source_doc_code = #{sourceDocCode},</if>

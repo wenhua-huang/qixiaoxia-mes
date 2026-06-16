@@ -27,9 +27,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectWmStorageLocationList" parameterType="WmStorageLocation" resultMap="WmStorageLocationResult">
         <include refid="selectWmStorageLocationVo"/>
-        <where>
-            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
-            <if test="locationCode != null and locationCode != ''"> and location_code like concat('%', #{locationCode}, '%')</if>
+        <where>            <if test="locationCode != null and locationCode != ''"> and location_code like concat('%', #{locationCode}, '%')</if>
             <if test="locationName != null and locationName != ''"> and location_name like concat('%', #{locationName}, '%')</if>
             <if test="warehouseId != null"> and warehouse_id = #{warehouseId}</if>
             <if test="warehouseCode != null and warehouseCode != ''"> and warehouse_code like concat('%', #{warehouseCode}, '%')</if>
@@ -52,9 +50,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertWmStorageLocation" parameterType="WmStorageLocation" useGeneratedKeys="true" keyProperty="locationId">
         insert into qxx_wm_storage_location
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="locationCode != null">location_code,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="locationCode != null">location_code,</if>
             <if test="locationName != null">location_name,</if>
             <if test="warehouseId != null">warehouse_id,</if>
             <if test="warehouseCode != null">warehouse_code,</if>
@@ -67,9 +63,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="locationCode != null">#{locationCode},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="locationCode != null">#{locationCode},</if>
             <if test="locationName != null">#{locationName},</if>
             <if test="warehouseId != null">#{warehouseId},</if>
             <if test="warehouseCode != null">#{warehouseCode},</if>
@@ -86,9 +80,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateWmStorageLocation" parameterType="WmStorageLocation">
         update qxx_wm_storage_location
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="locationCode != null">location_code = #{locationCode},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="locationCode != null">location_code = #{locationCode},</if>
             <if test="locationName != null">location_name = #{locationName},</if>
             <if test="warehouseId != null">warehouse_id = #{warehouseId},</if>
             <if test="warehouseCode != null">warehouse_code = #{warehouseCode},</if>

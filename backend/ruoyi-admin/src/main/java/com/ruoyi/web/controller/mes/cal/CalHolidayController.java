@@ -77,8 +77,15 @@ public class CalHolidayController extends BaseController
     @PostMapping
     public AjaxResult add(@RequestBody CalHoliday calHoliday)
     {
-        calHolidayService.insertCalHoliday(calHoliday);
-        return success(calHoliday);
+        CalHoliday param = new CalHoliday();
+        param.setHolidayDate(calHoliday.getHolidayDate());
+        List<CalHoliday> days = calHolidayService.selectCalHolidayList(param);
+        if(days != null && !days.isEmpty()){
+            calHoliday.setHolidayId(days.get(0).getHolidayId());
+            return toAjax(calHolidayService.updateCalHoliday(calHoliday));
+        }else{
+            return toAjax(calHolidayService.insertCalHoliday(calHoliday));
+        }
     }
 
     /**

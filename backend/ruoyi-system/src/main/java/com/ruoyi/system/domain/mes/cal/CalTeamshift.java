@@ -61,6 +61,18 @@ public class CalTeamshift extends BaseEntity
     @Excel(name = "排班计划名称")
     private String planName;
 
+    /** 序号(1白班/2夜班/3中班) */
+    @Excel(name = "序号")
+    private Long orderNum;
+
+    public Long getOrderNum() {
+        return orderNum;
+    }
+
+    public void setOrderNum(Long orderNum) {
+        this.orderNum = orderNum;
+    }
+
     public void setTeamshiftId(Long teamshiftId) 
     {
         this.teamshiftId = teamshiftId;

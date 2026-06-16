@@ -31,9 +31,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectWmStorageAreaList" parameterType="WmStorageArea" resultMap="WmStorageAreaResult">
         <include refid="selectWmStorageAreaVo"/>
-        <where>
-            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
-            <if test="areaCode != null and areaCode != ''"> and area_code like concat('%', #{areaCode}, '%')</if>
+        <where>            <if test="areaCode != null and areaCode != ''"> and area_code like concat('%', #{areaCode}, '%')</if>
             <if test="areaName != null and areaName != ''"> and area_name like concat('%', #{areaName}, '%')</if>
             <if test="locationId != null"> and location_id = #{locationId}</if>
             <if test="locationCode != null and locationCode != ''"> and location_code like concat('%', #{locationCode}, '%')</if>
@@ -59,9 +57,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertWmStorageArea" parameterType="WmStorageArea" useGeneratedKeys="true" keyProperty="areaId">
         insert into qxx_wm_storage_area
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="areaCode != null">area_code,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="areaCode != null">area_code,</if>
             <if test="areaName != null">area_name,</if>
             <if test="locationId != null">location_id,</if>
             <if test="locationCode != null">location_code,</if>
@@ -78,9 +74,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="areaCode != null">#{areaCode},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="areaCode != null">#{areaCode},</if>
             <if test="areaName != null">#{areaName},</if>
             <if test="locationId != null">#{locationId},</if>
             <if test="locationCode != null">#{locationCode},</if>
@@ -101,9 +95,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateWmStorageArea" parameterType="WmStorageArea">
         update qxx_wm_storage_area
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="areaCode != null">area_code = #{areaCode},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="areaCode != null">area_code = #{areaCode},</if>
             <if test="areaName != null">area_name = #{areaName},</if>
             <if test="locationId != null">location_id = #{locationId},</if>
             <if test="locationCode != null">location_code = #{locationCode},</if>

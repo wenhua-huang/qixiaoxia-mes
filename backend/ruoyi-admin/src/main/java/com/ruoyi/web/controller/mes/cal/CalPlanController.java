@@ -4,6 +4,7 @@ import java.util.List;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -17,7 +18,10 @@ import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.system.domain.mes.cal.CalPlan;
+import com.ruoyi.system.domain.mes.cal.CalPlanTeam;
 import com.ruoyi.system.service.mes.cal.ICalPlanService;
+import com.ruoyi.system.service.mes.cal.ICalPlanTeamService;
+import com.ruoyi.system.service.mes.cal.ICalTeamshiftService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.page.TableDataInfo;
 
@@ -33,6 +37,12 @@ public class CalPlanController extends BaseController
 {
     @Autowired
     private ICalPlanService calPlanService;
+
+    @Autowired
+    private ICalPlanTeamService calPlanTeamService;
+
+    @Autowired
+    private ICalTeamshiftService calTeamshiftService;
 
     /**
      * 查询排班计划列表
@@ -83,12 +93,31 @@ public class CalPlanController extends BaseController
 
     /**
      * 修改排班计划
+     * 当状态变更为"已确认"时，自动生成排班明细
      */
     @PreAuthorize("@ss.hasPermi('mes:cal:plan:edit')")
     @Log(title = "排班计划", businessType = BusinessType.UPDATE)
     @PutMapping
+    @Transactional
     public AjaxResult edit(@RequestBody CalPlan calPlan)
     {
+        if ("CONFIRMED".equals(calPlan.getStatus())) {
+            // 检查班组配置
+            CalPlanTeam teamParam = new CalPlanTeam();
+            teamParam.setPlanId(calPlan.getPlanId());
+            List<CalPlanTeam> teams = calPlanTeamService.selectCalPlanTeamList(teamParam);
+            if (teams == null || teams.isEmpty()) {
+                return AjaxResult.error("请先配置班组!");
+            }
+            if ("SHIFT_TWO".equals(calPlan.getShiftType()) && teams.size() != 2) {
+                return AjaxResult.error("两班倒需要配置两个班组!");
+            }
+            if ("SHIFT_THREE".equals(calPlan.getShiftType()) && teams.size() != 3) {
+                return AjaxResult.error("三班倒需要配置三个班组!");
+            }
+            // 生成排班明细
+            calTeamshiftService.genRecords(calPlan.getPlanId());
+        }
         return toAjax(calPlanService.updateCalPlan(calPlan));
     }
 

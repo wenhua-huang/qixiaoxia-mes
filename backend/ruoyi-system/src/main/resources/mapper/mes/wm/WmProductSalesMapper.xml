@@ -47,9 +47,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectWmProductSalesList" parameterType="WmProductSales" resultMap="WmProductSalesResult">
         <include refid="selectWmProductSalesVo"/>
-        <where>
-            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
-            <if test="salesCode != null and salesCode != ''"> and sales_code like concat('%', #{salesCode}, '%')</if>
+        <where>            <if test="salesCode != null and salesCode != ''"> and sales_code like concat('%', #{salesCode}, '%')</if>
             <if test="salesName != null and salesName != ''"> and sales_name like concat('%', #{salesName}, '%')</if>
             <if test="clientId != null"> and client_id = #{clientId}</if>
             <if test="clientCode != null and clientCode != ''"> and client_code like concat('%', #{clientCode}, '%')</if>
@@ -88,9 +86,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertWmProductSales" parameterType="WmProductSales" useGeneratedKeys="true" keyProperty="salesId">
         insert into qxx_wm_product_sales
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
-            <if test="salesCode != null">sales_code,</if>
+        <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="salesCode != null">sales_code,</if>
             <if test="salesName != null">sales_name,</if>
             <if test="clientId != null">client_id,</if>
             <if test="clientCode != null">client_code,</if>
@@ -123,9 +119,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by,</if>
             <if test="updateTime != null">update_time,</if>
         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
-            <if test="salesCode != null">#{salesCode},</if>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="salesCode != null">#{salesCode},</if>
             <if test="salesName != null">#{salesName},</if>
             <if test="clientId != null">#{clientId},</if>
             <if test="clientCode != null">#{clientCode},</if>
@@ -162,9 +156,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateWmProductSales" parameterType="WmProductSales">
         update qxx_wm_product_sales
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="factoryId != null">factory_id = #{factoryId},</if>
-            <if test="salesCode != null">sales_code = #{salesCode},</if>
+        <trim prefix="SET" suffixOverrides=",">            <if test="salesCode != null">sales_code = #{salesCode},</if>
             <if test="salesName != null">sales_name = #{salesName},</if>
             <if test="clientId != null">client_id = #{clientId},</if>
             <if test="clientCode != null">client_code = #{clientCode},</if>

@@ -466,14 +466,20 @@ curl -s http://localhost:8081/getInfo -H "Authorization: Bearer $TOKEN" | python
 ### 服务架构
 
 ```
-浏览器 → Nginx(:80) → /            → Vite(:5173)   前端
-                     → /prod-api/   → Java(:8081)    后端
+浏览器 → Nginx(:80) → /            → 静态文件(dist/)   前端(生产构建)
+                     → /prod-api/   → Java(:8081)         后端
 MySQL(:3307)  Redis(:6380)  MinIO(:9010)  均为 Docker 容器
 ```
+
+> ⚠️ **服务器仅 1.8GB 内存，禁止在生产环境跑 Vite dev server 或执行 `vite build`。**
+> 前端构建必须在本机完成（`cd frontend && npx vite build`），然后 scp `dist/` 到服务器。
 
 ### 发布流程
 
 ```bash
+# === 前置：本机构建前端 ===
+cd frontend && npx vite build
+
 # 1. 连接服务器
 sshpass -p 'ShQxx2026@$^' ssh -o StrictHostKeyChecking=no root@115.29.234.204
 
@@ -497,8 +503,11 @@ nohup java -jar /var/www/qixiaoxia-mes/backend/ruoyi-admin/target/ruoyi-admin.ja
   --server.port=8081 --ruoyi.profile=/var/www/qixiaoxia-mes/uploadPath \
   > /tmp/qxx-backend.log 2>&1 &
 
-# 6. 前端（Vite HMR 自动热更新，通常无需重启）
-# 如需重启：kill $(lsof -ti :5173) && cd frontend && npx vite --host 0.0.0.0 --port 5173
+# 6. 上传前端 dist（本机执行）
+sshpass -p 'ShQxx2026@$^' scp -o StrictHostKeyChecking=no -r frontend/dist/* root@115.29.234.204:/var/www/qixiaoxia-mes/frontend/dist/
+
+# 7. 重载 Nginx
+sshpass -p 'ShQxx2026@$^' ssh -o StrictHostKeyChecking=no root@115.29.234.204 'nginx -s reload'
 ```
 
 ### 发布后验证
@@ -525,7 +534,9 @@ curl -s -o /dev/null -w "HTTP %{http_code}" http://localhost/
 - 服务器 JDK：Java 11（Maven 默认）+ Java 17（Alibaba Dragonwell，后端运行时）
 - `mvn` 默认用 Java 11，**必须设 `JAVA_HOME` 指向 JDK 17 才能编译**
 - `checkstyle.xml` 不在服务器上，需加 `-Dcheckstyle.skip=true`
-- 前端用 Vite dev 模式（端口 5173），Nginx 代理到 80
+- **前端用 Nginx 托管静态文件**（`frontend/dist/`），非 Vite dev server
+- **禁止**在服务器跑 Vite dev server — 1.8GB 内存不够，会 OOM
+- Nginx 配置：`/etc/nginx/conf.d/qixiaoxia-mes.conf`（`root` → `dist/`，`try_files $uri /index.html`）
 
 ## AI 行为准则
 

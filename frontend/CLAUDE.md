@@ -385,22 +385,70 @@ onMounted(() => getList())
    - 用 `v-if="dicts.xxx"` 包裹依赖字典的 DOM，或直接硬编码固定选项
    - 确认字典名称在 `sys_dict_data` 表中存在
 
-2. **弹窗初始状态** — `v-if="form.id"` 包裹整个表单会导致新增时弹窗为空。**必须**：
+2. **枚举字段中文显示（禁止硬编码翻译映射）** — 表格列或表单中显示英文枚举值（如 `PRINT`、`IDLE`、`RUNNING`），**必须**通过后端字典系统翻译为中文，**严禁在组件内写死 `Record<string, string>` 映射对象**。完整流程：
+
+   **① 后端 — 添加字典数据**（`sys_dict_type` + `sys_dict_data`）：
+   ```sql
+   -- dict_type: 字典类型定义
+   INSERT IGNORE INTO sys_dict_type (dict_id, dict_name, dict_type, status, create_by, create_time)
+   VALUES (20, '工作站类型', 'mes_workstation_type', '0', 'admin', NOW());
+   
+   -- dict_data: 字典键值对（dict_label=中文, dict_value=英文存储值, list_class=el-tag颜色）
+   INSERT IGNORE INTO sys_dict_data (dict_code, dict_sort, dict_label, dict_value, dict_type, list_class, is_default, status, create_by, create_time)
+   VALUES (100, 1, '印刷机', 'PRINT', 'mes_workstation_type', 'primary', 'Y', '0', 'admin', NOW()),
+          (101, 2, '全自动制袋机', 'BAG_AUTO', 'mes_workstation_type', 'success', 'N', '0', 'admin', NOW());
+   ```
+   
+   **② 前端 — 表格列显示**（用 `<dict-tag>` 组件）：
+   ```html
+   <!-- ✅ 正确：通过字典加载，支持 el-tag 彩色标签 -->
+   <el-table-column label="类型" prop="workstationType">
+     <template #default="s"><dict-tag :options="mes_workstation_type" :value="s.row.workstationType" /></template>
+   </el-table-column>
+   
+   <!-- ❌ 错误：硬编码映射，无法维护 -->
+   <el-table-column label="类型" prop="workstationType">
+     <template #default="s">{{ { PRINT: '印刷机' }[s.row.workstationType] }}</template>
+   </el-table-column>
+   ```
+   
+   **③ 前端 — 表单下拉**（用 `v-for` 遍历字典数据）：
+   ```html
+   <!-- ✅ 正确：选项从字典加载 -->
+   <el-select v-model="form.workstationType">
+     <el-option v-for="d in mes_workstation_type" :key="d.value" :label="d.label" :value="d.value" />
+   </el-select>
+   
+   <!-- ❌ 错误：硬编码 el-option -->
+   <el-select v-model="form.workstationType">
+     <el-option label="印刷机" value="PRINT" />
+   </el-select>
+   ```
+   
+   **④ 前端 — script 声明**：
+   ```typescript
+   // 从后端 /system/dict/data/type/xxx 加载，自动缓存到 Pinia store
+   const { mes_workstation_type } = useDict('mes_workstation_type')
+   ```
+   
+   **命名规范**：字典类型名用 `mes_{模块}_{字段}` 格式，如 `mes_workstation_status`、`mes_order_status`。
+
+3. **弹窗初始状态** — `v-if="form.id"` 包裹整个表单会导致新增时弹窗为空。**必须**：
    - header 表单始终渲染（不受 `v-if` 限制），line/detail tab 才按需显示
 
-3. **操作栏按钮样式** — 统一用 `el-button link type="primary" size="small"`，列宽 ≥180px，`class-name="small-padding fixed-width"`
+4. **操作栏按钮样式** — 统一用 `el-button link type="primary" size="small"`，列宽 ≥180px，`class-name="small-padding fixed-width"`
 
-4. **Element Plus Icon** — 不要用 Element UI 的图标名（如 `el-icon-edit`），用 Element Plus 的 `Edit` / `Delete` 等。不确定图标是否存在时直接去掉 `icon` 属性，纯文字按钮
+5. **Element Plus Icon** — 不要用 Element UI 的图标名（如 `el-icon-edit`），用 Element Plus 的 `Edit` / `Delete` 等。不确定图标是否存在时直接去掉 `icon` 属性，纯文字按钮
 
-5. **路由导航** — `router.push({ path: '/mes/wm/xxx', query: { id } })` 前确认目标路径的菜单 `visible='0'`（菜单隐藏则路由未注册，push 失效）
+6. **路由导航** — `router.push({ path: '/mes/wm/xxx', query: { id } })` 前确认目标路径的菜单 `visible='0'`（菜单隐藏则路由未注册，push 失效）
 
-6. **确认弹窗** — `proxy.$modal.confirm(...)` 必须加 `.catch(() => {})` 处理取消操作，避免 unhandled rejection
+7. **确认弹窗** — `proxy.$modal.confirm(...)` 必须加 `.catch(() => {})` 处理取消操作，避免 unhandled rejection
 
-7. **Label 间距** — 所有 dialog 表单统一加 `<style scoped> :deep(.el-form-item__label) { padding-right: 16px !important; } </style>`，避免 label 文字和输入框紧贴
+8. **Label 间距** — 所有 dialog 表单统一加 `<style scoped> :deep(.el-form-item__label) { padding-right: 16px !important; } </style>`，避免 label 文字和输入框紧贴
 
-8. **自动生成开关** — 用 `<el-switch size="small" />` + 独立 `<span>自动生成</span>` 标签，**不用** `active-text` 属性（会竖向排列）
+9. **自动生成开关** — 用 `<el-switch size="small" />` + 独立 `<span>自动生成</span>` 标签，**不用** `active-text` 属性（会竖向排列）
 
-9. **日期格式** — `el-date-picker` 的 `value-format` **必须**为 `YYYY-MM-DD HH:mm:ss`，不能是 `YYYY-MM-DD`（后端 Jackson 解析报错）
+10. **日期格式** — `el-date-picker` 的 `value-format` **必须**为 `YYYY-MM-DD HH:mm:ss`，不能是 `YYYY-MM-DD`（后端 Jackson 解析报错）
 
 ## 前端修改后自验证（AI 必须执行，禁止直接让用户检查）
 

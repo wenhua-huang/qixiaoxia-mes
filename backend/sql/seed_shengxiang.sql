@@ -142,6 +142,94 @@ INSERT IGNORE INTO `qxx_md_client` (`client_id`, `factory_id`, `client_code`, `c
 UNLOCK TABLES;
 
 --
+-- Dumping data for table `sys_dict_type` (MES字典类型)
+--
+
+INSERT IGNORE INTO `sys_dict_type` (`dict_id`, `dict_name`, `dict_type`, `status`, `create_by`, `create_time`, `update_by`, `update_time`, `remark`) VALUES
+(20, '工作站类型', 'mes_workstation_type', '0', 'admin', NOW(), '', NULL, '工作站类型列表'),
+(21, '工序类型',   'mes_process_type',     '0', 'admin', NOW(), '', NULL, '工序类型列表'),
+(22, '工作站状态', 'mes_workstation_status','0', 'admin', NOW(), '', NULL, '工作站状态列表');
+
+--
+-- Dumping data for table `sys_dict_data` (MES字典数据)
+--
+
+INSERT IGNORE INTO `sys_dict_data` (`dict_code`, `dict_sort`, `dict_label`, `dict_value`, `dict_type`, `css_class`, `list_class`, `is_default`, `status`, `create_by`, `create_time`, `update_by`, `update_time`, `remark`) VALUES
+(100, 1, '印刷机',       'PRINT',       'mes_workstation_type', '', 'primary',   'Y', '0', 'admin', NOW(), '', NULL, '工作站类型-印刷机'),
+(101, 2, '全自动制袋机', 'BAG_AUTO',    'mes_workstation_type', '', 'success',   'N', '0', 'admin', NOW(), '', NULL, '工作站类型-全自动制袋机'),
+(102, 3, '半自动制袋机', 'BAG_SEMI',    'mes_workstation_type', '', 'warning',   'N', '0', 'admin', NOW(), '', NULL, '工作站类型-半自动制袋机'),
+(103, 4, '其他',         'OTHER',       'mes_workstation_type', '', 'info',      'N', '0', 'admin', NOW(), '', NULL, '工作站类型-其他'),
+(110, 1, '印刷',         'PRINT',       'mes_process_type',     '', 'primary',   'Y', '0', 'admin', NOW(), '', NULL, '工序类型-印刷'),
+(111, 2, '制袋',         'BAG_MAKE',    'mes_process_type',     '', 'success',   'N', '0', 'admin', NOW(), '', NULL, '工序类型-制袋'),
+(112, 3, '分切',         'SLITTING',    'mes_process_type',     '', 'warning',   'N', '0', 'admin', NOW(), '', NULL, '工序类型-分切'),
+(113, 4, '检验',         'INSPECT',     'mes_process_type',     '', 'info',      'N', '0', 'admin', NOW(), '', NULL, '工序类型-检验'),
+(120, 1, '空闲',         'IDLE',        'mes_workstation_status','', 'success',   'Y', '0', 'admin', NOW(), '', NULL, '工作站状态-空闲'),
+(121, 2, '运行中',       'RUNNING',     'mes_workstation_status','', 'primary',   'N', '0', 'admin', NOW(), '', NULL, '工作站状态-运行中'),
+(122, 3, '保养中',       'MAINTENANCE', 'mes_workstation_status','', 'warning',   'N', '0', 'admin', NOW(), '', NULL, '工作站状态-保养中'),
+(123, 4, '故障',         'BREAKDOWN',   'mes_workstation_status','', 'danger',    'N', '0', 'admin', NOW(), '', NULL, '工作站状态-故障');
+
+-- 客户类型
+INSERT IGNORE INTO `sys_dict_type` (`dict_id`, `dict_name`, `dict_type`, `status`, `create_by`, `create_time`, `update_by`, `update_time`, `remark`) VALUES
+(30, '客户类型',     'mes_client_type',        '0', 'admin', NOW(), '', NULL, '客户类型列表'),
+(31, '物料产品分类', 'mes_item_type',          '0', 'admin', NOW(), '', NULL, '物料/产品分类列表'),
+(32, '供应商类型',   'mes_vendor_type',        '0', 'admin', NOW(), '', NULL, '供应商类型列表'),
+(33, '结算方式',     'mes_settlement_type',    '0', 'admin', NOW(), '', NULL, '结算方式列表'),
+(34, '合作状态',     'mes_coop_status',        '0', 'admin', NOW(), '', NULL, '合作状态列表'),
+(35, '仓库类型',     'mes_warehouse_type',     '0', 'admin', NOW(), '', NULL, '仓库类型列表'),
+(36, '设备状态',     'mes_machinery_status',   '0', 'admin', NOW(), '', NULL, '设备状态列表'),
+(37, '订单状态',     'mes_order_status',        '0', 'admin', NOW(), '', NULL, '采购/生产订单状态列表'),
+(38, '采购类型',     'mes_purchase_type',       '0', 'admin', NOW(), '', NULL, '采购类型列表');
+
+INSERT IGNORE INTO `sys_dict_data` (`dict_code`, `dict_sort`, `dict_label`, `dict_value`, `dict_type`, `css_class`, `list_class`, `is_default`, `status`, `create_by`, `create_time`, `update_by`, `update_time`, `remark`) VALUES
+-- 客户类型 (mes_client_type)
+(200, 1, '内贸',     'DOMESTIC', 'mes_client_type', '', 'primary', 'Y', '0', 'admin', NOW(), '', NULL, '客户类型-内贸'),
+(201, 2, '外贸',     'FOREIGN',  'mes_client_type', '', 'success', 'N', '0', 'admin', NOW(), '', NULL, '客户类型-外贸'),
+(202, 3, '现货',     'SPOT',     'mes_client_type', '', 'warning', 'N', '0', 'admin', NOW(), '', NULL, '客户类型-现货'),
+-- 物料产品分类 (mes_item_type)
+(210, 1, '原料',     'RAW',       'mes_item_type', '', 'primary', 'Y', '0', 'admin', NOW(), '', NULL, '物料分类-原料'),
+(211, 2, '半成品',   'SEMI',      'mes_item_type', '', 'success', 'N', '0', 'admin', NOW(), '', NULL, '物料分类-半成品'),
+(212, 3, '成品',     'FINISHED',  'mes_item_type', '', 'warning', 'N', '0', 'admin', NOW(), '', NULL, '物料分类-成品'),
+(213, 4, '辅料',     'AUXILIARY', 'mes_item_type', '', 'info',    'N', '0', 'admin', NOW(), '', NULL, '物料分类-辅料'),
+(214, 5, '包材',     'PACK',      'mes_item_type', '', 'danger',  'N', '0', 'admin', NOW(), '', NULL, '物料分类-包材'),
+-- 供应商类型 (mes_vendor_type)
+(220, 1, '原材料供应商', 'MATERIAL',  'mes_vendor_type', '', 'primary', 'Y', '0', 'admin', NOW(), '', NULL, '供应商类型-原材料'),
+(221, 2, '外协加工商',   'OUTSOURCE', 'mes_vendor_type', '', 'success', 'N', '0', 'admin', NOW(), '', NULL, '供应商类型-外协'),
+(222, 3, '两者皆是',     'BOTH',      'mes_vendor_type', '', 'warning', 'N', '0', 'admin', NOW(), '', NULL, '供应商类型-两者皆是'),
+-- 结算方式 (mes_settlement_type)
+(230, 1, '月结',     'MONTHLY', 'mes_settlement_type', '', 'primary', 'Y', '0', 'admin', NOW(), '', NULL, '结算方式-月结'),
+(231, 2, '现结',     'CASH',    'mes_settlement_type', '', 'success', 'N', '0', 'admin', NOW(), '', NULL, '结算方式-现结'),
+(232, 3, '其他',     'OTHER',   'mes_settlement_type', '', 'info',    'N', '0', 'admin', NOW(), '', NULL, '结算方式-其他'),
+-- 合作状态 (mes_coop_status)
+(240, 1, '合作中',   'ACTIVE',   'mes_coop_status', '', 'success', 'Y', '0', 'admin', NOW(), '', NULL, '合作状态-合作中'),
+(241, 2, '暂停',     'INACTIVE', 'mes_coop_status', '', 'warning', 'N', '0', 'admin', NOW(), '', NULL, '合作状态-暂停'),
+(242, 3, '待审核',   'PENDING',  'mes_coop_status', '', 'info',    'N', '0', 'admin', NOW(), '', NULL, '合作状态-待审核'),
+(243, 4, '终止',     'STOPPED',  'mes_coop_status', '', 'danger',  'N', '0', 'admin', NOW(), '', NULL, '合作状态-终止'),
+-- 仓库类型 (mes_warehouse_type)
+(250, 1, '原料仓',   'RAW',      'mes_warehouse_type', '', 'primary', 'Y', '0', 'admin', NOW(), '', NULL, '仓库类型-原料仓'),
+(251, 2, '成品仓',   'FINISHED', 'mes_warehouse_type', '', 'success', 'N', '0', 'admin', NOW(), '', NULL, '仓库类型-成品仓'),
+(252, 3, '辅料仓',   'AUX',      'mes_warehouse_type', '', 'info',    'N', '0', 'admin', NOW(), '', NULL, '仓库类型-辅料仓'),
+(253, 4, '线边库',   'LINE',     'mes_warehouse_type', '', 'warning', 'N', '0', 'admin', NOW(), '', NULL, '仓库类型-线边库'),
+(254, 5, '临时仓',   'TEMP',     'mes_warehouse_type', '', 'danger',  'N', '0', 'admin', NOW(), '', NULL, '仓库类型-临时仓'),
+-- 设备状态 (mes_machinery_status)
+(260, 1, '空闲',     'IDLE',       'mes_machinery_status', '', 'success', 'Y', '0', 'admin', NOW(), '', NULL, '设备状态-空闲'),
+(261, 2, '运行中',   'RUNNING',    'mes_machinery_status', '', 'primary', 'N', '0', 'admin', NOW(), '', NULL, '设备状态-运行中'),
+(262, 3, '保养中',   'MAINTENANCE','mes_machinery_status', '', 'warning', 'N', '0', 'admin', NOW(), '', NULL, '设备状态-保养中'),
+(263, 4, '故障停机', 'BREAKDOWN',  'mes_machinery_status', '', 'danger',  'N', '0', 'admin', NOW(), '', NULL, '设备状态-故障停机'),
+-- 订单状态 (mes_order_status)
+(270, 1, '草稿',     'DRAFT',      'mes_order_status', '', 'info',    'Y', '0', 'admin', NOW(), '', NULL, '订单状态-草稿'),
+(271, 2, '已审批',   'APPROVED',   'mes_order_status', '', 'warning', 'N', '0', 'admin', NOW(), '', NULL, '订单状态-已审批'),
+(272, 3, '已下单',   'ORDERED',    'mes_order_status', '', 'primary', 'N', '0', 'admin', NOW(), '', NULL, '订单状态-已下单'),
+(273, 4, '收货中',   'RECEIVING',  'mes_order_status', '', 'success', 'N', '0', 'admin', NOW(), '', NULL, '订单状态-收货中'),
+(274, 5, '已收货',   'RECEIVED',   'mes_order_status', '', 'success', 'N', '0', 'admin', NOW(), '', NULL, '订单状态-已收货'),
+(275, 6, '已关闭',   'CLOSED',     'mes_order_status', '', 'danger',  'N', '0', 'admin', NOW(), '', NULL, '订单状态-已关闭'),
+(276, 7, '已取消',   'CANCEL',     'mes_order_status', '', 'danger',  'N', '0', 'admin', NOW(), '', NULL, '订单状态-已取消'),
+-- 采购类型 (mes_purchase_type)
+(280, 1, '纸张',     'PAPER',      'mes_purchase_type', '', 'primary', 'Y', '0', 'admin', NOW(), '', NULL, '采购类型-纸张'),
+(281, 2, '辅料',     'AUX',        'mes_purchase_type', '', 'success', 'N', '0', 'admin', NOW(), '', NULL, '采购类型-辅料'),
+(282, 3, '包材',     'PACK',       'mes_purchase_type', '', 'warning', 'N', '0', 'admin', NOW(), '', NULL, '采购类型-包材'),
+(283, 4, '其他',     'OTHER',      'mes_purchase_type', '', 'info',    'N', '0', 'admin', NOW(), '', NULL, '采购类型-其他');
+
+--
 -- Dumping data for table `qxx_md_workstation`
 --
 

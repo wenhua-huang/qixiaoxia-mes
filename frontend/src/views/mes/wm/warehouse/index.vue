@@ -33,7 +33,7 @@
       <el-table-column label="仓库名称" align="center" prop="warehouseName" :show-overflow-tooltip="true" />
       <el-table-column label="仓库类型" align="center" prop="warehouseType" width="90">
         <template #default="scope">
-          {{ warehouseTypeMap[scope.row.warehouseType] || scope.row.warehouseType || '-' }}
+          <dict-tag :options="mes_warehouse_type" :value="scope.row.warehouseType" />
         </template>
       </el-table-column>
       <el-table-column label="地址" align="center" prop="address" :show-overflow-tooltip="true" width="200" />
@@ -80,7 +80,7 @@
           <el-col :span="12">
             <el-form-item label="仓库类型" prop="warehouseType">
               <el-select v-model="form.warehouseType" placeholder="请选择" clearable style="width:100%">
-                <el-option v-for="(label, value) in warehouseTypeMap" :key="value" :label="label" :value="value" />
+                <el-option v-for="d in mes_warehouse_type" :key="d.value" :label="d.label" :value="d.value" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -139,7 +139,7 @@ import { genSerialCode } from '@/api/mes/sys/autocoderule'
 
 const { proxy } = getCurrentInstance() as any
 const router = useRouter()
-const warehouseTypeMap: Record<string, string> = { 'RAW': '原料仓', 'FINISHED': '成品仓', 'AUX': '辅料仓', 'LINE': '线边库', 'TEMP': '临时仓' }
+const { mes_warehouse_type } = useDict('mes_warehouse_type')
 
 const warehouseList = ref<WmWarehouse[]>([])
 const open = ref(false)

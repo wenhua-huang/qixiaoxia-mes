@@ -23,7 +23,7 @@ java -jar ruoyi-admin/target/ruoyi-admin.jar
 
 - **应用入口**: `ruoyi-admin/src/main/java/com/ruoyi/RuoYiApplication.java`
 - **Servlet 初始化器**: `RuoYiServletInitializer.java` (支持 war 部署)
-- **默认端口**: 8080 (配置在 `ruoyi-admin/src/main/resources/application.yml`)
+- **默认端口**: 8081 (配置在 `ruoyi-admin/src/main/resources/application.yml`)
 - **数据库配置**: `application-druid.yml` (Druid 连接池，MySQL)
 - **日志配置**: `logback.xml`
 - **Swagger/OpenAPI**: 已集成 springdoc-openapi (v3.0.2)，访问 `/swagger-ui.html`
@@ -40,26 +40,17 @@ mysql> source sql/quartz.sql
 
 ## Project Structure
 
-```
-backend/
-├── pom.xml                    # 父 POM，依赖管理 (SB 4.0.3, MyBatis 4.0.1, Druid 1.2.28)
-├── ruoyi-admin/               # 🔑 Web 入口模块 — Controller 层
-│   └── src/main/java/com/ruoyi/
-│       ├── RuoYiApplication.java       # Spring Boot 启动类
-│       └── web/controller/             # REST Controllers
-│           ├── system/                 # 系统管理 (用户/角色/菜单/部门/岗位/字典/配置/通知)
-│           └── monitor/                # 监控 (在线用户/操作日志/登录日志/缓存/服务器)
-├── ruoyi-common/               # 通用模块 — 工具类、异常、枚举、注解、过滤器
-├── ruoyi-framework/            # 框架模块 — Security、JWT、AOP、数据权限、配置
-├── ruoyi-system/               # 系统业务模块 — Service + Mapper 层
-├── ruoyi-generator/            # 代码生成器模块 — Velocity 模板引擎
-├── ruoyi-quartz/               # 定时任务模块 — Quartz 调度
-├── ruoyi-ui/                   # 前端 (Vue 2 版，本项目不使用此目录，前端在 ../frontend/)
-├── sql/                        # 数据库初始化脚本
-│   ├── ry_20260417.sql         # 核心表结构 + 初始化数据
-│   └── quartz.sql              # 定时任务表
-└── bin/                        # 部署脚本
-```
+| 模块 | 职责 |
+|------|------|
+| `ruoyi-admin/` | Web 入口 — Controller、启动类、`application.yml` |
+| `ruoyi-framework/` | Security、JWT、AOP、数据权限、FactoryId 拦截器 |
+| `ruoyi-system/` | 业务层 — Service + Mapper |
+| `ruoyi-common/` | 工具类、异常、枚举、注解 |
+| `ruoyi-generator/` | 代码生成器（Velocity 模板） |
+| `ruoyi-quartz/` | 定时任务（Quartz） |
+| `sql/` | 数据库初始化脚本（`ry_20260417.sql`、`quartz.sql`） |
+
+> `ruoyi-ui/` 目录不使用，前端在 `../frontend/`。
 
 ## Architecture & Key Patterns
 
@@ -85,16 +76,28 @@ Controller (ruoyi-admin) → Service (ruoyi-system) → Mapper (ruoyi-system)
 - **认证**: Spring Security + JWT (无状态)，`ruoyi-framework` 中配置
 - **权限**: RBAC 模型 — 用户 → 角色 → 菜单/权限
 - **数据权限**: `@DataScope` 注解，按部门数据隔离
-- **工厂隔离**: `FactoryIdInterceptor` MyBatis 拦截器，自动注入 `factory_id`（详见根 CLAUDE.md）
+- **工厂隔离**: `FactoryIdInterceptor` MyBatis 拦截器，自动注入 `factory_id`
 - **注解驱动**: `@PreAuthorize` + 自定义 `@RequiresPermissions` / `@RequiresRoles`
 
-### FactoryIdInterceptor
+### FactoryIdInterceptor ✅
 
-`ruoyi-framework/.../interceptor/FactoryIdInterceptor.java` — MyBatis 拦截器，拦截所有 `Executor.update()` 和 `Executor.query()`：
+> MyBatis Interceptor 自动注入 `factory_id`，所有用户（含 admin）都受拦截，仅 `@SkipFactoryId` 可放行。
 
-- 参数对象有 `factoryId` 字段且为 null → 自动注入 `SecurityUtils.getFactoryId()`
-- Mapper 方法上加 `@SkipFactoryId` → 跳过
-- 外协表：参数对象有 `outsourceFactoryId` 且已设值 → 跳过（用外协工厂隔离）
+**实现文件**：
+- `ruoyi-framework/.../interceptor/FactoryIdInterceptor.java` — 拦截器核心逻辑（~120 行）
+- `ruoyi-common/.../annotation/SkipFactoryId.java` — 放行注解
+- `ruoyi-framework/.../config/MyBatisConfig.java` — 注册拦截器
+
+**拦截规则**：
+
+| 场景 | 行为 |
+|------|------|
+| INSERT/UPDATE/DELETE/SELECT | 参数对象 `factoryId` 为 null → 自动注入 `SecurityUtils.getFactoryId()` |
+| 外协表 | `outsourceFactoryId` 已设值 → 跳过（用外协工厂 ID 替代） |
+| @SkipFactoryId | Mapper 方法有注解 → 跳过所有拦截 |
+| 参数为 null | 跳过 |
+
+**为什么不选 AOP**：AOP 只拦 Service 方法，Mapper 直接调用、动态 SQL 拼接都拦不到。MyBatis Interceptor 在 SQL 执行层，100% 覆盖。
 
 ### Request Lifecycle
 
@@ -147,16 +150,6 @@ Table queries return `TableDataInfo`:
 - 模块命名: `qixiaoxia-{domain}` (如 `qixiaoxia-wm` 仓储管理)
 - 数据库表前缀: `qxx_` (区别于 RuoYi 原生的 `sys_`)
 
-### MES Domain Modules (规划)
-
-| 模块 | 包名 | 功能 |
-|------|------|------|
-| 基础数据 (md) | `com.qixiaoxia.mes.md` | 物料/工艺路线/BOM/工作中心 |
-| 仓储管理 (wm) | `com.qixiaoxia.mes.wm` | 入库/出库/库存/盘点 |
-| 生产管理 (pro) | `com.qixiaoxia.mes.pro` | 工单/报工/流转 |
-| 质量管理 (qc) | `com.qixiaoxia.mes.qc` | 检验/缺陷/不良品 |
-| 设备管理 (dv) | `com.qixiaoxia.mes.dv` | 设备台账/保养/维修 |
-
 ### Adding a New MES Module
 
 1. 在根 `pom.xml` 中添加 `<module>qixiaoxia-{domain}</module>`
@@ -167,49 +160,21 @@ Table queries return `TableDataInfo`:
 
 ## Testing
 
-### Unit Tests (JUnit 5 + Mockito)
+### Unit Tests（JUnit 5 + Mockito）
 
-位于各模块 `src/test/java/` 下。示例：`ruoyi-system/src/test/java/.../SysConfigServiceImplTest.java`
+`@ExtendWith(MockitoExtension.class)` + `@Mock`/`@InjectMocks`，不启动 Spring 容器。命名 `should_{expected}_when_{condition}`，`@DisplayName` 中文描述。覆盖正常/边界/异常路径。
 
-- `@ExtendWith(MockitoExtension.class)` — 不启动 Spring 容器
-- `@Mock` 所有依赖（Mapper、RedisCache 等），`@InjectMocks` 待测类
-- 命名：`should_{expected}_when_{condition}`
-- `@DisplayName` 中文描述
-- 覆盖：正常路径、边界值（null/空/零）、异常路径
+### Integration Tests（SpringBootTest + Testcontainers）
 
-### Integration Tests (SpringBootTest + Testcontainers)
+继承 `BaseIntegrationTest`，`@SpringBootTest(webEnvironment = RANDOM_PORT)`，`RestTemplate` 发请求，断言 HTTP 响应 + DB 最终状态。
 
-位于 `ruoyi-admin/src/test/java/`。示例：`SysConfigControllerIT`
-
-- 继承 `BaseIntegrationTest`（Testcontainers MySQL 8.0.33）
-- `@SpringBootTest(webEnvironment = RANDOM_PORT)` + `@TestInstance(PER_CLASS)`
-- 数据源由 `@DynamicPropertySource` 动态注入
-- Schema 通过 `spring.sql.init` 从 `../sql/ry_20260417.sql` 自动初始化
-- 使用 `RestTemplate` 发 HTTP 请求
-- `@BeforeEach` 清理测试数据
-- 断言 HTTP 响应 + 数据库最终状态（通过 Mapper）
-
-### Prerequisites for Integration Tests
+前置：`docker compose up -d redis`（Redis 必须启动）。
 
 ```bash
-# 必须启动本地 Redis
-docker compose up -d redis
-```
-
-### Running Tests
-
-```bash
-# 单元测试（快速）
-mvn test
-
-# 特定模块
-mvn test -pl ruoyi-system
-
-# 单元 + 集成测试
-mvn verify
-
-# 特定集成测试
-mvn test -pl ruoyi-admin -Dtest="*IT" -Dsurefire.failIfNoSpecifiedTests=false
+mvn test                          # 单元测试
+mvn test -pl ruoyi-system         # 特定模块
+mvn verify                        # 单元 + 集成
+mvn test -pl ruoyi-admin -Dtest="*IT" -Dsurefire.failIfNoSpecifiedTests=false  # 特定集成测试
 ```
 
 ## RuoYi 框架工具清单
@@ -259,6 +224,7 @@ mvn test -pl ruoyi-admin -Dtest="*IT" -Dsurefire.failIfNoSpecifiedTests=false
 - **包结构**: Controller 放 `ruoyi-admin/module/controller/{domain}/`，Service/Mapper 放业务模块
 - **命名**: 类名 PascalCase，方法/变量 camelCase，常量 UPPER_SNAKE_CASE
 - 所有 `@RequestMapping` 路径使用 kebab-case（`/wm/item-receipt`）
+- **函数长度 ≤ 50 行**（模板/配置除外），超过必须拆分
 
 ### 推荐静态检查
 
@@ -266,111 +232,64 @@ mvn test -pl ruoyi-admin -Dtest="*IT" -Dsurefire.failIfNoSpecifiedTests=false
 
 ## DTO/Entity/VO 分层规范
 
-### 核心原则
+> RuoYi 代码生成器不分 DTO/VO，**标准 CRUD 用 Entity 贯穿，不建 DTO/VO**。
 
-> RuoYi 代码生成器不分 DTO/VO，模板只有 `domain.java.vm`（Entity）。**生成器产出的 CRUD 沿用 RuoYi 模式（Entity 一把梭），不加 DTO/VO。**
+**仅手写复杂业务时建 VO/Body**：多表组合查询结果、请求体与 Entity 差异大、敏感字段需隐藏。返回字段 ≥ 80% 匹配 Entity 则直接用 Entity，不提前建"以后可能用"的 VO。
 
-### 什么时候需要 VO/Body（仅手写复杂业务时）
-
-| 场景 | 用什么 | 触发条件 |
-|------|--------|----------|
-| 标准 CRUD（生成器） | Entity 贯穿 | 默认，不建 DTO/VO |
-| 多表组合查询结果 | VO | 返回字段来自 ≥2 张表，无现成 Entity |
-| 请求体字段与 Entity 差异大 | Body | 前端提交字段 ≠ Entity 字段（含临时字段、验证码） |
-| 敏感字段需隐藏 | VO | Entity 含 password 等不应暴露的字段 |
-
-### 什么时候不需要
-
-- 查询参数多几个筛选条件 → 直接用 Entity，别建 Query
-- 返回字段 = Entity 的 80% 以上 → 直接用 Entity，别建 VO
-- 「以后可能会变」→ 别提前建，等实际需要再说
-
-### 转换方式（仅手写 VO/Body 时）
-
-- **优先用静态工厂方法**：`XxxVO.from(entity)` — 零依赖
-- 字段 > 10 或嵌套多时考虑 MapStruct（需先加依赖）
-- **禁止**：手写逐字段 setter、`BeanUtils.copyProperties`
+转换优先用静态工厂方法 `XxxVO.from(entity)`，禁止逐字段 setter 和 `BeanUtils.copyProperties`。
 
 ## 分层开发模板
 
-### Controller（`ruoyi-admin` 的 controller 目录）
+> 标准 CRUD 用 **RuoYi 代码生成器**（`ruoyi-generator`）一键生成，零手写。以下仅记关键规则。
 
+- **Controller**：继承 `BaseController`，方法加 `@PreAuthorize`，用 `startPage()` / `getDataTable()` / `success()` / `toAjax()`
+- **Service**：`@Transactional(rollbackFor = Exception.class)`，通过 `SecurityUtils.getUsername()` 取操作人。**库存变更等需加锁的方法禁止 @Transactional，改用 TransactionTemplate（见 Redis 分布式锁节）**
+- **Mapper XML**：**所有 SELECT/UPDATE/DELETE WHERE 必须带 `factory_id = #{factoryId}`**（拦截器自动注入参数值，但 SQL 需有 `<if test>` 条件）
+
+## Redis 分布式锁 ✅
+
+> 库存变更（入库/出库/调拨/退货）**必须用 Redisson 分布式锁**，禁止 `synchronized`（仅限单 JVM）。
+
+**实现文件**：
+- `ruoyi-common/.../redis/RedisLockTemplate.java` — 锁模板（~50 行）
+- `ruoyi-common/.../enums/TransactionTypeEnum.java` — 库存事务类型枚举
+- `ruoyi-framework/.../config/RedissonConfig.java` — 手动创建 `RedissonClient` Bean（~35 行）
+- `ruoyi-common/pom.xml` — `redisson` 3.27.2（**非** starter，避免 Spring Boot 4.0 自动配置冲突）
+
+**强制规则**：
+- **先锁后事务**：`lockTemplate.execute(lockKey, () → txTemplate.execute(status → doWork()))`，锁内 lambda 第一行就是开事务
+- **禁止** `@Transactional` 注解 — 事务在方法入口就 `setAutoCommit(false)`，实际先于锁
+- 锁内禁止远程调用/耗时逻辑
+
+**标准用法**：
 ```java
-@RestController
-@RequestMapping("/mes/{domain}/{entity}")
-public class XxxController extends BaseController {
+@Autowired private RedisLockTemplate lockTemplate;
+@Autowired private PlatformTransactionManager txManager;
 
-    @Autowired
-    private IXxxService xxxService;
-
-    @PreAuthorize("@ss.hasPermi('mes:{domain}:{entity}:list')")
-    @GetMapping("/list")
-    public TableDataInfo list(Xxx xxx) {
-        startPage();
-        List<Xxx> list = xxxService.selectXxxList(xxx);
-        return getDataTable(list);
-    }
-
-    @PreAuthorize("@ss.hasPermi('mes:{domain}:{entity}:query')")
-    @GetMapping("/{id}")
-    public AjaxResult getInfo(@PathVariable Long id) {
-        return success(xxxService.selectXxxById(id));
-    }
-
-    @PreAuthorize("@ss.hasPermi('mes:{domain}:{entity}:add')")
-    @Log(title = "新增XXX", businessType = BusinessType.INSERT)
-    @PostMapping
-    public AjaxResult add(@RequestBody Xxx xxx) {
-        xxx.setCreateBy(SecurityUtils.getUsername());
-        return toAjax(xxxService.insertXxx(xxx));
-    }
+public WmTransaction processStock(WmTransaction tx) {
+    TransactionTemplate tt = new TransactionTemplate(txManager);
+    tt.setTimeout(30);
+    return lockTemplate.execute("wm:stock:lock:" + itemId,
+        () -> tt.execute(status -> doProcessTransaction(tx)));  // 🔒先锁 → 再开事务
 }
 ```
 
-### Service（业务模块中）
+**设计要点**：
 
-```java
-@Service
-public class XxxServiceImpl implements IXxxService {
+| 要点 | 说明 |
+|------|------|
+| Watchdog 自动续期 | `tryLock(waitTime)` 不设 leaseTime，Redisson 每 10s 续期 |
+| 锁粒度 | 与 `material_stock.uk_stock` 对齐：`item:batch:warehouse:vendor:workorder:quality` |
+| `isHeldByCurrentThread()` | finally 中先判断再 unlock，防止锁过期抛异常 |
+| `tryLock` 超时 | 最多等 5s，失败抛 `ServiceException` |
 
-    @Autowired
-    private XxxMapper xxxMapper;
+**为什么 Redisson 而非手写 RedisLock**：
 
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public int insertXxx(Xxx xxx) {
-        // 业务校验 → Mapper
-        return xxxMapper.insertXxx(xxx);
-    }
-}
-```
-
-### Mapper XML
-
-```java
-// Java 接口
-public interface XxxMapper {
-    List<Xxx> selectXxxList(Xxx xxx);
-    Xxx selectXxxById(Long id);
-    int insertXxx(Xxx xxx);
-    int updateXxx(Xxx xxx);
-}
-```
-
-```xml
-<!-- XML 中 SELECT 必须带 factory_id -->
-<select id="selectXxxList" resultType="Xxx">
-    SELECT * FROM qxx_{domain}_{entity}
-    <where>
-        AND factory_id = #{factoryId}
-        <if test="name != null and name != ''">AND name LIKE CONCAT('%', #{name}, '%')</if>
-    </where>
-</select>
-```
-
-## 并发控制 & 数据一致性
-
-> ⚠️ RuoYi 框架**无内置分布式锁/乐观锁工具**。`@RepeatSubmit` 只防重复提交（HTTP 幂等），`@RateLimiter` 只做限流。以下为设计规范，**具体工具类待后续完善**。
+| 对比 | 手写 SET NX EX | Redisson RLock |
+|------|---------------|----------------|
+| 锁过期 | 固定 TTL，DB 卡了锁会丢 ❌ | Watchdog 自动续期 ✅ |
+| 可重入 | 需自己实现计数器 | 内置支持 |
+| 锁释放安全 | 需 Lua 脚本保证原子性 | `isHeldByCurrentThread()` |
 
 ### 必须加锁的 MES 场景
 
@@ -382,56 +301,10 @@ public interface XxxMapper {
 | 外协收料/发料确认 | 两人同时确认同一外协单 | 重复入库 |
 | 设备状态变更（维修→正常、报废） | 两人同时更新同一设备 | 状态跳跃 |
 
-### 推荐方案
+## 异常处理与日志
 
-| 方案 | 适用场景 | 实现思路 |
-|------|---------|---------|
-| **乐观锁（推荐首选）** | 更新频率低、冲突概率小 | 表加 `version` 字段，UPDATE 时 `WHERE version = ?`，不匹配则重试 |
-| **Redis 分布式锁** | 更新频率高、需跨服务锁定 | `SET lock:key value NX EX 30`，操作完释放 |
-| **SELECT FOR UPDATE** | 事务内必须保证读取一致性 | Mapper XML 中手写，事务提交后自动释放 |
-
-### 乐观锁模板（待工具化）
-
-```sql
--- 1. DDL 加 version 字段
-ALTER TABLE qxx_wm_item_inventory ADD COLUMN version INT DEFAULT 0 NOT NULL COMMENT '乐观锁版本号';
-
--- 2. UPDATE 带 version + 条件约束
-UPDATE qxx_wm_item_inventory
-SET quantity = quantity - #{quantity}, version = version + 1
-WHERE id = #{id} AND version = #{version} AND quantity >= #{quantity};
--- affected rows = 0 → 版本冲突，重试或返回错误
-```
-
-### AI 开发并发检查
-
-- 涉及上述 5 类场景的 UPDATE → 必须加锁措施
-- Code Review 必须检查并发安全
-
-## 异常处理与日志规范
-
-### 异常处理
-
-- Service 层抛出 `ServiceException("业务描述")`，不吞异常
-- Controller 层由 `GlobalExceptionHandler` 统一捕获，不手写 try-catch
-- 不要 `catch (Exception e) { e.printStackTrace(); return null; }`
-
-### 日志级别
-
-| 级别 | 使用场景 |
-|------|---------|
-| `info` | 业务流程节点（开工、完工、入库、出库） |
-| `warn` | 可恢复异常（库存不足、状态不允许、参数越界） |
-| `error` | 不可恢复异常（数据库连接失败、外部系统调用失败） |
-| `debug` | 调试信息（SQL 参数、中间结果），生产关闭 |
-
-### 日志格式
-
-```java
-log.info("工单开工, workorderId={}, operator={}", workorderId, SecurityUtils.getUsername());
-log.warn("库存不足, itemId={}, required={}, available={}", itemId, qty, stock);
-log.error("入库失败, recptCode={}", recptCode, exception);  // 异常作最后一个参数
-```
+- Service 抛 `ServiceException("描述")`，不吞异常。Controller 由 `GlobalExceptionHandler` 统一捕获。
+- 日志级别：`info` 业务节点 → `warn` 可恢复异常 → `error` 不可恢复异常。格式用占位符，异常作最后参数：`log.error("入库失败, recptCode={}", code, ex)`。
 
 ## 测试覆盖率底线
 

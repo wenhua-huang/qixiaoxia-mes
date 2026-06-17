@@ -34,75 +34,28 @@ yarn preview
 npx vue-tsc --noEmit
 ```
 
-- **开发服务器代理**: 默认代理 `/dev-api` → `http://localhost:8080`（后端），配置在 `vite.config.ts`
+- **开发服务器代理**: 默认代理 `/dev-api` → `http://localhost:8081`（后端），配置在 `vite.config.ts`
 - **环境文件**: `.env.development` / `.env.staging` / `.env.production`
 - **后端接口地址**: 修改 `vite.config.ts` 中的 `baseUrl` 或环境变量 `VITE_APP_BASE_API`
 
 ## Project Structure
 
-```
-frontend/
-├── vite.config.ts             # Vite 配置 (代理、插件、构建)
-├── tsconfig.json              # TypeScript 配置
-├── package.json               # 依赖 & 脚本
-├── index.html                 # HTML 入口
-├── vite/                      # Vite 插件配置
-│   ├── plugins/index.ts       # 插件注册中心
-│   ├── auto-import.ts         # Element Plus 自动导入
-│   ├── compression.ts         # Gzip 压缩
-│   ├── setup-extend.ts        # Vue setup 组件名扩展
-│   └── svg-icon.ts            # SVG 图标加载
-├── public/                    # 静态资源 (不经过构建)
-└── src/
-    ├── main.ts                # 应用入口
-    ├── App.vue                # 根组件
-    ├── api/                   # API 接口层
-    │   ├── login.ts           # 登录认证
-    │   ├── menu.ts            # 菜单路由
-    │   ├── system/            # 系统管理 API
-    │   ├── monitor/           # 监控 API
-    │   └── tool/              # 工具 API
-    ├── assets/                # 静态资源 (经构建处理)
-    │   ├── icons/             # SVG 图标
-    │   └── styles/            # 全局样式
-    ├── components/            # 公共组件
-    │   ├── Icon/              # SVG Icon 组件
-    │   ├── Pagination/        # 分页组件
-    │   ├── RightToolbar/      # 右侧工具栏
-    │   ├── Editor/            # 富文本编辑器
-    │   └── ...                # 更多复用组件
-    ├── directive/             # 自定义指令
-    │   ├── permission/        # v-hasPermi 权限指令
-    │   └── common/            # 通用指令
-    ├── layout/                # 布局组件
-    │   ├── index.vue          # 主布局
-    │   └── components/        # Navbar, Sidebar, TagsView, AppMain, Settings
-    ├── plugins/               # JS 插件 (auth, cache, download, modal, tab)
-    ├── router/                # Vue Router 配置
-    │   └── index.ts           # constantRoutes (公开) + 动态路由
-    ├── store/                 # Pinia 状态管理
-    │   └── modules/
-    │       ├── app.ts         # UI 状态 (sidebar, device, size)
-    │       ├── user.ts        # 用户/token/角色/权限
-    │       ├── permission.ts  # 动态路由生成
-    │       ├── settings.ts    # 布局配置
-    │       ├── tagsView.ts    # 标签页状态
-    │       └── dict.ts        # 字典数据缓存
-    ├── types/                 # TypeScript 类型定义
-    ├── utils/                 # 工具函数
-    │   ├── request.ts         # Axios 实例 (拦截器、token、错误处理)
-    │   ├── auth.ts            # Token 存取 (js-cookie)
-    │   ├── permission.ts      # 权限检查辅助函数
-    │   ├── ruoyi.ts           # 框架工具 (日期、树、字典等)
-    │   └── validate.ts        # 表单校验规则
-    └── views/                 # 页面组件
-        ├── index.vue          # 首页/仪表盘
-        ├── login.vue          # 登录页
-        ├── register.vue       # 注册页
-        ├── system/            # 系统管理页面
-        ├── monitor/           # 监控页面
-        └── tool/              # 工具页面
-```
+| 目录 | 职责 |
+|------|------|
+| `vite.config.ts` | Vite 配置（代理 `/dev-api` → `localhost:8081`、插件、构建） |
+| `src/main.ts` | 应用入口 |
+| `src/api/` | API 接口层（`login.ts`、`menu.ts`、`system/`、`mes/`） |
+| `src/assets/` | 静态资源（icons/、styles/） |
+| `src/components/` | 公共组件（`Icon/`、`Pagination/`、`RightToolbar/`、`mes/` 业务组件） |
+| `src/directive/` | 自定义指令（`v-hasPermi`、`v-hasRole`） |
+| `src/layout/` | 布局（`index.vue` + Navbar/Sidebar/TagsView/AppMain） |
+| `src/plugins/` | JS 插件（auth、cache、download、modal、tab） |
+| `src/router/` | Vue Router（`constantRoutes` 公开 + 动态路由） |
+| `src/store/modules/` | Pinia 状态管理（app、user、permission、settings、tagsView、dict） |
+| `src/types/` | TypeScript 类型定义 |
+| `src/utils/` | 工具函数（`request.ts` Axios、`auth.ts` Token、`permission.ts` 权限检查） |
+| `src/views/` | 页面组件（`login.vue`、`system/`、`mes/`、`monitor/`） |
+| `vite/plugins/` | Vite 插件（Element Plus 自动导入、Gzip、SVG 图标） |
 
 ## Architecture & Key Patterns
 
@@ -153,7 +106,7 @@ Component calls API → Axios instance (utils/request.ts)
       1. Attach Authorization: Bearer <token>
       2. Convert GET params to query string
       3. Check duplicate POST/PUT (sessionStorage, 1s window)
-  → Proxy /dev-api → localhost:8080 (dev only)
+  → Proxy /dev-api → localhost:8081 (dev only)
   → Response interceptor:
       1. code=200 → return res.data
       2. code=401 → re-login dialog
@@ -181,100 +134,31 @@ dict        → Dictionary data cache
 
 ## Customization for 企小侠 MES
 
-### MES Page Directory
+### MES 目录约定
 
-所有 MES 业务页面放在 `src/views/mes/` 下，按领域分子目录：
-
-```
-src/views/mes/
-├── md/       # 基础数据 (物料/BOM/工艺路线)
-├── wm/       # 仓储管理 (入库/出库/库存)
-├── pro/      # 生产管理 (工单/报工)
-├── qc/       # 质量管理 (检验/不良品)
-└── dv/       # 设备管理
-```
-
-### MES API Directory
-
-```
-src/api/mes/
-├── md/       # 基础数据 API
-├── wm/       # 仓储管理 API
-├── pro/      # 生产管理 API
-├── qc/       # 质量管理 API
-└── dv/       # 设备管理 API
-```
-
-### Permission Naming Convention
-
-格式: `mes:{domain}:{entity}:{action}`
-- 示例: `mes:wm:itemrecpt:list`, `mes:pro:workorder:edit`, `mes:qc:inspection:add`
-
-### Custom Components
-
-MES 业务专用组件（下拉选择器等）放在 `src/components/mes/` 下。
+- 页面: `src/views/mes/{md,wm,pro,qc,dv}/{entity}/`
+- API: `src/api/mes/{md,wm,pro,qc,dv}/{entity}.ts`
+- 业务组件: `src/components/mes/`（如 `ItemSelect.vue`、`WarehouseSelect.vue`）
+- 权限格式: `mes:{domain}:{entity}:{action}`（如 `mes:wm:itemrecpt:list`）
 
 ## Testing
 
-### Component Tests (Vitest + @vue/test-utils)
-
-测试文件位于 `__tests__/` 目录，与组件同目录。示例：`src/views/__tests__/login.spec.ts`
-
-- `vi.mock('@/api/xxx')` mock 所有 API 调用
-- mock Vue Router（`useRouter`/`useRoute`）和 Pinia store
-- 使用 `data-testid` 属性定位元素
-- 测试覆盖：渲染、用户交互、错误状态、权限控制
-
-### data-testid 约定
-
-在模板中为可交互元素添加 `data-testid` 属性：
-
-```html
-<el-input v-model="form.name" data-testid="config-name-input" />
-<el-button type="primary" data-testid="config-save-btn" @click="submit">保存</el-button>
-```
-
-选择器优先级：`data-testid` > `aria-label` > CSS class
-
-### Running Tests
+Vitest + @vue/test-utils，测试文件放 `__tests__/` 与组件同目录。`vi.mock('@/api/xxx')` mock API，mock Vue Router/Pinia store，用 `data-testid` 定位元素（优先级 > `aria-label` > CSS class）。
 
 ```bash
-# 运行全部组件测试
-npm test
-
-# Watch 模式（开发时使用）
-npm run test:watch
-
-# 特定测试文件
-npx vitest run src/views/__tests__/login.spec.ts
+npm test                                    # 全量
+npm run test:watch                          # watch 模式
+npx vitest run src/views/__tests__/login.spec.ts  # 单文件
 ```
 
-### Setup
+配置文件：`vitest.config.ts`（jsdom）、`src/__tests__/setup.ts`（全局 stub）、`src/__tests__/helpers/`（mockRouter/mockStore）。
 
-- `vitest.config.ts` — 测试配置（jsdom 环境、路径别名）
-- `src/__tests__/setup.ts` — 全局 setup（stub 浏览器 API、Element Plus 插件）
-- `src/__tests__/helpers/` — 测试辅助工具（mockRouter、mockStore）
+## 代码风格
 
-## 代码风格与静态检查
-
-### 当前状态
-
-项目暂未配置 ESLint，以下为 AI 生成代码的编码约定。后续应添加 ESLint + Prettier 自动化检查。
-
-### 编码约定
-
-- `<script setup lang="ts">` 必须（新的 `<script setup>` 写法 + TypeScript）
-- 组件名 PascalCase，文件名 kebab-case
+- `<script setup lang="ts">` 必须，组件名 PascalCase，文件名 kebab-case
 - import 顺序：`vue` → `vue-router` → `pinia` → `element-plus` → `@/` → `./`
-- 禁止 `any` 类型（除非确实无法推断的第三方库）
-- Props/Emits 必须显式声明类型
-- CSS 使用 `scoped` + SCSS 变量
-
-### 计划添加的 lint 工具
-
-- ESLint（`@typescript-eslint` + `eslint-plugin-vue`）
-- Prettier（统一格式化）
-- AI 生成代码后运行 `npx eslint --fix src/`
+- 禁止 `any` 类型，Props/Emits 必须显式类型，CSS `scoped` + SCSS
+- 暂未配置 ESLint/Prettier，AI 生成后跑 `npx vue-tsc --noEmit`
 
 ## 已有工具使用规范
 
@@ -292,61 +176,9 @@ npx vitest run src/views/__tests__/login.spec.ts
 
 ## 标准 CRUD 页面模板
 
-所有 MES 业务页面遵循统一模板：
+> 所有 MES 业务页面遵循统一模式。用 RuoYi 代码生成器产出 → 手工补充业务逻辑。
 
-```vue
-<script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import type { XxxVO, XxxQuery } from '@/types/mes/{domain}'
-import { listXxx, getXxx, addXxx, updateXxx, delXxx } from '@/api/mes/{domain}/xxx'
-
-// 搜索表单
-const queryParams = reactive<XxxQuery>({ pageNum: 1, pageSize: 10 })
-
-// 表格数据
-const tableData = ref<XxxVO[]>([])
-const total = ref(0)
-const loading = ref(false)
-
-// 弹窗控制
-const open = ref(false)
-const title = ref('')
-const formRef = ref()
-const form = reactive<XxxVO>({})
-
-// 查询列表
-function getList() {
-  loading.value = true
-  listXxx(queryParams).then(res => {
-    tableData.value = res.rows
-    total.value = res.total
-    loading.value = false
-  })
-}
-
-// 新增/编辑弹窗
-function handleAdd() { /* open=true, title='新增', form={} */ }
-function handleUpdate(row: XxxVO) { /* open=true, title='修改', form={...row} */ }
-
-// 提交
-function submitForm() {
-  formRef.value?.validate((valid: boolean) => {
-    if (!valid) return
-    const api = form.id ? updateXxx : addXxx
-    api(form).then(() => { ElMessage.success('操作成功'); getList(); open.value = false })
-  })
-}
-
-// 删除
-function handleDelete(ids: number[]) {
-  ElMessageBox.confirm('确认删除？', '警告', { type: 'warning' })
-    .then(() => delXxx(ids)).then(() => { ElMessage.success('删除成功'); getList() })
-}
-
-onMounted(() => getList())
-</script>
-```
+**关键模式**：`queryParams`（`reactive<XxxQuery>`）→ `getList()`（`res.rows`/`res.total`）→ 弹窗 `handleAdd`/`handleUpdate` → `submitForm`（`form.id ? updateXxx : addXxx`）→ `handleDelete`（`ElMessageBox.confirm`）。详情参考 `src/views/mes/` 已有页面。
 
 ## Composable 与组件规范
 
@@ -385,53 +217,7 @@ onMounted(() => getList())
    - 用 `v-if="dicts.xxx"` 包裹依赖字典的 DOM，或直接硬编码固定选项
    - 确认字典名称在 `sys_dict_data` 表中存在
 
-2. **枚举字段中文显示（禁止硬编码翻译映射）** — 表格列或表单中显示英文枚举值（如 `PRINT`、`IDLE`、`RUNNING`），**必须**通过后端字典系统翻译为中文，**严禁在组件内写死 `Record<string, string>` 映射对象**。完整流程：
-
-   **① 后端 — 添加字典数据**（`sys_dict_type` + `sys_dict_data`）：
-   ```sql
-   -- dict_type: 字典类型定义
-   INSERT IGNORE INTO sys_dict_type (dict_id, dict_name, dict_type, status, create_by, create_time)
-   VALUES (20, '工作站类型', 'mes_workstation_type', '0', 'admin', NOW());
-   
-   -- dict_data: 字典键值对（dict_label=中文, dict_value=英文存储值, list_class=el-tag颜色）
-   INSERT IGNORE INTO sys_dict_data (dict_code, dict_sort, dict_label, dict_value, dict_type, list_class, is_default, status, create_by, create_time)
-   VALUES (100, 1, '印刷机', 'PRINT', 'mes_workstation_type', 'primary', 'Y', '0', 'admin', NOW()),
-          (101, 2, '全自动制袋机', 'BAG_AUTO', 'mes_workstation_type', 'success', 'N', '0', 'admin', NOW());
-   ```
-   
-   **② 前端 — 表格列显示**（用 `<dict-tag>` 组件）：
-   ```html
-   <!-- ✅ 正确：通过字典加载，支持 el-tag 彩色标签 -->
-   <el-table-column label="类型" prop="workstationType">
-     <template #default="s"><dict-tag :options="mes_workstation_type" :value="s.row.workstationType" /></template>
-   </el-table-column>
-   
-   <!-- ❌ 错误：硬编码映射，无法维护 -->
-   <el-table-column label="类型" prop="workstationType">
-     <template #default="s">{{ { PRINT: '印刷机' }[s.row.workstationType] }}</template>
-   </el-table-column>
-   ```
-   
-   **③ 前端 — 表单下拉**（用 `v-for` 遍历字典数据）：
-   ```html
-   <!-- ✅ 正确：选项从字典加载 -->
-   <el-select v-model="form.workstationType">
-     <el-option v-for="d in mes_workstation_type" :key="d.value" :label="d.label" :value="d.value" />
-   </el-select>
-   
-   <!-- ❌ 错误：硬编码 el-option -->
-   <el-select v-model="form.workstationType">
-     <el-option label="印刷机" value="PRINT" />
-   </el-select>
-   ```
-   
-   **④ 前端 — script 声明**：
-   ```typescript
-   // 从后端 /system/dict/data/type/xxx 加载，自动缓存到 Pinia store
-   const { mes_workstation_type } = useDict('mes_workstation_type')
-   ```
-   
-   **命名规范**：字典类型名用 `mes_{模块}_{字段}` 格式，如 `mes_workstation_status`、`mes_order_status`。
+2. **枚举字段中文显示（禁止硬编码映射）** — 英文枚举值（`PRINT`、`IDLE`）**必须**通过后端字典系统翻译。后端在 `sys_dict_type` + `sys_dict_data` 中注册字典（命名 `mes_{模块}_{字段}`），前端用 `useDict('mes_xxx')` 加载 + `<dict-tag :options="xxx" :value="row.field" />` 渲染。**严禁** `Record<string, string>` 手写映射或 `<el-option>` 硬编码。
 
 3. **弹窗初始状态** — `v-if="form.id"` 包裹整个表单会导致新增时弹窗为空。**必须**：
    - header 表单始终渲染（不受 `v-if` 限制），line/detail tab 才按需显示
@@ -455,34 +241,16 @@ onMounted(() => getList())
 > ⚠️ **修改任何 Vue/TS 文件后，必须自己先验证，不能丢给用户去试。**
 
 1. **编译验证** — `npx vue-tsc --noEmit` 确保 0 类型错误
-2. **Vite 热更新验证** — `curl -s http://localhost:5173/src/views/.../index.vue | grep "关键新增代码"` 确认 Vite 提供的是修改后的文件
+2. **Vite 热更新验证** — `curl -s http://localhost:80/src/views/.../index.vue | grep "关键新增代码"` 确认 Vite 提供的是修改后的文件
 3. **API 数据流验证** — 用 `curl`/`python3` 调后端 API，模拟前端操作流程，确认数据结构匹配
 4. **日期格式验证** — 每次改 `el-date-picker` 后，**必须**用 curl 模拟提交确认 `YYYY-MM-DD HH:mm:ss` 格式后端能解析
 5. **仅前 4 步全部通过后**，才让用户刷新浏览器验证
 
 ## 自动编码前端接入
 
-任一新增 MES 实体的前端页面**必须**包含：
+新增 MES 实体**必须**含自动编码功能。4 处修改：
 
-```typescript
-// ① import
-import { genSerialCode } from '@/api/mes/sys/autocoderule'
-
-// ② ref
-const autoGenFlag = ref(false)
-
-// ③ 模板 — 编码输入旁放开关（size="small"，不用 active-text）
-<el-col :span="6" v-if="!form.xxxId">
-  <el-form-item>
-    <el-switch v-model="autoGenFlag" active-color="#13ce66" size="small" @change="handleAutoGenChange" />
-    <span style="margin-left:6px;font-size:12px;color:#13ce66">自动生成</span>
-  </el-form-item>
-</el-col>
-
-// ④ handler + reset
-function handleAutoGenChange(flag: boolean) {
-  if (flag) genSerialCode('RULE_CODE').then((r: any) => { form.value.xxxCode = r.data })
-  else form.value.xxxCode = ''
-}
-function reset() { autoGenFlag.value = false; form.value = {} as ...; ... }
-```
+1. `import { genSerialCode } from '@/api/mes/sys/autocoderule'`
+2. `const autoGenFlag = ref(false)` + `reset()` 中重置
+3. 编码输入旁放 `<el-switch size="small" @change="handleAutoGenChange" />` + `<span>自动生成</span>`（**不用** `active-text`）
+4. `handleAutoGenChange(flag)` — `flag ? genSerialCode('RULE_CODE').then(r => form.code = r.data) : form.code = ''`

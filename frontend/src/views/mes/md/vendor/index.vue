@@ -5,7 +5,7 @@
       <el-form-item label="名称" prop="vendorName"><el-input v-model="queryParams.vendorName" placeholder="请输入" clearable style="width:160px" @keyup.enter="handleQuery" /></el-form-item>
       <el-form-item label="类型" prop="vendorType">
         <el-select v-model="queryParams.vendorType" placeholder="类型" clearable style="width:160px">
-          <el-option label="原材料供应商" value="MATERIAL" /><el-option label="外协加工商" value="OUTSOURCE" /><el-option label="两者皆是" value="BOTH" />
+          <el-option v-for="d in mes_vendor_type" :key="d.value" :label="d.label" :value="d.value" />
         </el-select>
       </el-form-item>
       <el-form-item><el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button><el-button icon="Refresh" @click="resetQuery">重置</el-button></el-form-item>
@@ -24,17 +24,17 @@
       <el-table-column label="编码" align="center" prop="vendorCode" width="120" />
       <el-table-column label="全称" align="center" prop="vendorName" :show-overflow-tooltip="true" min-width="140" />
       <el-table-column label="类型" align="center" width="110">
-        <template #default="s">{{ vendorTypeMap[s.row.vendorType] || s.row.vendorType }}</template>
+        <template #default="s"><dict-tag :options="mes_vendor_type" :value="s.row.vendorType" /></template>
       </el-table-column>
       <el-table-column label="等级" align="center" prop="vendorLevel" width="60" />
       <el-table-column label="联系人" align="center" prop="contact1" width="80" />
       <el-table-column label="电话" align="center" prop="contact1Tel" width="120" />
       <el-table-column label="结算方式" align="center" width="90">
-        <template #default="s">{{ settlementMap[s.row.settlementType] || s.row.settlementType || '—' }}</template>
+        <template #default="s"><dict-tag :options="mes_settlement_type" :value="s.row.settlementType" /></template>
       </el-table-column>
       <el-table-column label="付款条件" align="center" prop="paymentTerms" width="100" :show-overflow-tooltip="true" />
       <el-table-column label="合作状态" align="center" width="90">
-        <template #default="s">{{ coopStatusMap[s.row.coopStatus] || s.row.coopStatus }}</template>
+        <template #default="s"><dict-tag :options="mes_coop_status" :value="s.row.coopStatus" /></template>
       </el-table-column>
       <el-table-column label="操作" align="center" width="140" fixed="right">
         <template #default="s"><el-button link type="primary" icon="Edit" @click="handleUpdate(s.row)" v-hasPermi="['mes:md:vendor:edit']">修改</el-button><el-button link type="primary" icon="Delete" @click="handleDelete(s.row)" v-hasPermi="['mes:md:vendor:remove']">删除</el-button></template>
@@ -62,7 +62,7 @@
           <el-col :span="12">
             <el-form-item label="供应商类型">
               <el-select v-model="form.vendorType" style="width:100%">
-                <el-option label="原材料供应商" value="MATERIAL" /><el-option label="外协加工商" value="OUTSOURCE" /><el-option label="两者皆是" value="BOTH" />
+                <el-option v-for="d in mes_vendor_type" :key="d.value" :label="d.label" :value="d.value" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -89,7 +89,7 @@
         <el-row>
           <el-col :span="12"><el-form-item label="结算方式">
             <el-select v-model="form.settlementType" style="width:100%" clearable>
-              <el-option label="月结" value="MONTHLY" /><el-option label="现结" value="CASH" /><el-option label="其他" value="OTHER" />
+              <el-option v-for="d in mes_settlement_type" :key="d.value" :label="d.label" :value="d.value" />
             </el-select>
           </el-form-item></el-col>
           <el-col :span="12"><el-form-item label="付款条件"><el-input v-model="form.paymentTerms" placeholder="如：30天账期" /></el-form-item></el-col>
@@ -118,7 +118,7 @@
           <el-col :span="12">
             <el-form-item label="合作状态">
               <el-select v-model="form.coopStatus" style="width:100%">
-                <el-option label="合作中" value="ACTIVE" /><el-option label="暂停" value="INACTIVE" /><el-option label="待审核" value="PENDING" /><el-option label="终止" value="STOPPED" />
+                <el-option v-for="d in mes_coop_status" :key="d.value" :label="d.label" :value="d.value" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -144,10 +144,7 @@ import { listAllFactory } from '@/api/mes/md/factory'
 
 const { proxy } = getCurrentInstance() as any
 const { sys_yes_no } = useDict('sys_yes_no')
-
-const vendorTypeMap: Record<string, string> = { MATERIAL: '原材料供应商', OUTSOURCE: '外协加工商', BOTH: '两者皆是' }
-const settlementMap: Record<string, string> = { MONTHLY: '月结', CASH: '现结', OTHER: '其他' }
-const coopStatusMap: Record<string, string> = { ACTIVE: '合作中', INACTIVE: '暂停', PENDING: '待审核', STOPPED: '终止' }
+const { mes_vendor_type, mes_settlement_type, mes_coop_status } = useDict('mes_vendor_type', 'mes_settlement_type', 'mes_coop_status')
 
 const vendorList = ref<MdVendor[]>([]); const open = ref(false); const loading = ref(true); const showSearch = ref(true)
 const ids = ref<number[]>([]); const single = ref(true); const multiple = ref(true); const total = ref(0); const title = ref('')

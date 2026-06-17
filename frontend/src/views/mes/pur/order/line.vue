@@ -21,7 +21,7 @@
       <el-table-column label="门幅" align="center" prop="paperWidth" width="80" />
       <el-table-column label="克重" align="center" prop="paperWeight" width="80" />
       <el-table-column label="状态" align="center" prop="status" width="80">
-        <template #default="scope">{{ statusMap[scope.row.status] || scope.row.status }}</template>
+        <template #default="scope"><dict-tag :options="mes_order_status" :value="scope.row.status" /></template>
       </el-table-column>
       <el-table-column label="操作" align="center" width="100">
         <template #default="scope">
@@ -122,12 +122,15 @@ import ItemSelect from "@/components/itemSelect/single.vue"
 export default {
   name: "PurOrderLine",
   components: { ItemSelect },
+  setup() {
+    const { mes_order_status } = useDict("mes_order_status")
+    return { mes_order_status }
+  },
   props: { orderId: { type: Number, default: null } },
   data() {
     return {
       loading: false, lineList: [], ids: [], single: true, multiple: true,
       open: false, title: "新增采购订单行",
-      statusMap: { ORDERED: "已下单", RECEIVING: "收货中", RECEIVED: "已收货", CLOSED: "已关闭" },
       form: {},
       rules: {
         itemName: [{ required: true, message: "请选择物料", trigger: "change" }],

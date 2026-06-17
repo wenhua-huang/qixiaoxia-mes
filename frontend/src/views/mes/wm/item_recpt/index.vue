@@ -9,9 +9,7 @@
       </el-form-item>
       <el-form-item label="状态" prop="status">
         <el-select v-model="queryParams.status" placeholder="请选择" clearable style="width:100px">
-          <el-option label="草稿" value="DRAFT" />
-          <el-option label="已确认" value="CONFIRMED" />
-          <el-option label="已过账" value="POSTED" />
+          <el-option v-for="d in mes_itemrecpt_status" :key="d.value" :label="d.label" :value="d.value" />
         </el-select>
       </el-form-item>
       <el-form-item>
@@ -41,9 +39,9 @@
       <el-table-column label="供应商" align="center" prop="vendorName" width="120" />
       <el-table-column label="仓库" align="center" prop="warehouseName" width="120" />
       <el-table-column label="入库日期" align="center" prop="recptDate" width="110" />
-      <el-table-column label="状态" align="center" prop="status" width="90">
+      <el-table-column label="状态" align="center" width="90">
         <template #default="scope">
-          <el-tag :type="statusTag(scope.row.status)" size="small">{{ scope.row.status }}</el-tag>
+          <dict-tag :options="mes_itemrecpt_status" :value="scope.row.status" />
         </template>
       </el-table-column>
       <el-table-column label="操作" align="center" width="180" class-name="small-padding fixed-width">
@@ -105,9 +103,7 @@
           <el-col :span="8">
             <el-form-item label="入库类型" prop="recptType">
               <el-select v-model="form.recptType" placeholder="请选择" style="width:100%">
-                <el-option label="采购入库" value="PURCHASE" />
-                <el-option label="生产入库" value="PRODUCE" />
-                <el-option label="杂项入库" value="MISC" />
+                <el-option v-for="d in mes_recpt_type" :key="d.value" :label="d.label" :value="d.value" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -146,6 +142,7 @@ import VendorSelect from '@/components/vendorSelect/single.vue'
 import WarehouseSelect from '@/components/warehouseSelect/single.vue'
 
 const { proxy } = getCurrentInstance() as any
+const { mes_itemrecpt_status, mes_recpt_type } = useDict('mes_itemrecpt_status', 'mes_recpt_type')
 const vendorSelectRef = ref()
 const warehouseSelectRef = ref()
 
@@ -184,7 +181,6 @@ function handleQuery() { queryParams.value.pageNum = 1; getList() }
 function resetQuery() { proxy.resetForm('queryRef'); handleQuery() }
 function handleSelectionChange(s: any[]) { ids.value = s.map(i => i.recptId); single.value = s.length !== 1; multiple.value = !s.length }
 function isEditable(row: WmItemRecpt) { return row.status === 'DRAFT' }
-function statusTag(status: string) { return status === 'CONFIRMED' ? 'success' : status === 'POSTED' ? '' : 'info' }
 
 function handleAdd() {
   reset()

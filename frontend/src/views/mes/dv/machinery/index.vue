@@ -74,7 +74,7 @@
           <el-table-column label="所属车间" align="center" prop="workshopName" />
           <el-table-column label="设备状态" align="center" prop="status" width="100">
             <template #default="scope">
-              <span>{{ statusMap[scope.row.status] || scope.row.status }}</span>
+              <span><dict-tag :options="mes_machinery_status" :value="scope.row.status" /></span>
             </template>
           </el-table-column>
           <el-table-column label="创建时间" align="center" prop="createTime" width="180">
@@ -134,10 +134,7 @@
           <el-col :span="12">
             <el-form-item label="设备状态">
               <el-select v-model="form.status" placeholder="请选择设备状态" style="width:100%">
-                <el-option label="空闲" value="IDLE" />
-                <el-option label="运行中" value="RUNNING" />
-                <el-option label="保养中" value="MAINTENANCE" />
-                <el-option label="故障停机" value="BREAKDOWN" />
+                <el-option v-for="d in mes_machinery_status" :key="d.value" :label="d.label" :value="d.value" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -170,7 +167,7 @@ import { listAllWorkshop } from '@/api/mes/md/workshop'
 
 const { proxy } = getCurrentInstance() as any
 
-const statusMap: Record<string, string> = { IDLE: '空闲', RUNNING: '运行中', MAINTENANCE: '保养中', BREAKDOWN: '故障停机' }
+const { mes_machinery_status } = useDict("mes_machinery_status")
 
 const machineryList = ref<DvMachinery[]>([])
 const typeTree = ref<TreeSelect[]>([])

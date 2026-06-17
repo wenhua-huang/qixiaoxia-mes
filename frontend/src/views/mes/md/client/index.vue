@@ -3,7 +3,7 @@
     <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="80px">
       <el-form-item label="客户编码" prop="clientCode"><el-input v-model="queryParams.clientCode" placeholder="请输入" clearable style="width:180px" @keyup.enter="handleQuery" /></el-form-item>
       <el-form-item label="客户名称" prop="clientName"><el-input v-model="queryParams.clientName" placeholder="请输入" clearable style="width:180px" @keyup.enter="handleQuery" /></el-form-item>
-      <el-form-item label="客户类型" prop="clientType"><el-select v-model="queryParams.clientType" placeholder="类型" clearable style="width:180px"><el-option label="内贸" value="DOMESTIC" /><el-option label="外贸" value="FOREIGN" /><el-option label="现货" value="SPOT" /></el-select></el-form-item>
+      <el-form-item label="客户类型" prop="clientType"><el-select v-model="queryParams.clientType" placeholder="类型" clearable style="width:180px"><el-option v-for="d in mes_client_type" :key="d.value" :label="d.label" :value="d.value" /></el-select></el-form-item>
       <el-form-item><el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button><el-button icon="Refresh" @click="resetQuery">重置</el-button></el-form-item>
     </el-form>
     <el-row :gutter="10" class="mb8">
@@ -19,7 +19,7 @@
       <el-table-column label="全称" align="center" prop="clientName" :show-overflow-tooltip="true" />
       <el-table-column label="简称" align="center" prop="clientNick" />
       <el-table-column label="类型" align="center" width="80">
-        <template #default="s">{{ clientTypeMap[s.row.clientType] || s.row.clientType }}</template>
+        <template #default="s"><dict-tag :options="mes_client_type" :value="s.row.clientType" /></template>
       </el-table-column>
       <el-table-column label="业务员" align="center" prop="salesperson" width="80" />
       <el-table-column label="联系人" align="center" prop="contact1" />
@@ -43,7 +43,7 @@
           <el-col :span="12"><el-form-item label="英文名"><el-input v-model="form.clientEn" /></el-form-item></el-col>
         </el-row>
         <el-row>
-          <el-col :span="12"><el-form-item label="客户类型"><el-select v-model="form.clientType" style="width:100%"><el-option label="内贸" value="DOMESTIC" /><el-option label="外贸" value="FOREIGN" /><el-option label="现货" value="SPOT" /></el-select></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="客户类型"><el-select v-model="form.clientType" style="width:100%"><el-option v-for="d in mes_client_type" :key="d.value" :label="d.label" :value="d.value" /></el-select></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="业务员"><el-input v-model="form.salesperson" /></el-form-item></el-col>
         </el-row>
         <el-row>
@@ -67,7 +67,7 @@ import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import type { MdClient, ClientQueryParams } from '@/types/api/mes/md/client'
 import { listClient, getClient, delClient, addClient, updateClient } from '@/api/mes/md/client'
 const { proxy } = getCurrentInstance() as any; const { sys_yes_no } = useDict('sys_yes_no')
-const clientTypeMap: Record<string, string> = { DOMESTIC: '内贸', FOREIGN: '外贸', SPOT: '现货' }
+const { mes_client_type } = useDict('mes_client_type')
 const clientList = ref<MdClient[]>([]); const open = ref(false); const loading = ref(true); const showSearch = ref(true)
 const ids = ref<number[]>([]); const single = ref(true); const multiple = ref(true); const total = ref(0); const title = ref('')
 const autoGenFlag = ref(false)

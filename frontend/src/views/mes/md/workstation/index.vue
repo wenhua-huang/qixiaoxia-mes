@@ -16,10 +16,10 @@
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="编码" align="center" prop="workstationCode" />
       <el-table-column label="名称" align="center" prop="workstationName" />
-      <el-table-column label="类型" align="center" prop="workstationType" />
-      <el-table-column label="工序" align="center" prop="processType" />
+      <el-table-column label="类型" align="center" prop="workstationType"><template #default="s"><dict-tag :options="mes_workstation_type" :value="s.row.workstationType" /></template></el-table-column>
+      <el-table-column label="工序" align="center" prop="processType"><template #default="s"><dict-tag :options="mes_process_type" :value="s.row.processType" /></template></el-table-column>
       <el-table-column label="产能(个/时)" align="center" prop="capacity" />
-      <el-table-column label="状态" align="center" prop="status" />
+      <el-table-column label="状态" align="center" prop="status"><template #default="s"><dict-tag :options="mes_workstation_status" :value="s.row.status" /></template></el-table-column>
       <el-table-column label="启用" align="center" prop="enableFlag"><template #default="s"><dict-tag :options="sys_yes_no" :value="s.row.enableFlag" /></template></el-table-column>
       <el-table-column label="操作" align="center" width="150"><template #default="s"><el-button link type="primary" icon="Edit" @click="handleUpdate(s.row)" v-hasPermi="['mes:md:workstation:edit']">修改</el-button><el-button link type="primary" icon="Delete" @click="handleDelete(s.row)" v-hasPermi="['mes:md:workstation:remove']">删除</el-button></template></el-table-column>
     </el-table>
@@ -37,14 +37,14 @@
         </el-row>
         <el-row>
           <el-col :span="12"><el-form-item label="所属车间" prop="workshopId"><el-select v-model="form.workshopId" placeholder="请选择" style="width:100%"><el-option v-for="w in workshopOptions" :key="w.workshopId" :label="w.workshopName" :value="w.workshopId" /></el-select></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="类型"><el-select v-model="form.workstationType" style="width:100%"><el-option label="印刷机" value="PRINT" /><el-option label="全自动制袋机" value="BAG_AUTO" /><el-option label="半自动制袋机" value="BAG_SEMI" /><el-option label="其他" value="OTHER" /></el-select></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="类型"><el-select v-model="form.workstationType" style="width:100%"><el-option v-for="d in mes_workstation_type" :key="d.value" :label="d.label" :value="d.value" /></el-select></el-form-item></el-col>
         </el-row>
         <el-row>
-          <el-col :span="12"><el-form-item label="工序类型"><el-select v-model="form.processType" style="width:100%"><el-option label="印刷" value="PRINT" /><el-option label="制袋" value="BAG_MAKE" /><el-option label="分切" value="SLITTING" /><el-option label="检验" value="INSPECT" /></el-select></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="工序类型"><el-select v-model="form.processType" style="width:100%"><el-option v-for="d in mes_process_type" :key="d.value" :label="d.label" :value="d.value" /></el-select></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="产能(个/时)"><el-input-number v-model="form.capacity" :min="0" style="width:100%" /></el-form-item></el-col>
         </el-row>
         <el-row>
-          <el-col :span="12"><el-form-item label="状态"><el-select v-model="form.status" style="width:100%"><el-option label="空闲" value="IDLE" /><el-option label="运行中" value="RUNNING" /><el-option label="保养中" value="MAINTENANCE" /><el-option label="故障" value="BREAKDOWN" /></el-select></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="状态"><el-select v-model="form.status" style="width:100%"><el-option v-for="d in mes_workstation_status" :key="d.value" :label="d.label" :value="d.value" /></el-select></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="启用"><el-radio-group v-model="form.enableFlag"><el-radio value="1">是</el-radio><el-radio value="0">否</el-radio></el-radio-group></el-form-item></el-col>
         </el-row>
         <el-form-item label="备注"><el-input v-model="form.remark" type="textarea" /></el-form-item>
@@ -74,6 +74,7 @@ import { listWorkstation, getWorkstation, delWorkstation, addWorkstation, update
 import { listAllWorkshop } from '@/api/mes/md/workshop'
 
 const { proxy } = getCurrentInstance() as any; const { sys_yes_no } = useDict('sys_yes_no')
+const { mes_workstation_type, mes_process_type, mes_workstation_status } = useDict('mes_workstation_type', 'mes_process_type', 'mes_workstation_status')
 const list = ref<MdWorkstation[]>([]); const open = ref(false); const loading = ref(true); const showSearch = ref(true)
 const ids = ref<number[]>([]); const single = ref(true); const multiple = ref(true); const total = ref(0); const title = ref('')
 const autoGenFlag = ref(false)

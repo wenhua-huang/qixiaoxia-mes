@@ -37,7 +37,7 @@
       <el-table-column prop="orderNum" label="排序" width="100" align="center" />
       <el-table-column prop="itemOrProduct" label="物料/产品" width="120" align="center">
         <template #default="scope">
-          <span>{{ itemOrProductMap[scope.row.itemOrProduct] || scope.row.itemOrProduct }}</span>
+          <dict-tag :options="mes_item_type" :value="scope.row.itemOrProduct" />
         </template>
       </el-table-column>
       <el-table-column prop="enableFlag" label="是否启用" width="100" align="center">
@@ -123,9 +123,12 @@ import { handleTree } from '@/utils/ruoyi'
 
 const { proxy } = getCurrentInstance() as any
 const { sys_yes_no } = useDict('sys_yes_no')
+const { mes_item_type } = useDict('mes_item_type')
 
-const itemOrProductMap: Record<string, string> = { RAW: '原料', SEMI: '半成品', FINISHED: '成品', AUXILIARY: '辅料', PACK: '包材' }
-const itemOrProductLabel = computed(() => itemOrProductMap[form.value.itemOrProduct || ''] || '—')
+const itemOrProductLabel = computed(() => {
+  const found = mes_item_type.value?.find((d: any) => d.value === (form.value.itemOrProduct || ''))
+  return found?.label || '—'
+})
 
 const loading = ref(true)
 const showSearch = ref(true)

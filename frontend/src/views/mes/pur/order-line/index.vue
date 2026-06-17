@@ -260,7 +260,7 @@
       <el-table-column label="到货通知" align="center" prop="arrivalNoticeId" />
       <el-table-column label="状态" align="center" prop="status" width="90">
           <template #default="scope">
-            <span>{{ statusMap[scope.row.status] || scope.row.status }}</span>
+            <span><dict-tag :options="mes_order_status" :value="scope.row.status" /></span>
           </template>
         </el-table-column>
       <el-table-column label="备注" align="center" prop="remark" />
@@ -434,9 +434,14 @@
 
 <script>
 import { listLine, getLine, delLine, addLine, updateLine } from "@/api/mes/pur/order-line"
+import { useDict } from "@/utils/dict"
 
 export default {
   name: "Line",
+  setup() {
+    const { mes_order_status } = useDict("mes_order_status")
+    return { mes_order_status }
+  },
   data() {
     return {
       // 遮罩层

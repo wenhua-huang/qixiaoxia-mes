@@ -134,7 +134,7 @@
       <el-table-column label="供应商名称" align="center" prop="vendorName" />
       <el-table-column label="采购类型" align="center" prop="purchaseType" width="100">
           <template #default="scope">
-            <span>{{ purchaseTypeMap[scope.row.purchaseType] || scope.row.purchaseType }}</span>
+            <span><dict-tag :options="mes_purchase_type" :value="scope.row.purchaseType" /></span>
           </template>
         </el-table-column>
       <el-table-column label="下单日期" align="center" prop="orderDate" width="180">
@@ -155,7 +155,7 @@
       <el-table-column label="关联客户订单" align="center" prop="sourceOrderCode" />
       <el-table-column label="状态" align="center" prop="status" width="90">
           <template #default="scope">
-            <span>{{ statusMap[scope.row.status] || scope.row.status }}</span>
+            <span><dict-tag :options="mes_order_status" :value="scope.row.status" /></span>
           </template>
         </el-table-column>
       <el-table-column label="备注" align="center" prop="remark" />
@@ -285,11 +285,13 @@ import PurOrderLine from "./line.vue"
 
 export default {
   name: "Order",
+  setup() {
+    const { mes_order_status, mes_purchase_type } = useDict("mes_order_status", "mes_purchase_type")
+    return { mes_order_status, mes_purchase_type }
+  },
   components: { VendorSelect, PurOrderLine },
   data() {
     return {
-      purchaseTypeMap: { PAPER: "纸张", AUX: "辅料", PACK: "包材", OTHER: "其他" },
-      statusMap: { DRAFT: "草稿", APPROVED: "已审批", ORDERED: "已下单", RECEIVING: "收货中", RECEIVED: "已收货", CLOSED: "已关闭", CANCEL: "已取消" },
       // 遮罩层
       loading: true,
       // 选中数组

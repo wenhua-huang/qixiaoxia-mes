@@ -65,7 +65,7 @@ const currentPage = computed({
     return props.page
   },
   set(val: number) {
-    emit('update:current-page', val)
+    emit('update:page', val)
   }
 })
 const pageSize = computed({
@@ -73,7 +73,7 @@ const pageSize = computed({
     return props.limit
   },
   set(val: number){
-    emit('update:page-size', val)
+    emit('update:limit', val)
   }
 })
 

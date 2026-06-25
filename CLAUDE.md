@@ -207,7 +207,85 @@ curl -s http://localhost:8081/getInfo -H "Authorization: Bearer $TOKEN" | python
 
 ## 生产服务器部署
 
-> 部署流程见 `.claude/skills/deploy.md`，使用 `/deploy` 调用。
+### 服务器信息
+
+| 项 | 值 |
+|------|------|
+| IP | `115.29.234.204` |
+| 用户 | `root` |
+| 密码 | `ShQxx2026@$^` |
+| 连接命令 | `sshpass -p 'ShQxx2026@$^' ssh -o StrictHostKeyChecking=no root@115.29.234.204` |
+| 项目路径 | `/var/www/qixiaoxia-mes` |
+| 分支 | `main` |
+
+### 服务架构
+
+```
+浏览器 → Nginx(:80) → /            → 静态文件(dist/)   前端(生产构建)
+                     → /prod-api/   → Java(:8081)         后端
+MySQL(:3307)  Redis(:6380)  MinIO(:9010)  均为 Docker 容器
+```
+
+> ⚠️ **服务器仅 1.8GB 内存，禁止在生产环境跑 Vite dev server 或执行 `vite build`。**
+> 前端构建必须在本机完成（`cd frontend && npx vite build`），然后 scp `dist/` 到服务器。
+
+### 发布流程
+
+```bash
+# === 前置：本机构建前端 ===
+cd frontend && npx vite build
+
+# 1. 连接服务器
+sshpass -p 'ShQxx2026@$^' ssh -o StrictHostKeyChecking=no root@115.29.234.204
+
+# 2. 拉取最新代码
+cd /var/www/qixiaoxia-mes
+git pull origin main
+
+# 3. 执行 SQL 变更（如有）
+docker exec -i qxx-mysql mysql -uroot -pqxx123456 mes --default-character-set=utf8mb4 < backend/sql/xxx.sql
+
+# 4. 编译后端（必须用 JDK 17 + 跳过 checkstyle）
+export JAVA_HOME=/usr/lib/jvm/java-17-alibaba-dragonwell-17.0.9.0.10.9-1.al8.x86_64
+export PATH=$JAVA_HOME/bin:$PATH
+cd backend
+mvn clean package -pl ruoyi-admin -am -DskipTests -Dcheckstyle.skip=true -q
+
+# 5. 重启后端
+kill $(lsof -ti :8081) 2>/dev/null
+sleep 2
+nohup java -jar /var/www/qixiaoxia-mes/backend/ruoyi-admin/target/ruoyi-admin.jar \
+  --server.port=8081 --ruoyi.profile=/var/www/qixiaoxia-mes/uploadPath \
+  > /tmp/qxx-backend.log 2>&1 &
+
+# 6. 上传前端 dist（本机执行）
+sshpass -p 'ShQxx2026@$^' scp -o StrictHostKeyChecking=no -r frontend/dist/* root@115.29.234.204:/var/www/qixiaoxia-mes/frontend/dist/
+
+# 7. 重载 Nginx
+sshpass -p 'ShQxx2026@$^' ssh -o StrictHostKeyChecking=no root@115.29.234.204 'nginx -s reload'
+```
+
+### 发布后验证
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8081/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin123","code":"","uuid":""}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+
+# 后端直连
+curl -s http://localhost:8081/mes/md/unitmeasure/list -H "Authorization: Bearer $TOKEN"
+
+# Nginx 代理
+curl -s http://localhost/prod-api/mes/md/unitmeasure/list -H "Authorization: Bearer $TOKEN"
+
+# 前端页面
+curl -s -o /dev/null -w "HTTP %{http_code}" http://localhost/
+```
+
+### 注意事项
+
+- 服务器 **验证码已关闭**（`sys_config.captchaEnabled=false`）
 
 ## 环境版本
 

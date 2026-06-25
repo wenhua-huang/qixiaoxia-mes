@@ -118,7 +118,7 @@ function reset() { Object.keys(form).forEach(k => delete (form as any)[k]); form
 function handleQuery() { queryParams.pageNum = 1; getList() }
 function resetQuery() { Object.keys(queryParams).forEach(k => { if (k !== 'pageNum' && k !== 'pageSize') (queryParams as any)[k] = null }); handleQuery() }
 function handleSelectionChange(sel: any[]) { ids.value = sel.map(i => i.issueId); single.value = sel.length !== 1; multiple.value = !sel.length }
-function handleAutoGen(f: boolean) { if(f) genSerialCode('ISSUE_CODE').then((r:any) => { form.issueCode = r.data }) else form.issueCode = null }
+function handleAutoGen(f: boolean) { if(f) genSerialCode('ISSUE_CODE').then((r:any) => { form.issueCode = r.data }); else form.issueCode = null }
 function handleAdd() { reset(); open.value = true; title.value = '新增生产领料单'; optType.value = 'add'; activeTab.value = 'header'; autoGenFlag.value = true }
 function handleView(row: any) { reset(); getIssueHeader(row.issueId).then((r:any) => { Object.assign(form, r.data); open.value = true; title.value = '查看领料单'; optType.value = 'view'; activeTab.value = 'header'; loadLines(r.data.issueId) }) }
 function handleUpdate(row: any) { reset(); getIssueHeader(row.issueId).then((r:any) => { Object.assign(form, r.data); open.value = true; title.value = '修改领料单'; optType.value = 'edit'; activeTab.value = 'header'; loadLines(r.data.issueId) }) }

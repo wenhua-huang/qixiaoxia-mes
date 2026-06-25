@@ -45,7 +45,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectSysAutoCodeRuleByRuleCode" parameterType="String" resultMap="SysAutoCodeRuleResult">
         <include refid="selectSysAutoCodeRuleVo"/>
-        where rule_code = #{ruleCode}
+        where rule_code = #{ruleCode} limit 1
     </select>
 
     <select id="checkRuleCodeUnique" parameterType="com.ruoyi.system.domain.mes.sys.SysAutoCodeRule" resultMap="SysAutoCodeRuleResult">

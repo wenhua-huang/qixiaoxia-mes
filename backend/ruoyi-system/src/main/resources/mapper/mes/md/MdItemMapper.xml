@@ -53,6 +53,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="itemTypeId != null and itemTypeId != 0"> and item_type_id = #{itemTypeId}</if>
             <if test="specification != null and specification != ''"> and specification like concat('%', #{specification}, '%')</if>
             <if test="enableFlag != null and enableFlag != ''"> and enable_flag = #{enableFlag}</if>
+            <if test="parentIdFilter == 'spu'"> and parent_id = 0</if>
+            <if test="parentIdFilter == 'variant'"> and parent_id > 0</if>
         </where>
     </select>
 

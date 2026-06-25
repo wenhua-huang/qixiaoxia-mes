@@ -67,6 +67,9 @@ public class MdItem extends BaseEntity
     /** 父产品ID(0=SPU/原料,非0=变体) */
     private Long parentId;
 
+    /** 产品类型筛选(spu=标准/variant=变体，仅查询参数用，非DB字段) */
+    private String parentIdFilter;
+
     /** 产品尺寸 */
     @Excel(name = "产品尺寸")
     private String productSize;
@@ -152,6 +155,8 @@ public class MdItem extends BaseEntity
 
     public Long getParentId() { return parentId; }
     public void setParentId(Long parentId) { this.parentId = parentId; }
+    public String getParentIdFilter() { return parentIdFilter; }
+    public void setParentIdFilter(String parentIdFilter) { this.parentIdFilter = parentIdFilter; }
 
     public String getProductSize() { return productSize; }
     public void setProductSize(String productSize) { this.productSize = productSize; }

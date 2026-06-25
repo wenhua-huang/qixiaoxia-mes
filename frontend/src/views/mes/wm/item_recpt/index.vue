@@ -1,11 +1,14 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryRef" size="small" :inline="true" v-show="showSearch" label-width="80px">
+    <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="68px">
       <el-form-item label="入库单号" prop="recptCode">
         <el-input v-model="queryParams.recptCode" placeholder="请输入入库单号" clearable @keyup.enter="handleQuery" />
       </el-form-item>
       <el-form-item label="供应商" prop="vendorId">
         <el-input v-model="queryParams.vendorId" placeholder="供应商ID" clearable style="width:100px" />
+      </el-form-item>
+      <el-form-item label="采购订单号" prop="purOrderCode">
+        <el-input v-model="queryParams.purOrderCode" placeholder="请输入采购订单号" clearable style="width:140px" />
       </el-form-item>
       <el-form-item label="状态" prop="status">
         <el-select v-model="queryParams.status" placeholder="请选择" clearable style="width:100px">
@@ -27,7 +30,7 @@
     </el-row>
 
     <el-table v-loading="loading" :data="recptList" @selection-change="handleSelectionChange">
-      <el-table-column type="selection" width="45" align="center" />
+      <el-table-column type="selection" width="50" align="center" />
       <el-table-column label="入库单号" align="center" prop="recptCode" width="150">
         <template #default="scope">
           <el-button link type="primary" size="small" @click="handleView(scope.row)">
@@ -44,11 +47,11 @@
           <dict-tag :options="mes_itemrecpt_status" :value="scope.row.status" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="180" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="105" class-name="small-padding fixed-width">
         <template #default="scope">
-          <el-button link type="primary" size="small" v-if="isEditable(scope.row)" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:itemrecpt:edit']">修改</el-button>
-          <el-button link type="primary" size="small" v-if="isEditable(scope.row)" @click="handleDelete(scope.row)" v-hasPermi="['mes:wm:itemrecpt:remove']">删除</el-button>
-          <el-button link type="success" size="small" v-if="scope.row.status === 'DRAFT'" @click="handleConfirm(scope.row)">确认</el-button>
+          <el-tooltip content="修改" placement="top" v-if="isEditable(scope.row)"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:itemrecpt:edit']"></el-button></el-tooltip>
+          <el-tooltip content="删除" placement="top" v-if="isEditable(scope.row)"><el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:wm:itemrecpt:remove']"></el-button></el-tooltip>
+          <el-tooltip content="确认" placement="top" v-if="scope.row.status === 'DRAFT'"><el-button link type="success" icon="Check" @click="handleConfirm(scope.row)"></el-button></el-tooltip>
         </template>
       </el-table-column>
     </el-table>
@@ -101,13 +104,21 @@
         </el-row>
         <el-row>
           <el-col :span="8">
+            <el-form-item label="采购订单号" prop="purOrderCode">
+              <el-input v-model="form.purOrderCode" readonly placeholder="请选择采购订单">
+                <template #append><el-button icon="Search" @click="handleSelectPurOrder" /></template>
+              </el-input>
+            </el-form-item>
+            <PurOrderSelect ref="purOrderSelectRef" @onSelected="onPurOrderSelected" />
+          </el-col>
+          <el-col :span="8">
             <el-form-item label="入库类型" prop="recptType">
               <el-select v-model="form.recptType" placeholder="请选择" style="width:100%">
                 <el-option v-for="d in mes_recpt_type" :key="d.value" :label="d.label" :value="d.value" />
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="16">
+          <el-col :span="8">
             <el-form-item label="备注" prop="remark">
               <el-input v-model="form.remark" placeholder="备注" />
             </el-form-item>
@@ -140,11 +151,14 @@ import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import WmItemRecptLine from './line.vue'
 import VendorSelect from '@/components/vendorSelect/single.vue'
 import WarehouseSelect from '@/components/warehouseSelect/single.vue'
+import PurOrderSelect from '@/components/purOrderSelect/single.vue'
+import type { PurOrder } from '@/types/api/mes/pur/order'
 
 const { proxy } = getCurrentInstance() as any
 const { mes_itemrecpt_status, mes_recpt_type } = useDict('mes_itemrecpt_status', 'mes_recpt_type')
 const vendorSelectRef = ref()
 const warehouseSelectRef = ref()
+const purOrderSelectRef = ref()
 
 const recptList = ref<WmItemRecpt[]>([])
 const open = ref(false)
@@ -201,18 +215,14 @@ function submitForm() {
     if (!v) return
     const isNew = !form.value.recptId
     const fn = isNew ? addWmItemRecpt : updateWmItemRecpt
-    const savedCode = form.value.recptCode
-    fn(form.value).then(() => {
+    fn(form.value).then((response: any) => {
       proxy.$modal.msgSuccess('操作成功')
-      if (isNew && savedCode) {
-        // 反查新记录的 recptId（后端 add 接口不返回 ID）
-        setTimeout(() => {
-          listWmItemRecpt({ pageNum: 1, pageSize: 1, recptCode: savedCode } as WmItemRecptQueryParams).then(r => {
-            if (r.rows?.length && r.rows[0]) {
-              form.value.recptId = r.rows[0].recptId
-            }
-          })
-        }, 300)
+      if (isNew) {
+        // 后端 add 已返回完整实体（含 recptId），直接从响应中获取
+        const newRecptId = response?.data?.recptId
+        if (newRecptId) {
+          form.value.recptId = newRecptId
+        }
       }
       getList()
     })
@@ -233,6 +243,18 @@ function onWarehouseSelected(row: any) {
   form.value.warehouseId = row.warehouseId
   form.value.warehouseName = row.warehouseName
   form.value.warehouseCode = row.warehouseCode
+}
+function handleSelectPurOrder() { purOrderSelectRef.value.open() }
+function onPurOrderSelected(row: PurOrder) {
+  form.value.purOrderId = row.orderId
+  form.value.purOrderCode = row.orderCode
+  // 回填供应商信息（采购订单无供应商时清除旧值，避免残留）
+  // 复用 onVendorSelected 的字段赋值逻辑，避免 vendor 字段映射重复
+  onVendorSelected({
+    vendorId: row.vendorId ?? undefined,
+    vendorCode: row.vendorCode ?? undefined,
+    vendorName: row.vendorName ?? undefined,
+  })
 }
 function handleExport() { proxy.download('/mes/wm/item_recpt/export', { ...queryParams.value }, `itemrecpt_${Date.now()}.xlsx`) }
 function handleConfirm(row?: WmItemRecpt) {

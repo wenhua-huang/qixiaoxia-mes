@@ -36,6 +36,7 @@ create table qxx_pro_workorder (
   product_code                varchar(64)     not null                   comment '产品编码',
   product_name                varchar(255)    not null                   comment '产品名称',
   product_spc                 varchar(255)    default null               comment '产品规格型号',
+  route_product_id            bigint(20)      default null               comment '路线产品ID(关联qxx_pro_route_product)',
   unit_of_measure             varchar(64)     not null                   comment '主单位编码',
   unit_name                   varchar(64)     default null               comment '主单位名称',
   quantity                    decimal(14,2)   default 0.00  not null     comment '计划生产数量',
@@ -99,6 +100,8 @@ create table qxx_pro_workorder_bom (
   unit2                       varchar(64)     default null               comment '辅助单位编码(如ROLL-卷/TON-吨,纸袋/礼品盒通用)',
   unit2_name                  varchar(64)     default null               comment '辅助单位名称',
   conversion_rate             decimal(10,4)   default 1.0000             comment '主单位→辅助单位换算率',
+  process_id                  bigint(20)      default null               comment '工序ID(关联qxx_pro_process)',
+  process_name                varchar(255)    default null               comment '工序名称',
   item_or_product             varchar(20)     not null                   comment '物料产品标识:RAW-原料,SEMI-半成品,FINISHED-成品,AUXILIARY-辅料,PACK-包材',
   quantity                    decimal(14,2)   default 0.00  not null     comment '单位用量(每个成品消耗的数量)',
   total_quantity              decimal(14,2)   default 0.00               comment '预计总用量(单位用量*计划数量)',
@@ -550,6 +553,25 @@ create table qxx_pro_feedback (
   key idx_outsource_factory_id (outsource_factory_id),
   primary key (record_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '报工记录表';
+
+-- ----------------------------
+-- 10.1、报工物料消耗表
+-- 用途: 记录报工时的实际物料消耗，新增报工时从工单BOM(qxx_pro_workorder_bom)自动填入默认值
+-- ----------------------------
+drop table if exists qxx_pro_feedback_consume;
+create table qxx_pro_feedback_consume (
+  consume_id    bigint(20)      not null auto_increment    comment '消耗ID',
+  factory_id    bigint(20)      not null default 1         comment '工厂ID',
+  feedback_id   bigint(20)      not null                   comment '报工ID(关联qxx_pro_feedback.record_id)',
+  workorder_id  bigint(20)      default null               comment '工单ID(关联qxx_pro_workorder)',
+  item_id       bigint(20)      default null               comment '物料ID(关联qxx_md_item)',
+  item_code     varchar(100)    default ''                 comment '物料编码',
+  item_name     varchar(200)    default ''                 comment '物料名称',
+  quantity      decimal(18,4)   default null               comment '消耗数量',
+  batch_code    varchar(100)    default ''                 comment '批次号',
+  primary key (consume_id),
+  key idx_feedback_id (feedback_id)
+) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '报工物料消耗表';
 
 -- ----------------------------
 -- 11、上下工记录表

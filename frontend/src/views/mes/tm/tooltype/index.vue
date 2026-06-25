@@ -1,6 +1,6 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="80px">
+    <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="68px">
       <el-form-item label="类型编码" prop="toolTypeCode">
         <el-input v-model="queryParams.toolTypeCode" placeholder="请输入类型编码" clearable @keyup.enter="handleQuery" />
       </el-form-item>
@@ -13,29 +13,29 @@
         </el-select>
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
+        <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
+        <el-button icon="Refresh" @click="resetQuery">重置</el-button>
       </el-form-item>
     </el-form>
 
     <el-row :gutter="10" class="mb8">
       <el-col :span="1.5">
-        <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd" v-hasPermi="['mes:tm:tooltype:add']">新增</el-button>
+        <el-button type="primary" plain icon="Plus" @click="handleAdd" v-hasPermi="['mes:tm:tooltype:add']">新增</el-button>
       </el-col>
       <el-col :span="1.5">
-        <el-button type="success" plain icon="el-icon-edit" size="mini" :disabled="single" @click="handleUpdate" v-hasPermi="['mes:tm:tooltype:edit']">修改</el-button>
+        <el-button type="success" plain icon="Edit" :disabled="single" @click="handleUpdate" v-hasPermi="['mes:tm:tooltype:edit']">修改</el-button>
       </el-col>
       <el-col :span="1.5">
-        <el-button type="danger" plain icon="el-icon-delete" size="mini" :disabled="multiple" @click="handleDelete" v-hasPermi="['mes:tm:tooltype:remove']">删除</el-button>
+        <el-button type="danger" plain icon="Delete" :disabled="multiple" @click="handleDelete" v-hasPermi="['mes:tm:tooltype:remove']">删除</el-button>
       </el-col>
       <el-col :span="1.5">
-        <el-button type="warning" plain icon="el-icon-download" size="mini" @click="handleExport" v-hasPermi="['mes:tm:tooltype:export']">导出</el-button>
+        <el-button type="warning" plain icon="Download" @click="handleExport" v-hasPermi="['mes:tm:tooltype:export']">导出</el-button>
       </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
     <el-table v-loading="loading" :data="typeList" @selection-change="handleSelectionChange">
-      <el-table-column type="selection" width="55" align="center" />
+      <el-table-column type="selection" width="50" align="center" />
       <el-table-column label="类型编码" align="center" prop="toolTypeCode">
         <template #default="scope">
           <el-button type="text" @click="handleView(scope.row)" v-hasPermi="['mes:tm:tooltype:query']">{{ scope.row.toolTypeCode }}</el-button>
@@ -55,7 +55,7 @@
       </el-table-column>
       <el-table-column label="保养周期" align="center" prop="maintenCycle" width="110">
         <template #default="scope">
-          <span v-if="scope.row.needCodeFlag === '1' && scope.row.maintenType && maintenTypePeriodUnit[scope.row.maintenType]">
+          <span v-if="scope.row.needCodeFlag === '1' && scope.row.maintenType && maintenTypePeriodUnit[scope.row.maintenType] && scope.row.maintenCycle != null && scope.row.maintenCycle > 0">
             {{ scope.row.maintenCycle + maintenTypePeriodUnit[scope.row.maintenType] }}
           </span>
           <span v-else>无</span>
@@ -69,8 +69,8 @@
       <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="150">
         <template #default="scope">
-          <el-button size="mini" type="text" icon="el-icon-edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:tm:tooltype:edit']">修改</el-button>
-          <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:tm:tooltype:remove']">删除</el-button>
+          <el-tooltip content="修改" placement="top"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:tm:tooltype:edit']"></el-button></el-tooltip>
+          <el-tooltip content="删除" placement="top"><el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:tm:tooltype:remove']"></el-button></el-tooltip>
         </template>
       </el-table-column>
     </el-table>
@@ -214,7 +214,7 @@ export default {
         ],
         needCodeFlag: [{ required: true, message: '是否编码管理不能为空', trigger: 'change' }],
         enableFlag: [{ required: true, message: '是否启用不能为空', trigger: 'change' }],
-        maintenCycle: [{ pattern: /^\d+$/, message: '必须为正整数', trigger: 'blur' }],
+        maintenCycle: [{ pattern: /^[1-9]\d*$/, message: '必须为正整数', trigger: 'blur' }],
       },
     }
   },
@@ -225,7 +225,7 @@ export default {
     getList() {
       this.loading = true
       listType(this.queryParams).then(response => {
-        this.typeList = response.rows
+        this.typeList = response.rows || []
         this.total = response.total
         this.loading = false
       })

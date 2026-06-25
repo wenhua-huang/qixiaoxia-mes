@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.pro.ProWorkorderChangeMapper">
+
+    <resultMap type="ProWorkorderChange" id="ProWorkorderChangeResult">
+        <result property="changeId"    column="change_id"    />
+        <result property="factoryId"    column="factory_id"    />
+        <result property="workorderId"    column="workorder_id"    />
+        <result property="changeType"    column="change_type"    />
+        <result property="fieldName"    column="field_name"    />
+        <result property="oldValue"    column="old_value"    />
+        <result property="newValue"    column="new_value"    />
+        <result property="changeReason"    column="change_reason"    />
+        <result property="approver"    column="approver"    />
+        <result property="approveTime"    column="approve_time"    />
+        <result property="status"    column="status"    />
+        <result property="remark"    column="remark"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectProWorkorderChangeVo">
+        select change_id, factory_id, workorder_id, change_type, field_name, old_value, new_value, change_reason, approver, approve_time, status, remark, create_by, create_time, update_by, update_time from qxx_pro_workorder_change
+    </sql>
+
+    <select id="selectProWorkorderChangeList" parameterType="ProWorkorderChange" resultMap="ProWorkorderChangeResult">
+        <include refid="selectProWorkorderChangeVo"/>
+        <where>
+            <if test="workorderId != null "> and workorder_id = #{workorderId}</if>
+            <if test="changeType != null  and changeType != ''"> and change_type = #{changeType}</if>
+            <if test="status != null  and status != ''"> and status = #{status}</if>
+        </where>
+        order by change_id desc
+    </select>
+
+    <select id="selectProWorkorderChangeByChangeId" parameterType="Long" resultMap="ProWorkorderChangeResult">
+        <include refid="selectProWorkorderChangeVo"/>
+        where change_id = #{changeId}
+    </select>
+
+    <select id="selectProWorkorderChangeByWorkorderId" parameterType="Long" resultMap="ProWorkorderChangeResult">
+        <include refid="selectProWorkorderChangeVo"/>
+        where workorder_id = #{workorderId}
+        order by change_id desc
+    </select>
+
+    <insert id="insertProWorkorderChange" parameterType="ProWorkorderChange" useGeneratedKeys="true" keyProperty="changeId">
+        insert into qxx_pro_workorder_change
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="workorderId != null">workorder_id,</if>
+            <if test="changeType != null">change_type,</if>
+            <if test="fieldName != null">field_name,</if>
+            <if test="oldValue != null">old_value,</if>
+            <if test="newValue != null">new_value,</if>
+            <if test="changeReason != null">change_reason,</if>
+            <if test="approver != null">approver,</if>
+            <if test="approveTime != null">approve_time,</if>
+            <if test="status != null and status != ''">status,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="workorderId != null">#{workorderId},</if>
+            <if test="changeType != null">#{changeType},</if>
+            <if test="fieldName != null">#{fieldName},</if>
+            <if test="oldValue != null">#{oldValue},</if>
+            <if test="newValue != null">#{newValue},</if>
+            <if test="changeReason != null">#{changeReason},</if>
+            <if test="approver != null">#{approver},</if>
+            <if test="approveTime != null">#{approveTime},</if>
+            <if test="status != null and status != ''">#{status},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateProWorkorderChange" parameterType="ProWorkorderChange">
+        update qxx_pro_workorder_change
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="workorderId != null">workorder_id = #{workorderId},</if>
+            <if test="changeType != null">change_type = #{changeType},</if>
+            <if test="fieldName != null">field_name = #{fieldName},</if>
+            <if test="oldValue != null">old_value = #{oldValue},</if>
+            <if test="newValue != null">new_value = #{newValue},</if>
+            <if test="changeReason != null">change_reason = #{changeReason},</if>
+            <if test="approver != null">approver = #{approver},</if>
+            <if test="approveTime != null">approve_time = #{approveTime},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where change_id = #{changeId}
+    </update>
+
+    <delete id="deleteProWorkorderChangeByChangeId" parameterType="Long">
+        delete from qxx_pro_workorder_change where change_id = #{changeId}
+    </delete>
+
+    <delete id="deleteProWorkorderChangeByChangeIds">
+        delete from qxx_pro_workorder_change where change_id in
+        <foreach item="changeId" collection="array" open="(" separator="," close=")">
+            #{changeId}
+        </foreach>
+    </delete>
+</mapper>

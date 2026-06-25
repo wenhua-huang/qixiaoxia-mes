@@ -41,6 +41,13 @@ public class MdWorkstation extends BaseEntity
     @Excel(name = "工序类型")
     private String processType;
 
+    /** 工序ID(关联qxx_pro_process) */
+    private Long processId;
+
+    /** 工序名称(关联查询，非DB字段) */
+    @Excel(name = "工序名称")
+    private String processName;
+
     /** 产能 */
     @Excel(name = "产能")
     private Integer capacity;
@@ -121,6 +128,26 @@ public class MdWorkstation extends BaseEntity
     public void setProcessType(String processType)
     {
         this.processType = processType;
+    }
+
+    public Long getProcessId()
+    {
+        return processId;
+    }
+
+    public void setProcessId(Long processId)
+    {
+        this.processId = processId;
+    }
+
+    public String getProcessName()
+    {
+        return processName;
+    }
+
+    public void setProcessName(String processName)
+    {
+        this.processName = processName;
     }
 
     public Integer getCapacity()

@@ -12,15 +12,21 @@
       </el-col>
       <!-- 右侧表格 -->
       <el-col :span="20" :xs="24">
-        <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="80px">
+        <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="68px">
           <el-form-item label="物料编码" prop="itemCode">
-            <el-input v-model="queryParams.itemCode" placeholder="请输入物料编码" clearable style="width: 180px" @keyup.enter="handleQuery" />
+            <el-input v-model="queryParams.itemCode" placeholder="请输入物料编码" clearable style="width: 240px" @keyup.enter="handleQuery" />
           </el-form-item>
           <el-form-item label="物料名称" prop="itemName">
             <el-input v-model="queryParams.itemName" placeholder="请输入物料名称" clearable style="width: 180px" @keyup.enter="handleQuery" />
           </el-form-item>
           <el-form-item label="规格型号" prop="specification">
             <el-input v-model="queryParams.specification" placeholder="请输入规格" clearable style="width: 180px" @keyup.enter="handleQuery" />
+          </el-form-item>
+          <el-form-item label="产品类型" prop="parentIdFilter">
+            <el-select v-model="queryParams.parentIdFilter" placeholder="全部" clearable style="width: 120px" @change="handleQuery">
+              <el-option label="SPU（标准）" value="spu" />
+              <el-option label="变体" value="variant" />
+            </el-select>
           </el-form-item>
           <el-form-item>
             <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
@@ -37,8 +43,13 @@
         </el-row>
 
         <el-table v-loading="loading" :data="itemList" @selection-change="handleSelectionChange">
-          <el-table-column type="selection" width="55" align="center" />
-          <el-table-column label="物料编码" align="center" prop="itemCode" width="130" />
+          <el-table-column type="selection" width="50" align="center" />
+          <el-table-column label="物料编码" align="center" prop="itemCode" width="130">
+            <template #default="scope">
+              <span>{{ scope.row.itemCode }}</span>
+              <el-tag v-if="scope.row.parentId > 0" type="warning" size="small" class="variant-tag" effect="plain">变体</el-tag>
+            </template>
+          </el-table-column>
           <el-table-column label="物料名称" align="center" prop="itemName" min-width="120" :show-overflow-tooltip="true" />
           <el-table-column label="规格型号" align="center" prop="specification" width="150" :show-overflow-tooltip="true" />
           <el-table-column label="分类" align="center" prop="itemTypeName" width="100" />
@@ -46,10 +57,10 @@
           <el-table-column label="是否启用" align="center" prop="enableFlag" width="80">
             <template #default="scope"><dict-tag :options="sys_yes_no" :value="scope.row.enableFlag" /></template>
           </el-table-column>
-          <el-table-column label="操作" align="center" width="110" class-name="small-padding fixed-width">
+          <el-table-column label="操作" align="center" width="80" class-name="small-padding fixed-width">
             <template #default="scope">
-              <el-button link type="primary" size="small" @click="handleUpdate(scope.row)" v-hasPermi="['mes:md:item:edit']">修改</el-button>
-              <el-button link type="primary" size="small" @click="handleDelete(scope.row)" v-hasPermi="['mes:md:item:remove']">删除</el-button>
+              <el-tooltip content="修改" placement="top"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:md:item:edit']"></el-button></el-tooltip>
+              <el-tooltip content="删除" placement="top"><el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:md:item:remove']"></el-button></el-tooltip>
             </template>
           </el-table-column>
         </el-table>
@@ -135,6 +146,15 @@
             <el-form-item label="印刷要求" prop="printingReq">
               <el-input v-model="form.printingReq" type="textarea" placeholder="印刷要求描述" />
             </el-form-item>
+            <el-row v-if="form.parentId && form.parentId > 0">
+              <el-col :span="24">
+                <el-form-item label="父产品">
+                  <el-input :model-value="parentItemDisplay" disabled>
+                    <template #prepend>变体</template>
+                  </el-input>
+                </el-form-item>
+              </el-col>
+            </el-row>
             <el-row>
               <el-col :span="12"><el-form-item label="启用批次管理"><el-switch v-model="form.batchFlag" active-value="1" inactive-value="0" /></el-form-item></el-col>
               <el-col :span="12"><el-form-item label="高价值物资"><el-switch v-model="form.highValue" active-value="1" inactive-value="0" /></el-form-item></el-col>
@@ -242,7 +262,7 @@ const data = reactive({
     enableFlag: '1', batchFlag: '1', safeStockFlag: '0',
     highValue: '0', conversionRate: 1.0, parentId: 0
   } as MdItem,
-  queryParams: { pageNum: 1, pageSize: 10 } as ItemQueryParams,
+  queryParams: { pageNum: 1, pageSize: 10, parentIdFilter: undefined } as ItemQueryParams,
   rules: {
     itemCode: [{ required: true, message: '物料编码不能为空', trigger: 'blur' }],
     itemName: [{ required: true, message: '物料名称不能为空', trigger: 'blur' }],
@@ -255,6 +275,10 @@ const { queryParams, form, rules } = toRefs(data)
 const showPaperTab = computed(() => {
   const c = form.value.itemTypeCode?.toUpperCase() || ''
   return c.includes('PAPER') || c.includes('纸')
+})
+const parentItemDisplay = computed(() => {
+  if (!form.value.parentId || form.value.parentId === 0) return ''
+  return `${form.value.parentItemCode || '(父产品#' + form.value.parentId + ')'} — ${form.value.parentItemName || ''}`
 })
 const showPaperBagTab = computed(() => {
   const c = form.value.itemTypeCode?.toUpperCase() || ''
@@ -297,6 +321,7 @@ function syncItemTypeName() {
 }
 
 function handleNodeClick(data: any) {
+  if (data.disabled) return // 禁用的分类不触发查询
   queryParams.value.itemTypeId = data.id
   handleQuery()
 }

@@ -70,7 +70,7 @@ app.use(router)
 app.use(store)
 app.use(plugins)
 app.use(elementIcons)
-app.component('svg-icon', SvgIcon)
+app.component('SvgIcon', SvgIcon)
 app.component('AppIcon', AppIcon)
 
 directive(app)

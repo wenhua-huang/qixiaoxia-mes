@@ -92,6 +92,12 @@ const componentSlot = {
   }
 }
 export default defineComponent({
+  props: {
+    conf: {
+      type: Object,
+      required: true,
+    },
+  },
 
   // 使用 render 函数
   render() {
@@ -146,11 +152,5 @@ export default defineComponent({
         },
       }
       , slot ?? null)
-  },
-  props: {
-    conf: {
-      type: Object,
-      required: true,
-    },
   }
 })

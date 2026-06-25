@@ -73,25 +73,27 @@ values (1, 'SX', '圣享工厂', '圣享', null, null, null, '1', '', 'admin', s
 -- 变体(item_type/code/name)继承父产品，差异字段有值=覆盖/null=继承
 --
 -- === 变体创建时机（parent_id>0 的行什么时候写入）===
--- 变体由系统/业务员创建，不是物料管理员手动建档：
+-- 变体在建工单时由系统自动触发创建，SPU 自身即为标准，无需物料建档时创建冗余"标准变体"。
 -- ┌──────────────┬─────────────────────┬──────────────────────────────┐
--- │ 场景          │ 写入时机             │ 操作方式                      │
+-- │ 场景          │ 触发时机             │ 操作方式                      │
 -- ├──────────────┼─────────────────────┼──────────────────────────────┤
--- │ 物料建档      │ 可自动创建标准变体     │ 系统：INSERT 一条 parent_id=SPU │
--- │              │ 差异字段全=NULL      │ 的变体行，作为"默认规格"        │
+-- │ ❌ 物料建档    │ —                   │ 删除。SPU 即标准，不建冗余变体。 │
 -- ├──────────────┼─────────────────────┼──────────────────────────────┤
--- │ 首次客户定制   │ 业务员接单时手动创建   │ 业务员在物料界面"新增变体"       │
--- │              │ 填差异字段（彩印/红绳） │ ① INSERT INTO qxx_md_item      │
+-- │ ✅ 建工单时    │ 工单向导 Step2       │ 系统检测 BOM/参数偏离标准 → 弹窗  │
+-- │   BOM/参数    │ BOM 调整完成后       │ "是否创建 SKU 变体？"           │
+-- │   偏离标准     │                     │ ① 是 → 系统自动：              │
+-- │              │                     │   INSERT INTO qxx_md_item      │
 -- │              │                     │    parent_id=SPU_ID             │
--- │              │                     │ ② INSERT INTO 行业子表           │
--- │              │                     │    SELECT ... FROM 子表          │
--- │              │                     │    WHERE item_id=SPU_ID          │
--- │              │                     │    → 方案A：复制父产品子表行       │
--- │              │                     │ ③ UPDATE 差异字段               │
+-- │              │                     │   → 复制行业子表（方案A）         │
+-- │              │                     │   → 复制批次配置                │
+-- │              │                     │   → 复制工艺路线关联             │
+-- │              │                     │   → 工单 product_id 替换为SKU   │
+-- │              │                     │ ② 否 → 沿用原物料编码           │
 -- ├──────────────┼─────────────────────┼──────────────────────────────┤
--- │ 返单（同规格） │ 不创建，复用已有变体    │ 业务员下拉选已有变体 item_id     │
+-- │ ✅ 返单（同规格）│ 建工单 Step1 选产品   │ 按 parent_id 列出已有变体供选择  │
+-- │              │                     │ 选择已有变体 → 加载对应路线BOM    │
 -- └──────────────┴─────────────────────┴──────────────────────────────┘
--- 变体生命周期：首次接单→创建；返单→复用；随产品生命周期长期存在。
+-- 变体生命周期：首次接单→创建变体；返单→复用已有变体；随产品生命周期长期存在。
 -- 与库存纸卷(roll_detail)的区别：变体是产品定义(永久可复用)，纸卷是物理实例(消耗性)。
 --
 -- === 多行业子表设计 ===
@@ -481,7 +483,8 @@ create table qxx_md_workstation (
   workstation_name  varchar(255)    not null                   comment '工作站名称(如1号印刷机/2号全自动制袋机)',
   workshop_id       bigint(20)      not null                   comment '所属车间ID(关联qxx_md_workshop)',
   workstation_type  varchar(50)     default null               comment '工作站类型:PRINT-印刷机,BAG_AUTO-全自动制袋机,BAG_SEMI-半自动制袋机,OTHER-其他',
-  process_type      varchar(50)     default null               comment '可执行工序类型:PRINT-印刷,BAG_MAKE-制袋,SLITTING-分切,INSPECT-检验',
+  process_id        bigint(20)      default null               comment '工序ID(关联qxx_pro_process)',
+  process_type      varchar(50)     default null               comment '工序类型(冗余字段,INTERNAL-自制/OUTSOURCE-外发/SLITTING-分切)',
   capacity          int(11)         default 0                  comment '单位时间产能(个/小时)',
   status            varchar(20)     default 'IDLE'             comment '当前状态:IDLE-空闲,RUNNING-运行中,MAINTENANCE-保养中,BREAKDOWN-故障',
   enable_flag       char(1)         default '1' not null       comment '是否启用(1-是,0-否)',
@@ -491,6 +494,7 @@ create table qxx_md_workstation (
   update_by         varchar(64)     default ''                 comment '更新者',
   update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
   key idx_factory_id (factory_id),
+  key idx_process_id (process_id),
   primary key (workstation_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '工作站管理表';
 

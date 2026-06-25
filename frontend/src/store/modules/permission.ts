@@ -4,6 +4,7 @@ import { getRouters } from '@/api/menu'
 import Layout from '@/layout/index.vue'
 import ParentView from '@/components/ParentView/index.vue'
 import InnerLink from '@/layout/components/InnerLink/index.vue'
+import { h } from 'vue'
 
 // 匹配views里面所有的.vue文件
 const modules = import.meta.glob('./../../views/**/*.vue')
@@ -49,6 +50,10 @@ const usePermissionStore = defineStore(
             this.setDefaultRoutes(sidebarRoutes)
             this.setTopbarRoutes(defaultRoutes)
             resolve(rewriteRoutes)
+          }).catch((err) => {
+            console.error('[generateRoutes] 获取路由失败', err)
+            // API 失败时保持现有路由不变（可能来自上次成功的缓存），避免空侧边栏
+            resolve(this.routes)
           })
         })
       }
@@ -113,6 +118,19 @@ export function filterDynamicRoutes(routes: any[]): any[] {
   return res
 }
 
+// 页面加载失败时的降级组件，避免 loadView 返回 undefined 导致白屏
+// 使用 h() 渲染函数（兼容运行时构建），区分"模块缺失"与"页面不存在"
+const MissingModule = {
+  name: 'MissingModule',
+  render() {
+    return h('div', { class: 'app-container', style: { textAlign: 'center', paddingTop: '80px' } }, [
+      h('h2', { style: { color: '#e6a23c' } }, '⚠ 模块缺失'),
+      h('p', { style: { color: '#909399', marginTop: '12px' } }, '后端路由配置的组件路径未匹配到对应前端文件，请联系管理员检查系统菜单配置。'),
+      h('el-button', { type: 'primary', style: { marginTop: '20px' }, onClick: () => window.history.back() }, '返回上一页'),
+    ])
+  },
+}
+
 export const loadView = (view: string): any => {
   let res
   for (const path in modules) {
@@ -120,6 +138,10 @@ export const loadView = (view: string): any => {
     if (dir === view) {
       res = () => modules[path]()
     }
+  }
+  if (!res) {
+    console.error(`[loadView] ❌ 未找到匹配的视图模块: "${view}"，请检查后端 sys_menu.component 是否与前端文件路径一致`)
+    return MissingModule
   }
   return res
 }

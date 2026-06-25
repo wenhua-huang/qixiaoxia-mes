@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.pro.ProWorkorderParamMapper">
+
+    <resultMap type="ProWorkorderParam" id="ProWorkorderParamResult">
+        <result property="recordId"    column="record_id"    />
+        <result property="factoryId"    column="factory_id"    />
+        <result property="workorderId"    column="workorder_id"    />
+        <result property="routeProductId"    column="route_product_id"    />
+        <result property="templateId"    column="template_id"    />
+        <result property="standardValue"    column="standard_value"    />
+        <result property="adjustedValue"    column="adjusted_value"    />
+        <result property="remark"    column="remark"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectProWorkorderParamVo">
+        select record_id, factory_id, workorder_id, route_product_id, template_id, standard_value, adjusted_value, remark, create_by, create_time, update_by, update_time from qxx_pro_workorder_param
+    </sql>
+
+    <select id="selectProWorkorderParamList" parameterType="ProWorkorderParam" resultMap="ProWorkorderParamResult">
+        <include refid="selectProWorkorderParamVo"/>
+        <where>
+            <if test="workorderId != null "> and workorder_id = #{workorderId}</if>
+            <if test="routeProductId != null "> and route_product_id = #{routeProductId}</if>
+            <if test="templateId != null "> and template_id = #{templateId}</if>
+        </where>
+        order by record_id
+    </select>
+
+    <select id="selectProWorkorderParamByRecordId" parameterType="Long" resultMap="ProWorkorderParamResult">
+        <include refid="selectProWorkorderParamVo"/>
+        where record_id = #{recordId}
+    </select>
+
+    <select id="selectProWorkorderParamByWorkorderId" parameterType="Long" resultMap="ProWorkorderParamResult">
+        <include refid="selectProWorkorderParamVo"/>
+        where workorder_id = #{workorderId}
+        order by record_id
+    </select>
+
+    <insert id="insertProWorkorderParam" parameterType="ProWorkorderParam" useGeneratedKeys="true" keyProperty="recordId">
+        insert into qxx_pro_workorder_param
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="workorderId != null">workorder_id,</if>
+            <if test="routeProductId != null">route_product_id,</if>
+            <if test="templateId != null">template_id,</if>
+            <if test="standardValue != null">standard_value,</if>
+            <if test="adjustedValue != null">adjusted_value,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="workorderId != null">#{workorderId},</if>
+            <if test="routeProductId != null">#{routeProductId},</if>
+            <if test="templateId != null">#{templateId},</if>
+            <if test="standardValue != null">#{standardValue},</if>
+            <if test="adjustedValue != null">#{adjustedValue},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateProWorkorderParam" parameterType="ProWorkorderParam">
+        update qxx_pro_workorder_param
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="workorderId != null">workorder_id = #{workorderId},</if>
+            <if test="routeProductId != null">route_product_id = #{routeProductId},</if>
+            <if test="templateId != null">template_id = #{templateId},</if>
+            <if test="standardValue != null">standard_value = #{standardValue},</if>
+            <if test="adjustedValue != null">adjusted_value = #{adjustedValue},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where record_id = #{recordId}
+    </update>
+
+    <delete id="deleteProWorkorderParamByRecordId" parameterType="Long">
+        delete from qxx_pro_workorder_param where record_id = #{recordId}
+    </delete>
+
+    <delete id="deleteProWorkorderParamByRecordIds">
+        delete from qxx_pro_workorder_param where record_id in
+        <foreach item="recordId" collection="array" open="(" separator="," close=")">
+            #{recordId}
+        </foreach>
+    </delete>
+
+    <delete id="deleteProWorkorderParamByWorkorderId" parameterType="Long">
+        delete from qxx_pro_workorder_param where workorder_id = #{workorderId}
+    </delete>
+</mapper>

@@ -20,7 +20,7 @@ export default defineConfig({
 
   use: {
     // 前端 dev server 地址
-    baseURL: process.env.BASE_URL || 'http://localhost:80',
+    baseURL: process.env.BASE_URL || 'http://localhost:5173',
 
     // 失败时保留 trace
     trace: 'retain-on-failure',
@@ -46,7 +46,7 @@ export default defineConfig({
   // 自动启动前端 dev server
   webServer: {
     command: 'cd ../frontend && npm run dev',
-    url: 'http://localhost:80',
+    url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000
   }

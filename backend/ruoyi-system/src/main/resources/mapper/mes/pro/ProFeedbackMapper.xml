@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.pro.ProFeedbackMapper">
+
+    <resultMap type="ProFeedback" id="ProFeedbackResult">
+        <result property="recordId"    column="record_id"    />
+        <result property="factoryId"    column="factory_id"    />
+        <result property="feedbackType"    column="feedback_type"    />
+        <result property="feedbackCode"    column="feedback_code"    />
+        <result property="workstationId"    column="workstation_id"    />
+        <result property="workstationCode"    column="workstation_code"    />
+        <result property="workstationName"    column="workstation_name"    />
+        <result property="workorderId"    column="workorder_id"    />
+        <result property="workorderCode"    column="workorder_code"    />
+        <result property="workorderName"    column="workorder_name"    />
+        <result property="routeId"    column="route_id"    />
+        <result property="routeCode"    column="route_code"    />
+        <result property="processId"    column="process_id"    />
+        <result property="processCode"    column="process_code"    />
+        <result property="processName"    column="process_name"    />
+        <result property="taskId"    column="task_id"    />
+        <result property="taskCode"    column="task_code"    />
+        <result property="itemId"    column="item_id"    />
+        <result property="itemCode"    column="item_code"    />
+        <result property="itemName"    column="item_name"    />
+        <result property="unitOfMeasure"    column="unit_of_measure"    />
+        <result property="unitName"    column="unit_name"    />
+        <result property="specification"    column="specification"    />
+        <result property="vendorId"    column="vendor_id"    />
+        <result property="vendorCode"    column="vendor_code"    />
+        <result property="vendorName"    column="vendor_name"    />
+        <result property="outsourceFactoryId"    column="outsource_factory_id"    />
+        <result property="outsourceIssueId"    column="outsource_issue_id"    />
+        <result property="outsourceIssueCode"    column="outsource_issue_code"    />
+        <result property="outsourceRecptId"    column="outsource_recpt_id"    />
+        <result property="expireDate"    column="expire_date"    />
+        <result property="lotNumber"    column="lot_number"    />
+        <result property="quantity"    column="quantity"    />
+        <result property="quantityFeedback"    column="quantity_feedback"    />
+        <result property="quantityQualified"    column="quantity_qualified"    />
+        <result property="quantityUnqualified"    column="quantity_unqualified"    />
+        <result property="quantityUncheck"    column="quantity_uncheck"    />
+        <result property="quantityLaborScrap"    column="quantity_labor_scrap"    />
+        <result property="quantityMaterialScrap"    column="quantity_material_scrap"    />
+        <result property="quantityOtherScrap"    column="quantity_other_scrap"    />
+        <result property="userName"    column="user_name"    />
+        <result property="nickName"    column="nick_name"    />
+        <result property="feedbackChannel"    column="feedback_channel"    />
+        <result property="feedbackTime"    column="feedback_time"    />
+        <result property="recordUser"    column="record_user"    />
+        <result property="recordNick"    column="record_nick"    />
+        <result property="status"    column="status"    />
+        <result property="remark"    column="remark"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectProFeedbackVo">
+        select record_id, factory_id, feedback_type, feedback_code, workstation_id, workstation_code, workstation_name, workorder_id, workorder_code, workorder_name, route_id, route_code, process_id, process_code, process_name, task_id, task_code, item_id, item_code, item_name, unit_of_measure, unit_name, specification, vendor_id, vendor_code, vendor_name, outsource_factory_id, outsource_issue_id, outsource_issue_code, outsource_recpt_id, expire_date, lot_number, quantity, quantity_feedback, quantity_qualified, quantity_unqualified, quantity_uncheck, quantity_labor_scrap, quantity_material_scrap, quantity_other_scrap, user_name, nick_name, feedback_channel, feedback_time, record_user, record_nick, status, remark, create_by, create_time, update_by, update_time from qxx_pro_feedback
+    </sql>
+
+    <select id="selectProFeedbackList" parameterType="ProFeedback" resultMap="ProFeedbackResult">
+        <include refid="selectProFeedbackVo"/>
+        <where>
+            <if test="feedbackCode != null  and feedbackCode != ''"> and feedback_code = #{feedbackCode}</if>
+            <if test="feedbackType != null  and feedbackType != ''"> and feedback_type = #{feedbackType}</if>
+            <if test="workorderId != null "> and workorder_id = #{workorderId}</if>
+            <if test="workorderCode != null  and workorderCode != ''"> and workorder_code = #{workorderCode}</if>
+            <if test="workstationId != null "> and workstation_id = #{workstationId}</if>
+            <if test="processId != null "> and process_id = #{processId}</if>
+            <if test="itemId != null "> and item_id = #{itemId}</if>
+            <if test="workorderName != null  and workorderName != ''"> and workorder_name like concat('%', #{workorderName}, '%')</if>
+            <if test="workstationName != null  and workstationName != ''"> and workstation_name like concat('%', #{workstationName}, '%')</if>
+            <if test="processName != null  and processName != ''"> and process_name like concat('%', #{processName}, '%')</if>
+            <if test="status != null  and status != ''"> and status = #{status}</if>
+        </where>
+        order by record_id desc
+    </select>
+
+    <select id="selectProFeedbackByRecordId" parameterType="Long" resultMap="ProFeedbackResult">
+        <include refid="selectProFeedbackVo"/>
+        where record_id = #{recordId}
+    </select>
+
+    <select id="selectProFeedbackByRecordIdForUpdate" parameterType="Long" resultMap="ProFeedbackResult">
+        <include refid="selectProFeedbackVo"/>
+        where record_id = #{recordId} for update
+    </select>
+
+    <select id="selectProFeedbackByFeedbackCode" parameterType="String" resultMap="ProFeedbackResult">
+        <include refid="selectProFeedbackVo"/>
+        where feedback_code = #{feedbackCode}
+    </select>
+
+    <insert id="insertProFeedback" parameterType="ProFeedback" useGeneratedKeys="true" keyProperty="recordId">
+        insert into qxx_pro_feedback
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="feedbackType != null and feedbackType != ''">feedback_type,</if>
+            <if test="feedbackCode != null and feedbackCode != ''">feedback_code,</if>
+            <if test="workstationId != null">workstation_id,</if>
+            <if test="workstationCode != null">workstation_code,</if>
+            <if test="workstationName != null">workstation_name,</if>
+            <if test="workorderId != null">workorder_id,</if>
+            <if test="workorderCode != null">workorder_code,</if>
+            <if test="workorderName != null">workorder_name,</if>
+            <if test="routeId != null">route_id,</if>
+            <if test="routeCode != null">route_code,</if>
+            <if test="processId != null">process_id,</if>
+            <if test="processCode != null">process_code,</if>
+            <if test="processName != null">process_name,</if>
+            <if test="taskId != null">task_id,</if>
+            <if test="taskCode != null">task_code,</if>
+            <if test="itemId != null">item_id,</if>
+            <if test="itemCode != null">item_code,</if>
+            <if test="itemName != null">item_name,</if>
+            <if test="unitOfMeasure != null">unit_of_measure,</if>
+            <if test="unitName != null">unit_name,</if>
+            <if test="specification != null">specification,</if>
+            <if test="vendorId != null">vendor_id,</if>
+            <if test="vendorCode != null">vendor_code,</if>
+            <if test="vendorName != null">vendor_name,</if>
+            <if test="outsourceFactoryId != null">outsource_factory_id,</if>
+            <if test="outsourceIssueId != null">outsource_issue_id,</if>
+            <if test="outsourceIssueCode != null">outsource_issue_code,</if>
+            <if test="outsourceRecptId != null">outsource_recpt_id,</if>
+            <if test="expireDate != null">expire_date,</if>
+            <if test="lotNumber != null">lot_number,</if>
+            <if test="quantity != null">quantity,</if>
+            <if test="quantityFeedback != null">quantity_feedback,</if>
+            <if test="quantityQualified != null">quantity_qualified,</if>
+            <if test="quantityUnqualified != null">quantity_unqualified,</if>
+            <if test="quantityUncheck != null">quantity_uncheck,</if>
+            <if test="quantityLaborScrap != null">quantity_labor_scrap,</if>
+            <if test="quantityMaterialScrap != null">quantity_material_scrap,</if>
+            <if test="quantityOtherScrap != null">quantity_other_scrap,</if>
+            <if test="userName != null">user_name,</if>
+            <if test="nickName != null">nick_name,</if>
+            <if test="feedbackChannel != null">feedback_channel,</if>
+            <if test="feedbackTime != null">feedback_time,</if>
+            <if test="recordUser != null">record_user,</if>
+            <if test="recordNick != null">record_nick,</if>
+            <if test="status != null and status != ''">status,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="feedbackType != null and feedbackType != ''">#{feedbackType},</if>
+            <if test="feedbackCode != null and feedbackCode != ''">#{feedbackCode},</if>
+            <if test="workstationId != null">#{workstationId},</if>
+            <if test="workstationCode != null">#{workstationCode},</if>
+            <if test="workstationName != null">#{workstationName},</if>
+            <if test="workorderId != null">#{workorderId},</if>
+            <if test="workorderCode != null">#{workorderCode},</if>
+            <if test="workorderName != null">#{workorderName},</if>
+            <if test="routeId != null">#{routeId},</if>
+            <if test="routeCode != null">#{routeCode},</if>
+            <if test="processId != null">#{processId},</if>
+            <if test="processCode != null">#{processCode},</if>
+            <if test="processName != null">#{processName},</if>
+            <if test="taskId != null">#{taskId},</if>
+            <if test="taskCode != null">#{taskCode},</if>
+            <if test="itemId != null">#{itemId},</if>
+            <if test="itemCode != null">#{itemCode},</if>
+            <if test="itemName != null">#{itemName},</if>
+            <if test="unitOfMeasure != null">#{unitOfMeasure},</if>
+            <if test="unitName != null">#{unitName},</if>
+            <if test="specification != null">#{specification},</if>
+            <if test="vendorId != null">#{vendorId},</if>
+            <if test="vendorCode != null">#{vendorCode},</if>
+            <if test="vendorName != null">#{vendorName},</if>
+            <if test="outsourceFactoryId != null">#{outsourceFactoryId},</if>
+            <if test="outsourceIssueId != null">#{outsourceIssueId},</if>
+            <if test="outsourceIssueCode != null">#{outsourceIssueCode},</if>
+            <if test="outsourceRecptId != null">#{outsourceRecptId},</if>
+            <if test="expireDate != null">#{expireDate},</if>
+            <if test="lotNumber != null">#{lotNumber},</if>
+            <if test="quantity != null">#{quantity},</if>
+            <if test="quantityFeedback != null">#{quantityFeedback},</if>
+            <if test="quantityQualified != null">#{quantityQualified},</if>
+            <if test="quantityUnqualified != null">#{quantityUnqualified},</if>
+            <if test="quantityUncheck != null">#{quantityUncheck},</if>
+            <if test="quantityLaborScrap != null">#{quantityLaborScrap},</if>
+            <if test="quantityMaterialScrap != null">#{quantityMaterialScrap},</if>
+            <if test="quantityOtherScrap != null">#{quantityOtherScrap},</if>
+            <if test="userName != null">#{userName},</if>
+            <if test="nickName != null">#{nickName},</if>
+            <if test="feedbackChannel != null">#{feedbackChannel},</if>
+            <if test="feedbackTime != null">#{feedbackTime},</if>
+            <if test="recordUser != null">#{recordUser},</if>
+            <if test="recordNick != null">#{recordNick},</if>
+            <if test="status != null and status != ''">#{status},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateProFeedback" parameterType="ProFeedback">
+        update qxx_pro_feedback
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="feedbackType != null and feedbackType != ''">feedback_type = #{feedbackType},</if>
+            <if test="feedbackCode != null and feedbackCode != ''">feedback_code = #{feedbackCode},</if>
+            <if test="workstationId != null">workstation_id = #{workstationId},</if>
+            <if test="workstationCode != null">workstation_code = #{workstationCode},</if>
+            <if test="workstationName != null">workstation_name = #{workstationName},</if>
+            <if test="workorderId != null">workorder_id = #{workorderId},</if>
+            <if test="workorderCode != null">workorder_code = #{workorderCode},</if>
+            <if test="workorderName != null">workorder_name = #{workorderName},</if>
+            <if test="routeId != null">route_id = #{routeId},</if>
+            <if test="routeCode != null">route_code = #{routeCode},</if>
+            <if test="processId != null">process_id = #{processId},</if>
+            <if test="processCode != null">process_code = #{processCode},</if>
+            <if test="processName != null">process_name = #{processName},</if>
+            <if test="taskId != null">task_id = #{taskId},</if>
+            <if test="taskCode != null">task_code = #{taskCode},</if>
+            <if test="itemId != null">item_id = #{itemId},</if>
+            <if test="itemCode != null">item_code = #{itemCode},</if>
+            <if test="itemName != null">item_name = #{itemName},</if>
+            <if test="unitOfMeasure != null">unit_of_measure = #{unitOfMeasure},</if>
+            <if test="unitName != null">unit_name = #{unitName},</if>
+            <if test="specification != null">specification = #{specification},</if>
+            <if test="vendorId != null">vendor_id = #{vendorId},</if>
+            <if test="vendorCode != null">vendor_code = #{vendorCode},</if>
+            <if test="vendorName != null">vendor_name = #{vendorName},</if>
+            <if test="outsourceFactoryId != null">outsource_factory_id = #{outsourceFactoryId},</if>
+            <if test="outsourceIssueId != null">outsource_issue_id = #{outsourceIssueId},</if>
+            <if test="outsourceIssueCode != null">outsource_issue_code = #{outsourceIssueCode},</if>
+            <if test="outsourceRecptId != null">outsource_recpt_id = #{outsourceRecptId},</if>
+            <if test="expireDate != null">expire_date = #{expireDate},</if>
+            <if test="lotNumber != null">lot_number = #{lotNumber},</if>
+            <if test="quantity != null">quantity = #{quantity},</if>
+            <if test="quantityFeedback != null">quantity_feedback = #{quantityFeedback},</if>
+            <if test="quantityQualified != null">quantity_qualified = #{quantityQualified},</if>
+            <if test="quantityUnqualified != null">quantity_unqualified = #{quantityUnqualified},</if>
+            <if test="quantityUncheck != null">quantity_uncheck = #{quantityUncheck},</if>
+            <if test="quantityLaborScrap != null">quantity_labor_scrap = #{quantityLaborScrap},</if>
+            <if test="quantityMaterialScrap != null">quantity_material_scrap = #{quantityMaterialScrap},</if>
+            <if test="quantityOtherScrap != null">quantity_other_scrap = #{quantityOtherScrap},</if>
+            <if test="userName != null">user_name = #{userName},</if>
+            <if test="nickName != null">nick_name = #{nickName},</if>
+            <if test="feedbackChannel != null">feedback_channel = #{feedbackChannel},</if>
+            <if test="feedbackTime != null">feedback_time = #{feedbackTime},</if>
+            <if test="recordUser != null">record_user = #{recordUser},</if>
+            <if test="recordNick != null">record_nick = #{recordNick},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where record_id = #{recordId}
+    </update>
+
+    <delete id="deleteProFeedbackByRecordId" parameterType="Long">
+        delete from qxx_pro_feedback where record_id = #{recordId}
+    </delete>
+
+    <delete id="deleteProFeedbackByRecordIds">
+        delete from qxx_pro_feedback where record_id in
+        <foreach item="recordId" collection="array" open="(" separator="," close=")">
+            #{recordId}
+        </foreach>
+    </delete>
+</mapper>

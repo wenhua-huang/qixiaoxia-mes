@@ -55,7 +55,7 @@ export function resetForm(refName: string): void {
 
 // 添加日期范围
 export function addDateRange(params: any, dateRange: string[], propName?: string): any {
-  let search = params
+  const search = params
   search.params = typeof (search.params) === 'object' && search.params !== null && !Array.isArray(search.params) ? search.params : {}
   dateRange = Array.isArray(dateRange) ? dateRange : []
   if (typeof (propName) === 'undefined') {
@@ -217,7 +217,7 @@ export function getNormalPath(p: string): string {
   if (p.length === 0 || !p || p == 'undefined') {
     return p
   }
-  let res = p.replace('//', '/')
+  const res = p.replace('//', '/')
   if (res[res.length - 1] === '/') {
     return res.slice(0, res.length - 1)
   }

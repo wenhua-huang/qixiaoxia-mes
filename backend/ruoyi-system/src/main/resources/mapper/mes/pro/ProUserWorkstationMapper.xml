@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.pro.ProUserWorkstationMapper">
+
+    <resultMap type="ProUserWorkstation" id="ProUserWorkstationResult">
+        <result property="recordId"    column="record_id"    />
+        <result property="factoryId"    column="factory_id"    />
+        <result property="userId"    column="user_id"    />
+        <result property="userName"    column="user_name"    />
+        <result property="nickName"    column="nick_name"    />
+        <result property="workstationId"    column="workstation_id"    />
+        <result property="workstationCode"    column="workstation_code"    />
+        <result property="workstationName"    column="workstation_name"    />
+        <result property="enableFlag"    column="enable_flag"    />
+        <result property="operationTime"    column="operation_time"    />
+        <result property="remark"    column="remark"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectProUserWorkstationVo">
+        select record_id, factory_id, user_id, user_name, nick_name, workstation_id, workstation_code, workstation_name, enable_flag, operation_time, remark, create_by, create_time, update_by, update_time from qxx_pro_user_workstation
+    </sql>
+
+    <select id="selectProUserWorkstationList" parameterType="ProUserWorkstation" resultMap="ProUserWorkstationResult">
+        <include refid="selectProUserWorkstationVo"/>
+        <where>
+            <if test="userId != null"> and user_id = #{userId}</if>
+            <if test="workstationId != null"> and workstation_id = #{workstationId}</if>
+            <if test="enableFlag != null  and enableFlag != ''"> and enable_flag = #{enableFlag}</if>
+        </where>
+        order by record_id desc
+    </select>
+
+    <select id="selectProUserWorkstationByRecordId" parameterType="Long" resultMap="ProUserWorkstationResult">
+        <include refid="selectProUserWorkstationVo"/>
+        where record_id = #{recordId}
+    </select>
+
+    <insert id="insertProUserWorkstation" parameterType="ProUserWorkstation" useGeneratedKeys="true" keyProperty="recordId">
+        insert into qxx_pro_user_workstation
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="userId != null">user_id,</if>
+            <if test="userName != null and userName != ''">user_name,</if>
+            <if test="nickName != null and nickName != ''">nick_name,</if>
+            <if test="workstationId != null">workstation_id,</if>
+            <if test="workstationCode != null and workstationCode != ''">workstation_code,</if>
+            <if test="workstationName != null and workstationName != ''">workstation_name,</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag,</if>
+            <if test="operationTime != null">operation_time,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="userId != null">#{userId},</if>
+            <if test="userName != null and userName != ''">#{userName},</if>
+            <if test="nickName != null and nickName != ''">#{nickName},</if>
+            <if test="workstationId != null">#{workstationId},</if>
+            <if test="workstationCode != null and workstationCode != ''">#{workstationCode},</if>
+            <if test="workstationName != null and workstationName != ''">#{workstationName},</if>
+            <if test="enableFlag != null and enableFlag != ''">#{enableFlag},</if>
+            <if test="operationTime != null">#{operationTime},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateProUserWorkstation" parameterType="ProUserWorkstation">
+        update qxx_pro_user_workstation
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="userId != null">user_id = #{userId},</if>
+            <if test="userName != null and userName != ''">user_name = #{userName},</if>
+            <if test="nickName != null and nickName != ''">nick_name = #{nickName},</if>
+            <if test="workstationId != null">workstation_id = #{workstationId},</if>
+            <if test="workstationCode != null and workstationCode != ''">workstation_code = #{workstationCode},</if>
+            <if test="workstationName != null and workstationName != ''">workstation_name = #{workstationName},</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag = #{enableFlag},</if>
+            <if test="operationTime != null">operation_time = #{operationTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where record_id = #{recordId}
+    </update>
+
+    <delete id="deleteProUserWorkstationByRecordId" parameterType="Long">
+        delete from qxx_pro_user_workstation where record_id = #{recordId}
+    </delete>
+
+    <delete id="deleteProUserWorkstationByRecordIds">
+        delete from qxx_pro_user_workstation where record_id in
+        <foreach item="recordId" collection="array" open="(" separator="," close=")">
+            #{recordId}
+        </foreach>
+    </delete>
+</mapper>

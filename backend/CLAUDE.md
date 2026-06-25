@@ -168,14 +168,17 @@ Table queries return `TableDataInfo`:
 
 继承 `BaseIntegrationTest`，`@SpringBootTest(webEnvironment = RANDOM_PORT)`，`RestTemplate` 发请求，断言 HTTP 响应 + DB 最终状态。
 
-前置：`docker compose up -d redis`（Redis 必须启动）。
+前置：`docker compose up -d redis`（Redis 必须启动）。**改 `ruoyi-system` 的代码/XML 后必须先 `mvn install -pl ruoyi-system -am -DskipTests`，否则测试从 `~/.m2` 加载旧 jar**。
 
 ```bash
+mvn install -pl ruoyi-system -am -DskipTests    # 改依赖模块后必须先 install
 mvn test                          # 单元测试
 mvn test -pl ruoyi-system         # 特定模块
 mvn verify                        # 单元 + 集成
-mvn test -pl ruoyi-admin -Dtest="*IT" -Dsurefire.failIfNoSpecifiedTests=false  # 特定集成测试
+mvn failsafe:integration-test -pl ruoyi-admin -Dit.test="XxxControllerIT"  # 单跑一个集成测试
 ```
+
+调试 SQL：临时在 `application-test.yml` 设 `logging.level.com.ruoyi.system.mapper.mes: debug`。
 
 ## RuoYi 框架工具清单
 

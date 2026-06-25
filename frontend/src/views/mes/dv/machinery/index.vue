@@ -29,12 +29,12 @@
       <!-- 右侧设备列表 -->
       <el-col :span="20" :xs="24">
         <!-- 搜索 -->
-        <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="80px">
+        <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="68px">
           <el-form-item label="设备编码" prop="machineryCode">
-            <el-input v-model="queryParams.machineryCode" placeholder="请输入设备编码" clearable style="width:200px" @keyup.enter="handleQuery" />
+            <el-input v-model="queryParams.machineryCode" placeholder="请输入设备编码" clearable style="width: 240px" @keyup.enter="handleQuery" />
           </el-form-item>
           <el-form-item label="设备名称" prop="machineryName">
-            <el-input v-model="queryParams.machineryName" placeholder="请输入设备名称" clearable style="width:200px" @keyup.enter="handleQuery" />
+            <el-input v-model="queryParams.machineryName" placeholder="请输入设备名称" clearable style="width: 240px" @keyup.enter="handleQuery" />
           </el-form-item>
           <el-form-item>
             <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
@@ -61,7 +61,7 @@
 
         <!-- 表格 -->
         <el-table v-loading="loading" :data="machineryList" @selection-change="handleSelectionChange">
-          <el-table-column type="selection" width="55" align="center" />
+          <el-table-column type="selection" width="50" align="center" />
           <el-table-column label="设备编码" align="center" prop="machineryCode" width="140">
             <template #default="scope">
               <el-button link type="primary" @click="handleUpdate(scope.row)" v-hasPermi="['mes:dv:machinery:query']">{{ scope.row.machineryCode }}</el-button>
@@ -215,6 +215,7 @@ function filterTypeNodeFn(value: string, data: any) {
 
 /** 点击树节点 → 按类型（含子类型）过滤设备 */
 function handleNodeClick(data: any) {
+  if (data.disabled) return // 禁用的分类不触发查询
   queryParams.value.machineryTypeId = data.id
   handleQuery()
 }

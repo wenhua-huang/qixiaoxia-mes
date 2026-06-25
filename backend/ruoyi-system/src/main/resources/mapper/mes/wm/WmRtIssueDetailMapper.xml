@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.wm.WmRtIssueDetailMapper">
+
+    <resultMap type="WmRtIssueDetail" id="WmRtIssueDetailResult">
+        <result property="detailId"    column="detail_id"    />
+        <result property="factoryId"    column="factory_id"    />
+        <result property="lineId"    column="line_id"    />
+        <result property="rtId"    column="rt_id"    />
+        <result property="rtCode"    column="rt_code"    />
+        <result property="itemId"    column="item_id"    />
+        <result property="itemCode"    column="item_code"    />
+        <result property="itemName"    column="item_name"    />
+        <result property="batchId"    column="batch_id"    />
+        <result property="batchCode"    column="batch_code"    />
+        <result property="warehouseId"    column="warehouse_id"    />
+        <result property="locationId"    column="location_id"    />
+        <result property="areaId"    column="area_id"    />
+        <result property="materialStockId"    column="material_stock_id"    />
+        <result property="quantity"    column="quantity"    />
+        <result property="unitOfMeasure"    column="unit_of_measure"    />
+        <result property="unitName"    column="unit_name"    />
+        <result property="remark"    column="remark"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectWmRtIssueDetailVo">
+        select detail_id, factory_id, line_id, rt_id, rt_code, item_id, item_code, item_name, batch_id, batch_code, warehouse_id, location_id, area_id, material_stock_id, quantity, unit_of_measure, unit_name, remark, create_by, create_time, update_by, update_time from qxx_wm_rt_issue_detail
+    </sql>
+
+    <select id="selectWmRtIssueDetailList" parameterType="WmRtIssueDetail" resultMap="WmRtIssueDetailResult">
+        <include refid="selectWmRtIssueDetailVo"/>
+        <where>
+            <if test="rtId != null"> and rt_id = #{rtId}</if>
+            <if test="lineId != null"> and line_id = #{lineId}</if>
+            <if test="itemId != null"> and item_id = #{itemId}</if>
+        </where>
+        order by detail_id desc
+    </select>
+
+    <select id="selectWmRtIssueDetailByDetailId" parameterType="Long" resultMap="WmRtIssueDetailResult">
+        <include refid="selectWmRtIssueDetailVo"/>
+        where detail_id = #{detailId}
+    </select>
+
+    <insert id="insertWmRtIssueDetail" parameterType="WmRtIssueDetail" useGeneratedKeys="true" keyProperty="detailId">
+        insert into qxx_wm_rt_issue_detail
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="lineId != null">line_id,</if>
+            <if test="rtId != null">rt_id,</if>
+            <if test="rtCode != null and rtCode != ''">rt_code,</if>
+            <if test="itemId != null">item_id,</if>
+            <if test="itemCode != null and itemCode != ''">item_code,</if>
+            <if test="itemName != null and itemName != ''">item_name,</if>
+            <if test="batchId != null">batch_id,</if>
+            <if test="batchCode != null and batchCode != ''">batch_code,</if>
+            <if test="warehouseId != null">warehouse_id,</if>
+            <if test="locationId != null">location_id,</if>
+            <if test="areaId != null">area_id,</if>
+            <if test="materialStockId != null">material_stock_id,</if>
+            <if test="quantity != null">quantity,</if>
+            <if test="unitOfMeasure != null and unitOfMeasure != ''">unit_of_measure,</if>
+            <if test="unitName != null and unitName != ''">unit_name,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="lineId != null">#{lineId},</if>
+            <if test="rtId != null">#{rtId},</if>
+            <if test="rtCode != null and rtCode != ''">#{rtCode},</if>
+            <if test="itemId != null">#{itemId},</if>
+            <if test="itemCode != null and itemCode != ''">#{itemCode},</if>
+            <if test="itemName != null and itemName != ''">#{itemName},</if>
+            <if test="batchId != null">#{batchId},</if>
+            <if test="batchCode != null and batchCode != ''">#{batchCode},</if>
+            <if test="warehouseId != null">#{warehouseId},</if>
+            <if test="locationId != null">#{locationId},</if>
+            <if test="areaId != null">#{areaId},</if>
+            <if test="materialStockId != null">#{materialStockId},</if>
+            <if test="quantity != null">#{quantity},</if>
+            <if test="unitOfMeasure != null and unitOfMeasure != ''">#{unitOfMeasure},</if>
+            <if test="unitName != null and unitName != ''">#{unitName},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateWmRtIssueDetail" parameterType="WmRtIssueDetail">
+        update qxx_wm_rt_issue_detail
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="lineId != null">line_id = #{lineId},</if>
+            <if test="rtId != null">rt_id = #{rtId},</if>
+            <if test="rtCode != null and rtCode != ''">rt_code = #{rtCode},</if>
+            <if test="itemId != null">item_id = #{itemId},</if>
+            <if test="itemCode != null and itemCode != ''">item_code = #{itemCode},</if>
+            <if test="itemName != null and itemName != ''">item_name = #{itemName},</if>
+            <if test="batchId != null">batch_id = #{batchId},</if>
+            <if test="batchCode != null and batchCode != ''">batch_code = #{batchCode},</if>
+            <if test="warehouseId != null">warehouse_id = #{warehouseId},</if>
+            <if test="locationId != null">location_id = #{locationId},</if>
+            <if test="areaId != null">area_id = #{areaId},</if>
+            <if test="materialStockId != null">material_stock_id = #{materialStockId},</if>
+            <if test="quantity != null">quantity = #{quantity},</if>
+            <if test="unitOfMeasure != null and unitOfMeasure != ''">unit_of_measure = #{unitOfMeasure},</if>
+            <if test="unitName != null and unitName != ''">unit_name = #{unitName},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where detail_id = #{detailId}
+    </update>
+
+    <delete id="deleteWmRtIssueDetailByDetailId" parameterType="Long">
+        delete from qxx_wm_rt_issue_detail where detail_id = #{detailId}
+    </delete>
+
+    <delete id="deleteWmRtIssueDetailByDetailIds">
+        delete from qxx_wm_rt_issue_detail where detail_id in
+        <foreach item="detailId" collection="array" open="(" separator="," close=")">
+            #{detailId}
+        </foreach>
+    </delete>
+</mapper>

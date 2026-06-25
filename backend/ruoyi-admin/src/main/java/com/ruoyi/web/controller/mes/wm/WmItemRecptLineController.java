@@ -77,7 +77,7 @@ public class WmItemRecptLineController extends BaseController
     public AjaxResult add(@RequestBody WmItemRecptLine entity)
     {
         autoGenBatch(entity);
-        return toAjax(wmItemRecptLineService.insertWmItemRecptLine(entity));
+        return toAjax(wmItemRecptLineService.insertWmItemRecptLine(entity), entity, "新增入库单行失败");
     }
 
     @PreAuthorize("@ss.hasPermi('mes:wm:item_recpt_line:edit')")

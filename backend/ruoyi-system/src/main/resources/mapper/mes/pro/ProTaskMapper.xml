@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.pro.ProTaskMapper">
+
+    <resultMap type="ProTask" id="ProTaskResult">
+        <result property="taskId"    column="task_id"    />
+        <result property="factoryId"    column="factory_id"    />
+        <result property="taskCode"    column="task_code"    />
+        <result property="taskName"    column="task_name"    />
+        <result property="workorderId"    column="workorder_id"    />
+        <result property="workorderCode"    column="workorder_code"    />
+        <result property="workorderName"    column="workorder_name"    />
+        <result property="workstationId"    column="workstation_id"    />
+        <result property="workstationCode"    column="workstation_code"    />
+        <result property="workstationName"    column="workstation_name"    />
+        <result property="routeId"    column="route_id"    />
+        <result property="routeCode"    column="route_code"    />
+        <result property="processId"    column="process_id"    />
+        <result property="processCode"    column="process_code"    />
+        <result property="processName"    column="process_name"    />
+        <result property="itemId"    column="item_id"    />
+        <result property="itemCode"    column="item_code"    />
+        <result property="itemName"    column="item_name"    />
+        <result property="specification"    column="specification"    />
+        <result property="unitOfMeasure"    column="unit_of_measure"    />
+        <result property="unitName"    column="unit_name"    />
+        <result property="quantity"    column="quantity"    />
+        <result property="quantityProduced"    column="quantity_produced"    />
+        <result property="quantityQualified"    column="quantity_qualified"    />
+        <result property="quantityUnqualified"    column="quantity_unqualified"    />
+        <result property="quantityChanged"    column="quantity_changed"    />
+        <result property="clientId"    column="client_id"    />
+        <result property="clientCode"    column="client_code"    />
+        <result property="clientName"    column="client_name"    />
+        <result property="clientNick"    column="client_nick"    />
+        <result property="machineCode"    column="machine_code"    />
+        <result property="setupDuration"    column="setup_duration"    />
+        <result property="unitDuration"    column="unit_duration"    />
+        <result property="offlineQty"    column="offline_qty"    />
+        <result property="startTime"    column="start_time"    />
+        <result property="duration"    column="duration"    />
+        <result property="endTime"    column="end_time"    />
+        <result property="colorCode"    column="color_code"    />
+        <result property="requestDate"    column="request_date"    />
+        <result property="finishDate"    column="finish_date"    />
+        <result property="cancelDate"    column="cancel_date"    />
+        <result property="vendorId"    column="vendor_id"    />
+        <result property="vendorCode"    column="vendor_code"    />
+        <result property="outsourceFactoryId"    column="outsource_factory_id"    />
+        <result property="status"    column="status"    />
+        <result property="remark"    column="remark"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectProTaskVo">
+        select task_id, factory_id, task_code, task_name, workorder_id, workorder_code, workorder_name, workstation_id, workstation_code, workstation_name, route_id, route_code, process_id, process_code, process_name, item_id, item_code, item_name, specification, unit_of_measure, unit_name, quantity, quantity_produced, quantity_qualified, quantity_unqualified, quantity_changed, client_id, client_code, client_name, client_nick, machine_code, setup_duration, unit_duration, offline_qty, start_time, duration, end_time, color_code, request_date, finish_date, cancel_date, vendor_id, vendor_code, outsource_factory_id, status, remark, create_by, create_time, update_by, update_time from qxx_pro_task
+    </sql>
+
+    <select id="selectProTaskList" parameterType="ProTask" resultMap="ProTaskResult">
+        <include refid="selectProTaskVo"/>
+        <where>
+            <if test="taskCode != null  and taskCode != ''"> and task_code = #{taskCode}</if>
+            <if test="taskName != null  and taskName != ''"> and task_name like concat('%', #{taskName}, '%')</if>
+            <if test="workorderId != null"> and workorder_id = #{workorderId}</if>
+            <if test="workorderCode != null  and workorderCode != ''"> and workorder_code like concat('%', #{workorderCode}, '%')</if>
+            <if test="workorderName != null  and workorderName != ''"> and workorder_name like concat('%', #{workorderName}, '%')</if>
+            <if test="workstationId != null"> and workstation_id = #{workstationId}</if>
+            <if test="workstationCode != null  and workstationCode != ''"> and workstation_code like concat('%', #{workstationCode}, '%')</if>
+            <if test="workstationName != null  and workstationName != ''"> and workstation_name like concat('%', #{workstationName}, '%')</if>
+            <if test="processId != null"> and process_id = #{processId}</if>
+            <if test="processCode != null  and processCode != ''"> and process_code like concat('%', #{processCode}, '%')</if>
+            <if test="processName != null  and processName != ''"> and process_name like concat('%', #{processName}, '%')</if>
+            <if test="status != null  and status != ''"> and status = #{status}</if>
+        </where>
+        order by task_id desc
+    </select>
+
+    <select id="selectProTaskByTaskId" parameterType="Long" resultMap="ProTaskResult">
+        <include refid="selectProTaskVo"/>
+        where task_id = #{taskId}
+    </select>
+
+    <insert id="insertProTask" parameterType="ProTask" useGeneratedKeys="true" keyProperty="taskId">
+        insert into qxx_pro_task
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="taskCode != null and taskCode != ''">task_code,</if>
+            <if test="taskName != null and taskName != ''">task_name,</if>
+            <if test="workorderId != null">workorder_id,</if>
+            <if test="workorderCode != null">workorder_code,</if>
+            <if test="workorderName != null">workorder_name,</if>
+            <if test="workstationId != null">workstation_id,</if>
+            <if test="workstationCode != null">workstation_code,</if>
+            <if test="workstationName != null">workstation_name,</if>
+            <if test="routeId != null">route_id,</if>
+            <if test="routeCode != null">route_code,</if>
+            <if test="processId != null">process_id,</if>
+            <if test="processCode != null">process_code,</if>
+            <if test="processName != null">process_name,</if>
+            <if test="itemId != null">item_id,</if>
+            <if test="itemCode != null">item_code,</if>
+            <if test="itemName != null">item_name,</if>
+            <if test="specification != null">specification,</if>
+            <if test="unitOfMeasure != null">unit_of_measure,</if>
+            <if test="unitName != null">unit_name,</if>
+            <if test="quantity != null">quantity,</if>
+            <if test="quantityProduced != null">quantity_produced,</if>
+            <if test="quantityQualified != null">quantity_qualified,</if>
+            <if test="quantityUnqualified != null">quantity_unqualified,</if>
+            <if test="quantityChanged != null">quantity_changed,</if>
+            <if test="clientId != null">client_id,</if>
+            <if test="clientCode != null">client_code,</if>
+            <if test="clientName != null">client_name,</if>
+            <if test="clientNick != null">client_nick,</if>
+            <if test="machineCode != null">machine_code,</if>
+            <if test="setupDuration != null">setup_duration,</if>
+            <if test="unitDuration != null">unit_duration,</if>
+            <if test="offlineQty != null">offline_qty,</if>
+            <if test="startTime != null">start_time,</if>
+            <if test="duration != null">duration,</if>
+            <if test="endTime != null">end_time,</if>
+            <if test="colorCode != null">color_code,</if>
+            <if test="requestDate != null">request_date,</if>
+            <if test="finishDate != null">finish_date,</if>
+            <if test="cancelDate != null">cancel_date,</if>
+            <if test="vendorId != null">vendor_id,</if>
+            <if test="vendorCode != null">vendor_code,</if>
+            <if test="outsourceFactoryId != null">outsource_factory_id,</if>
+            <if test="status != null and status != ''">status,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="taskCode != null and taskCode != ''">#{taskCode},</if>
+            <if test="taskName != null and taskName != ''">#{taskName},</if>
+            <if test="workorderId != null">#{workorderId},</if>
+            <if test="workorderCode != null">#{workorderCode},</if>
+            <if test="workorderName != null">#{workorderName},</if>
+            <if test="workstationId != null">#{workstationId},</if>
+            <if test="workstationCode != null">#{workstationCode},</if>
+            <if test="workstationName != null">#{workstationName},</if>
+            <if test="routeId != null">#{routeId},</if>
+            <if test="routeCode != null">#{routeCode},</if>
+            <if test="processId != null">#{processId},</if>
+            <if test="processCode != null">#{processCode},</if>
+            <if test="processName != null">#{processName},</if>
+            <if test="itemId != null">#{itemId},</if>
+            <if test="itemCode != null">#{itemCode},</if>
+            <if test="itemName != null">#{itemName},</if>
+            <if test="specification != null">#{specification},</if>
+            <if test="unitOfMeasure != null">#{unitOfMeasure},</if>
+            <if test="unitName != null">#{unitName},</if>
+            <if test="quantity != null">#{quantity},</if>
+            <if test="quantityProduced != null">#{quantityProduced},</if>
+            <if test="quantityQualified != null">#{quantityQualified},</if>
+            <if test="quantityUnqualified != null">#{quantityUnqualified},</if>
+            <if test="quantityChanged != null">#{quantityChanged},</if>
+            <if test="clientId != null">#{clientId},</if>
+            <if test="clientCode != null">#{clientCode},</if>
+            <if test="clientName != null">#{clientName},</if>
+            <if test="clientNick != null">#{clientNick},</if>
+            <if test="machineCode != null">#{machineCode},</if>
+            <if test="setupDuration != null">#{setupDuration},</if>
+            <if test="unitDuration != null">#{unitDuration},</if>
+            <if test="offlineQty != null">#{offlineQty},</if>
+            <if test="startTime != null">#{startTime},</if>
+            <if test="duration != null">#{duration},</if>
+            <if test="endTime != null">#{endTime},</if>
+            <if test="colorCode != null">#{colorCode},</if>
+            <if test="requestDate != null">#{requestDate},</if>
+            <if test="finishDate != null">#{finishDate},</if>
+            <if test="cancelDate != null">#{cancelDate},</if>
+            <if test="vendorId != null">#{vendorId},</if>
+            <if test="vendorCode != null">#{vendorCode},</if>
+            <if test="outsourceFactoryId != null">#{outsourceFactoryId},</if>
+            <if test="status != null and status != ''">#{status},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateProTask" parameterType="ProTask">
+        update qxx_pro_task
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="taskCode != null and taskCode != ''">task_code = #{taskCode},</if>
+            <if test="taskName != null and taskName != ''">task_name = #{taskName},</if>
+            <if test="workorderId != null">workorder_id = #{workorderId},</if>
+            <if test="workorderCode != null">workorder_code = #{workorderCode},</if>
+            <if test="workorderName != null">workorder_name = #{workorderName},</if>
+            <if test="workstationId != null">workstation_id = #{workstationId},</if>
+            <if test="workstationCode != null">workstation_code = #{workstationCode},</if>
+            <if test="workstationName != null">workstation_name = #{workstationName},</if>
+            <if test="routeId != null">route_id = #{routeId},</if>
+            <if test="routeCode != null">route_code = #{routeCode},</if>
+            <if test="processId != null">process_id = #{processId},</if>
+            <if test="processCode != null">process_code = #{processCode},</if>
+            <if test="processName != null">process_name = #{processName},</if>
+            <if test="itemId != null">item_id = #{itemId},</if>
+            <if test="itemCode != null">item_code = #{itemCode},</if>
+            <if test="itemName != null">item_name = #{itemName},</if>
+            <if test="specification != null">specification = #{specification},</if>
+            <if test="unitOfMeasure != null">unit_of_measure = #{unitOfMeasure},</if>
+            <if test="unitName != null">unit_name = #{unitName},</if>
+            <if test="quantity != null">quantity = #{quantity},</if>
+            <if test="quantityProduced != null">quantity_produced = #{quantityProduced},</if>
+            <if test="quantityQualified != null">quantity_qualified = #{quantityQualified},</if>
+            <if test="quantityUnqualified != null">quantity_unqualified = #{quantityUnqualified},</if>
+            <if test="quantityChanged != null">quantity_changed = #{quantityChanged},</if>
+            <if test="clientId != null">client_id = #{clientId},</if>
+            <if test="clientCode != null">client_code = #{clientCode},</if>
+            <if test="clientName != null">client_name = #{clientName},</if>
+            <if test="clientNick != null">client_nick = #{clientNick},</if>
+            <if test="machineCode != null">machine_code = #{machineCode},</if>
+            <if test="setupDuration != null">setup_duration = #{setupDuration},</if>
+            <if test="unitDuration != null">unit_duration = #{unitDuration},</if>
+            <if test="offlineQty != null">offline_qty = #{offlineQty},</if>
+            <if test="startTime != null">start_time = #{startTime},</if>
+            <if test="duration != null">duration = #{duration},</if>
+            <if test="endTime != null">end_time = #{endTime},</if>
+            <if test="colorCode != null">color_code = #{colorCode},</if>
+            <if test="requestDate != null">request_date = #{requestDate},</if>
+            <if test="finishDate != null">finish_date = #{finishDate},</if>
+            <if test="cancelDate != null">cancel_date = #{cancelDate},</if>
+            <if test="vendorId != null">vendor_id = #{vendorId},</if>
+            <if test="vendorCode != null">vendor_code = #{vendorCode},</if>
+            <if test="outsourceFactoryId != null">outsource_factory_id = #{outsourceFactoryId},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where task_id = #{taskId}
+    </update>
+
+    <delete id="deleteProTaskByTaskId" parameterType="Long">
+        delete from qxx_pro_task where task_id = #{taskId}
+    </delete>
+
+    <delete id="deleteProTaskByTaskIds">
+        delete from qxx_pro_task where task_id in
+        <foreach item="taskId" collection="array" open="(" separator="," close=")">
+            #{taskId}
+        </foreach>
+    </delete>
+
+    <update id="addQuantityProduced">
+        update qxx_pro_task
+        set quantity_produced = quantity_produced + #{deltaProduced},
+            quantity_qualified = quantity_qualified + #{deltaQualified},
+            quantity_unqualified = quantity_unqualified + #{deltaUnqualified}
+        where task_id = #{taskId}
+    </update>
+</mapper>

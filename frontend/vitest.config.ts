@@ -7,7 +7,15 @@ export default defineConfig({
   plugins: [
     vue(),
     autoImport({
-      imports: ['vue', 'vue-router', 'pinia'],
+      imports: [
+        'vue',
+        'vue-router',
+        'pinia',
+        {
+          '@/utils/dict': ['useDict'],
+          '@/utils/ruoyi': ['selectDictLabel']
+        }
+      ],
       dts: false
     })
   ],

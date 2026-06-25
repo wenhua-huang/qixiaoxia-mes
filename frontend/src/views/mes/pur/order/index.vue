@@ -1,6 +1,7 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">      <el-form-item label="订单编码" prop="orderCode">
+    <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="68px">
+      <el-form-item label="订单编码" prop="orderCode">
         <el-input
           v-model="queryParams.orderCode"
           placeholder="请输入采购订单编码(唯一)"
@@ -126,7 +127,7 @@
     </el-row>
 
     <el-table v-loading="loading" :data="orderList" @selection-change="handleSelectionChange">
-      <el-table-column type="selection" width="55" align="center" />
+      <el-table-column type="selection" width="50" align="center" />
       <el-table-column label="ID" align="center" prop="orderId" />      <el-table-column label="订单编码" align="center" prop="orderCode" />
       <el-table-column label="订单名称" align="center" prop="orderName" />
       
@@ -159,10 +160,10 @@
           </template>
         </el-table-column>
       <el-table-column label="备注" align="center" prop="remark" />
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="150" class-name="small-padding fixed-width">
         <template #default="scope">
-          <el-button link type="primary" size="small" @click="handleUpdate(scope.row)" v-hasPermi="['mes:pur:order:edit']">修改</el-button>
-          <el-button link type="danger" size="small" @click="handleDelete(scope.row)" v-hasPermi="['mes:pur:order:remove']">删除</el-button>
+          <el-tooltip content="修改" placement="top"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:pur:order:edit']"></el-button></el-tooltip>
+          <el-tooltip content="删除" placement="top"><el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:pur:order:remove']"></el-button></el-tooltip>
         </template>
       </el-table-column>
     </el-table>
@@ -170,8 +171,8 @@
     <pagination
       v-show="total>0"
       :total="total"
-      v-model:current-page="queryParams.pageNum"
-      v-model:page-size="queryParams.pageSize"
+      v-model:page="queryParams.pageNum"
+      v-model:limit="queryParams.pageSize"
       @pagination="getList"
     />
 

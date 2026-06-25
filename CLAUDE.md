@@ -8,6 +8,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 - **编辑 Vue/XML 模板前必 Read 上下文**，确认标签嵌套。闭眼改 `<el-row>`/`<el-col>` 极易破坏结构
 - **所有 SQL WHERE 必须带 `factory_id`**（由 MyBatis 拦截器自动注入，但编写时仍需确认）
 - **所有表都有 `factory_id` 字段**，外协 8 张表额外冗余 `outsource_factory_id`（vendor、workorder、task、route_process、card_process、feedback、outsource_issue、outsource_recpt）
+- **Debug：信任用户判断** — 用户指出问题方向时，先聚焦该方向直接修，修完验证。不要在用户说的方向还没查透时就去翻后端/DB/拦截器等无关代码。用户是实际操作者，判断优先级最高（详见 [[debug-rule-trust-user-judgment]]）
 
 ## Project Overview
 
@@ -59,7 +60,6 @@ yarn install && yarn dev   # :80，代理 /dev-api → localhost:8081
 | [数据库设计决策](docs/设计文档/数据库设计决策.md) | 库存分层、SPU/SKU、BOM 约定 |
 | [多工厂外协设计](docs/设计文档/多工厂外协设计.md) | factory_id、外协 8 张表 |
 | [数据库字符集规范](docs/设计文档/数据库字符集规范.md) | utf8mb4 DDL 模板 |
-| [测试约定](docs/设计文档/测试约定.md) | 测试金字塔、E2E 流程 |
 
 ## 后端关键机制
 
@@ -96,24 +96,67 @@ INSERT INTO sys_auto_code_part (factory_id, rule_id, part_index, part_type, part
 VALUES (1, @rid, 3, 'SERIALNO', 'SERIAL_PART', '流水号', 3, 1, 1, 'Y', 'DAY');
 ```
 
-## E2E 测试
+## 测试策略
 
-> 全栈功能完成后逐层验证，禁止用 curl 测 API 替代前端编译和完整流程检查。
+项目严格区分三层测试，各层职责不同，**禁止用 `curl` 调 API 替代任何一层的正式测试**。
 
-**测到 bug 先停**：本次引入的 bug → 直接修；项目既有问题 → 停下告知，不偷偷修。
+> 命名规范、运行时约定、参考实现详见 [测试约定](docs/设计文档/测试约定.md)。
 
-6 层清单（逐层过，不可跳）：
+### 测试金字塔
 
-| # | 怎么测 | 一条命令 |
-|---|--------|---------|
-| ① 服务 | 端口可达 | `curl -so /dev/null -w '%{http_code}' http://localhost:8081/ && curl -so /dev/null -w ' %{http_code}' http://localhost:80/` |
-| ② 编译 | import 全解析 | `curl -s http://localhost:80/src/views/mes/{M}/{E}/index.vue \| grep -o '/src/api/[^"]*' \| sort -u` |
-| ③ API | CRUD 全流程 | `TOKEN=$(python3 backend/scripts/get_token.py); curl -s -H "Authorization: Bearer $TOKEN" ...` → add → update → delete |
-| ④ 取值 | 拦截器解包 | `grep -A20 'response.use' frontend/src/utils/request.ts` → 确认 `resolve(res.data)` |
-| ⑤ 关键 | genSerialCode | 连调 3 次确认流水号递增；编码规则+分段存在；`response.data` 取值正确 |
-| ⑥ 流程 | 全链路 | Playwright 或 curl 模拟：genCode → add → list 查回 → update → delete |
+| 层级 | 位置 | 框架 | 运行前提 | 测什么 | 真实接口 |
+|------|------|------|---------|--------|:---:|
+| **单元测试** | `backend/*/src/test/`（`*Test.java`） | JUnit 5 + Mockito | 无（不连 DB，全 Mock） | 单个 Service/Utils 方法逻辑 | ❌ |
+| **组件测试** | `frontend/src/**/__tests__/`（`*.spec.ts`） | Vitest + @vue/test-utils | 无（jsdom mock） | 单个 Vue 组件渲染+交互 | ❌ |
+| **集成测试** | `backend/ruoyi-admin/src/test/`（`*IT.java`） | SpringBootTest + Testcontainers | Docker（MySQL 容器 + Redis） | Controller → Service → Mapper → DB | ✅ |
+| **E2E 测试** | `e2e/tests/`（`*.spec.ts`） | Playwright | ⚠️ **前后端必须同时启动** | 真实浏览器全栈业务流程 | ✅ |
 
-Playwright：`cd e2e && npx playwright test [tests/pur/order.spec.ts]`
+### 接口调用红线
+
+| 层级 | 规则 | 断网能跑？ |
+|------|------|:---:|
+| **后端单元测试** | 禁止连 DB/Redis/任何外部服务，全 Mock | ✅ 必须能 |
+| **前端组件测试** | 禁止调真实后端 API，`vi.mock('@/api/xxx')` mock 所有 API 模块 | ✅ 必须能 |
+| **集成测试** | 可连 Testcontainers 临时 DB，禁止连生产库 | ❌ 不能 |
+| **E2E 测试** | 必须连真实前后端，禁止 mock 业务 API | ❌ 不能 |
+
+### 运行命令
+
+```bash
+# === 单元测试（秒级，不连 DB）===
+cd backend && mvn test                          # Surefire，*Test.java
+cd frontend && npm test                         # Vitest
+
+# === 集成测试（分钟级，需要 Docker）===
+cd backend && mvn verify                        # Failsafe，*IT.java
+# 前置：docker compose up -d redis
+
+# === E2E 测试（分钟级，前后端必须都在运行）===
+cd e2e && npx playwright test                   # 全量
+cd e2e && npx playwright test tests/pur/order.spec.ts  # 单文件
+```
+
+### ⚠️ curl ≠ E2E
+
+| 方式 | 经过前端编译渲染？ | 经过真实浏览器？ | 性质 |
+|------|:---:|:---:|------|
+| `curl` 调 API | ❌ | ❌ | **API 快速验证**（开发辅助），仅验证后端接口 |
+| Playwright | ✅ | ✅ | **E2E 测试**（正式验证），全链路真实验证 |
+
+curl 跳过了 Vue 编译、Axios 封装、响应拦截器解包、UI 渲染等关键环节，**禁止用 curl 结果声称"E2E 通过"**。
+
+### 全栈功能上线前验证清单
+
+> **测到 bug 先停**：本次引入的 → 直接修；项目既有的 → 停下告知，不偷偷修。
+
+| # | 验证层 | 性质 | 操作 |
+|---|--------|------|------|
+| ① 服务可达 | 端口检查 | 开发辅助 | `curl -so /dev/null -w '%{http_code}' http://localhost:8081/ && curl -so /dev/null -w ' %{http_code}' http://localhost:5173/` |
+| ② 编译 | import 解析 | 开发辅助 | `curl -s http://localhost:5173/src/views/mes/{M}/{E}/index.vue \| grep -o '/src/api/[^"]*' \| sort -u` |
+| ③ API 快速验证 | curl CRUD | **冒烟，非 E2E** | `TOKEN=$(python3 backend/scripts/get_token.py); curl ...` → add → update → delete |
+| ④ 取值 | 拦截器解包 | 开发辅助 | `grep -A20 'response.use' frontend/src/utils/request.ts` → 确认 `resolve(res.data)` |
+| ⑤ genSerialCode | 连调 3 次 | 开发辅助 | 确认流水号递增、编码规则存在、`response.data` 取值正确 |
+| ⑥ **正式 E2E** | Playwright 全链路 | **正式验证** | `cd e2e && npx playwright test`（前后端都必须启动） |
 
 ## 调试约定
 
@@ -173,6 +216,21 @@ curl -s http://localhost:8081/getInfo -H "Authorization: Bearer $TOKEN" | python
 | JDK | 17+ | MySQL | 8.0+ |
 | Maven | 3.9+ | Redis | 7.0+ |
 | Node | 18.20 LTS | — | — |
+
+## 前后端职责划分
+
+| 职责 | 后端 | 前端 |
+|------|:---:|:---:|
+| 数据填充（默认值、关联数据、计算字段） | ✅ 负责 | ❌ 禁止 |
+| 跨域数据聚合（如从工单BOM取消耗默认值） | ✅ 提供本域专用接口 | ❌ 禁止直接调其他域的 BOM API |
+| 表单展示与交互 | — | ✅ 负责 |
+| 前端主动请求后端 → 接收数据 → 渲染 | — | ✅ 接收即展示 |
+
+**核心原则**：后端拥有数据逻辑，前端无感知。
+
+- ❌ **禁止前端直接调跨域 API** 获取数据填充。如报工页物料消耗 → 禁止前端调 `workorderbom/listByWorkorderId` 自行拼装
+- ✅ **后端提供专用接口**，封装内部数据查询逻辑。如 `GET /mes/pro/feedback/consumeDefaults/{workorderId}` → 后端内部查 BOM 表，返回 `List<ProFeedbackConsume>`
+- ✅ 前端只跟本 domain 的 API 交互，不关心数据来源
 
 ## API 契约
 

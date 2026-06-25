@@ -1,6 +1,6 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryFormRef" size="small" :inline="true" v-show="showSearch" label-width="68px">
+    <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="68px">
       <el-form-item label="班组类型" prop="teamType">
         <el-select v-model="queryParams.teamType" placeholder="请选择班组类型" clearable>
           <el-option
@@ -28,8 +28,8 @@
         />
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="small" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="small" @click="resetQuery">重置</el-button>
+        <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
+        <el-button icon="Refresh" @click="resetQuery">重置</el-button>
       </el-form-item>
     </el-form>
 
@@ -38,8 +38,7 @@
         <el-button
           type="primary"
           plain
-          icon="el-icon-plus"
-          size="small"
+          icon="Plus"
           @click="handleAdd"
           v-hasPermi="['mes:cal:team:add']"
         >新增</el-button>
@@ -48,8 +47,7 @@
         <el-button
           type="success"
           plain
-          icon="el-icon-edit"
-          size="small"
+          icon="Edit"
           :disabled="single"
           @click="handleUpdate"
           v-hasPermi="['mes:cal:team:edit']"
@@ -59,8 +57,7 @@
         <el-button
           type="danger"
           plain
-          icon="el-icon-delete"
-          size="small"
+          icon="Delete"
           :disabled="multiple"
           @click="handleDelete"
           v-hasPermi="['mes:cal:team:remove']"
@@ -70,8 +67,7 @@
         <el-button
           type="warning"
           plain
-          icon="el-icon-download"
-          size="small"
+          icon="Download"
           @click="handleExport"
           v-hasPermi="['mes:cal:team:export']"
         >导出</el-button>
@@ -80,7 +76,7 @@
     </el-row>
 
     <el-table v-loading="loading" :data="teamList" @selection-change="handleSelectionChange">
-      <el-table-column type="selection" width="55" align="center" />
+      <el-table-column type="selection" width="50" align="center" />
       <el-table-column label="班组编号" align="center" prop="teamCode">
         <template #default="scope">
           <el-button
@@ -97,22 +93,10 @@
         </template>
       </el-table-column>
       <el-table-column label="备注" align="center" prop="remark" />
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="80" class-name="small-padding fixed-width">
         <template #default="scope">
-          <el-button
-            size="small"
-            link
-            icon="el-icon-edit"
-            @click="handleUpdate(scope.row)"
-            v-hasPermi="['mes:cal:team:edit']"
-          >修改</el-button>
-          <el-button
-            size="small"
-            link
-            icon="el-icon-delete"
-            @click="handleDelete(scope.row)"
-            v-hasPermi="['mes:cal:team:remove']"
-          >删除</el-button>
+          <el-tooltip content="修改" placement="top"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:cal:team:edit']"></el-button></el-tooltip>
+          <el-tooltip content="删除" placement="top"><el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:cal:team:remove']"></el-button></el-tooltip>
         </template>
       </el-table-column>
     </el-table>

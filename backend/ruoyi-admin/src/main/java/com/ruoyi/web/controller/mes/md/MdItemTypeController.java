@@ -43,9 +43,8 @@ public class MdItemTypeController extends BaseController
     @GetMapping("/treeselect")
     public AjaxResult treeselect()
     {
-        MdItemType mdItemType = new MdItemType();
-        mdItemType.setEnableFlag("1");
-        List<MdItemType> list = mdItemTypeService.selectMdItemTypeList(mdItemType);
+        // 查询全部分类（不按 enableFlag 过滤），确保树结构完整
+        List<MdItemType> list = mdItemTypeService.selectMdItemTypeList(new MdItemType());
         List<TreeSelect> trees = mdItemTypeService.buildItemTypeTreeSelect(list);
         return AjaxResult.success(trees);
     }

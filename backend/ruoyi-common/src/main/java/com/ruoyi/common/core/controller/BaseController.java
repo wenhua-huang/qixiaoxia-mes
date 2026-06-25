@@ -150,8 +150,21 @@ public class BaseController
     }
 
     /**
+     * 响应返回结果（带数据和错误消息）
+     *
+     * @param rows 影响行数
+     * @param data 成功时返回的数据（如新增后的实体，含生成的ID）
+     * @param errorMsg 失败时的错误消息
+     * @return 操作结果
+     */
+    protected AjaxResult toAjax(int rows, Object data, String errorMsg)
+    {
+        return rows > 0 ? AjaxResult.success(data) : AjaxResult.error(errorMsg);
+    }
+
+    /**
      * 响应返回结果
-     * 
+     *
      * @param result 结果
      * @return 操作结果
      */

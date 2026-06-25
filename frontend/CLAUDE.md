@@ -143,7 +143,26 @@ dict        → Dictionary data cache
 
 ## Testing
 
-Vitest + @vue/test-utils，测试文件放 `__tests__/` 与组件同目录。`vi.mock('@/api/xxx')` mock API，mock Vue Router/Pinia store，用 `data-testid` 定位元素（优先级 > `aria-label` > CSS class）。
+### 组件测试（Vitest）
+
+Vitest + @vue/test-utils，测试文件放 `__tests__/` 与组件同目录。
+
+**🚫 禁止调用真实后端 API**。组件测试在 jsdom 环境下运行，无后端服务，所有 API 模块必须 mock：
+
+```typescript
+// ✅ 正确：mock API，返回假数据
+vi.mock('@/api/mes/pro/workorder', () => ({
+  listWorkorder: vi.fn().mockResolvedValue({ code: 200, rows: [...], total: 3 }),
+  addWorkorder: vi.fn().mockResolvedValue({ code: 200, msg: '成功' }),
+}))
+
+// ❌ 错误：组件 mount 后触发真实 HTTP 请求
+// 不 mock API，测试中调用 getList() → axios.get('/dev-api/...') → 请求超时/失败
+```
+
+> **判断标准**：断网后 `npm test` 必须能全部通过。
+
+配合 mock Vue Router/Pinia store，用 `data-testid` 定位元素（优先级 > `aria-label` > CSS class）。
 
 ```bash
 npm test                                    # 全量
@@ -179,6 +198,99 @@ npx vitest run src/views/__tests__/login.spec.ts  # 单文件
 > 所有 MES 业务页面遵循统一模式。用 RuoYi 代码生成器产出 → 手工补充业务逻辑。
 
 **关键模式**：`queryParams`（`reactive<XxxQuery>`）→ `getList()`（`res.rows`/`res.total`）→ 弹窗 `handleAdd`/`handleUpdate` → `submitForm`（`form.id ? updateXxx : addXxx`）→ `handleDelete`（`ElMessageBox.confirm`）。详情参考 `src/views/mes/` 已有页面。
+
+## RuoYi 页面排版规范
+
+> ⚠️ **生成/修改任何 MES 页面时必须严格遵循，确保所有页面风格统一。**
+
+### 1. 页面布局 — Row + Col 栅格
+
+**表单一行 2 列，弹窗表单同样排版。**
+
+```html
+<!-- ✅ 正确：el-row + el-col :span="12" 两列布局 -->
+<el-row>
+  <el-col :span="12"><el-form-item label="编码"><el-input v-model="form.code" /></el-form-item></el-col>
+  <el-col :span="12"><el-form-item label="名称"><el-input v-model="form.name" /></el-form-item></el-col>
+</el-row>
+<el-row>
+  <el-col :span="12"><el-form-item label="类型"><el-select v-model="form.type" /></el-form-item></el-col>
+  <el-col :span="12"><el-form-item label="状态"><el-select v-model="form.status" /></el-form-item></el-col>
+</el-row>
+
+<!-- ✅ 单字段占满行用 :span="24" -->
+<el-row>
+  <el-col :span="24"><el-form-item label="备注"><el-input v-model="form.remark" type="textarea" /></el-form-item></el-col>
+</el-row>
+
+<!-- ❌ 错误：裸 el-form-item 不套 row+col，宽窄不一 -->
+```
+
+### 2. 表单组件对齐
+
+- **label 宽度统一**：`label-width="100px"`（搜索区 `80px`），所有页面保持一致
+- **控件宽度统一**：`style="width:100%"` 撑满 col，不设固定像素宽度
+- **label 间距**：dialog 表单统一加 `<style scoped> :deep(.el-form-item__label) { padding-right: 16px !important; } </style>`
+
+### 3. 按钮位置规范
+
+| 区域 | 规范 |
+|------|------|
+| **搜索区** | 查询 + 重置按钮放在 `<el-form>` 最后一个 `<el-form-item>` 内（表单右侧） |
+| **表格上方** | 新增 + 修改 + 删除 + 导出按钮放在 `<el-row :gutter="10" class="mb8">` 内 |
+| **弹窗底部** | `确 定` + `取 消` 按钮 `<template #footer>` 内，居中对齐 |
+
+```html
+<!-- 搜索区：最后一个 el-form-item -->
+<el-form-item>
+  <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
+  <el-button icon="Refresh" @click="resetQuery">重置</el-button>
+</el-form-item>
+
+<!-- 弹窗底部 -->
+<template #footer>
+  <el-button type="primary" @click="submitForm">确 定</el-button>
+  <el-button @click="cancel">取 消</el-button>
+</template>
+```
+
+### 4. 代码结构分层
+
+**Template 内部顺序**：搜索表单 → 工具栏按钮 → 数据表格 → 新增/编辑弹窗
+
+**Script 内部顺序**：import → 类型定义 → 响应式状态 → computed → 生命周期 → 方法（getList → reset → handleQuery → handleAdd → handleUpdate → submitForm → handleDelete）
+
+**缩进**：HTML/TS 统一 2 空格，标签嵌套层级对齐，属性换行对齐。
+
+### 5. CSS 规范
+
+- **只用** `<style scoped>` 或行内 `style=""`，**禁止**非 scoped 全局样式
+- 行间距统一 `margin: 10px 0`，保持页面间距一致
+- 弹窗 scoped 样式用 `:deep()` 穿透
+
+### 6. 命名遵循 RuoYi 习惯
+
+| 概念 | 命名 | 示例 |
+|------|------|------|
+| 查询参数 | `queryParams` | `queryParams.value.pageNum` |
+| 列表数据 | `xxxList` | `itemList`、`workstationList` |
+| 表单数据 | `form` | `form.value.itemCode` |
+| 加载状态 | `loading` | `loading.value = true` |
+| 弹窗开关 | `open` | `open.value = true` |
+| 批量选中 | `ids`、`single`、`multiple` | `ids.value = [...]` |
+| 新增方法 | `handleAdd` | `function handleAdd()` |
+| 修改方法 | `handleUpdate` | `function handleUpdate(row?)` |
+| 删除方法 | `handleDelete` | `function handleDelete(row?)` |
+| 提交方法 | `submitForm` | `function submitForm()` |
+| 导出方法 | `handleExport` | `function handleExport()` |
+
+> 分页组件绑定：`v-model:page="queryParams.pageNum"` + `v-model:limit="queryParams.pageSize"`
+
+### 7. 输出格式化
+
+- **标签闭合**：每个 `<el-row>` 有对应 `</el-row>`，每个 `<el-col>` 有对应 `</el-col>`，禁止残缺标签
+- **缩进严格对齐**：嵌套层级 2 空格递增，同级元素缩进一致
+- **代码片段完整**：输出完整 `<template>` + `<script setup>` + `<style scoped>` 三段式，不输出零散片段
 
 ## Composable 与组件规范
 

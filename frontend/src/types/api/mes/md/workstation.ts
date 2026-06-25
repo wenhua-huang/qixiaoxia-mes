@@ -1,12 +1,13 @@
 import type { PageDomain, BaseEntity } from "../../common";
 
 export interface WorkstationQueryParams extends PageDomain {
-  workstationCode?: string; workstationName?: string; workshopId?: number; enableFlag?: string;
+  workstationCode?: string; workstationName?: string; workshopId?: number; processId?: number; enableFlag?: string;
 }
 
 export interface MdWorkstation extends BaseEntity {
   workstationId?: number; factoryId?: number; workstationCode?: string; workstationName?: string;
-  workshopId?: number; workstationType?: string; processType?: string;
+  workshopId?: number; workstationType?: string;
+  processId?: number; processName?: string; processType?: string;
   capacity?: number; status?: string; enableFlag?: string;
 }
 

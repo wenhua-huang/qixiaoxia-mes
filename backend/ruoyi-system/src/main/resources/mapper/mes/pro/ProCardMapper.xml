@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.pro.ProCardMapper">
+
+    <resultMap type="ProCard" id="ProCardResult">
+        <result property="cardId"    column="card_id"    />
+        <result property="factoryId"    column="factory_id"    />
+        <result property="cardCode"    column="card_code"    />
+        <result property="workorderId"    column="workorder_id"    />
+        <result property="workorderCode"    column="workorder_code"    />
+        <result property="workorderName"    column="workorder_name"    />
+        <result property="taskId"    column="task_id"    />
+        <result property="taskCode"    column="task_code"    />
+        <result property="batchCode"    column="batch_code"    />
+        <result property="itemId"    column="item_id"    />
+        <result property="itemCode"    column="item_code"    />
+        <result property="itemName"    column="item_name"    />
+        <result property="specification"    column="specification"    />
+        <result property="unitOfMeasure"    column="unit_of_measure"    />
+        <result property="unitName"    column="unit_name"    />
+        <result property="barcodeUrl"    column="barcode_url"    />
+        <result property="quantityTransfered"    column="quantity_transfered"    />
+        <result property="currentProcessId"    column="current_process_id"    />
+        <result property="currentProcessName"    column="current_process_name"    />
+        <result property="status"    column="status"    />
+        <result property="remark"    column="remark"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectProCardVo">
+        select card_id, factory_id, card_code, workorder_id, workorder_code, workorder_name, task_id, task_code, batch_code, item_id, item_code, item_name, specification, unit_of_measure, unit_name, barcode_url, quantity_transfered, current_process_id, current_process_name, status, remark, create_by, create_time, update_by, update_time from qxx_pro_card
+    </sql>
+
+    <select id="selectProCardList" parameterType="ProCard" resultMap="ProCardResult">
+        <include refid="selectProCardVo"/>
+        <where>
+            <if test="cardCode != null  and cardCode != ''"> and card_code = #{cardCode}</if>
+            <if test="workorderId != null"> and workorder_id = #{workorderId}</if>
+            <if test="status != null  and status != ''"> and status = #{status}</if>
+        </where>
+        order by card_id desc
+    </select>
+
+    <select id="selectProCardByCardId" parameterType="Long" resultMap="ProCardResult">
+        <include refid="selectProCardVo"/>
+        where card_id = #{cardId}
+    </select>
+
+    <insert id="insertProCard" parameterType="ProCard" useGeneratedKeys="true" keyProperty="cardId">
+        insert into qxx_pro_card
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="cardCode != null and cardCode != ''">card_code,</if>
+            <if test="workorderId != null">workorder_id,</if>
+            <if test="workorderCode != null and workorderCode != ''">workorder_code,</if>
+            <if test="workorderName != null and workorderName != ''">workorder_name,</if>
+            <if test="taskId != null">task_id,</if>
+            <if test="taskCode != null and taskCode != ''">task_code,</if>
+            <if test="batchCode != null and batchCode != ''">batch_code,</if>
+            <if test="itemId != null">item_id,</if>
+            <if test="itemCode != null and itemCode != ''">item_code,</if>
+            <if test="itemName != null and itemName != ''">item_name,</if>
+            <if test="specification != null and specification != ''">specification,</if>
+            <if test="unitOfMeasure != null and unitOfMeasure != ''">unit_of_measure,</if>
+            <if test="unitName != null and unitName != ''">unit_name,</if>
+            <if test="barcodeUrl != null and barcodeUrl != ''">barcode_url,</if>
+            <if test="quantityTransfered != null">quantity_transfered,</if>
+            <if test="currentProcessId != null">current_process_id,</if>
+            <if test="currentProcessName != null and currentProcessName != ''">current_process_name,</if>
+            <if test="status != null and status != ''">status,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="cardCode != null and cardCode != ''">#{cardCode},</if>
+            <if test="workorderId != null">#{workorderId},</if>
+            <if test="workorderCode != null and workorderCode != ''">#{workorderCode},</if>
+            <if test="workorderName != null and workorderName != ''">#{workorderName},</if>
+            <if test="taskId != null">#{taskId},</if>
+            <if test="taskCode != null and taskCode != ''">#{taskCode},</if>
+            <if test="batchCode != null and batchCode != ''">#{batchCode},</if>
+            <if test="itemId != null">#{itemId},</if>
+            <if test="itemCode != null and itemCode != ''">#{itemCode},</if>
+            <if test="itemName != null and itemName != ''">#{itemName},</if>
+            <if test="specification != null and specification != ''">#{specification},</if>
+            <if test="unitOfMeasure != null and unitOfMeasure != ''">#{unitOfMeasure},</if>
+            <if test="unitName != null and unitName != ''">#{unitName},</if>
+            <if test="barcodeUrl != null and barcodeUrl != ''">#{barcodeUrl},</if>
+            <if test="quantityTransfered != null">#{quantityTransfered},</if>
+            <if test="currentProcessId != null">#{currentProcessId},</if>
+            <if test="currentProcessName != null and currentProcessName != ''">#{currentProcessName},</if>
+            <if test="status != null and status != ''">#{status},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateProCard" parameterType="ProCard">
+        update qxx_pro_card
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="cardCode != null and cardCode != ''">card_code = #{cardCode},</if>
+            <if test="workorderId != null">workorder_id = #{workorderId},</if>
+            <if test="workorderCode != null and workorderCode != ''">workorder_code = #{workorderCode},</if>
+            <if test="workorderName != null and workorderName != ''">workorder_name = #{workorderName},</if>
+            <if test="taskId != null">task_id = #{taskId},</if>
+            <if test="taskCode != null and taskCode != ''">task_code = #{taskCode},</if>
+            <if test="batchCode != null and batchCode != ''">batch_code = #{batchCode},</if>
+            <if test="itemId != null">item_id = #{itemId},</if>
+            <if test="itemCode != null and itemCode != ''">item_code = #{itemCode},</if>
+            <if test="itemName != null and itemName != ''">item_name = #{itemName},</if>
+            <if test="specification != null and specification != ''">specification = #{specification},</if>
+            <if test="unitOfMeasure != null and unitOfMeasure != ''">unit_of_measure = #{unitOfMeasure},</if>
+            <if test="unitName != null and unitName != ''">unit_name = #{unitName},</if>
+            <if test="barcodeUrl != null and barcodeUrl != ''">barcode_url = #{barcodeUrl},</if>
+            <if test="quantityTransfered != null">quantity_transfered = #{quantityTransfered},</if>
+            <if test="currentProcessId != null">current_process_id = #{currentProcessId},</if>
+            <if test="currentProcessName != null and currentProcessName != ''">current_process_name = #{currentProcessName},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where card_id = #{cardId}
+    </update>
+
+    <delete id="deleteProCardByCardId" parameterType="Long">
+        delete from qxx_pro_card where card_id = #{cardId}
+    </delete>
+
+    <delete id="deleteProCardByCardIds">
+        delete from qxx_pro_card where card_id in
+        <foreach item="cardId" collection="array" open="(" separator="," close=")">
+            #{cardId}
+        </foreach>
+    </delete>
+</mapper>

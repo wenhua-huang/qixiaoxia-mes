@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.pro.ProFeedbackParamMapper">
+
+    <resultMap type="ProFeedbackParam" id="ProFeedbackParamResult">
+        <result property="recordId"    column="record_id"    />
+        <result property="factoryId"    column="factory_id"    />
+        <result property="feedbackId"    column="feedback_id"    />
+        <result property="workorderParamId"    column="workorder_param_id"    />
+        <result property="templateId"    column="template_id"    />
+        <result property="actualValue"    column="actual_value"    />
+        <result property="isDeviation"    column="is_deviation"    />
+        <result property="remark"    column="remark"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectProFeedbackParamVo">
+        select record_id, factory_id, feedback_id, workorder_param_id, template_id, actual_value, is_deviation, remark, create_by, create_time, update_by, update_time from qxx_pro_feedback_param
+    </sql>
+
+    <select id="selectProFeedbackParamList" parameterType="ProFeedbackParam" resultMap="ProFeedbackParamResult">
+        <include refid="selectProFeedbackParamVo"/>
+        <where>
+            <if test="feedbackId != null "> and feedback_id = #{feedbackId}</if>
+            <if test="workorderParamId != null "> and workorder_param_id = #{workorderParamId}</if>
+            <if test="templateId != null "> and template_id = #{templateId}</if>
+        </where>
+        order by record_id
+    </select>
+
+    <select id="selectProFeedbackParamByRecordId" parameterType="Long" resultMap="ProFeedbackParamResult">
+        <include refid="selectProFeedbackParamVo"/>
+        where record_id = #{recordId}
+    </select>
+
+    <select id="selectProFeedbackParamByFeedbackId" parameterType="Long" resultMap="ProFeedbackParamResult">
+        <include refid="selectProFeedbackParamVo"/>
+        where feedback_id = #{feedbackId}
+        order by record_id
+    </select>
+
+    <insert id="insertProFeedbackParam" parameterType="ProFeedbackParam" useGeneratedKeys="true" keyProperty="recordId">
+        insert into qxx_pro_feedback_param
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="feedbackId != null">feedback_id,</if>
+            <if test="workorderParamId != null">workorder_param_id,</if>
+            <if test="templateId != null">template_id,</if>
+            <if test="actualValue != null">actual_value,</if>
+            <if test="isDeviation != null">is_deviation,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="feedbackId != null">#{feedbackId},</if>
+            <if test="workorderParamId != null">#{workorderParamId},</if>
+            <if test="templateId != null">#{templateId},</if>
+            <if test="actualValue != null">#{actualValue},</if>
+            <if test="isDeviation != null">#{isDeviation},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateProFeedbackParam" parameterType="ProFeedbackParam">
+        update qxx_pro_feedback_param
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="feedbackId != null">feedback_id = #{feedbackId},</if>
+            <if test="workorderParamId != null">workorder_param_id = #{workorderParamId},</if>
+            <if test="templateId != null">template_id = #{templateId},</if>
+            <if test="actualValue != null">actual_value = #{actualValue},</if>
+            <if test="isDeviation != null">is_deviation = #{isDeviation},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where record_id = #{recordId}
+    </update>
+
+    <delete id="deleteProFeedbackParamByRecordId" parameterType="Long">
+        delete from qxx_pro_feedback_param where record_id = #{recordId}
+    </delete>
+
+    <delete id="deleteProFeedbackParamByRecordIds">
+        delete from qxx_pro_feedback_param where record_id in
+        <foreach item="recordId" collection="array" open="(" separator="," close=")">
+            #{recordId}
+        </foreach>
+    </delete>
+
+    <delete id="deleteProFeedbackParamByFeedbackId" parameterType="Long">
+        delete from qxx_pro_feedback_param where feedback_id = #{feedbackId}
+    </delete>
+</mapper>

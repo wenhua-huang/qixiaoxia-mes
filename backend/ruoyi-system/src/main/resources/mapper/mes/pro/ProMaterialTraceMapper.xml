@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.pro.ProMaterialTraceMapper">
+
+    <resultMap type="ProMaterialTrace" id="ProMaterialTraceResult">
+        <result property="traceId"    column="trace_id"    />
+        <result property="factoryId"    column="factory_id"    />
+        <result property="traceType"    column="trace_type"    />
+        <result property="parentType"    column="parent_type"    />
+        <result property="parentId"    column="parent_id"    />
+        <result property="childType"    column="child_type"    />
+        <result property="childId"    column="child_id"    />
+        <result property="quantity"    column="quantity"    />
+        <result property="unitOfMeasure"    column="unit_of_measure"    />
+        <result property="workorderId"    column="workorder_id"    />
+        <result property="cardId"    column="card_id"    />
+        <result property="cardProcessId"    column="card_process_id"    />
+        <result property="issueId"    column="issue_id"    />
+        <result property="issueDetailId"    column="issue_detail_id"    />
+        <result property="feedbackId"    column="feedback_id"    />
+        <result property="transactionId"    column="transaction_id"    />
+        <result property="processId"    column="process_id"    />
+        <result property="traceTime"    column="trace_time"    />
+        <result property="remark"    column="remark"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectProMaterialTraceVo">
+        select trace_id, factory_id, trace_type, parent_type, parent_id, child_type, child_id, quantity, unit_of_measure, workorder_id, card_id, card_process_id, issue_id, issue_detail_id, feedback_id, transaction_id, process_id, trace_time, remark, create_by, create_time, update_by, update_time from qxx_pro_material_trace
+    </sql>
+
+    <select id="selectProMaterialTraceList" parameterType="ProMaterialTrace" resultMap="ProMaterialTraceResult">
+        <include refid="selectProMaterialTraceVo"/>
+        <where>
+            <if test="traceType != null  and traceType != ''"> and trace_type = #{traceType}</if>
+            <if test="workorderId != null"> and workorder_id = #{workorderId}</if>
+            <if test="cardId != null"> and card_id = #{cardId}</if>
+            <if test="processId != null"> and process_id = #{processId}</if>
+        </where>
+        order by trace_id desc
+    </select>
+
+    <select id="selectProMaterialTraceByTraceId" parameterType="Long" resultMap="ProMaterialTraceResult">
+        <include refid="selectProMaterialTraceVo"/>
+        where trace_id = #{traceId}
+    </select>
+
+    <insert id="insertProMaterialTrace" parameterType="ProMaterialTrace" useGeneratedKeys="true" keyProperty="traceId">
+        insert into qxx_pro_material_trace
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="traceType != null and traceType != ''">trace_type,</if>
+            <if test="parentType != null and parentType != ''">parent_type,</if>
+            <if test="parentId != null">parent_id,</if>
+            <if test="childType != null and childType != ''">child_type,</if>
+            <if test="childId != null">child_id,</if>
+            <if test="quantity != null">quantity,</if>
+            <if test="unitOfMeasure != null and unitOfMeasure != ''">unit_of_measure,</if>
+            <if test="workorderId != null">workorder_id,</if>
+            <if test="cardId != null">card_id,</if>
+            <if test="cardProcessId != null">card_process_id,</if>
+            <if test="issueId != null">issue_id,</if>
+            <if test="issueDetailId != null">issue_detail_id,</if>
+            <if test="feedbackId != null">feedback_id,</if>
+            <if test="transactionId != null">transaction_id,</if>
+            <if test="processId != null">process_id,</if>
+            <if test="traceTime != null">trace_time,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="traceType != null and traceType != ''">#{traceType},</if>
+            <if test="parentType != null and parentType != ''">#{parentType},</if>
+            <if test="parentId != null">#{parentId},</if>
+            <if test="childType != null and childType != ''">#{childType},</if>
+            <if test="childId != null">#{childId},</if>
+            <if test="quantity != null">#{quantity},</if>
+            <if test="unitOfMeasure != null and unitOfMeasure != ''">#{unitOfMeasure},</if>
+            <if test="workorderId != null">#{workorderId},</if>
+            <if test="cardId != null">#{cardId},</if>
+            <if test="cardProcessId != null">#{cardProcessId},</if>
+            <if test="issueId != null">#{issueId},</if>
+            <if test="issueDetailId != null">#{issueDetailId},</if>
+            <if test="feedbackId != null">#{feedbackId},</if>
+            <if test="transactionId != null">#{transactionId},</if>
+            <if test="processId != null">#{processId},</if>
+            <if test="traceTime != null">#{traceTime},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateProMaterialTrace" parameterType="ProMaterialTrace">
+        update qxx_pro_material_trace
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="traceType != null and traceType != ''">trace_type = #{traceType},</if>
+            <if test="parentType != null and parentType != ''">parent_type = #{parentType},</if>
+            <if test="parentId != null">parent_id = #{parentId},</if>
+            <if test="childType != null and childType != ''">child_type = #{childType},</if>
+            <if test="childId != null">child_id = #{childId},</if>
+            <if test="quantity != null">quantity = #{quantity},</if>
+            <if test="unitOfMeasure != null and unitOfMeasure != ''">unit_of_measure = #{unitOfMeasure},</if>
+            <if test="workorderId != null">workorder_id = #{workorderId},</if>
+            <if test="cardId != null">card_id = #{cardId},</if>
+            <if test="cardProcessId != null">card_process_id = #{cardProcessId},</if>
+            <if test="issueId != null">issue_id = #{issueId},</if>
+            <if test="issueDetailId != null">issue_detail_id = #{issueDetailId},</if>
+            <if test="feedbackId != null">feedback_id = #{feedbackId},</if>
+            <if test="transactionId != null">transaction_id = #{transactionId},</if>
+            <if test="processId != null">process_id = #{processId},</if>
+            <if test="traceTime != null">trace_time = #{traceTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where trace_id = #{traceId}
+    </update>
+
+    <delete id="deleteProMaterialTraceByTraceId" parameterType="Long">
+        delete from qxx_pro_material_trace where trace_id = #{traceId}
+    </delete>
+
+    <delete id="deleteProMaterialTraceByTraceIds">
+        delete from qxx_pro_material_trace where trace_id in
+        <foreach item="traceId" collection="array" open="(" separator="," close=")">
+            #{traceId}
+        </foreach>
+    </delete>
+
+    <select id="selectByParent" resultMap="ProMaterialTraceResult">
+        <include refid="selectProMaterialTraceVo"/>
+        where parent_type = #{parentType} and parent_id = #{parentId}
+        order by trace_time asc
+    </select>
+
+    <select id="selectByChild" resultMap="ProMaterialTraceResult">
+        <include refid="selectProMaterialTraceVo"/>
+        where child_type = #{childType} and child_id = #{childId}
+        order by trace_time desc
+    </select>
+</mapper>

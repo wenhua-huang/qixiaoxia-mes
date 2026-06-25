@@ -7,6 +7,8 @@ export interface ItemQueryParams extends PageDomain {
   itemTypeId?: number;
   specification?: string;
   enableFlag?: string;
+  /** 产品类型筛选：spu=标准产品(parent_id=0) | variant=变体(parent_id>0) */
+  parentIdFilter?: string;
 }
 
 /** 物料纸张属性 */
@@ -53,6 +55,10 @@ export interface MdItem extends BaseEntity {
   itemTypeCode?: string;
   itemTypeName?: string;
   parentId?: number;
+  /** 父产品编码（变体物料查询时后端带出，只读） */
+  parentItemCode?: string;
+  /** 父产品名称（变体物料查询时后端带出，只读） */
+  parentItemName?: string;
   productSize?: string;
   packageSpec?: string;
   printingReq?: string;

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.pro.ProFeedbackConsumeMapper">
+
+    <resultMap type="ProFeedbackConsume" id="ProFeedbackConsumeResult">
+        <result property="consumeId"    column="consume_id"    />
+        <result property="factoryId"    column="factory_id"    />
+        <result property="feedbackId"   column="feedback_id"   />
+        <result property="workorderId"  column="workorder_id"  />
+        <result property="itemId"       column="item_id"       />
+        <result property="itemCode"     column="item_code"     />
+        <result property="itemName"     column="item_name"     />
+        <result property="quantity"     column="quantity"      />
+        <result property="batchCode"    column="batch_code"    />
+    </resultMap>
+
+    <sql id="selectProFeedbackConsumeVo">
+        select consume_id, feedback_id, workorder_id, item_id, item_code, item_name, quantity, batch_code
+        from qxx_pro_feedback_consume
+    </sql>
+
+    <select id="selectByFeedbackId" parameterType="Long" resultMap="ProFeedbackConsumeResult">
+        <include refid="selectProFeedbackConsumeVo"/>
+        where feedback_id = #{feedbackId}
+        order by consume_id
+    </select>
+
+    <insert id="insertBatch" parameterType="list">
+        insert into qxx_pro_feedback_consume (feedback_id, workorder_id, item_id, item_code, item_name, quantity, batch_code)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.feedbackId}, #{item.workorderId}, #{item.itemId}, #{item.itemCode}, #{item.itemName}, #{item.quantity}, #{item.batchCode})
+        </foreach>
+    </insert>
+
+    <delete id="deleteByFeedbackId" parameterType="Long">
+        delete from qxx_pro_feedback_consume where feedback_id = #{feedbackId}
+    </delete>
+
+</mapper>

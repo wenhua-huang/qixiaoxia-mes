@@ -77,7 +77,7 @@ public class WmItemRecptController extends BaseController
     @PostMapping
     public AjaxResult add(@RequestBody WmItemRecpt entity)
     {
-        return toAjax(wmItemRecptService.insertWmItemRecpt(entity));
+        return toAjax(wmItemRecptService.insertWmItemRecpt(entity), entity, "新增入库单失败");
     }
 
     @PreAuthorize("@ss.hasPermi('mes:wm:item_recpt:edit')")

@@ -11,7 +11,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="workstationName"  column="workstation_name"   />
         <result property="workshopId"       column="workshop_id"        />
         <result property="workstationType"  column="workstation_type"   />
+        <result property="processId"        column="process_id"         />
         <result property="processType"      column="process_type"       />
+        <result property="processName"      column="process_name"       />
         <result property="capacity"         column="capacity"           />
         <result property="status"           column="status"             />
         <result property="enableFlag"       column="enable_flag"        />
@@ -23,10 +25,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectMdWorkstationVo">
-        select workstation_id, factory_id, workstation_code, workstation_name,
-               workshop_id, workstation_type, process_type, capacity, status,
-               enable_flag, remark, create_by, create_time, update_by, update_time
-        from qxx_md_workstation
+        select w.workstation_id, w.factory_id, w.workstation_code, w.workstation_name,
+               w.workshop_id, w.workstation_type, w.process_id, w.process_type,
+               p.process_name, w.capacity, w.status,
+               w.enable_flag, w.remark, w.create_by, w.create_time, w.update_by, w.update_time
+        from qxx_md_workstation w
+        left join qxx_pro_process p on w.process_id = p.process_id
     </sql>
 
     <select id="selectMdWorkstationList" parameterType="com.ruoyi.system.domain.mes.md.MdWorkstation" resultMap="MdWorkstationResult">
@@ -36,9 +40,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="workstationName != null  and workstationName != ''"> and workstation_name like concat('%', #{workstationName}, '%')</if>
             <if test="workshopId != null"> and workshop_id = #{workshopId}</if>
             <if test="workstationType != null  and workstationType != ''"> and workstation_type = #{workstationType}</if>
-            <if test="processType != null  and processType != ''"> and process_type = #{processType}</if>
+            <if test="processId != null"> and w.process_id = #{processId}</if>
+            <if test="processType != null  and processType != ''"> and w.process_type = #{processType}</if>
             <if test="status != null  and status != ''"> and status = #{status}</if>
-            <if test="enableFlag != null  and enableFlag != ''"> and enable_flag = #{enableFlag}</if>
+            <if test="enableFlag != null  and enableFlag != ''"> and w.enable_flag = #{enableFlag}</if>
         </where>
     </select>
 
@@ -58,6 +63,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="workstationName != null and workstationName != ''">workstation_name,</if>
             <if test="workshopId != null">workshop_id,</if>
             <if test="workstationType != null">workstation_type,</if>
+            <if test="processId != null">process_id,</if>
             <if test="processType != null">process_type,</if>
             <if test="capacity != null">capacity,</if>
             <if test="status != null">status,</if>
@@ -72,6 +78,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="workstationName != null and workstationName != ''">#{workstationName},</if>
             <if test="workshopId != null">#{workshopId},</if>
             <if test="workstationType != null">#{workstationType},</if>
+            <if test="processId != null">#{processId},</if>
             <if test="processType != null">#{processType},</if>
             <if test="capacity != null">#{capacity},</if>
             <if test="status != null">#{status},</if>
@@ -90,6 +97,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="workstationName != null and workstationName != ''">workstation_name = #{workstationName},</if>
             <if test="workshopId != null">workshop_id = #{workshopId},</if>
             <if test="workstationType != null">workstation_type = #{workstationType},</if>
+            <if test="processId != null">process_id = #{processId},</if>
             <if test="processType != null">process_type = #{processType},</if>
             <if test="capacity != null">capacity = #{capacity},</if>
             <if test="status != null">status = #{status},</if>

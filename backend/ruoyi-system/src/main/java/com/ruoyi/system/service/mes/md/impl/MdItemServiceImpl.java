@@ -83,6 +83,7 @@ public class MdItemServiceImpl implements IMdItemService
         resolveItemTypeId(mdItem);
 
         // SPU/变体继承逻辑：如果是变体（parentId>0），从父产品继承 itemType 信息
+        // 注意：SPU 自身（parentId=0）即标准，不在此自动创建冗余"标准变体"
         if (mdItem.getParentId() != null && mdItem.getParentId() > 0)
         {
             MdItem parent = mdItemMapper.selectMdItemById(mdItem.getParentId());
@@ -95,20 +96,17 @@ public class MdItemServiceImpl implements IMdItemService
                     mdItem.setItemTypeId(parent.getItemTypeId());
                 if (StringUtils.isEmpty(mdItem.getItemTypeName()))
                     mdItem.setItemTypeName(parent.getItemTypeName());
-                // 继承规格
+                // 继承单位
                 if (StringUtils.isEmpty(mdItem.getUnitOfMeasure()))
                     mdItem.setUnitOfMeasure(parent.getUnitOfMeasure());
                 if (StringUtils.isEmpty(mdItem.getUnitName()))
                     mdItem.setUnitName(parent.getUnitName());
-
-                // 方案A：复制父产品的行业子表行
-                copyParentAttrs(mdItem.getParentId(), null); // itemId 还未生成，先记下 parentId
             }
         }
 
         int rows = mdItemMapper.insertMdItem(mdItem);
 
-        // 方案A续：复制父产品子表行到新 itemId
+        // 方案A：变体创建时，复制父产品的行业子表行到新 itemId
         if (mdItem.getParentId() != null && mdItem.getParentId() > 0 && mdItem.getItemId() != null)
         {
             copyParentAttrsToNewItem(mdItem.getParentId(), mdItem.getItemId());
@@ -163,9 +161,6 @@ public class MdItemServiceImpl implements IMdItemService
             attrGiftBoxMapper.insert(pBox);
         }
     }
-
-    /** 占位方法（兼容旧签名） */
-    private void copyParentAttrs(Long parentId, Long unused) { /* no-op */ }
 
     /** 根据 item 信息判断并插入对应的行业子表（按 itemOrProduct 精确匹配） */
     private void handleSubTableInsert(MdItem item)

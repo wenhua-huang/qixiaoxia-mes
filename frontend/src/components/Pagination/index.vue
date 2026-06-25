@@ -30,6 +30,15 @@ const props = defineProps({
     type: Number,
     default: 20
   },
+  // 兼容 v-model:current-page / v-model:page-size 写法
+  currentPage: {
+    type: Number,
+    default: undefined
+  },
+  pageSize: {
+    type: Number,
+    default: undefined
+  },
   pageSizes: {
     type: Array,
     default() {
@@ -60,19 +69,22 @@ const props = defineProps({
 })
 
 const emit = defineEmits()
+// 兼容两套 v-model 写法：page/limit 和 current-page/page-size
 const currentPage = computed({
   get() {
-    return props.page
+    return props.currentPage ?? props.page
   },
   set(val: number) {
+    emit('update:currentPage', val)
     emit('update:page', val)
   }
 })
 const pageSize = computed({
   get() {
-    return props.limit
+    return props.pageSize ?? props.limit
   },
   set(val: number){
+    emit('update:pageSize', val)
     emit('update:limit', val)
   }
 })

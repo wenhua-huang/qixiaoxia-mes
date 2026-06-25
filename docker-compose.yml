@@ -10,7 +10,7 @@ services:
       MYSQL_DATABASE: mes
       TZ: Asia/Shanghai
     ports:
-      - "3307:3306"
+      - "127.0.0.1:3307:3306"
     volumes:
       - ./docker-data/mysql:/var/lib/mysql
       - ./backend/sql:/docker-entrypoint-initdb.d  # 自动执行初始化SQL
@@ -33,7 +33,7 @@ services:
     container_name: qxx-redis
     restart: unless-stopped
     ports:
-      - "6380:6379"
+      - "127.0.0.1:6380:6379"
     volumes:
       - ./docker-data/redis:/data
     command: redis-server --requirepass qxx123456 --appendonly yes
@@ -51,8 +51,8 @@ services:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin123
     ports:
-      - "9010:9000"   # API
-      - "9011:9001"   # Console
+      - "127.0.0.1:9010:9000"   # API
+      - "127.0.0.1:9011:9001"   # Console
     volumes:
       - ./docker-data/minio:/data
     command: server /data --console-address ":9001"

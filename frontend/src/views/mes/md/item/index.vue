@@ -12,7 +12,7 @@
       </el-col>
       <!-- 右侧表格 -->
       <el-col :span="20" :xs="24">
-        <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="68px">
+        <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="80px">
           <el-form-item label="物料编码" prop="itemCode">
             <el-input v-model="queryParams.itemCode" placeholder="请输入物料编码" clearable style="width: 240px" @keyup.enter="handleQuery" />
           </el-form-item>
@@ -230,7 +230,7 @@ import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import type { MdItem, ItemQueryParams, MdItemAttrPaper, MdItemAttrPaperBag } from '@/types/api/mes/md/item'
 import type { TreeSelect } from '@/types/api/common'
 import { listItem, getItem, delItem, addItem, updateItem } from '@/api/mes/md/item'
-import { treeselect } from '@/api/mes/md/itemtype'
+import { treeselect, getItemtype } from '@/api/mes/md/itemtype'
 import { listAllUnitmeasure } from '@/api/mes/md/unitmeasure'
 import BatchConfig from './components/BatchConfig.vue'
 import ItemBom from './components/ItemBom.vue'
@@ -343,8 +343,17 @@ function getList() {
 function cancel() { open.value = false; reset() }
 
 function handleAutoGenChange(flag: boolean) {
-  if (flag) genSerialCode('ITEM_CODE').then((r: any) => { form.value.itemCode = r.data })
-  else form.value.itemCode = ''
+  if (flag) {
+    const product = form.value.itemTypeId
+      ? getItemtype(form.value.itemTypeId).then(t => t.data?.itemOrProduct)
+      : Promise.resolve(null)
+    product.then(p => {
+      const ruleCode = p ? `ITEM_${p}_CODE` : 'ITEM_CODE'
+      genSerialCode(ruleCode).then((r: any) => { form.value.itemCode = r.data })
+    })
+  } else {
+    form.value.itemCode = ''
+  }
 }
 function reset() {
   autoGenFlag.value = false
@@ -361,6 +370,11 @@ function handleSelectionChange(s: MdItem[]) { ids.value = s.map(i => i.itemId!);
 function handleAdd() {
   reset()
   loadTree().then(() => {
+    // 继承左侧栏选中分类
+    if (queryParams.value.itemTypeId) {
+      form.value.itemTypeId = queryParams.value.itemTypeId
+      syncItemTypeName()
+    }
     open.value = true; title.value = '添加物料'
   })
 }

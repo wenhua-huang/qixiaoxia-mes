@@ -159,6 +159,7 @@ create table qxx_pro_process_content (
   device                      varchar(255)    default null               comment '辅助设备/工具',
   material                    varchar(255)    default null               comment '辅助材料/辅料',
   doc_url                     varchar(255)    default null               comment '作业指导书URL(SOP文件)',
+  is_check                    char(1)         default 'Y'                comment '是否需要质检(Y-是,N-否)',
   remark                      varchar(500)    default ''                 comment '备注',
   create_by                   varchar(64)     default ''                 comment '创建者',
   create_time                 datetime        default current_timestamp  comment '创建时间',

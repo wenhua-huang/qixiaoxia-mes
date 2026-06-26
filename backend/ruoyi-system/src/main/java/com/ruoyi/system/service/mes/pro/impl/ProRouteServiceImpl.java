@@ -38,7 +38,9 @@ public class ProRouteServiceImpl implements IProRouteService
     @Override
     public List<ProRoute> selectProRouteAll()
     {
-        return qxxProRouteMapper.selectProRouteList(new ProRoute());
+        ProRoute cond = new ProRoute();
+        cond.setEnableFlag("1");
+        return qxxProRouteMapper.selectProRouteList(cond);
     }
 
     @Override

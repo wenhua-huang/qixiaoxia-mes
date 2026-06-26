@@ -11,6 +11,8 @@ import com.ruoyi.system.domain.mes.md.MdItem;
  */
 public interface IMdItemService
 {
+    public List<MdItem> selectMdItemAllEnabled();
+
     public List<MdItem> selectMdItemList(MdItem mdItem);
 
     /** 查询物料详情（含行业子表数据） */

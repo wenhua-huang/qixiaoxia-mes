@@ -37,6 +37,16 @@ public class TmToolController extends BaseController
     /**
      * 查询工装夹具清单列表
      */
+    @PreAuthorize("@ss.hasPermi('mes:tm:tool:query')")
+    @GetMapping("/listAll")
+    public AjaxResult listAll()
+    {
+        TmTool cond = new TmTool();
+        cond.setEnableFlag("1");
+        List<TmTool> list = tmToolService.selectTmToolList(cond);
+        return AjaxResult.success(list);
+    }
+
     @PreAuthorize("@ss.hasPermi('mes:tm:tool:list')")
     @GetMapping("/list")
     public TableDataInfo list(TmTool tmTool)

@@ -39,6 +39,16 @@ public class MdWorkstationController extends BaseController
 
     // ===== 工作站 CRUD =====
 
+    @PreAuthorize("@ss.hasPermi('mes:md:workstation:query')")
+    @GetMapping("/listAll")
+    public AjaxResult listAll()
+    {
+        MdWorkstation cond = new MdWorkstation();
+        cond.setEnableFlag("1");
+        List<MdWorkstation> list = mdWorkstationService.selectMdWorkstationList(cond);
+        return AjaxResult.success(list);
+    }
+
     @PreAuthorize("@ss.hasPermi('mes:md:workstation:list')")
     @GetMapping("/list")
     public TableDataInfo list(MdWorkstation mdWorkstation)

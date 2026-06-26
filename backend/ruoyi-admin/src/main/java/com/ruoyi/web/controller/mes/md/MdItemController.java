@@ -28,6 +28,14 @@ public class MdItemController extends BaseController
     @Autowired
     private IMdItemService mdItemService;
 
+    @PreAuthorize("@ss.hasPermi('mes:md:item:query')")
+    @GetMapping("/listAll")
+    public AjaxResult listAll()
+    {
+        List<MdItem> list = mdItemService.selectMdItemAllEnabled();
+        return AjaxResult.success(list);
+    }
+
     @PreAuthorize("@ss.hasPermi('mes:md:item:list')")
     @GetMapping("/list")
     public TableDataInfo list(MdItem mdItem)

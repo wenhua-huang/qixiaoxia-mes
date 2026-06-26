@@ -42,6 +42,14 @@ public class MdItemServiceImpl implements IMdItemService
     private com.ruoyi.system.mapper.mes.md.MdItemTypeMapper itemTypeMapper;
 
     @Override
+    public List<MdItem> selectMdItemAllEnabled()
+    {
+        MdItem cond = new MdItem();
+        cond.setEnableFlag("1");
+        return mdItemMapper.selectMdItemList(cond);
+    }
+
+    @Override
     public List<MdItem> selectMdItemList(MdItem mdItem)
     {
         return mdItemMapper.selectMdItemList(mdItem);

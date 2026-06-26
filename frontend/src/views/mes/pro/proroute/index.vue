@@ -56,15 +56,15 @@
         </template>
       </el-table-column>
       <el-table-column label="路线说明" align="center" prop="routeDesc" :show-overflow-tooltip="true" />
-      <el-table-column label="是否启用" align="center" prop="enableFlag">
-        <template #default="scope">
-          <dict-tag :options="sys_yes_no_options" :value="scope.row.enableFlag" />
-        </template>
-      </el-table-column>
       <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
       <el-table-column label="创建时间" align="center" prop="createTime" width="180">
         <template #default="scope">
           <span>{{ parseTime(scope.row.createTime, '{y}-{m}-{d} {h}:{i}:{s}') }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="启用" align="center" width="70">
+        <template #default="scope">
+          <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
         </template>
       </el-table-column>
       <el-table-column label="操作" align="center" width="80" class-name="small-padding fixed-width">
@@ -698,6 +698,17 @@ export default {
     handleDelParamItem(row) {
       this.$modal.confirm('确认删除该参数？').then(() => delRouteProcessParam(row.recordId)).then(() => { this.loadParamData(); this.$modal.msgSuccess('删除成功') }).catch(() => {})
     },
+    handleEnableChange(row) {
+      const newVal = row.enableFlag
+      const text = newVal === '1' ? '启用' : '停用'
+      this.$modal.confirm('确认要' + text + '"' + row.routeName + '"吗？').then(() => {
+        updateRoute({ routeId: row.routeId, enableFlag: newVal }).then(() => this.$modal.msgSuccess(text + '成功'))
+      }).catch(() => {
+        row.enableFlag = newVal === '1' ? '0' : '1'
+        this.getList()
+      })
+    },
   },
 }
+
 </script>

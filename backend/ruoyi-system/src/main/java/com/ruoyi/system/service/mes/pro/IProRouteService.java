@@ -17,8 +17,7 @@ public interface IProRouteService
 
     public List<ProRoute> selectProRouteAll();
 
-    public int insertProRoute(ProRoute proRoute);
-
+        public int insertProRoute(ProRoute proRoute);
     public int updateProRoute(ProRoute proRoute);
 
     public int deleteProRouteByRouteIds(Long[] routeIds);

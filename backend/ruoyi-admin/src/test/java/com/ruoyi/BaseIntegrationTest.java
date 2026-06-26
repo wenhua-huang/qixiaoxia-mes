@@ -84,7 +84,8 @@ public abstract class BaseIntegrationTest {
 
         // SQL init 通过 classpath 资源（由 maven-resources-plugin 复制到 test-classes/sql/）
         registry.add("spring.sql.init.mode", () -> "always");
-        registry.add("spring.sql.init.schema-locations", () -> "classpath:sql/ry_20260417.sql");
+        registry.add("spring.sql.init.schema-locations", () ->
+            "classpath:sql/ry_20260417.sql,classpath:sql/test_mes_ddl.sql");
         registry.add("spring.sql.init.continue-on-error", () -> "true");
     }
 

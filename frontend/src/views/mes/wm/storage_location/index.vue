@@ -30,9 +30,9 @@
       <el-table-column label="仓库编码" align="center" prop="warehouseCode" width="120" />
       <el-table-column label="仓库名称" align="center" prop="warehouseName" width="150" />
       <el-table-column label="面积(㎡)" align="center" prop="area" width="90" />
-      <el-table-column label="启用" align="center" width="80">
+      <el-table-column label="启用" align="center" width="70">
         <template #default="scope">
-          {{ scope.row.enableFlag === '1' ? '是' : '否' }}
+          <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
         </template>
       </el-table-column>
       <el-table-column label="操作" align="center" width="220" class-name="small-padding fixed-width">
@@ -170,6 +170,17 @@ function submitForm() {
     }
   })
 }
+function handleEnableChange(row: any) {
+  const newVal = row.enableFlag
+  const text = newVal === '1' ? '启用' : '停用'
+  proxy.$modal.confirm(`确认要${text}"${row.locationName}"吗？`).then(() => {
+    updateWmStorageLocation({ locationId: row.locationId, enableFlag: newVal } as any).then(() => proxy.$modal.msgSuccess(`${text}成功`))
+  }).catch(() => {
+    row.enableFlag = newVal === '1' ? '0' : '1'
+    getList()
+  })
+}
+
 function handleDelete(row?: WmStorageLocation) {
   const _ids = row?.locationId ? [row.locationId] : ids.value
   proxy.$modal.confirm('是否确认删除？').then(() => delWmStorageLocation(_ids)).then(() => { getList(); proxy.$modal.msgSuccess('删除成功') })

@@ -21,8 +21,7 @@ public interface IMdItemService
     public boolean checkItemCodeUnique(MdItem mdItem);
 
     /** 新增物料（含行业子表联动 + 变体继承逻辑） */
-    public int insertMdItem(MdItem mdItem);
-
+        public int insertMdItem(MdItem mdItem);
     /** 更新物料（含行业子表联动） */
     public int updateMdItem(MdItem mdItem);
 

@@ -35,14 +35,14 @@
     >
       <el-table-column prop="machineryTypeName" label="设备类型" width="260" />
       <el-table-column prop="orderNum" label="排序" width="100" align="center" />
-      <el-table-column prop="enableFlag" label="是否启用" width="100" align="center">
-        <template #default="scope">
-          <dict-tag :options="sys_yes_no" :value="scope.row.enableFlag" />
-        </template>
-      </el-table-column>
       <el-table-column label="创建时间" align="center" prop="createTime" width="180">
         <template #default="scope">
           <span>{{ scope.row.createTime }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="启用" align="center" width="70">
+        <template #default="scope">
+          <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
         </template>
       </el-table-column>
       <el-table-column label="操作" align="center" width="200" class-name="small-padding fixed-width">
@@ -192,6 +192,17 @@ function submitForm() {
         addMachinerytype(form.value).then(() => { proxy.$modal.msgSuccess('新增成功'); open.value = false; getList() })
       }
     }
+  })
+}
+
+function handleEnableChange(row: any) {
+  const newVal = row.enableFlag
+  const text = newVal === '1' ? '启用' : '停用'
+  proxy.$modal.confirm(`确认要${text}"${row.machineryTypeName}"吗？`).then(() => {
+    updateMachinerytype({ machineryTypeId: row.machineryTypeId, enableFlag: newVal } as any).then(() => proxy.$modal.msgSuccess(`${text}成功`))
+  }).catch(() => {
+    row.enableFlag = newVal === '1' ? '0' : '1'
+    getList()
   })
 }
 

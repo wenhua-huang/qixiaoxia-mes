@@ -23,7 +23,11 @@
       </el-table-column>
       <el-table-column label="产能(个/时)" align="center" prop="capacity" />
       <el-table-column label="状态" align="center" prop="status"><template #default="s"><dict-tag :options="mes_workstation_status" :value="s.row.status" /></template></el-table-column>
-      <el-table-column label="启用" align="center" prop="enableFlag"><template #default="s"><dict-tag :options="sys_yes_no" :value="s.row.enableFlag" /></template></el-table-column>
+      <el-table-column label="启用" align="center" width="70">
+        <template #default="scope">
+          <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
+        </template>
+      </el-table-column>
       <el-table-column label="操作" align="center" width="150"><template #default="s"><el-button link type="primary" icon="Edit" @click="handleUpdate(s.row)" v-hasPermi="['mes:md:workstation:edit']">修改</el-button></template></el-table-column>
     </el-table>
     <pagination v-show="total>0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
@@ -102,6 +106,17 @@ function handleSelectionChange(s: MdWorkstation[]) { ids.value = s.map(i => i.wo
 function handleAdd() { reset(); optType.value = 'add'; listAllWorkshop().then(r => { workshopOptions.value = r.data || [] }); open.value = true; title.value = '新增工作站' }
 function handleUpdate(row?: MdWorkstation) { reset(); optType.value = 'edit'; const id = row?.workstationId || ids.value[0]; Promise.all([listAllWorkshop(), getWorkstation(id)]).then(([wsRes, gwRes]) => { workshopOptions.value = wsRes.data || []; form.value = gwRes.data; loadSubData(id); open.value = true; title.value = '修改工作站' }) }
 function submitForm() { proxy.$refs['formRef'].validate((v: boolean) => { if (v) { (form.value.workstationId ? updateWorkstation(form.value) : addWorkstation(form.value)).then(() => { proxy.$modal.msgSuccess('操作成功'); open.value = false; getList() }).catch((err: any) => { proxy.$modal.msgError(err?.msg || '操作失败') }) } else { proxy.$modal.msgError('请完善表单信息') } }) }
+function handleEnableChange(row: any) {
+  const newVal = row.enableFlag
+  const text = newVal === '1' ? '启用' : '停用'
+  proxy.$modal.confirm(`确认要${text}"${row.workstationName}"吗？`).then(() => {
+    updateWorkstation({ workstationId: row.workstationId, enableFlag: newVal } as any).then(() => proxy.$modal.msgSuccess(`${text}成功`))
+  }).catch(() => {
+    row.enableFlag = newVal === '1' ? '0' : '1'
+    getList()
+  })
+}
+
 function handleDelete(row?: MdWorkstation) { const ids_ = row?.workstationId || ids.value; proxy.$modal.confirm('确认删除？').then(() => delWorkstation(ids_)).then(() => { getList(); proxy.$modal.msgSuccess('删除成功') }).catch(() => {}) }
 function handleExport() { proxy.download('mes/md/workstation/export', { ...queryParams.value }, `workstation_${Date.now()}.xlsx`) }
 

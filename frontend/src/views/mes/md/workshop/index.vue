@@ -70,12 +70,12 @@
       <el-table-column label="车间名称" align="center" prop="workshopName" />
       <el-table-column label="车间地址" align="center" prop="address" :show-overflow-tooltip="true" />
       <el-table-column label="负责人" align="center" prop="manager" />
-      <el-table-column label="是否启用" align="center" prop="enableFlag">
+      <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
+      <el-table-column label="启用" align="center" width="70">
         <template #default="scope">
-          <dict-tag :options="sys_yes_no" :value="scope.row.enableFlag" />
+          <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
         </template>
       </el-table-column>
-      <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
       <el-table-column label="操作" align="center" width="150" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:md:workshop:edit']">修改</el-button>
@@ -268,6 +268,17 @@ function submitForm() {
         })
       }
     }
+  })
+}
+
+function handleEnableChange(row: MdWorkshop) {
+  const newVal = row.enableFlag
+  const text = newVal === '1' ? '启用' : '停用'
+  proxy.$modal.confirm(`确认要${text}"${row.workshopName}"吗？`).then(() => {
+    updateWorkshop({ workshopId: row.workshopId, enableFlag: newVal } as MdWorkshop).then(() => proxy.$modal.msgSuccess(`${text}成功`))
+  }).catch(() => {
+    row.enableFlag = newVal === '1' ? '0' : '1'
+    getList()
   })
 }
 

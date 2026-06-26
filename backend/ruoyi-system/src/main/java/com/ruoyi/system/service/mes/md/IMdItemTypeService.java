@@ -27,8 +27,7 @@ public interface IMdItemTypeService
     /** 排除自身及子孙节点（编辑时防止循环引用） */
     public List<MdItemType> selectMdItemTypeListExcludeChild(Long itemTypeId);
 
-    public int insertMdItemType(MdItemType mdItemType);
-
+        public int insertMdItemType(MdItemType mdItemType);
     public int updateMdItemType(MdItemType mdItemType);
 
     public int deleteMdItemTypeById(Long itemTypeId);

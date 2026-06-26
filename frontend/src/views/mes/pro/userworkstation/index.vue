@@ -44,19 +44,17 @@
       <el-table-column label="昵称" align="center" prop="nickName" width="130" :show-overflow-tooltip="true" />
       <el-table-column label="工作站ID" align="center" prop="workstationId" width="100" />
       <el-table-column label="工作站名称" align="center" prop="workstationName" min-width="140" :show-overflow-tooltip="true" />
-      <el-table-column label="是否启用" align="center" prop="enableFlag" width="90">
-        <template #default="scope">
-          <el-tag :type="scope.row.enableFlag === '1' ? 'success' : 'info'" size="small">
-            {{ scope.row.enableFlag === '1' ? '是' : '否' }}
-          </el-tag>
-        </template>
-      </el-table-column>
       <el-table-column label="绑定时间" align="center" width="160">
         <template #default="scope">
           <span>{{ parseTime(scope.row.operationTime || scope.row.createTime, '{y}-{m}-{d} {h}:{i}:{s}') }}</span>
         </template>
       </el-table-column>
       <el-table-column label="备注" align="center" prop="remark" min-width="120" :show-overflow-tooltip="true" />
+      <el-table-column label="启用" align="center" width="70">
+        <template #default="scope">
+          <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
+        </template>
+      </el-table-column>
       <el-table-column label="操作" align="center" width="120" fixed="right" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="View" size="small" @click="handleView(scope.row)" v-hasPermi="['mes:pro:userworkstation:query']">查看</el-button>
@@ -256,6 +254,17 @@ function handleUpdate(row?: UserWorkstation) {
 }
 
 // -------------------- 删除 --------------------
+function handleEnableChange(row: any) {
+  const newVal = row.enableFlag
+  const text = newVal === '1' ? '启用' : '停用'
+  proxy.$modal.confirm(`确认要${text}"${row.userName}"吗？`).then(() => {
+    updateUserWorkstation({ recordId: row.recordId, enableFlag: newVal } as any).then(() => proxy.$modal.msgSuccess(`${text}成功`))
+  }).catch(() => {
+    row.enableFlag = newVal === '1' ? '0' : '1'
+    getList()
+  })
+}
+
 function handleDelete(row?: UserWorkstation) {
   const _ids = row?.recordId ? String(row.recordId) : ids.value.join(',')
   proxy.$modal

@@ -154,9 +154,7 @@ public class MdItemTypeServiceImpl implements IMdItemTypeService
     {
         mdItemType.setCreateTime(DateUtils.getNowDate());
         return mdItemTypeMapper.insertMdItemType(mdItemType);
-    }
-
-    @Override
+    }    @Override
     public int updateMdItemType(MdItemType mdItemType)
     {
         mdItemType.setUpdateTime(DateUtils.getNowDate());

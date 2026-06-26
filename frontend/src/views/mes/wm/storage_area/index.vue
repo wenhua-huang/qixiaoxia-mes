@@ -32,6 +32,11 @@
       <el-table-column label="库区编码" align="center" prop="locationCode" width="180" :show-overflow-tooltip="true" />
       <el-table-column label="库区名称" align="center" prop="locationName" width="180" :show-overflow-tooltip="true" />
       <el-table-column label="仓库编码" align="center" prop="warehouseCode" width="180" :show-overflow-tooltip="true" />
+      <el-table-column label="启用" align="center" width="70">
+        <template #default="scope">
+          <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
+        </template>
+      </el-table-column>
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="160">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:storage_area:edit']">修改</el-button>
@@ -148,6 +153,17 @@ function submitForm() {
     }
   })
 }
+function handleEnableChange(row: any) {
+  const newVal = row.enableFlag
+  const text = newVal === '1' ? '启用' : '停用'
+  proxy.$modal.confirm(`确认要${text}"${row.areaName}"吗？`).then(() => {
+    updateWmStorageArea({ areaId: row.areaId, enableFlag: newVal } as any).then(() => proxy.$modal.msgSuccess(`${text}成功`))
+  }).catch(() => {
+    row.enableFlag = newVal === '1' ? '0' : '1'
+    getList()
+  })
+}
+
 function handleDelete(row?: WmStorageArea) {
   const _ids = row?.areaId ? [row.areaId] : ids.value
   proxy.$modal.confirm('是否确认删除？').then(() => delWmStorageArea(_ids)).then(() => { getList(); proxy.$modal.msgSuccess('删除成功') })

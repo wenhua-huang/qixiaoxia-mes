@@ -37,9 +37,7 @@ public class ProUserWorkstationServiceImpl implements IProUserWorkstationService
         e.setCreateTime(DateUtils.getNowDate());
         e.setCreateBy(SecurityUtils.getUsername());
         return proUserWorkstationMapper.insertProUserWorkstation(e);
-    }
-
-    @Override
+    }    @Override
     public int updateProUserWorkstation(ProUserWorkstation e) {
         e.setUpdateTime(DateUtils.getNowDate());
         e.setUpdateBy(SecurityUtils.getUsername());

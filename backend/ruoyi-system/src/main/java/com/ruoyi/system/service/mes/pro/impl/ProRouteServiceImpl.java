@@ -50,9 +50,7 @@ public class ProRouteServiceImpl implements IProRouteService
         proRoute.setCreateTime(DateUtils.getNowDate());
         proRoute.setCreateBy(SecurityUtils.getUsername());
         return qxxProRouteMapper.insertProRoute(proRoute);
-    }
-
-    @Override
+    }    @Override
     public int updateProRoute(ProRoute proRoute)
     {
         proRoute.setUpdateTime(DateUtils.getNowDate());

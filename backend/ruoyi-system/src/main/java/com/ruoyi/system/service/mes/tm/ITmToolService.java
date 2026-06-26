@@ -33,8 +33,7 @@ public interface ITmToolService
      * @param tmTool 工装夹具清单
      * @return 结果
      */
-    public int insertTmTool(TmTool tmTool);
-
+        public int insertTmTool(TmTool tmTool);
     /**
      * 修改工装夹具清单
      * 

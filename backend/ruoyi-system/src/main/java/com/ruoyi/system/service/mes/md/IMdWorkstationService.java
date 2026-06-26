@@ -14,8 +14,7 @@ public interface IMdWorkstationService
     public MdWorkstation selectMdWorkstationByWorkstationId(Long workstationId);
     public boolean checkWorkstationCodeUnique(MdWorkstation mdWorkstation);
     public List<MdWorkstation> selectMdWorkstationList(MdWorkstation mdWorkstation);
-    public int insertMdWorkstation(MdWorkstation mdWorkstation);
-    public int updateMdWorkstation(MdWorkstation mdWorkstation);
+        public int insertMdWorkstation(MdWorkstation mdWorkstation);    public int updateMdWorkstation(MdWorkstation mdWorkstation);
     public int deleteMdWorkstationByWorkstationIds(Long[] workstationIds);
     public int deleteMdWorkstationByWorkstationId(Long workstationId);
 }

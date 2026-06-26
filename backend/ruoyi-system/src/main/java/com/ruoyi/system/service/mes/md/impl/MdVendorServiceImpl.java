@@ -57,9 +57,7 @@ public class MdVendorServiceImpl implements IMdVendorService
     {
         mdVendor.setCreateTime(DateUtils.getNowDate());
         return mdVendorMapper.insertMdVendor(mdVendor);
-    }
-
-    @Override
+    }    @Override
     public int updateMdVendor(MdVendor mdVendor)
     {
         mdVendor.setUpdateTime(DateUtils.getNowDate());

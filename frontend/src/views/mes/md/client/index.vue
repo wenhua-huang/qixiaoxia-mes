@@ -24,6 +24,11 @@
       <el-table-column label="业务员" align="center" prop="salesperson" width="80" />
       <el-table-column label="联系人" align="center" prop="contact1" />
       <el-table-column label="联系电话" align="center" prop="contact1Tel" />
+      <el-table-column label="启用" align="center" width="70">
+        <template #default="scope">
+          <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
+        </template>
+      </el-table-column>
       <el-table-column label="操作" align="center" width="150"><template #default="s"><el-button link type="primary" icon="Edit" @click="handleUpdate(s.row)" v-hasPermi="['mes:md:client:edit']">修改</el-button></template></el-table-column>
     </el-table>
     <pagination v-show="total>0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
@@ -87,6 +92,17 @@ function handleSelectionChange(s: MdClient[]) { ids.value = s.map(i => i.clientI
 function handleAdd() { reset(); optType.value = 'add'; open.value = true; title.value = '新增客户' }
 function handleUpdate(row?: MdClient) { reset(); optType.value = 'edit'; const id = row?.clientId || ids.value[0]; getClient(id).then(r => { form.value = r.data; open.value = true; title.value = '修改客户' }) }
 function submitForm() { proxy.$refs['formRef'].validate((v: boolean) => { if (v) { (form.value.clientId ? updateClient(form.value) : addClient(form.value)).then(() => { proxy.$modal.msgSuccess('操作成功'); open.value = false; getList() }) } }) }
+function handleEnableChange(row: any) {
+  const newVal = row.enableFlag
+  const text = newVal === '1' ? '启用' : '停用'
+  proxy.$modal.confirm(`确认要${text}"${row.clientName}"吗？`).then(() => {
+    updateClient({ clientId: row.clientId, enableFlag: newVal } as any).then(() => proxy.$modal.msgSuccess(`${text}成功`))
+  }).catch(() => {
+    row.enableFlag = newVal === '1' ? '0' : '1'
+    getList()
+  })
+}
+
 function handleDelete(row?: MdClient) { const ids_ = row?.clientId || ids.value; proxy.$modal.confirm('确认删除？').then(() => delClient(ids_)).then(() => { getList(); proxy.$modal.msgSuccess('删除成功') }).catch(() => {}) }
 function handleExport() { proxy.download('mes/md/client/export', { ...queryParams.value }, `client_${Date.now()}.xlsx`) }
 getList()

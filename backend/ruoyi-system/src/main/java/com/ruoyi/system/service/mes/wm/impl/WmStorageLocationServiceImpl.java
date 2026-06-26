@@ -35,9 +35,7 @@ public class WmStorageLocationServiceImpl implements IWmStorageLocationService
     public int insertWmStorageLocation(WmStorageLocation entity) {
         entity.setCreateTime(DateUtils.getNowDate());
         return wmStorageLocationMapper.insertWmStorageLocation(entity);
-    }
-
-    @Override
+    }    @Override
     @Transactional
     public int updateWmStorageLocation(WmStorageLocation entity) {
         entity.setUpdateTime(DateUtils.getNowDate());

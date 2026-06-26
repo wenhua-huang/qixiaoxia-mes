@@ -14,8 +14,7 @@ public interface IProUserWorkstationService
     public ProUserWorkstation selectProUserWorkstationByRecordId(Long recordId);
     public List<ProUserWorkstation> selectProUserWorkstationList(ProUserWorkstation e);
     public List<ProUserWorkstation> selectAll();
-    public int insertProUserWorkstation(ProUserWorkstation e);
-    public int updateProUserWorkstation(ProUserWorkstation e);
+        public int insertProUserWorkstation(ProUserWorkstation e);    public int updateProUserWorkstation(ProUserWorkstation e);
     public int deleteProUserWorkstationByRecordIds(Long[] recordIds);
     public int deleteProUserWorkstationByRecordId(Long recordId);
 }

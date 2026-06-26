@@ -60,9 +60,7 @@ public class MdWorkstationServiceImpl implements IMdWorkstationService
     {
         mdWorkstation.setCreateTime(DateUtils.getNowDate());
         return mdWorkstationMapper.insertMdWorkstation(mdWorkstation);
-    }
-
-    @Override
+    }    @Override
     public int updateMdWorkstation(MdWorkstation mdWorkstation)
     {
         mdWorkstation.setUpdateTime(DateUtils.getNowDate());

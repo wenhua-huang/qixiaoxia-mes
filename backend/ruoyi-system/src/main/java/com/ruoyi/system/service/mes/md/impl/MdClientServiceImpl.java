@@ -57,9 +57,7 @@ public class MdClientServiceImpl implements IMdClientService
     {
         mdClient.setCreateTime(DateUtils.getNowDate());
         return mdClientMapper.insertMdClient(mdClient);
-    }
-
-    @Override
+    }    @Override
     public int updateMdClient(MdClient mdClient)
     {
         mdClient.setUpdateTime(DateUtils.getNowDate());

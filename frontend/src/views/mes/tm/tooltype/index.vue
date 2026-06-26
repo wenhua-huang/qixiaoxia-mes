@@ -61,12 +61,12 @@
           <span v-else>无</span>
         </template>
       </el-table-column>
-      <el-table-column label="是否启用" align="center" prop="enableFlag" width="80">
+      <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
+      <el-table-column label="启用" align="center" width="70">
         <template #default="scope">
-          <dict-tag :options="sys_yes_no_options" :value="scope.row.enableFlag" />
+          <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
         </template>
       </el-table-column>
-      <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="150">
         <template #default="scope">
           <el-tooltip content="修改" placement="top"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:tm:tooltype:edit']"></el-button></el-tooltip>
@@ -326,6 +326,17 @@ export default {
         this.form.toolTypeCode = null
       }
     },
+    handleEnableChange(row) {
+      const newVal = row.enableFlag
+      const text = newVal === '1' ? '启用' : '停用'
+      this.$modal.confirm('确认要' + text + '"' + row.toolTypeName + '"吗？').then(() => {
+        updateType({ toolTypeId: row.toolTypeId, enableFlag: newVal }).then(() => this.$modal.msgSuccess(text + '成功'))
+      }).catch(() => {
+        row.enableFlag = newVal === '1' ? '0' : '1'
+        this.getList()
+      })
+    },
   },
 }
+
 </script>

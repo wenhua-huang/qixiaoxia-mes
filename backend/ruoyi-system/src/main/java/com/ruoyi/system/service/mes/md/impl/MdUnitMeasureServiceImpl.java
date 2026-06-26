@@ -57,9 +57,7 @@ public class MdUnitMeasureServiceImpl implements IMdUnitMeasureService
     {
         mdUnitMeasure.setCreateTime(DateUtils.getNowDate());
         return mdUnitMeasureMapper.insertMdUnitMeasure(mdUnitMeasure);
-    }
-
-    @Override
+    }    @Override
     public int updateMdUnitMeasure(MdUnitMeasure mdUnitMeasure)
     {
         mdUnitMeasure.setUpdateTime(DateUtils.getNowDate());

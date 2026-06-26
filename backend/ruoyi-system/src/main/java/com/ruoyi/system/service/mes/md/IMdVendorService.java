@@ -15,8 +15,7 @@ public interface IMdVendorService
     public boolean checkVendorCodeUnique(MdVendor mdVendor);
     public List<MdVendor> selectMdVendorList(MdVendor mdVendor);
     public List<MdVendor> selectMdVendorAllEnabled();
-    public int insertMdVendor(MdVendor mdVendor);
-    public int updateMdVendor(MdVendor mdVendor);
+        public int insertMdVendor(MdVendor mdVendor);    public int updateMdVendor(MdVendor mdVendor);
     public int deleteMdVendorByVendorIds(Long[] vendorIds);
     public int deleteMdVendorByVendorId(Long vendorId);
 }

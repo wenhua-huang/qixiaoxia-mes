@@ -16,8 +16,7 @@ public interface IMdWorkshopService
     public MdWorkshop selectMdWorkshopById(Long workshopId);
 
     public boolean checkWorkshopCodeUnique(MdWorkshop mdWorkshop);
-
-    public int insertMdWorkshop(MdWorkshop mdWorkshop);
+        public int insertMdWorkshop(MdWorkshop mdWorkshop);
 
     public int updateMdWorkshop(MdWorkshop mdWorkshop);
 

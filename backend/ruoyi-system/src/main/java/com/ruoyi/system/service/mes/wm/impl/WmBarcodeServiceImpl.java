@@ -35,9 +35,7 @@ public class WmBarcodeServiceImpl implements IWmBarcodeService
     public int insertWmBarcode(WmBarcode entity) {
         entity.setCreateTime(DateUtils.getNowDate());
         return wmBarcodeMapper.insertWmBarcode(entity);
-    }
-
-    @Override
+    }    @Override
     @Transactional
     public int updateWmBarcode(WmBarcode entity) {
         entity.setUpdateTime(DateUtils.getNowDate());

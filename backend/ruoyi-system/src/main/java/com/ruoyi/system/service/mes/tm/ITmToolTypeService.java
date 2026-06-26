@@ -40,8 +40,7 @@ public interface ITmToolTypeService
      * @param tmToolType 工装夹具类型
      * @return 结果
      */
-    public int insertTmToolType(TmToolType tmToolType);
-
+        public int insertTmToolType(TmToolType tmToolType);
     /**
      * 修改工装夹具类型
      * 

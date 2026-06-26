@@ -161,9 +161,7 @@ public class DvMachineryTypeServiceImpl implements IDvMachineryTypeService
     {
         dvMachineryType.setCreateTime(DateUtils.getNowDate());
         return dvMachineryTypeMapper.insertDvMachineryType(dvMachineryType);
-    }
-
-    @Override
+    }    @Override
     public int updateDvMachineryType(DvMachineryType dvMachineryType)
     {
         dvMachineryType.setUpdateTime(DateUtils.getNowDate());

@@ -15,8 +15,7 @@ public interface IMdClientService
     public boolean checkClientCodeUnique(MdClient mdClient);
     public List<MdClient> selectMdClientList(MdClient mdClient);
     public List<MdClient> selectMdClientAllEnabled();
-    public int insertMdClient(MdClient mdClient);
-    public int updateMdClient(MdClient mdClient);
+        public int insertMdClient(MdClient mdClient);    public int updateMdClient(MdClient mdClient);
     public int deleteMdClientByClientIds(Long[] clientIds);
     public int deleteMdClientByClientId(Long clientId);
 }

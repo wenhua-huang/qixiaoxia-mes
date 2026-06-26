@@ -51,9 +51,7 @@ public class SysAutoCodeRuleServiceImpl implements ISysAutoCodeRuleService
     public int insertSysAutoCodeRule(SysAutoCodeRule sysAutoCodeRule) {
         sysAutoCodeRule.setCreateTime(DateUtils.getNowDate());
         return sysAutoCodeRuleMapper.insertSysAutoCodeRule(sysAutoCodeRule);
-    }
-
-    @Override
+    }    @Override
     public int updateSysAutoCodeRule(SysAutoCodeRule sysAutoCodeRule) {
         sysAutoCodeRule.setUpdateTime(DateUtils.getNowDate());
         return sysAutoCodeRuleMapper.updateSysAutoCodeRule(sysAutoCodeRule);

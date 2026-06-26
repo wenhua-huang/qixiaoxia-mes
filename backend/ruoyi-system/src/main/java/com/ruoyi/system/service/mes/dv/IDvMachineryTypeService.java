@@ -33,8 +33,7 @@ public interface IDvMachineryTypeService
     /** 查询指定节点及所有子孙节点ID（MySQL 8.0 递归CTE） */
     public List<Long> selectDescendantIds(Long machineryTypeId);
 
-    public int insertDvMachineryType(DvMachineryType dvMachineryType);
-
+        public int insertDvMachineryType(DvMachineryType dvMachineryType);
     public int updateDvMachineryType(DvMachineryType dvMachineryType);
 
     public int deleteDvMachineryTypeById(Long machineryTypeId);

@@ -45,12 +45,12 @@
           <span>{{ scope.row.isPadded === '1' ? '是' : '否' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="是否启用" align="center" prop="enableFlag" width="80">
+      <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
+      <el-table-column label="启用" align="center" width="70">
         <template #default="scope">
-          <span>{{ scope.row.enableFlag === '1' ? '启用' : '停用' }}</span>
+          <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
         </template>
       </el-table-column>
-      <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
       <el-table-column label="操作" align="center" width="250" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click.stop="handleUpdate(scope.row)" v-hasPermi="['mes:sys:autocoderule:edit']">修改</el-button>
@@ -334,6 +334,17 @@ function submitForm() {
     }
   })
 }
+function handleEnableChange(row: any) {
+  const newVal = row.enableFlag
+  const text = newVal === '1' ? '启用' : '停用'
+  proxy.$modal.confirm('确认要' + text + '"' + row.ruleName + '"吗？').then(() => {
+    updateAutoCodeRule({ ruleId: row.ruleId, enableFlag: newVal } as any).then(() => proxy.$modal.msgSuccess(text + '成功'))
+  }).catch(() => {
+    row.enableFlag = newVal === '1' ? '0' : '1'
+    getList()
+  })
+}
+
 function handleDelete(row?: SysAutoCodeRule) {
   const ruleIds = row?.ruleId || ids.value
   proxy.$modal.confirm('是否确认删除该编码规则？').then(function () { return delAutoCodeRule(ruleIds) }).then(() => { getList(); proxy.$modal.msgSuccess('删除成功') }).catch(() => {})

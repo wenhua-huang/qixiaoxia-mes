@@ -50,9 +50,7 @@ public class ProProcessServiceImpl implements IProProcessService
         proProcess.setCreateTime(DateUtils.getNowDate());
         proProcess.setCreateBy(SecurityUtils.getUsername());
         return qxxProProcessMapper.insertProProcess(proProcess);
-    }
-
-    @Override
+    }    @Override
     public int updateProProcess(ProProcess proProcess)
     {
         proProcess.setUpdateTime(DateUtils.getNowDate());

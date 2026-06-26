@@ -35,9 +35,7 @@ public class WmStorageAreaServiceImpl implements IWmStorageAreaService
     public int insertWmStorageArea(WmStorageArea entity) {
         entity.setCreateTime(DateUtils.getNowDate());
         return wmStorageAreaMapper.insertWmStorageArea(entity);
-    }
-
-    @Override
+    }    @Override
     @Transactional
     public int updateWmStorageArea(WmStorageArea entity) {
         entity.setUpdateTime(DateUtils.getNowDate());

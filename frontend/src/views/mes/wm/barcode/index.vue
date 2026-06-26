@@ -32,6 +32,11 @@
       <el-table-column label="物料名称" align="center" prop="itemName" width="180" :show-overflow-tooltip="true" />
       <el-table-column label="生产工单编码" align="center" prop="workorderCode" width="180" :show-overflow-tooltip="true" />
       <el-table-column label="批次号" align="center" prop="batchCode" width="180" :show-overflow-tooltip="true" />
+      <el-table-column label="启用" align="center" width="70">
+        <template #default="scope">
+          <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
+        </template>
+      </el-table-column>
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="160">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:barcode:edit']">修改</el-button>
@@ -151,6 +156,17 @@ function submitForm() {
     }
   })
 }
+function handleEnableChange(row: any) {
+  const newVal = row.enableFlag
+  const text = newVal === '1' ? '启用' : '停用'
+  proxy.$modal.confirm(`确认要${text}"${row.barcodeCode}"吗？`).then(() => {
+    updateWmBarcode({ barcodeId: row.barcodeId, enableFlag: newVal } as any).then(() => proxy.$modal.msgSuccess(`${text}成功`))
+  }).catch(() => {
+    row.enableFlag = newVal === '1' ? '0' : '1'
+    getList()
+  })
+}
+
 function handleDelete(row?: WmBarcode) {
   const _ids = row?.barcodeId ? [row.barcodeId] : ids.value
   proxy.$modal.confirm('是否确认删除？').then(() => delWmBarcode(_ids)).then(() => { getList(); proxy.$modal.msgSuccess('删除成功') })

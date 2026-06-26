@@ -17,8 +17,7 @@ public interface IProProcessService
 
     public List<ProProcess> selectProProcessAll();
 
-    public int insertProProcess(ProProcess proProcess);
-
+        public int insertProProcess(ProProcess proProcess);
     public int updateProProcess(ProProcess proProcess);
 
     public int deleteProProcessByProcessIds(Long[] processIds);

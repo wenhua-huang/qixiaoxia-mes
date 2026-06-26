@@ -15,8 +15,7 @@ public interface ISysAutoCodeRuleService
     public SysAutoCodeRule selectSysAutoCodeRuleByRuleCode(String ruleCode);
     public boolean checkRuleCodeUnique(SysAutoCodeRule sysAutoCodeRule);
     public List<SysAutoCodeRule> selectSysAutoCodeRuleList(SysAutoCodeRule sysAutoCodeRule);
-    public int insertSysAutoCodeRule(SysAutoCodeRule sysAutoCodeRule);
-    public int updateSysAutoCodeRule(SysAutoCodeRule sysAutoCodeRule);
+        public int insertSysAutoCodeRule(SysAutoCodeRule sysAutoCodeRule);    public int updateSysAutoCodeRule(SysAutoCodeRule sysAutoCodeRule);
     public int deleteSysAutoCodeRuleByRuleIds(Long[] ruleIds);
     public int deleteSysAutoCodeRuleByRuleId(Long ruleId);
 }

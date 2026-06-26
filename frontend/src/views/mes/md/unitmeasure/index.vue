@@ -74,12 +74,12 @@
         </template>
       </el-table-column>
       <el-table-column label="换算率" align="center" prop="conversionRate" />
-      <el-table-column label="是否启用" align="center" prop="enableFlag">
+      <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
+      <el-table-column label="启用" align="center" width="70">
         <template #default="scope">
-          <dict-tag :options="sys_yes_no" :value="scope.row.enableFlag" />
+          <el-switch v-model="scope.row.enableFlag" active-value="Y" inactive-value="N" @change="handleEnableChange(scope.row)" />
         </template>
       </el-table-column>
-      <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
       <el-table-column label="操作" align="center" width="150" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:md:unitmeasure:edit']">修改</el-button>
@@ -288,6 +288,17 @@ function submitForm() {
 }
 
 /** 删除按钮操作 */
+function handleEnableChange(row: any) {
+  const newVal = row.enableFlag
+  const text = newVal === 'Y' ? '启用' : '停用'
+  proxy.$modal.confirm(`确认要${text}"${row.unitName}"吗？`).then(() => {
+    updateUnitmeasure({ unitId: row.unitId, enableFlag: newVal } as any).then(() => proxy.$modal.msgSuccess(`${text}成功`))
+  }).catch(() => {
+    row.enableFlag = newVal === 'Y' ? 'N' : 'Y'
+    getList()
+  })
+}
+
 function handleDelete(row?: MdUnitMeasure) {
   const unitIds = row?.unitId || ids.value
   proxy.$modal.confirm('是否确认删除单位编号为"' + unitIds + '"的数据项？').then(function () {

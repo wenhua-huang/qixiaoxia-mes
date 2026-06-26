@@ -35,9 +35,7 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService
     public int insertWmWarehouse(WmWarehouse entity) {
         entity.setCreateTime(DateUtils.getNowDate());
         return wmWarehouseMapper.insertWmWarehouse(entity);
-    }
-
-    @Override
+    }    @Override
     @Transactional
     public int updateWmWarehouse(WmWarehouse entity) {
         entity.setUpdateTime(DateUtils.getNowDate());

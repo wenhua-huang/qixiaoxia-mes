@@ -186,6 +186,7 @@ function submitForm() {
     }
   })
 }
+
 function handleDelete(row?: WmWarehouse) {
   const _ids = row?.warehouseId ? [row.warehouseId] : ids.value
   proxy.$modal.confirm('是否确认删除？').then(() => delWmWarehouse(_ids)).then(() => { getList(); proxy.$modal.msgSuccess('删除成功') })

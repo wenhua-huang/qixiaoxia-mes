@@ -8,8 +8,7 @@ public interface IWmWarehouseService
     public List<WmWarehouse> selectWmWarehouseList(WmWarehouse entity);
     public List<WmWarehouse> selectWmWarehouseAll();
     public WmWarehouse selectWmWarehouseByWarehouseId(Long warehouseId);
-    public int insertWmWarehouse(WmWarehouse entity);
-    public int updateWmWarehouse(WmWarehouse entity);
+        public int insertWmWarehouse(WmWarehouse entity);    public int updateWmWarehouse(WmWarehouse entity);
     public int deleteWmWarehouseByWarehouseId(Long warehouseId);
     public int deleteWmWarehouseByWarehouseIds(Long[] warehouseIds);
 }

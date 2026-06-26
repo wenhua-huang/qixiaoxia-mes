@@ -15,8 +15,7 @@ public interface IMdUnitMeasureService
     public boolean checkUnitCodeUnique(MdUnitMeasure mdUnitMeasure);
     public List<MdUnitMeasure> selectMdUnitMeasureList(MdUnitMeasure mdUnitMeasure);
     public MdUnitMeasure selectMdUnitMeasureByCode(String unitCode);
-    public int insertMdUnitMeasure(MdUnitMeasure mdUnitMeasure);
-    public int updateMdUnitMeasure(MdUnitMeasure mdUnitMeasure);
+        public int insertMdUnitMeasure(MdUnitMeasure mdUnitMeasure);    public int updateMdUnitMeasure(MdUnitMeasure mdUnitMeasure);
     public int deleteMdUnitMeasureByUnitIds(Long[] unitIds);
     public int deleteMdUnitMeasureByUnitId(Long unitId);
 }

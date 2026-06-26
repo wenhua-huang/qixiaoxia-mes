@@ -77,8 +77,7 @@ public class TmToolTypeServiceImpl implements ITmToolTypeService
      * 
      * @param tmToolType 工装夹具类型
      * @return 结果
-     */
-    @Override
+     */    @Override
     public int updateTmToolType(TmToolType tmToolType)
     {
         tmToolType.setUpdateTime(DateUtils.getNowDate());

@@ -38,7 +38,9 @@ public class ProProcessServiceImpl implements IProProcessService
     @Override
     public List<ProProcess> selectProProcessAll()
     {
-        return qxxProProcessMapper.selectProProcessList(new ProProcess());
+        ProProcess cond = new ProProcess();
+        cond.setEnableFlag("1");
+        return qxxProProcessMapper.selectProProcessList(cond);
     }
 
     @Override

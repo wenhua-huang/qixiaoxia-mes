@@ -49,7 +49,6 @@
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:dv:machinerytype:edit']">修改</el-button>
           <el-button link type="primary" icon="Plus" @click="handleAdd(scope.row)" v-hasPermi="['mes:dv:machinerytype:add']">新增</el-button>
-          <el-button v-if="scope.row.parentTypeId != 0" link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:dv:machinerytype:remove']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>

@@ -55,7 +55,7 @@
         <el-button type="success" plain icon="Edit" :disabled="single" @click="handleUpdate" v-hasPermi="['mes:tm:tool:edit']">修改</el-button>
       </el-col>
       <el-col :span="1.5">
-        <el-button type="danger" plain icon="Delete" :disabled="multiple" @click="handleDelete" v-hasPermi="['mes:tm:tool:remove']">删除</el-button>
+        <!-- 删除按钮已移除：用启停用(enableFlag)替代物理删除 -->
       </el-col>
       <el-col :span="1.5">
         <el-button type="warning" plain icon="Download" @click="handleExport" v-hasPermi="['mes:tm:tool:export']">导出</el-button>
@@ -95,7 +95,6 @@
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="150">
         <template #default="scope">
           <el-tooltip content="修改" placement="top"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:tm:tool:edit']"></el-button></el-tooltip>
-          <el-tooltip content="删除" placement="top"><el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:tm:tool:remove']"></el-button></el-tooltip>
         </template>
       </el-table-column>
     </el-table>

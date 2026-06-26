@@ -50,7 +50,7 @@ const selectedId = ref<number>()
 const selectedRow = ref<WmWarehouse>()
 const list = ref<WmWarehouse[]>([])
 
-const data = reactive({ queryParams: { pageNum: 1, pageSize: 10 } as any })
+const data = reactive({ queryParams: { pageNum: 1, pageSize: 10, enableFlag: '1' } as any })
 const { queryParams } = toRefs(data)
 
 function getList() {

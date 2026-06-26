@@ -9,7 +9,7 @@
     <el-row :gutter="10" class="mb8">
       <el-col :span="1.5"><el-button type="primary" plain icon="Plus" @click="handleAdd" v-hasPermi="['mes:md:client:add']">新增</el-button></el-col>
       <el-col :span="1.5"><el-button type="success" plain icon="Edit" :disabled="single" @click="handleUpdate()" v-hasPermi="['mes:md:client:edit']">修改</el-button></el-col>
-      <el-col :span="1.5"><el-button type="danger" plain icon="Delete" :disabled="multiple" @click="handleDelete()" v-hasPermi="['mes:md:client:remove']">删除</el-button></el-col>
+      <!-- 删除按钮已移除：用启停用(enableFlag)替代物理删除 -->
       <el-col :span="1.5"><el-button type="warning" plain icon="Download" @click="handleExport" v-hasPermi="['mes:md:client:export']">导出</el-button></el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList" />
     </el-row>
@@ -24,7 +24,7 @@
       <el-table-column label="业务员" align="center" prop="salesperson" width="80" />
       <el-table-column label="联系人" align="center" prop="contact1" />
       <el-table-column label="联系电话" align="center" prop="contact1Tel" />
-      <el-table-column label="操作" align="center" width="150"><template #default="s"><el-button link type="primary" icon="Edit" @click="handleUpdate(s.row)" v-hasPermi="['mes:md:client:edit']">修改</el-button><el-button link type="primary" icon="Delete" @click="handleDelete(s.row)" v-hasPermi="['mes:md:client:remove']">删除</el-button></template></el-table-column>
+      <el-table-column label="操作" align="center" width="150"><template #default="s"><el-button link type="primary" icon="Edit" @click="handleUpdate(s.row)" v-hasPermi="['mes:md:client:edit']">修改</el-button></template></el-table-column>
     </el-table>
     <pagination v-show="total>0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
     <el-dialog :title="title" v-model="open" width="750px" append-to-body>

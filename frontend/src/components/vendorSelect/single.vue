@@ -54,7 +54,7 @@ const selectedRow = ref<MdVendor>()
 const vendorList = ref<MdVendor[]>([])
 
 const data = reactive({
-  queryParams: { pageNum: 1, pageSize: 10 } as any
+  queryParams: { pageNum: 1, pageSize: 10, enableFlag: '1' } as any
 })
 const { queryParams } = toRefs(data)
 

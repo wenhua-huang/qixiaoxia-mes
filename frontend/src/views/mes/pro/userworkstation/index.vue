@@ -28,7 +28,7 @@
         <el-button type="success" plain icon="Edit" size="small" :disabled="single" @click="handleUpdate()" v-hasPermi="['mes:pro:userworkstation:edit']">修改</el-button>
       </el-col>
       <el-col :span="1.5">
-        <el-button type="danger" plain icon="Delete" size="small" :disabled="multiple" @click="handleDelete()" v-hasPermi="['mes:pro:userworkstation:remove']">删除</el-button>
+        <!-- 删除按钮已移除：用启停用(enableFlag)替代物理删除 -->
       </el-col>
       <el-col :span="1.5">
         <el-button type="warning" plain icon="Download" size="small" @click="handleExport" v-hasPermi="['mes:pro:userworkstation:export']">导出</el-button>
@@ -61,7 +61,6 @@
         <template #default="scope">
           <el-button link type="primary" icon="View" size="small" @click="handleView(scope.row)" v-hasPermi="['mes:pro:userworkstation:query']">查看</el-button>
           <el-button link type="primary" icon="Edit" size="small" @click="handleUpdate(scope.row)" v-hasPermi="['mes:pro:userworkstation:edit']">修改</el-button>
-          <el-button link type="primary" icon="Delete" size="small" @click="handleDelete(scope.row)" v-hasPermi="['mes:pro:userworkstation:remove']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>

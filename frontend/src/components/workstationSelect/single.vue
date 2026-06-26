@@ -74,6 +74,7 @@ const workshopOptions = ref<any[]>([])
 const queryParams = reactive<Record<string, any>>({
   pageNum: 1,
   pageSize: 10,
+  enableFlag: '1',
   processId: undefined,
   workshopId: undefined
 })

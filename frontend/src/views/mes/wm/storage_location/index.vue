@@ -19,7 +19,7 @@
     <el-row :gutter="10" class="mb8">
       <el-col :span="1.5"><el-button type="primary" plain icon="Plus" size="small" @click="handleAdd" v-hasPermi="['mes:wm:location:add']">新增</el-button></el-col>
       <el-col :span="1.5"><el-button type="success" plain icon="Edit" size="small" :disabled="single" @click="handleUpdate()" v-hasPermi="['mes:wm:location:edit']">修改</el-button></el-col>
-      <el-col :span="1.5"><el-button type="danger" plain icon="Delete" size="small" :disabled="multiple" @click="handleDelete()" v-hasPermi="['mes:wm:location:remove']">删除</el-button></el-col>
+      <!-- 删除按钮已移除：用启停用(enableFlag)替代物理删除 -->
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList" />
     </el-row>
 
@@ -39,7 +39,6 @@
         <template #default="scope">
           <el-button link type="primary" size="small" @click="handleArea(scope.row.locationId)" v-hasPermi="['mes:wm:area:list']">库位</el-button>
           <el-button link type="primary" size="small" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:location:edit']">修改</el-button>
-          <el-button link type="primary" size="small" @click="handleDelete(scope.row)" v-hasPermi="['mes:wm:location:remove']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>

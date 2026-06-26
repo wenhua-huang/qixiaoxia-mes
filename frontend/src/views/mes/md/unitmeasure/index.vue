@@ -51,16 +51,7 @@
           v-hasPermi="['mes:md:unitmeasure:edit']"
         >修改</el-button>
       </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="danger"
-          plain
-          icon="Delete"
-          :disabled="multiple"
-          @click="handleDelete()"
-          v-hasPermi="['mes:md:unitmeasure:remove']"
-        >删除</el-button>
-      </el-col>
+      <!-- 删除按钮已移除：用启停用(enableFlag)替代物理删除 -->
       <el-col :span="1.5">
         <el-button
           type="warning"
@@ -92,7 +83,6 @@
       <el-table-column label="操作" align="center" width="150" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:md:unitmeasure:edit']">修改</el-button>
-          <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:md:unitmeasure:remove']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>

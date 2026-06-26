@@ -37,7 +37,7 @@
         <el-row :gutter="10" class="mb8">
           <el-col :span="1.5"><el-button type="primary" plain icon="Plus" @click="handleAdd" v-hasPermi="['mes:md:item:add']">新增</el-button></el-col>
           <el-col :span="1.5"><el-button type="success" plain icon="Edit" :disabled="single" @click="handleUpdate()" v-hasPermi="['mes:md:item:edit']">修改</el-button></el-col>
-          <el-col :span="1.5"><el-button type="danger" plain icon="Delete" :disabled="multiple" @click="handleDelete()" v-hasPermi="['mes:md:item:remove']">删除</el-button></el-col>
+          <!-- 删除按钮已移除：用启停用(enableFlag)替代物理删除 -->
           <el-col :span="1.5"><el-button type="warning" plain icon="Download" @click="handleExport" v-hasPermi="['mes:md:item:export']">导出</el-button></el-col>
           <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
         </el-row>
@@ -60,7 +60,6 @@
           <el-table-column label="操作" align="center" width="80" class-name="small-padding fixed-width">
             <template #default="scope">
               <el-tooltip content="修改" placement="top"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:md:item:edit']"></el-button></el-tooltip>
-              <el-tooltip content="删除" placement="top"><el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:md:item:remove']"></el-button></el-tooltip>
             </template>
           </el-table-column>
         </el-table>

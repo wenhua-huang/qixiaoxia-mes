@@ -27,7 +27,7 @@
         <el-button type="success" plain icon="Edit" :disabled="single" @click="handleUpdate()" v-hasPermi="['mes:sys:autocoderule:edit']">修改</el-button>
       </el-col>
       <el-col :span="1.5">
-        <el-button type="danger" plain icon="Delete" :disabled="multiple" @click="handleDelete()" v-hasPermi="['mes:sys:autocoderule:remove']">删除</el-button>
+        <!-- 删除按钮已移除：用启停用(enableFlag)替代物理删除 -->
       </el-col>
       <el-col :span="1.5">
         <el-button type="warning" plain icon="Download" @click="handleExport" v-hasPermi="['mes:sys:autocoderule:export']">导出</el-button>
@@ -55,7 +55,6 @@
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click.stop="handleUpdate(scope.row)" v-hasPermi="['mes:sys:autocoderule:edit']">修改</el-button>
           <el-button link type="primary" icon="View" @click.stop="showGenDialog(scope.row)">生成编码</el-button>
-          <el-button link type="primary" icon="Delete" @click.stop="handleDelete(scope.row)" v-hasPermi="['mes:sys:autocoderule:remove']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>

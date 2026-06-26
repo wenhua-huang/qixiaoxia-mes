@@ -9,7 +9,7 @@
     <el-row :gutter="10" class="mb8">
       <el-col :span="1.5"><el-button type="primary" plain icon="Plus" @click="handleAdd" v-hasPermi="['mes:md:workstation:add']">新增</el-button></el-col>
       <el-col :span="1.5"><el-button type="success" plain icon="Edit" :disabled="single" @click="handleUpdate()" v-hasPermi="['mes:md:workstation:edit']">修改</el-button></el-col>
-      <el-col :span="1.5"><el-button type="danger" plain icon="Delete" :disabled="multiple" @click="handleDelete()" v-hasPermi="['mes:md:workstation:remove']">删除</el-button></el-col>
+      <!-- 删除按钮已移除：用启停用(enableFlag)替代物理删除 -->
       <el-col :span="1.5"><el-button type="warning" plain icon="Download" @click="handleExport" v-hasPermi="['mes:md:workstation:export']">导出</el-button></el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList" />
     </el-row>
@@ -24,7 +24,7 @@
       <el-table-column label="产能(个/时)" align="center" prop="capacity" />
       <el-table-column label="状态" align="center" prop="status"><template #default="s"><dict-tag :options="mes_workstation_status" :value="s.row.status" /></template></el-table-column>
       <el-table-column label="启用" align="center" prop="enableFlag"><template #default="s"><dict-tag :options="sys_yes_no" :value="s.row.enableFlag" /></template></el-table-column>
-      <el-table-column label="操作" align="center" width="150"><template #default="s"><el-button link type="primary" icon="Edit" @click="handleUpdate(s.row)" v-hasPermi="['mes:md:workstation:edit']">修改</el-button><el-button link type="primary" icon="Delete" @click="handleDelete(s.row)" v-hasPermi="['mes:md:workstation:remove']">删除</el-button></template></el-table-column>
+      <el-table-column label="操作" align="center" width="150"><template #default="s"><el-button link type="primary" icon="Edit" @click="handleUpdate(s.row)" v-hasPermi="['mes:md:workstation:edit']">修改</el-button></template></el-table-column>
     </el-table>
     <pagination v-show="total>0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
     <el-dialog :title="title" v-model="open" width="750px" append-to-body>

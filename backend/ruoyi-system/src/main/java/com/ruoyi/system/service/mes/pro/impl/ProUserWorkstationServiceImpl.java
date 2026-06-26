@@ -29,7 +29,7 @@ public class ProUserWorkstationServiceImpl implements IProUserWorkstationService
     public List<ProUserWorkstation> selectProUserWorkstationList(ProUserWorkstation e) { return proUserWorkstationMapper.selectProUserWorkstationList(e); }
 
     @Override
-    public List<ProUserWorkstation> selectAll() { return proUserWorkstationMapper.selectProUserWorkstationList(new ProUserWorkstation()); }
+    public List<ProUserWorkstation> selectAll() { ProUserWorkstation cond = new ProUserWorkstation(); cond.setEnableFlag("1"); return proUserWorkstationMapper.selectProUserWorkstationList(cond); }
 
     @Override
     @Transactional

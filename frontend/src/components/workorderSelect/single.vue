@@ -69,7 +69,7 @@ const statusMap: Record<string,string> = { PREPARE:'待生产', PRODUCING:'生�
 const statusColor: Record<string,string> = { PREPARE:'#E6A23C', PRODUCING:'#409EFF', COMPLETED:'#67C23A', CANCEL:'#909399', CLOSED:'#909399' }
 
 const data = reactive({
-  queryParams: { pageNum: 1, pageSize: 10 } as any
+  queryParams: { pageNum: 1, pageSize: 10, enableFlag: '1' } as any
 })
 const { queryParams } = toRefs(data)
 

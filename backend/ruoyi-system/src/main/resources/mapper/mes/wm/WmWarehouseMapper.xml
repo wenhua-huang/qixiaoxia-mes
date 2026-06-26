@@ -41,6 +41,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectWmWarehouseAll" resultMap="WmWarehouseResult">
         <include refid="selectWmWarehouseVo"/>
+        where enable_flag = '1'
     </select>
 
     <select id="selectWmWarehouseByWarehouseId" parameterType="Long" resultMap="WmWarehouseResult">

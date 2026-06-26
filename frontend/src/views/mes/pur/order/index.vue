@@ -182,10 +182,10 @@
         <el-row>
           <el-col :span="8">
             <el-form-item label="订单编码" prop="orderCode">
-              <el-input v-model="form.orderCode" placeholder="PO20260614001" :disabled="autoGenFlag" />
+              <el-input v-model="form.orderCode" placeholder="PO20260614001" :disabled="optType === 'edit' || optType === 'view' || autoGenFlag" />
             </el-form-item>
           </el-col>
-          <el-col :span="6" v-if="!form.orderId">
+          <el-col :span="6" v-if="optType === 'add'">
             <el-form-item>
               <el-switch v-model="autoGenFlag" active-color="#13ce66" size="small" @change="handleAutoGenChange" />
               <span style="margin-left:6px;font-size:12px;color:#13ce66">自动生成</span>
@@ -334,6 +334,7 @@ export default {
       autoGenFlag: true,
       orderDateRange: null,
       expectedDateRange: null,
+      optType: undefined,
       // 表单校验
       rules: {        orderCode: [
         ],
@@ -385,6 +386,7 @@ export default {
         updateBy: null,
         updateTime: null
       }
+      this.optType = undefined
       this.resetForm("form")
     },
     /** 搜索按钮操作 */
@@ -431,6 +433,7 @@ export default {
     },
     handleAdd() {
       this.reset()
+      this.optType = 'add'
       this.autoGenFlag = true
       // 确保日期为字符串（防止 data()/el-date-picker 序列化异常）
       const today = new Date()
@@ -446,6 +449,7 @@ export default {
     /** 修改按钮操作 */
     handleUpdate(row) {
       this.reset()
+      this.optType = 'edit'
       const orderId = row.orderId || this.ids
       getOrder(orderId).then(response => {
         this.form = response.data

@@ -51,11 +51,11 @@
         <el-row>
           <el-col :span="16">
             <el-form-item label="库区编码" prop="locationCode">
-              <el-input v-model="form.locationCode" placeholder="请输入库区编码" />
+              <el-input v-model="form.locationCode" placeholder="请输入库区编码" :disabled="optType === 'edit' || optType === 'view'" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item label-width="70" v-if="!form.locationId">
+            <el-form-item label-width="70" v-if="optType === 'add'">
               <el-switch v-model="autoGenFlag" active-color="#13ce66" @change="handleAutoGenChange" /><span style="margin-left:6px;font-size:12px;color:#13ce66">自动生成</span>
             </el-form-item>
           </el-col>
@@ -131,6 +131,7 @@ const multiple = ref(true)
 const total = ref(0)
 const title = ref('')
 const autoGenFlag = ref(false)
+const optType = ref<string | undefined>(undefined)
 
 const data = reactive({
   form: {} as WmStorageLocation,
@@ -147,7 +148,7 @@ function getList() {
   listWmStorageLocation(queryParams.value).then(r => { locationList.value = r.rows; total.value = r.total; loading.value = false })
 }
 function cancel() { open.value = false; reset() }
-function reset() { autoGenFlag.value = false; form.value = {} as WmStorageLocation; proxy.resetForm('formRef') }
+function reset() { optType.value = undefined; autoGenFlag.value = false; form.value = {} as WmStorageLocation; proxy.resetForm('formRef') }
 function handleAutoGenChange(flag: boolean) {
   if (flag) genSerialCode('LOCATION_CODE').then((r: any) => { form.value.locationCode = r.data })
   else form.value.locationCode = ''
@@ -155,9 +156,10 @@ function handleAutoGenChange(flag: boolean) {
 function handleQuery() { queryParams.value.pageNum = 1; getList() }
 function resetQuery() { proxy.resetForm('queryRef'); handleQuery() }
 function handleSelectionChange(s: any[]) { ids.value = s.map(i => i.locationId); single.value = s.length !== 1; multiple.value = !s.length }
-function handleAdd() { reset(); open.value = true; title.value = '新增库区' }
+function handleAdd() { reset(); optType.value = 'add'; open.value = true; title.value = '新增库区' }
 function handleUpdate(row?: WmStorageLocation) {
   reset()
+  optType.value = 'edit'
   const id = row?.locationId || ids.value[0]
   getWmStorageLocation(id).then(r => { form.value = r.data; open.value = true; title.value = '修改库区' })
 }

@@ -46,9 +46,9 @@
     <el-dialog :title="title" v-model="open" width="800px" append-to-body>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
         <el-row>
-          <el-col :span="12"><el-form-item label="供应商编码" prop="vendorCode"><el-input v-model="form.vendorCode" placeholder="自动生成或手动输入" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="供应商编码" prop="vendorCode"><el-input v-model="form.vendorCode" placeholder="自动生成或手动输入" :disabled="optType === 'edit' || optType === 'view'" /></el-form-item></el-col>
           <el-col :span="12">
-            <el-form-item label-width="70" v-if="!form.vendorId">
+            <el-form-item label-width="70" v-if="optType === 'add'">
               <el-switch v-model="autoGenFlag" active-color="#13ce66" size="small" @change="handleAutoGenChange" /><span style="margin-left:6px;font-size:12px;color:#13ce66">自动生成</span>
             </el-form-item>
           </el-col>
@@ -149,6 +149,7 @@ const { mes_vendor_type, mes_settlement_type, mes_coop_status } = useDict('mes_v
 const vendorList = ref<MdVendor[]>([]); const open = ref(false); const loading = ref(true); const showSearch = ref(true)
 const ids = ref<number[]>([]); const single = ref(true); const multiple = ref(true); const total = ref(0); const title = ref('')
 const autoGenFlag = ref(false)
+const optType = ref<string | undefined>(undefined)
 const factoryOptions = ref<any[]>([])
 
 const data = reactive({
@@ -164,12 +165,12 @@ function handleAutoGenChange(flag: boolean) {
   if (flag) genSerialCode('VENDOR_CODE').then((r: any) => { form.value.vendorCode = r.data })
   else form.value.vendorCode = ''
 }
-function reset() { autoGenFlag.value = false; form.value = { enableFlag: '1', coopStatus: 'ACTIVE', vendorType: 'MATERIAL', vendorLevel: 'C' } as MdVendor; proxy.resetForm('formRef') }
+function reset() { optType.value = undefined; autoGenFlag.value = false; form.value = { enableFlag: '1', coopStatus: 'ACTIVE', vendorType: 'MATERIAL', vendorLevel: 'C' } as MdVendor; proxy.resetForm('formRef') }
 function handleQuery() { queryParams.value.pageNum = 1; getList() }
 function resetQuery() { proxy.resetForm('queryRef'); handleQuery() }
 function handleSelectionChange(s: MdVendor[]) { ids.value = s.map(i => i.vendorId!); single.value = s.length !== 1; multiple.value = !s.length }
-function handleAdd() { reset(); listAllFactory().then(r => { factoryOptions.value = r.data || [] }); open.value = true; title.value = '新增供应商' }
-function handleUpdate(row?: MdVendor) { reset(); listAllFactory().then(r => { factoryOptions.value = r.data || [] }); const id = row?.vendorId || ids.value[0]; getVendor(id).then(r => { form.value = r.data; open.value = true; title.value = '修改供应商' }) }
+function handleAdd() { reset(); optType.value = 'add'; listAllFactory().then(r => { factoryOptions.value = r.data || [] }); open.value = true; title.value = '新增供应商' }
+function handleUpdate(row?: MdVendor) { reset(); optType.value = 'edit'; listAllFactory().then(r => { factoryOptions.value = r.data || [] }); const id = row?.vendorId || ids.value[0]; getVendor(id).then(r => { form.value = r.data; open.value = true; title.value = '修改供应商' }) }
 function submitForm() { proxy.$refs['formRef'].validate((v: boolean) => { if (v) { (form.value.vendorId ? updateVendor(form.value) : addVendor(form.value)).then(() => { proxy.$modal.msgSuccess('操作成功'); open.value = false; getList() }) } }) }
 function handleDelete(row?: MdVendor) { const ids_ = row?.vendorId || ids.value; proxy.$modal.confirm('确认删除？').then(() => delVendor(ids_)).then(() => { getList(); proxy.$modal.msgSuccess('删除成功') }).catch(() => {}) }
 function handleExport() { proxy.download('mes/md/vendor/export', { ...queryParams.value }, `vendor_${Date.now()}.xlsx`) }

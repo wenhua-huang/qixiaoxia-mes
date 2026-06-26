@@ -109,7 +109,7 @@
     <el-dialog :title="title" v-model="open" width="700px" append-to-body>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="130px">
         <el-form-item label="单位编码" prop="unitCode">
-          <el-input v-model="form.unitCode" placeholder="请输入单位编码" />
+          <el-input v-model="form.unitCode" placeholder="请输入单位编码" :disabled="optType === 'edit' || optType === 'view'" />
         </el-form-item>
         <el-form-item label="单位名称" prop="unitName">
           <el-input v-model="form.unitName" placeholder="请输入单位名称" />
@@ -168,6 +168,7 @@ const multiple = ref<boolean>(true)
 const total = ref<number>(0)
 const title = ref<string>('')
 const primaryUnitOptions = ref<MdUnitMeasure[]>([])
+const optType = ref<string | undefined>(undefined)
 
 const data = reactive({
   form: {} as MdUnitMeasure,
@@ -213,6 +214,7 @@ function cancel() {
 
 /** 表单重置 */
 function reset() {
+  optType.value = undefined
   form.value = {
     unitId: undefined,
     factoryId: undefined,
@@ -255,6 +257,7 @@ function loadPrimaryUnitOptions() {
 /** 新增按钮操作 */
 function handleAdd() {
   reset()
+  optType.value = 'add'
   loadPrimaryUnitOptions()
   open.value = true
   title.value = '添加单位'
@@ -263,6 +266,7 @@ function handleAdd() {
 /** 修改按钮操作 */
 function handleUpdate(row?: MdUnitMeasure) {
   reset()
+  optType.value = 'edit'
   loadPrimaryUnitOptions()
   const unitId = row?.unitId || ids.value[0]
   getUnitmeasure(unitId).then(response => {

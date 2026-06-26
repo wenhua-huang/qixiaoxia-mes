@@ -83,11 +83,11 @@
         <el-row>
           <el-col :span="8">
             <el-form-item label="类型编码" prop="toolTypeCode">
-              <el-input v-model="form.toolTypeCode" placeholder="请输入类型编码" :disabled="optType === 'view'" />
+              <el-input v-model="form.toolTypeCode" placeholder="请输入类型编码" :disabled="optType === 'edit' || optType === 'view'" />
             </el-form-item>
           </el-col>
           <el-col :span="4">
-            <el-switch v-model="autoGenFlag" active-color="#13ce66" active-text="自动生成" @change="handleAutoGenChange" v-if="optType !== 'view'" />
+            <el-switch v-model="autoGenFlag" active-color="#13ce66" active-text="自动生成" @change="handleAutoGenChange" v-if="optType === 'add'" />
           </el-col>
           <el-col :span="12">
             <el-form-item label="类型名称" prop="toolTypeName">

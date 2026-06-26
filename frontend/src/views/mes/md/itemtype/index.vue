@@ -70,7 +70,7 @@
         <el-row>
           <el-col :span="12">
             <el-form-item label="分类编码" prop="itemTypeCode">
-              <el-input v-model="form.itemTypeCode" placeholder="请输入分类编码" />
+              <el-input v-model="form.itemTypeCode" placeholder="请输入分类编码" :disabled="optType === 'edit' || optType === 'view'" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -138,6 +138,7 @@ const open = ref(false)
 const title = ref('')
 const isExpandAll = ref(true)
 const refreshTable = ref(true)
+const optType = ref<string | undefined>(undefined)
 
 const data = reactive({
   form: {} as MdItemType,
@@ -170,6 +171,7 @@ function toggleExpandAll() {
 function cancel() { open.value = false; reset() }
 
 function reset() {
+  optType.value = undefined
   form.value = {
     itemTypeId: undefined, parentTypeId: undefined, itemTypeCode: '',
     itemTypeName: undefined, orderNum: 1, itemOrProduct: '', enableFlag: '1'
@@ -184,6 +186,7 @@ function resetQuery() { proxy.resetForm('queryRef'); handleQuery() }
 /** 新增 — 父行自动填入 parentTypeId，itemOrProduct 从父分类继承 */
 function handleAdd(row?: MdItemType) {
   reset()
+  optType.value = 'add'
   if (row) {
     form.value.parentTypeId = row.itemTypeId
     form.value.itemOrProduct = row.itemOrProduct
@@ -196,6 +199,7 @@ function handleAdd(row?: MdItemType) {
 /** 修改 — 排除自身及子孙作为可选的父分类 */
 function handleUpdate(row: MdItemType) {
   reset()
+  optType.value = 'edit'
   getItemtype(row.itemTypeId!).then(response => {
     form.value = response.data
     open.value = true

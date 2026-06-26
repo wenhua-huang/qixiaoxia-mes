@@ -100,7 +100,7 @@
         <el-row>
           <el-col :span="12">
             <el-form-item label="设备编码" prop="machineryCode">
-              <el-input v-model="form.machineryCode" placeholder="请输入设备编码" />
+              <el-input v-model="form.machineryCode" placeholder="请输入设备编码" :disabled="optType === 'edit' || optType === 'view'" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -181,6 +181,7 @@ const multiple = ref<boolean>(true)
 const total = ref<number>(0)
 const title = ref<string>('')
 const typeFilterText = ref<string>('')
+const optType = ref<string | undefined>(undefined)
 
 const data = reactive({
   form: {} as DvMachinery,
@@ -239,6 +240,7 @@ function loadSelectOptions() {
 function cancel() { open.value = false; reset() }
 
 function reset() {
+  optType.value = undefined
   form.value = {
     machineryId: undefined, factoryId: undefined,
     machineryCode: undefined, machineryName: undefined, machineryBrand: undefined,
@@ -266,6 +268,7 @@ function handleSelectionChange(selection: DvMachinery[]) {
 
 function handleAdd() {
   reset()
+  optType.value = 'add'
   // 并行加载下拉数据，完成后再打开对话框，避免空选择器闪烁
   Promise.all([treeselect(), listAllWorkshop()]).then(([treeRes, wsRes]) => {
     typeTree.value = treeRes.data || []
@@ -277,6 +280,7 @@ function handleAdd() {
 
 function handleUpdate(row?: DvMachinery) {
   reset()
+  optType.value = 'edit'
   const machineryId = row?.machineryId || ids.value[0]
   // 并行加载下拉数据 + 设备详情，全部完成后再打开对话框
   Promise.all([

@@ -164,7 +164,7 @@
         <el-row>
           <el-col :span="8">
             <el-form-item label="计划编号" prop="planCode">
-              <el-input v-model="form.planCode" placeholder="请输入计划编号" />
+              <el-input v-model="form.planCode" placeholder="请输入计划编号" :disabled="optType === 'edit' || optType === 'view'" />
             </el-form-item>
           </el-col>
           <el-col :span="5">
@@ -174,7 +174,7 @@
                 active-color="#13ce66"
                 active-text="自动生成"
                 @change="handleAutoGenChange"
-                v-if="optType !== 'view'"
+                v-if="optType === 'add'"
               />
             </el-form-item>
           </el-col>

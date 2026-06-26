@@ -10,6 +10,11 @@ This file provides guidance to Claude Code when working with code in this reposi
 - **所有表都有 `factory_id` 字段**，外协 8 张表额外冗余 `outsource_factory_id`（vendor、workorder、task、route_process、card_process、feedback、outsource_issue、outsource_recpt）
 - **Debug：信任用户判断** — 用户指出问题方向时，先聚焦该方向直接修，修完验证。不要在用户说的方向还没查透时就去翻后端/DB/拦截器等无关代码。用户是实际操作者，判断优先级最高（详见 [[debug-rule-trust-user-judgment]]）
 
+## 🗄️ SQL 执行
+
+- 命令：`ssh qxx 'docker exec -i qxx-mysql mysql -uroot -pqxx123456 mes < xxx.sql'`
+- 只执行 SQL，不连带部署/重启等操作
+
 ## Project Overview
 
 **企小侠文化纸盒MES系统** — 三端一体 monorepo，基于若依框架：

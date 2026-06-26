@@ -30,9 +30,9 @@
     <el-dialog :title="title" v-model="open" width="750px" append-to-body>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
         <el-row>
-          <el-col :span="12"><el-form-item label="客户编码" prop="clientCode"><el-input v-model="form.clientCode" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="客户编码" prop="clientCode"><el-input v-model="form.clientCode" :disabled="optType === 'edit' || optType === 'view'" /></el-form-item></el-col>
           <el-col :span="12">
-            <el-form-item label-width="70" v-if="!form.clientId">
+            <el-form-item label-width="70" v-if="optType === 'add'">
               <el-switch v-model="autoGenFlag" active-color="#13ce66" size="small" @change="handleAutoGenChange" /><span style="margin-left:6px;font-size:12px;color:#13ce66">自动生成</span>
             </el-form-item>
           </el-col>
@@ -71,6 +71,7 @@ const { mes_client_type } = useDict('mes_client_type')
 const clientList = ref<MdClient[]>([]); const open = ref(false); const loading = ref(true); const showSearch = ref(true)
 const ids = ref<number[]>([]); const single = ref(true); const multiple = ref(true); const total = ref(0); const title = ref('')
 const autoGenFlag = ref(false)
+const optType = ref<string | undefined>(undefined)
 const data = reactive({ form: {} as MdClient, queryParams: { pageNum: 1, pageSize: 10 } as ClientQueryParams, rules: { clientCode: [{ required: true, message: '编码不能为空' }], clientName: [{ required: true, message: '名称不能为空' }] } })
 const { queryParams, form, rules } = toRefs(data)
 function getList() { loading.value = true; listClient(queryParams.value).then(r => { clientList.value = r.rows; total.value = r.total; loading.value = false }) }
@@ -79,12 +80,12 @@ function handleAutoGenChange(flag: boolean) {
   if (flag) genSerialCode('CLIENT_CODE').then((r: any) => { form.value.clientCode = r.data })
   else form.value.clientCode = ''
 }
-function reset() { autoGenFlag.value = false; form.value = { enableFlag: '1' } as MdClient; proxy.resetForm('formRef') }
+function reset() { optType.value = undefined; autoGenFlag.value = false; form.value = { enableFlag: '1' } as MdClient; proxy.resetForm('formRef') }
 function handleQuery() { queryParams.value.pageNum = 1; getList() }
 function resetQuery() { proxy.resetForm('queryRef'); handleQuery() }
 function handleSelectionChange(s: MdClient[]) { ids.value = s.map(i => i.clientId!); single.value = s.length !== 1; multiple.value = !s.length }
-function handleAdd() { reset(); open.value = true; title.value = '新增客户' }
-function handleUpdate(row?: MdClient) { reset(); const id = row?.clientId || ids.value[0]; getClient(id).then(r => { form.value = r.data; open.value = true; title.value = '修改客户' }) }
+function handleAdd() { reset(); optType.value = 'add'; open.value = true; title.value = '新增客户' }
+function handleUpdate(row?: MdClient) { reset(); optType.value = 'edit'; const id = row?.clientId || ids.value[0]; getClient(id).then(r => { form.value = r.data; open.value = true; title.value = '修改客户' }) }
 function submitForm() { proxy.$refs['formRef'].validate((v: boolean) => { if (v) { (form.value.clientId ? updateClient(form.value) : addClient(form.value)).then(() => { proxy.$modal.msgSuccess('操作成功'); open.value = false; getList() }) } }) }
 function handleDelete(row?: MdClient) { const ids_ = row?.clientId || ids.value; proxy.$modal.confirm('确认删除？').then(() => delClient(ids_)).then(() => { getList(); proxy.$modal.msgSuccess('删除成功') }).catch(() => {}) }
 function handleExport() { proxy.download('mes/md/client/export', { ...queryParams.value }, `client_${Date.now()}.xlsx`) }

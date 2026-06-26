@@ -48,7 +48,7 @@
           <el-input v-model="form.factoryId" placeholder="请输入" clearable />
         </el-form-item>
         <el-form-item label="库位编码" prop="areaCode">
-          <el-input v-model="form.areaCode" placeholder="请输入" clearable />
+          <el-input v-model="form.areaCode" placeholder="请输入" clearable :disabled="optType === 'edit' || optType === 'view'" />
         </el-form-item>
         <el-form-item label="库位名称" prop="areaName">
           <el-input v-model="form.areaName" placeholder="请输入" clearable />
@@ -57,7 +57,7 @@
           <el-input v-model="form.locationId" placeholder="请输入" clearable />
         </el-form-item>
         <el-form-item label="库区编码" prop="locationCode">
-          <el-input v-model="form.locationCode" placeholder="请输入" clearable />
+          <el-input v-model="form.locationCode" placeholder="请输入" clearable :disabled="optType === 'edit' || optType === 'view'" />
         </el-form-item>
         <el-form-item label="库区名称" prop="locationName">
           <el-input v-model="form.locationName" placeholder="请输入" clearable />
@@ -111,6 +111,7 @@ const single = ref(true)
 const multiple = ref(true)
 const total = ref(0)
 const title = ref('')
+const optType = ref<string | undefined>(undefined)
 
 const data = reactive({
   form: {} as WmStorageArea,
@@ -129,13 +130,14 @@ function getList() {
 }
 
 function cancel() { open.value = false; reset() }
-function reset() { form.value = {} as WmStorageArea; proxy.resetForm('formRef') }
+function reset() { optType.value = undefined; form.value = {} as WmStorageArea; proxy.resetForm('formRef') }
 function handleQuery() { queryParams.value.pageNum = 1; getList() }
 function resetQuery() { proxy.resetForm('queryRef'); handleQuery() }
 function handleSelectionChange(s: any[]) { ids.value = s.map(i => i.areaId); single.value = s.length !== 1; multiple.value = !s.length }
-function handleAdd() { reset(); open.value = true; title.value = '新增库位表' }
+function handleAdd() { reset(); optType.value = 'add'; open.value = true; title.value = '新增库位表' }
 function handleUpdate(row?: WmStorageArea) {
   reset()
+  optType.value = 'edit'
   const _id = row?.areaId || ids.value[0]
   getWmStorageArea(_id).then(r => { form.value = r.data; open.value = true; title.value = '修改库位表' })
 }

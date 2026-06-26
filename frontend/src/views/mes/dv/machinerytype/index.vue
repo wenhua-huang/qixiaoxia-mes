@@ -65,7 +65,7 @@
         <el-row>
           <el-col :span="12">
             <el-form-item label="类型编码" prop="machineryTypeCode">
-              <el-input v-model="form.machineryTypeCode" placeholder="请输入类型编码" />
+              <el-input v-model="form.machineryTypeCode" placeholder="请输入类型编码" :disabled="optType === 'edit' || optType === 'view'" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -119,6 +119,7 @@ const open = ref(false)
 const title = ref('')
 const isExpandAll = ref(true)
 const refreshTable = ref(true)
+const optType = ref<string | undefined>(undefined)
 
 const data = reactive({
   form: {} as DvMachineryType,
@@ -148,6 +149,7 @@ function toggleExpandAll() {
 function cancel() { open.value = false; reset() }
 
 function reset() {
+  optType.value = undefined
   form.value = {
     machineryTypeId: undefined, parentTypeId: undefined, machineryTypeCode: '',
     machineryTypeName: undefined, orderNum: 1, enableFlag: '1'
@@ -160,6 +162,7 @@ function resetQuery() { proxy.resetForm('queryRef'); handleQuery() }
 
 function handleAdd(row?: DvMachineryType) {
   reset()
+  optType.value = 'add'
   if (row) {
     form.value.parentTypeId = row.machineryTypeId
   }
@@ -170,6 +173,7 @@ function handleAdd(row?: DvMachineryType) {
 
 function handleUpdate(row: DvMachineryType) {
   reset()
+  optType.value = 'edit'
   getMachinerytype(row.machineryTypeId!).then(response => {
     form.value = response.data
     open.value = true

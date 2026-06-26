@@ -78,11 +78,11 @@
             <el-row>
               <el-col :span="16">
                 <el-form-item label="物料编码" prop="itemCode">
-                  <el-input v-model="form.itemCode" placeholder="请输入物料编码" />
+                  <el-input v-model="form.itemCode" placeholder="请输入物料编码" :disabled="optType === 'edit' || optType === 'view'" />
                 </el-form-item>
               </el-col>
               <el-col :span="8">
-                <el-form-item label-width="70" v-if="!form.itemId">
+                <el-form-item label-width="70" v-if="optType === 'add'">
                   <el-switch v-model="autoGenFlag" active-color="#13ce66" @change="handleAutoGenChange" /><span style="margin-left:6px;font-size:12px;color:#13ce66">自动生成</span>
                 </el-form-item>
               </el-col>
@@ -248,6 +248,7 @@ const multiple = ref<boolean>(true)
 const total = ref<number>(0)
 const title = ref<string>('')
 const autoGenFlag = ref(false)
+const optType = ref<string | undefined>(undefined)
 const activeTab = ref<string>('basic')
 const treeData = ref<TreeSelect[]>([])
 const itemTypeTree = ref<TreeSelect[]>([])
@@ -356,6 +357,7 @@ function handleAutoGenChange(flag: boolean) {
   }
 }
 function reset() {
+  optType.value = undefined
   autoGenFlag.value = false
   form.value = { enableFlag: '1', batchFlag: '1', safeStockFlag: '0', highValue: '0', conversionRate: 1.0, parentId: 0,
     attrPaper: {} as MdItemAttrPaper, attrPaperBag: {} as MdItemAttrPaperBag } as MdItem
@@ -369,6 +371,7 @@ function handleSelectionChange(s: MdItem[]) { ids.value = s.map(i => i.itemId!);
 
 function handleAdd() {
   reset()
+  optType.value = 'add'
   loadTree().then(() => {
     // 继承左侧栏选中分类
     if (queryParams.value.itemTypeId) {
@@ -381,6 +384,7 @@ function handleAdd() {
 
 function handleUpdate(row?: MdItem) {
   reset()
+  optType.value = 'edit'
   const itemId = row?.itemId || ids.value[0]
   // 先加载下拉数据，再加载表单数据，确保 select/tree-select 能正确回显
   loadTree().then(() => {

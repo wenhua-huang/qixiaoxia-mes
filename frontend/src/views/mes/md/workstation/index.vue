@@ -30,9 +30,9 @@
     <el-dialog :title="title" v-model="open" width="750px" append-to-body>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
         <el-row>
-          <el-col :span="12"><el-form-item label="编码" prop="workstationCode"><el-input v-model="form.workstationCode" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="编码" prop="workstationCode"><el-input v-model="form.workstationCode" :disabled="optType === 'edit' || optType === 'view'" /></el-form-item></el-col>
           <el-col :span="12">
-            <el-form-item label-width="70" v-if="!form.workstationId">
+            <el-form-item label-width="70" v-if="optType === 'add'">
               <el-switch v-model="autoGenFlag" active-color="#13ce66" @change="handleAutoGenChange" /><span style="margin-left:6px;font-size:12px;color:#13ce66">自动生成</span>
             </el-form-item>
           </el-col>
@@ -82,6 +82,7 @@ const { mes_workstation_type, mes_workstation_status } = useDict('mes_workstatio
 const list = ref<MdWorkstation[]>([]); const open = ref(false); const loading = ref(true); const showSearch = ref(true)
 const ids = ref<number[]>([]); const single = ref(true); const multiple = ref(true); const total = ref(0); const title = ref('')
 const autoGenFlag = ref(false)
+const optType = ref<string | undefined>(undefined)
 const workshopOptions = ref<any[]>([]); const machineList = ref<MdWorkstationMachine[]>([]); const workerList = ref<MdWorkstationWorker[]>([])
 const processOptions = ref<any[]>([])
 const data = reactive({ form: { enableFlag: '1', status: 'IDLE' } as MdWorkstation, queryParams: { pageNum: 1, pageSize: 10, processId: undefined } as WorkstationQueryParams, rules: { workstationCode: [{ required: true, message: '编码不能为空' }], workstationName: [{ required: true, message: '名称不能为空' }], workshopId: [{ required: true, message: '请选择车间' }] } })
@@ -94,12 +95,12 @@ function handleAutoGenChange(flag: boolean) {
   if (flag) genSerialCode('WORKSTATION_CODE').then((r: any) => { form.value.workstationCode = r.data })
   else form.value.workstationCode = ''
 }
-function reset() { autoGenFlag.value = false; form.value = { enableFlag: '1', status: 'IDLE' } as MdWorkstation; machineList.value = []; workerList.value = []; proxy.resetForm('formRef') }
+function reset() { optType.value = undefined; autoGenFlag.value = false; form.value = { enableFlag: '1', status: 'IDLE' } as MdWorkstation; machineList.value = []; workerList.value = []; proxy.resetForm('formRef') }
 function handleQuery() { queryParams.value.pageNum = 1; getList() }
 function resetQuery() { proxy.resetForm('queryRef'); handleQuery() }
 function handleSelectionChange(s: MdWorkstation[]) { ids.value = s.map(i => i.workstationId!); single.value = s.length !== 1; multiple.value = !s.length }
-function handleAdd() { reset(); listAllWorkshop().then(r => { workshopOptions.value = r.data || [] }); open.value = true; title.value = '新增工作站' }
-function handleUpdate(row?: MdWorkstation) { reset(); const id = row?.workstationId || ids.value[0]; Promise.all([listAllWorkshop(), getWorkstation(id)]).then(([wsRes, gwRes]) => { workshopOptions.value = wsRes.data || []; form.value = gwRes.data; loadSubData(id); open.value = true; title.value = '修改工作站' }) }
+function handleAdd() { reset(); optType.value = 'add'; listAllWorkshop().then(r => { workshopOptions.value = r.data || [] }); open.value = true; title.value = '新增工作站' }
+function handleUpdate(row?: MdWorkstation) { reset(); optType.value = 'edit'; const id = row?.workstationId || ids.value[0]; Promise.all([listAllWorkshop(), getWorkstation(id)]).then(([wsRes, gwRes]) => { workshopOptions.value = wsRes.data || []; form.value = gwRes.data; loadSubData(id); open.value = true; title.value = '修改工作站' }) }
 function submitForm() { proxy.$refs['formRef'].validate((v: boolean) => { if (v) { (form.value.workstationId ? updateWorkstation(form.value) : addWorkstation(form.value)).then(() => { proxy.$modal.msgSuccess('操作成功'); open.value = false; getList() }).catch((err: any) => { proxy.$modal.msgError(err?.msg || '操作失败') }) } else { proxy.$modal.msgError('请完善表单信息') } }) }
 function handleDelete(row?: MdWorkstation) { const ids_ = row?.workstationId || ids.value; proxy.$modal.confirm('确认删除？').then(() => delWorkstation(ids_)).then(() => { getList(); proxy.$modal.msgSuccess('删除成功') }).catch(() => {}) }
 function handleExport() { proxy.download('mes/md/workstation/export', { ...queryParams.value }, `workstation_${Date.now()}.xlsx`) }

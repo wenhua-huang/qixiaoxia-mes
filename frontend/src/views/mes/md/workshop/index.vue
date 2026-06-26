@@ -107,11 +107,11 @@
         <el-row>
           <el-col :span="16">
             <el-form-item label="车间编码" prop="workshopCode">
-              <el-input v-model="form.workshopCode" placeholder="请输入车间编码" />
+              <el-input v-model="form.workshopCode" placeholder="请输入车间编码" :disabled="optType === 'edit' || optType === 'view'" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item label-width="70" v-if="!form.workshopId">
+            <el-form-item label-width="70" v-if="optType === 'add'">
               <el-switch v-model="autoGenFlag" active-color="#13ce66" size="small" @change="handleAutoGenChange" /><span style="margin-left:6px;font-size:12px;color:#13ce66">自动生成</span>
             </el-form-item>
           </el-col>
@@ -165,6 +165,7 @@ const multiple = ref<boolean>(true)
 const total = ref<number>(0)
 const title = ref<string>('')
 const autoGenFlag = ref(false)
+const optType = ref<string | undefined>(undefined)
 
 const data = reactive({
   form: {} as MdWorkshop,
@@ -211,6 +212,7 @@ function handleAutoGenChange(flag: boolean) {
   else form.value.workshopCode = ''
 }
 function reset() {
+  optType.value = undefined
   autoGenFlag.value = false
   form.value = {
     workshopId: undefined,
@@ -243,12 +245,14 @@ function handleSelectionChange(selection: MdWorkshop[]) {
 
 function handleAdd() {
   reset()
+  optType.value = 'add'
   open.value = true
   title.value = '添加车间'
 }
 
 function handleUpdate(row?: MdWorkshop) {
   reset()
+  optType.value = 'edit'
   const workshopId = row?.workshopId || ids.value[0]
   getWorkshop(workshopId).then(response => {
     form.value = response.data

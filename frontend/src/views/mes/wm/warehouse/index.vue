@@ -60,11 +60,11 @@
         <el-row>
           <el-col :span="16">
             <el-form-item label="仓库编码" prop="warehouseCode">
-              <el-input v-model="form.warehouseCode" placeholder="请输入仓库编码" />
+              <el-input v-model="form.warehouseCode" placeholder="请输入仓库编码" :disabled="optType === 'edit' || optType === 'view'" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item label-width="70" v-if="!form.warehouseId">
+            <el-form-item label-width="70" v-if="optType === 'add'">
               <el-switch v-model="autoGenFlag" active-color="#13ce66" @change="handleAutoGenChange" /><span style="margin-left:6px;font-size:12px;color:#13ce66">自动生成</span>
             </el-form-item>
           </el-col>
@@ -151,6 +151,7 @@ const multiple = ref(true)
 const total = ref(0)
 const title = ref('')
 const autoGenFlag = ref(false)
+const optType = ref<string | undefined>(undefined)
 
 const data = reactive({
   form: {} as WmWarehouse,
@@ -167,14 +168,15 @@ function getList() {
   listWmWarehouse(queryParams.value).then(r => { warehouseList.value = r.rows; total.value = r.total; loading.value = false })
 }
 function cancel() { open.value = false; reset() }
-function reset() { form.value = {} as WmWarehouse; autoGenFlag.value = false; proxy.resetForm('formRef') }
+function reset() { optType.value = undefined; form.value = {} as WmWarehouse; autoGenFlag.value = false; proxy.resetForm('formRef') }
 function handleQuery() { queryParams.value.pageNum = 1; getList() }
 function resetQuery() { proxy.resetForm('queryRef'); handleQuery() }
 function handleSelectionChange(s: any[]) { ids.value = s.map(i => i.warehouseId); single.value = s.length !== 1; multiple.value = !s.length }
-function handleAdd() { reset(); open.value = true; title.value = '新增仓库' }
-function handleView(row: WmWarehouse) { reset(); form.value = { ...row }; open.value = true; title.value = '查看仓库' }
+function handleAdd() { reset(); optType.value = 'add'; open.value = true; title.value = '新增仓库' }
+function handleView(row: WmWarehouse) { reset(); optType.value = 'view'; form.value = { ...row }; open.value = true; title.value = '查看仓库' }
 function handleUpdate(row?: WmWarehouse) {
   reset()
+  optType.value = 'edit'
   const id = row?.warehouseId || ids.value[0]
   getWmWarehouse(id).then(r => { form.value = r.data; open.value = true; title.value = '修改仓库' })
 }

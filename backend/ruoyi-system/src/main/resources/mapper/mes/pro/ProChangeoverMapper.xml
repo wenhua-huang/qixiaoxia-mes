@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.pro.ProChangeoverMapper">
+
+    <resultMap type="ProChangeover" id="ProChangeoverResult">
+        <result property="id"               column="id"                />
+        <result property="factoryId"        column="factory_id"        />
+        <result property="name"             column="name"              />
+        <result property="fromProcessId"    column="from_process_id"   />
+        <result property="toProcessId"      column="to_process_id"     />
+        <result property="workstationId"    column="workstation_id"    />
+        <result property="durationMinutes"  column="duration_minutes"  />
+        <result property="remark"           column="remark"            />
+        <result property="createBy"         column="create_by"         />
+        <result property="createTime"       column="create_time"       />
+        <result property="updateBy"         column="update_by"         />
+        <result property="updateTime"       column="update_time"       />
+    </resultMap>
+
+    <sql id="selectProChangeoverVo">
+        select id, factory_id, name, from_process_id, to_process_id, workstation_id, duration_minutes,
+               remark, create_by, create_time, update_by, update_time
+        from qxx_pro_changeover
+    </sql>
+
+    <select id="selectProChangeoverById" parameterType="Long" resultMap="ProChangeoverResult">
+        <include refid="selectProChangeoverVo"/>
+        where id = #{id}
+    </select>
+
+    <select id="selectProChangeoverList" parameterType="ProChangeover" resultMap="ProChangeoverResult">
+        <include refid="selectProChangeoverVo"/>
+        <where>
+            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
+            <if test="name != null and name != ''"> and name like concat('%', #{name}, '%')</if>
+            <if test="fromProcessId != null"> and from_process_id = #{fromProcessId}</if>
+            <if test="toProcessId != null"> and to_process_id = #{toProcessId}</if>
+            <if test="workstationId != null"> and workstation_id = #{workstationId}</if>
+        </where>
+        order by from_process_id, to_process_id
+    </select>
+
+    <!-- 排产算法专用：按优先级匹配换型时间 -->
+    <select id="selectChangeover" parameterType="ProChangeover" resultMap="ProChangeoverResult">
+        select * from qxx_pro_changeover
+        where to_process_id = #{toProcessId}
+        <if test="fromProcessId != null">
+            and (from_process_id = #{fromProcessId} or from_process_id is null)
+        </if>
+        <if test="fromProcessId == null">
+            and from_process_id is null
+        </if>
+        <if test="workstationId != null">
+            and (workstation_id = #{workstationId} or workstation_id is null)
+        </if>
+        <if test="workstationId == null">
+            and workstation_id is null
+        </if>
+        <if test="factoryId != null">
+            and factory_id = #{factoryId}
+        </if>
+        -- 精确匹配优先(有from_process_id + workstation_id的排前面)，取第一条
+        order by
+            case when from_process_id is not null then 0 else 1 end,
+            case when workstation_id is not null then 0 else 1 end,
+            duration_minutes asc
+        limit 1
+    </select>
+
+    <insert id="insertProChangeover" parameterType="ProChangeover" useGeneratedKeys="true" keyProperty="id">
+        insert into qxx_pro_changeover
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="name != null">name,</if>
+            <if test="fromProcessId != null">from_process_id,</if>
+            <if test="toProcessId != null">to_process_id,</if>
+            <if test="workstationId != null">workstation_id,</if>
+            <if test="durationMinutes != null">duration_minutes,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="name != null">#{name},</if>
+            <if test="fromProcessId != null">#{fromProcessId},</if>
+            <if test="toProcessId != null">#{toProcessId},</if>
+            <if test="workstationId != null">#{workstationId},</if>
+            <if test="durationMinutes != null">#{durationMinutes},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateProChangeover" parameterType="ProChangeover">
+        update qxx_pro_changeover
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="name != null">name = #{name},</if>
+            <if test="fromProcessId != null">from_process_id = #{fromProcessId},</if>
+            <if test="toProcessId != null">to_process_id = #{toProcessId},</if>
+            <if test="workstationId != null">workstation_id = #{workstationId},</if>
+            <if test="durationMinutes != null">duration_minutes = #{durationMinutes},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteProChangeoverById" parameterType="Long">
+        delete from qxx_pro_changeover where id = #{id}
+    </delete>
+
+    <delete id="deleteProChangeoverByIds">
+        delete from qxx_pro_changeover where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>

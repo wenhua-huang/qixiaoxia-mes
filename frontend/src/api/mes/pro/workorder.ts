@@ -1,6 +1,7 @@
 import request from '@/utils/request'
 
 export function listWorkorder(query) { return request({ url: '/mes/pro/workorder/list', method: 'get', params: query }) }
+export function listAllWorkorder() { return request({ url: '/mes/pro/workorder/listAll', method: 'get' }) }
 export function getWorkorder(workorderId) { return request({ url: '/mes/pro/workorder/' + workorderId, method: 'get' }) }
 // 获取工单详情（含BOM和工序参数，合并返回）
 export function getWorkorderDetail(workorderId) { return request({ url: '/mes/pro/workorder/detail/' + workorderId, method: 'get' }) }

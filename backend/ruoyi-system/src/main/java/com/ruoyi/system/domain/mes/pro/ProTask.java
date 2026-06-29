@@ -71,6 +71,11 @@ public class ProTask extends BaseEntity
     private Long outsourceFactoryId;
     @Excel(name = "状态") private String status;
 
+    /** 甘特图扩展字段 */
+    private Long predecessorId;
+    private Long snapshotId;
+    private Integer ganttSort;
+
     public Long getTaskId() { return taskId; }
     public void setTaskId(Long v) { this.taskId = v; }
     public Long getFactoryId() { return factoryId; }
@@ -161,6 +166,12 @@ public class ProTask extends BaseEntity
     public void setOutsourceFactoryId(Long v) { this.outsourceFactoryId = v; }
     public String getStatus() { return status; }
     public void setStatus(String v) { this.status = v; }
+    public Long getPredecessorId() { return predecessorId; }
+    public void setPredecessorId(Long v) { this.predecessorId = v; }
+    public Long getSnapshotId() { return snapshotId; }
+    public void setSnapshotId(Long v) { this.snapshotId = v; }
+    public Integer getGanttSort() { return ganttSort; }
+    public void setGanttSort(Integer v) { this.ganttSort = v; }
 
     @Override
     public String toString() {

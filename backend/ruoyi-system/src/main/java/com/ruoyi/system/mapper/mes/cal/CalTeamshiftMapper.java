@@ -58,4 +58,9 @@ public interface CalTeamshiftMapper
      * @return 结果
      */
     public int deleteCalTeamshiftByTeamshiftIds(Long[] teamshiftIds);
+
+    /**
+     * 统计某天是否有排班记录(用于工作日判定，JOIN plan过滤ACTIVE)
+     */
+    public int countByDate(CalTeamshift calTeamshift);
 }

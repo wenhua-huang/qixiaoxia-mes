@@ -208,64 +208,6 @@
       <template #footer><el-button type="primary" @click="confirmBomEdit">确 定</el-button><el-button @click="bomEditOpen=false">取 消</el-button></template>
     </el-dialog>
 
-    <!-- 排产弹窗：工单 → 工序步骤 → 每步骤管理任务 -->
-    <el-dialog :title="'排产 — ' + scheduleWorkorderName" v-model="scheduleOpen" width="1100px" append-to-body @close="scheduleOpen=false">
-      <el-row :gutter="16">
-        <el-col :span="8">
-          <el-descriptions title="工单信息" :column="1" size="small" border>
-            <el-descriptions-item label="工单编码">{{ scheduleWorkorderCode }}</el-descriptions-item>
-            <el-descriptions-item label="产品">{{ scheduleProductName }}</el-descriptions-item>
-            <el-descriptions-item label="计划数量">{{ scheduleQuantity }} {{ scheduleUnitName }}</el-descriptions-item>
-            <el-descriptions-item label="已排产">{{ scheduleQuantityScheduled }}</el-descriptions-item>
-            <el-descriptions-item label="已生产">{{ scheduleQuantityProduced }}</el-descriptions-item>
-          </el-descriptions>
-        </el-col>
-        <el-col :span="16">
-          <el-steps :active="scheduleActiveStep" align-center simple style="margin-bottom: 12px; cursor: pointer">
-            <el-step v-for="(item, idx) in scheduleSteps" :key="item.processId" :title="item.processName" @click="handleScheduleStepClick(idx)" />
-          </el-steps>
-          <div v-if="scheduleSteps.length>0" v-for="(step, idx) in scheduleSteps" :key="step.processId" v-show="scheduleActiveStep===idx">
-            <el-row class="mb8">
-              <el-col :span="1.5"><el-button type="primary" plain icon="Plus" size="small" @click="handleScheduleAddTask(step)" v-hasPermi="['mes:pro:task:add']">新增任务</el-button></el-col>
-            </el-row>
-            <el-table :data="scheduleTasksByProcess[step.processId] || []" size="small">
-              <el-table-column label="任务编码" prop="taskCode" width="130" :show-overflow-tooltip="true" />
-              <el-table-column label="任务名称" prop="taskName" :show-overflow-tooltip="true" min-width="150" />
-              <el-table-column label="工作站" prop="workstationName" width="100" />
-              <el-table-column label="排产数量" prop="quantity" width="90" />
-              <el-table-column label="已生产" prop="quantityProduced" width="80" />
-              <el-table-column label="开始时间" width="100"><template #default="s">{{ parseTime(s.row.startTime, '{y}-{m}-{d}') }}</template></el-table-column>
-              <el-table-column label="时长(h)" prop="duration" width="70" />
-              <el-table-column label="状态" width="70"><template #default="s"><span :style="{color:scheduleStatusColor[s.row.status]}">{{ scheduleStatusMap[s.row.status]||s.row.status }}</span></template></el-table-column>
-              <el-table-column label="操作" width="80" class-name="small-padding fixed-width">
-                <template #default="s">
-                  <el-tooltip content="编辑"><el-button link type="primary" icon="Edit" size="small" @click="handleScheduleEditTask(s.row)"></el-button></el-tooltip>
-                  <el-tooltip content="删除"><el-button link type="primary" icon="Delete" size="small" @click="handleScheduleDelTask(s.row)"></el-button></el-tooltip>
-                </template>
-              </el-table-column>
-            </el-table>
-            <el-empty v-if="!(scheduleTasksByProcess[step.processId]||[]).length" description="该工序暂无排产任务" :image-size="60" />
-          </div>
-          <el-empty v-if="scheduleSteps.length===0" description="该工单产品未配置工艺路线，无法排产" :image-size="80" />
-        </el-col>
-      </el-row>
-      <template #footer><el-button @click="scheduleOpen=false">关 闭</el-button></template>
-    </el-dialog>
-
-    <!-- 排产任务编辑弹窗（在排产对话框内） -->
-    <el-dialog :title="scheduleTaskTitle" v-model="scheduleTaskOpen" width="600px" append-to-body>
-      <el-form ref="scheduleTaskForm" :model="scheduleTaskForm" label-width="100px">
-        <el-row><el-col :span="18"><el-form-item label="工作站" prop="workstationName"><el-input v-model="scheduleTaskForm.workstationName" placeholder="请选择工作站" readonly><template #append><el-button icon="Search" @click="handleOpenWorkstationSelect" /></template></el-input></el-form-item></el-col>
-        <el-col :span="12"><el-form-item label="排产数量" prop="quantity"><el-input-number v-model="scheduleTaskForm.quantity" :min="1" style="width:100%" /></el-form-item></el-col></el-row>
-        <el-row><el-col :span="12"><el-form-item label="开始时间"><el-date-picker v-model="scheduleTaskForm.startTime" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" style="width:100%" /></el-form-item></el-col>
-        <el-col :span="12"><el-form-item label="时长(小时)" prop="duration"><el-input-number v-model="scheduleTaskForm.duration" :min="1" style="width:100%" /></el-form-item></el-col></el-row>
-        <el-row><el-col :span="12"><el-form-item label="机台号"><el-input v-model="scheduleTaskForm.machineCode" /></el-form-item></el-col>
-        <el-col :span="12"><el-form-item label="结束时间"><el-date-picker v-model="scheduleTaskForm.endTime" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" style="width:100%" /></el-form-item></el-col></el-row>
-        <el-row><el-col :span="24"><el-form-item label="备注"><el-input v-model="scheduleTaskForm.remark" /></el-form-item></el-col></el-row>
-      </el-form>
-      <template #footer><el-button type="primary" @click="submitScheduleTask">确 定</el-button><el-button @click="scheduleTaskOpen=false">取 消</el-button></template>
-    </el-dialog>
-
     <!-- 物料齐套检查弹窗 -->
     <el-dialog :title="'物料齐套检查 — ' + materialCheckWorkorderName" v-model="materialCheckOpen" width="800px" append-to-body>
       <el-alert :title="materialCheckPassed ? '所有物料齐套，可以开工！' : '以下物料缺料，暂不可开工'" :type="materialCheckPassed ? 'success' : 'warning'" :closable="false" show-icon style="margin-bottom:12px" />
@@ -337,7 +279,6 @@
 
     <ItemSelect ref="itemSelectRef" @onSelected="onProductSelected" />
     <ItemSelect ref="bomItemSelectRef" @onSelected="onBomItemSelected" />
-    <WorkstationSelect ref="wsSelectRef" :processId="scheduleTaskForm.processId" @onSelected="onScheduleWorkstationSelected" />
 
     <!-- 添加工序选择弹窗 -->
     <el-dialog title="添加工序" v-model="showProcessSelector" width="600px" append-to-body>
@@ -358,12 +299,11 @@ import { listRouteProcessByRouteId } from '@/api/mes/pro/routeprocess'
 import { listRoute } from '@/api/mes/pro/proroute'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import ItemSelect from '@/components/itemSelect/single.vue'
-import WorkstationSelect from '@/components/workstationSelect/single.vue'
 import { listAllProcess } from '@/api/mes/pro/process'
 
 export default {
   name: 'Workorder',
-  components: { ItemSelect, WorkstationSelect },
+  components: { ItemSelect },
   data() {
     return {
       autoGenFlag: false, optType: undefined, step: 1, prorouteId: null,
@@ -372,14 +312,6 @@ export default {
       activeProcesses: [], showProcessSelector: false,
       title: '', open: false,
       bomEditOpen: false, bomEditTitle: '', bomEditForm: {},
-      // 排产对话框
-      scheduleOpen: false, scheduleActiveStep: 0, scheduleSteps: [], scheduleTasksByProcess: {},
-      scheduleWorkorderId: null, scheduleWorkorderCode: '', scheduleWorkorderName: '',
-      scheduleProductName: '', scheduleQuantity: 0, scheduleUnitName: '',
-      scheduleQuantityProduced: 0, scheduleQuantityScheduled: 0,
-      scheduleTaskOpen: false, scheduleTaskTitle: '', scheduleTaskForm: {}, scheduleEditTaskId: null,
-      scheduleStatusMap: { PREPARE:'待排产',NORMAL:'正常',PRODUCING:'生产中',COMPLETED:'已完成',PAUSED:'暂停',CANCEL:'取消' },
-      scheduleStatusColor: { PREPARE:'#E6A23C',NORMAL:'#409EFF',PRODUCING:'#67C23A',COMPLETED:'#909399',PAUSED:'#E6A23C',CANCEL:'#F56C6C' },
       // 物料齐套检查
       materialCheckOpen: false, materialCheckWorkorderId: null, materialCheckWorkorderName: '', materialCheckWorkorderStatus: '',
       materialCheckList: [], materialCheckPassed: false,
@@ -728,104 +660,11 @@ export default {
     stepIconStatus(status) {
       return status === 'success' ? 'success' : (status === 'error' ? 'error' : status === 'wait' ? 'wait' : 'finish')
     },
-    // 排产步骤切换
-    handleScheduleStepClick(idx) {
-      this.scheduleActiveStep = idx
-    },
-    // 排产：打开排产对话框，按工序步骤管理任务
+    // 排产：跳转甘特图排产页面
     handleSchedule(row) {
-      this.scheduleWorkorderId = row.workorderId
-      this.scheduleWorkorderCode = row.workorderCode
-      this.scheduleWorkorderName = row.workorderName
-      this.scheduleProductName = row.productName
-      this.scheduleQuantity = row.quantity
-      this.scheduleUnitName = row.unitName
-      this.scheduleQuantityProduced = row.quantityProduced || 0
-      this.scheduleQuantityScheduled = row.quantityScheduled || 0
-      this.scheduleSteps = []
-      this.scheduleTasksByProcess = {}
-      this.scheduleActiveStep = 0
-      this.scheduleOpen = true
-      this.loadScheduleData(row)
-    },
-    // 加载排产数据：工序步骤 + 已有任务
-    loadScheduleData(row) {
-      // 加载已有任务（不与路线工序耦合）
-      this.loadScheduleTasks()
-      // 加载路线工序（用于步骤导航）
-      if (row.routeProductId) {
-        listRouteProduct({ pageSize: 100 }).then(rpRes => {
-          const rpList = rpRes.rows || []
-          const rp = rpList.find(p => p.recordId === row.routeProductId)
-          if (rp && rp.routeId) {
-            listRouteProcessByRouteId(rp.routeId).then(procRes => {
-              this.scheduleSteps = (procRes.data || []).map(p => ({
-                processId: p.processId, processName: p.processName || p.processCode,
-                processCode: p.processCode, processType: p.processType, routeId: rp.routeId, colorCode: p.colorCode || '#00AEF3'
-              }))
-            })
-          }
-        })
-      }
-    },
-    loadScheduleTasks() {
-      if (!this.scheduleWorkorderId) return
-      import('@/api/mes/pro/task').then(m => {
-        m.listTask({ workorderId: this.scheduleWorkorderId, pageSize: 1000 }).then(res => {
-          const tasks = res.rows || []
-          const byProcess = {}
-          tasks.forEach(t => {
-            const pid = t.processId || '__none__'
-            if (!byProcess[pid]) byProcess[pid] = []
-            byProcess[pid].push(t)
-          })
-          this.scheduleTasksByProcess = byProcess
-        })
-      })
-    },
-    // 打开工作站选择器，带入当前工序筛选条件
-    handleOpenWorkstationSelect() {
-      this.$refs.wsSelectRef.open(this.scheduleTaskForm.processId)
-    },
-    // 工作站选择回调
-    onScheduleWorkstationSelected(row) {
-      this.scheduleTaskForm.workstationId = row.workstationId
-      this.scheduleTaskForm.workstationCode = row.workstationCode
-      this.scheduleTaskForm.workstationName = row.workstationName
-    },
-    // 排产任务 CRUD
-    handleScheduleAddTask(step) {
-      this.scheduleTaskForm = {
-        workorderId: this.scheduleWorkorderId, workorderCode: this.scheduleWorkorderCode, workorderName: this.scheduleWorkorderName,
-        processId: step.processId, processCode: step.processCode, processName: step.processName, processType: step.processType,
-        routeId: step.routeId, quantity: 1, duration: 1, setupDuration: 0, unitDuration: 0, offlineQty: 0
-      }
-      this.scheduleEditTaskId = null
-      this.scheduleTaskTitle = '新增排产任务 — ' + step.processName
-      this.scheduleTaskOpen = true
-    },
-    handleScheduleEditTask(row) {
-      this.scheduleTaskForm = { ...row }
-      this.scheduleEditTaskId = row.taskId
-      this.scheduleTaskTitle = '修改排产任务'
-      this.scheduleTaskOpen = true
-    },
-    handleScheduleDelTask(row) {
-      this.$modal.confirm('确认删除任务"' + (row.taskName || row.taskCode) + '"？').then(() => {
-        import('@/api/mes/pro/task').then(m => m.delTask(row.taskId)).then(() => {
-          this.$modal.msgSuccess('删除成功')
-          this.loadScheduleTasks()
-        })
-      }).catch(() => {})
-    },
-    submitScheduleTask() {
-      import('@/api/mes/pro/task').then(m => {
-        const action = this.scheduleEditTaskId ? m.updateTask(this.scheduleTaskForm) : m.addTask(this.scheduleTaskForm)
-        action.then(() => {
-          this.$modal.msgSuccess(this.scheduleEditTaskId ? '修改成功' : '新增成功')
-          this.scheduleTaskOpen = false
-          this.loadScheduleTasks()
-        }).catch(() => {})
+      this.$router.push({
+        path: '/mes/pro/gantt',
+        query: { workorderId: row.workorderId }
       })
     },
     // 齐套检查通过后确认开工

@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderCreateRequest;
@@ -35,6 +37,8 @@ import com.ruoyi.common.core.page.TableDataInfo;
 @RequestMapping("/mes/pro/workorder")
 public class ProWorkorderController extends BaseController
 {
+    private static final Logger log = LoggerFactory.getLogger(ProWorkorderController.class);
+
     @Autowired
     private IProWorkorderService proWorkorderService;
 
@@ -122,7 +126,7 @@ public class ProWorkorderController extends BaseController
         ProWorkorder workorder = proWorkorderService.createWorkorderWithBom(
             request.getWorkorder(), request.getBomList(), request.getParamList());
         // 自动排产：工单创建后自动生成工序任务，甘特图即可展示
-        try { scheduleService.scheduleWorkOrder(workorder.getWorkorderId()); } catch (Exception ignored) {}
+        try { scheduleService.scheduleWorkOrder(workorder.getWorkorderId()); } catch (Exception e) { log.warn("自动排产失败: workorderId={}", e.getMessage()); }
         return success(workorder);
     }
 
@@ -161,7 +165,7 @@ public class ProWorkorderController extends BaseController
         ProWorkorder workorder = proWorkorderService.updateWorkorderWithBom(
             request.getWorkorder(), request.getBomList(), request.getParamList());
         // 自动排产：工单修改后重新生成工序任务
-        try { scheduleService.scheduleWorkOrder(workorder.getWorkorderId()); } catch (Exception ignored) {}
+        try { scheduleService.scheduleWorkOrder(workorder.getWorkorderId()); } catch (Exception e) { log.warn("自动排产失败: workorderId={}", e.getMessage()); }
         return success(workorder);
     }
 

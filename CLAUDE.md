@@ -325,4 +325,48 @@ curl -s -o /dev/null -w "HTTP %{http_code}" http://localhost/
 
 - 若依官方: http://doc.ruoyi.vip
 - Element Plus: https://element-plus.org/zh-CN/
+
+## 🔁 新功能实现后自检工作流（CRT）
+
+> ⚠️ **每完成一个新功能（MES 模块/Controller/Service/页面）后，必须按顺序执行以下三步，禁止省略或跳步。**
+
+### C — Code Review（三轮找 Bug）
+
+直接对当前改动执行 `/code-review`（high effort）。每轮发现问题→修复→再 review，直到输出 `[]`（零 finding）。
+
+```
+第 1 轮：启动 /code-review → 通常 5~10 个 finding → 修复所有
+第 2 轮：再次 /code-review → 通常 2~5 个 finding → 修复所有  
+第 3 轮：再次 /code-review → 通常 0~2 个 finding → 修复至清零
+```
+
+**典型问题类型**：FactoryIdInterceptor 冲突（INSERT 别写 `factory_id`）、`@Transactional` 与锁顺序（先锁后事务）、并发幂等缺失（加 Redis 锁+DB 唯一约束）、mapper XML UPDATE 缺新列、N+1 查询、死代码。
+
+### R — Repair（修复所有 Finding）
+
+对每个 finding：读代码 → 确认根因 → 改代码 → `mvn compile -pl ruoyi-system -am -DskipTests -q` 验证编译通过。
+
+**修复优先级**：🔴 系统不可用（SQL error/编译失败） → 🟠 数据正确性（重复/丢失） → 🟡 性能/风格。
+
+### T — Test（三层测试全覆盖）
+
+| 层级 | 工具 | 要求 |
+|------|------|------|
+| **后端单元测试** | JUnit 5 + Mockito | Service 每个 public 方法 ≥1 个测试。Mock 所有依赖，覆盖正常/边界/幂等/错误路径 |
+| **后端集成测试** | SpringBootTest + Testcontainers | Controller 端点可达 + **E2E 连续流程**（如：工单→缺料看板→采购单→补货→领料单→完工→入库单） |
+| **前端组件测试** | Vitest + @vue/test-utils | 新增/修改的 Vue 组件 ≥1 个测试。Mock API，验证渲染、API 调用参数、按钮行为、错误不崩溃 |
+
+**运行命令**：
+```bash
+# 后端
+cd backend
+mvn test -pl ruoyi-system -Dtest="XxxUnitTest"  # 单元测试
+mvn test -pl ruoyi-admin -Dtest="XxxIntegrationTest"  # 集成测试（需 Redis + Docker）
+
+# 前端
+cd frontend
+npx vitest run src/views/mes/{domain}/{entity}/__tests__/  # 组件测试
+```
+
+**质量门禁**：三层测试全部 green + 已有回归测试未破坏 → 才能交付。
 - uni-app: https://uniapp.dcloud.net.cn/

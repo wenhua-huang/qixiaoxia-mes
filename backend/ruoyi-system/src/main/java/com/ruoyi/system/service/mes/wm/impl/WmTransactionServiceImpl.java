@@ -71,7 +71,7 @@ public class WmTransactionServiceImpl implements IWmTransactionService
             return existingTx;
         }
 
-        WmMaterialStock existing = wmMaterialStockMapper.loadMaterialStock(stock);
+        WmMaterialStock existing = wmMaterialStockMapper.loadMaterialStockForUpdate(stock);
         BigDecimal delta = transaction.getQuantity();
 
         if (StringUtils.isNotNull(existing)) {

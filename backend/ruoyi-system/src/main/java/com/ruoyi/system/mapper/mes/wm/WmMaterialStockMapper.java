@@ -10,6 +10,11 @@ public interface WmMaterialStockMapper
      */
     public WmMaterialStock loadMaterialStock(WmMaterialStock stock);
 
+    /**
+     * 根据唯一键查询库存记录并锁定行（SELECT FOR UPDATE，事务内使用）
+     */
+    public WmMaterialStock loadMaterialStockForUpdate(WmMaterialStock stock);
+
     public List<WmMaterialStock> selectWmMaterialStockList(WmMaterialStock entity);
     public List<WmMaterialStock> selectWmMaterialStockAll();
     public WmMaterialStock selectWmMaterialStockByMaterialStockId(Long materialStockId);

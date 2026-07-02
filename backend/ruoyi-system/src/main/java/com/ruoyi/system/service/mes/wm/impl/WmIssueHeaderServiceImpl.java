@@ -136,7 +136,168 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
         return wmIssueHeaderMapper.updateWmIssueHeader(header);
     }
 
-    // ── 2b. 执行出库：Redis 锁 + TransactionTemplate ──
+    // ── 2b. 确认领料单：Redis 锁 + TransactionTemplate，预占库存 ──
+
+    @Override
+    public int confirmIssue(Long issueId) {
+        lockTemplate.execute("wm:issue:lock:" + issueId, 10,
+                () -> txTemplate.execute(status -> doConfirmIssue(issueId)));
+        return 1;
+    }
+
+    private Long doConfirmIssue(Long issueId) {
+        // 1. 加载 header + lines
+        WmIssueHeader header = wmIssueHeaderMapper.selectWmIssueHeaderByIssueId(issueId);
+        if (header == null) throw new ServiceException("领料单不存在");
+        if (!"DRAFT".equals(header.getStatus())) throw new ServiceException("只有草稿状态的领料单才能确认，当前状态：" + header.getStatus());
+
+        WmIssueLine lineQuery = new WmIssueLine();
+        lineQuery.setIssueId(issueId);
+        List<WmIssueLine> lines = wmIssueLineMapper.selectWmIssueLineList(lineQuery);
+        if (lines == null || lines.isEmpty()) throw new ServiceException("领料单无明细行，请先添加物料后再确认");
+
+        for (WmIssueLine line : lines) {
+            // 2. 跳过零量行（先检查避免无效的库存查询）
+            BigDecimal delta = line.getQuantityIssue() != null ? line.getQuantityIssue() : BigDecimal.ZERO;
+            if (delta.compareTo(BigDecimal.ZERO) <= 0) continue;
+
+            // 3. 查库存并锁定行（SELECT FOR UPDATE，防止并发超分）
+            WmMaterialStock stockQuery = new WmMaterialStock();
+            stockQuery.setItemId(line.getItemId());
+            stockQuery.setBatchId(line.getBatchId() != null ? line.getBatchId() : 0L);
+            stockQuery.setWarehouseId(line.getWarehouseId() != null ? line.getWarehouseId() : header.getWarehouseId());
+            stockQuery.setVendorId(0L);
+            stockQuery.setWorkorderId(0L);
+            stockQuery.setQualityStatus("NORMAL");
+
+            WmMaterialStock existing = wmMaterialStockMapper.loadMaterialStockForUpdate(stockQuery);
+            if (existing == null) {
+                throw new ServiceException("物料[" + line.getItemCode() + "]库存记录不存在，无法预占");
+            }
+
+            // 检查可用库存是否充足
+            BigDecimal avail = existing.getQuantityAvailable() != null ? existing.getQuantityAvailable() : BigDecimal.ZERO;
+            if (avail.compareTo(delta) < 0) {
+                throw new ServiceException("物料[" + line.getItemCode() + "]可用库存不足！可用：" + avail + "，需预占：" + delta);
+            }
+
+            // 扣减可用库存（预占），现有库存不动
+            BigDecimal newAvailable = avail.subtract(delta);
+            existing.setQuantityAvailable(newAvailable.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : newAvailable);
+            existing.setUpdateTime(new Date());
+            wmMaterialStockMapper.updateWmMaterialStock(existing);
+
+            // 3. 写库存事务 (ALLOCATE — 预占)
+            WmTransaction tx = new WmTransaction();
+            tx.setTransactionType("ALLOCATE");
+            tx.setSourceDocType("ISSUE");
+            tx.setSourceDocId(issueId);
+            tx.setSourceDocCode(header.getIssueCode());
+            tx.setSourceLineId(line.getLineId());
+            tx.setMaterialStockId(existing.getMaterialStockId());
+            tx.setItemId(line.getItemId());
+            tx.setItemCode(line.getItemCode());
+            tx.setItemName(line.getItemName());
+            tx.setSpecification(line.getItemSpc());
+            tx.setUnitOfMeasure(line.getUnitOfMeasure());
+            tx.setUnitName(line.getUnitName());
+            tx.setQuantity(delta.negate());
+            tx.setBatchId(line.getBatchId() != null ? line.getBatchId() : 0L);
+            tx.setBatchCode(line.getBatchCode());
+            tx.setWarehouseId(line.getWarehouseId() != null ? line.getWarehouseId() : header.getWarehouseId());
+            tx.setWorkorderId(header.getWorkorderId());
+            tx.setWorkorderCode(header.getWorkorderCode());
+            tx.setTransactionTime(new Date());
+            tx.setCreateTime(DateUtils.getNowDate());
+            tx.setCreateBy(SecurityUtils.getUsername());
+            wmTransactionMapper.insertWmTransaction(tx);
+        }
+
+        // 4. 更新 header 状态
+        header.setStatus("CONFIRMED");
+        header.setUpdateTime(DateUtils.getNowDate());
+        header.setUpdateBy(SecurityUtils.getUsername());
+        wmIssueHeaderMapper.updateWmIssueHeader(header);
+
+        return issueId;
+    }
+
+    // ── 2b2. 释放预占：CONFIRMED → DRAFT，恢复 quantityAvailable ──
+
+    @Override
+    public int releaseAllocation(Long issueId) {
+        lockTemplate.execute("wm:issue:lock:" + issueId, 10,
+                () -> txTemplate.execute(status -> doReleaseAllocation(issueId)));
+        return 1;
+    }
+
+    private Long doReleaseAllocation(Long issueId) {
+        WmIssueHeader header = wmIssueHeaderMapper.selectWmIssueHeaderByIssueId(issueId);
+        if (header == null) throw new ServiceException("领料单不存在");
+        if (!"CONFIRMED".equals(header.getStatus())) throw new ServiceException("只有已确认状态的领料单才能释放预占，当前状态：" + header.getStatus());
+
+        WmIssueLine lineQuery = new WmIssueLine();
+        lineQuery.setIssueId(issueId);
+        List<WmIssueLine> lines = wmIssueLineMapper.selectWmIssueLineList(lineQuery);
+        if (lines == null || lines.isEmpty()) return issueId;
+
+        for (WmIssueLine line : lines) {
+            WmMaterialStock stockQuery = new WmMaterialStock();
+            stockQuery.setItemId(line.getItemId());
+            stockQuery.setBatchId(line.getBatchId() != null ? line.getBatchId() : 0L);
+            stockQuery.setWarehouseId(line.getWarehouseId() != null ? line.getWarehouseId() : header.getWarehouseId());
+            stockQuery.setVendorId(0L);
+            stockQuery.setWorkorderId(0L);
+            stockQuery.setQualityStatus("NORMAL");
+
+            WmMaterialStock existing = wmMaterialStockMapper.loadMaterialStockForUpdate(stockQuery);
+            if (existing == null) continue; // 库存记录已不存在，跳过
+
+            BigDecimal delta = line.getQuantityIssue() != null ? line.getQuantityIssue() : BigDecimal.ZERO;
+            if (delta.compareTo(BigDecimal.ZERO) <= 0) continue;
+
+            // 恢复可用库存
+            BigDecimal currentAvail = existing.getQuantityAvailable() != null ? existing.getQuantityAvailable() : BigDecimal.ZERO;
+            existing.setQuantityAvailable(currentAvail.add(delta));
+            existing.setUpdateTime(new Date());
+            wmMaterialStockMapper.updateWmMaterialStock(existing);
+
+            // 写释放事务记录
+            WmTransaction tx = new WmTransaction();
+            tx.setTransactionType("RELEASE");
+            tx.setSourceDocType("ISSUE");
+            tx.setSourceDocId(issueId);
+            tx.setSourceDocCode(header.getIssueCode());
+            tx.setSourceLineId(line.getLineId());
+            tx.setMaterialStockId(existing.getMaterialStockId());
+            tx.setItemId(line.getItemId());
+            tx.setItemCode(line.getItemCode());
+            tx.setItemName(line.getItemName());
+            tx.setSpecification(line.getItemSpc());
+            tx.setUnitOfMeasure(line.getUnitOfMeasure());
+            tx.setUnitName(line.getUnitName());
+            tx.setQuantity(delta); // 正数 = 释放
+            tx.setBatchId(line.getBatchId() != null ? line.getBatchId() : 0L);
+            tx.setBatchCode(line.getBatchCode());
+            tx.setWarehouseId(line.getWarehouseId() != null ? line.getWarehouseId() : header.getWarehouseId());
+            tx.setWorkorderId(header.getWorkorderId());
+            tx.setWorkorderCode(header.getWorkorderCode());
+            tx.setTransactionTime(new Date());
+            tx.setCreateTime(DateUtils.getNowDate());
+            tx.setCreateBy(SecurityUtils.getUsername());
+            wmTransactionMapper.insertWmTransaction(tx);
+        }
+
+        // 恢复为草稿状态
+        header.setStatus("DRAFT");
+        header.setUpdateTime(DateUtils.getNowDate());
+        header.setUpdateBy(SecurityUtils.getUsername());
+        wmIssueHeaderMapper.updateWmIssueHeader(header);
+
+        return issueId;
+    }
+
+    // ── 2c. 执行出库：Redis 锁 + TransactionTemplate ──
 
     @Override
     public int executeIssue(Long issueId) {
@@ -150,6 +311,7 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
         WmIssueHeader header = wmIssueHeaderMapper.selectWmIssueHeaderByIssueId(issueId);
         if (header == null) throw new ServiceException("领料单不存在");
         if ("POSTED".equals(header.getStatus())) throw new ServiceException("领料单已执行，不能重复执行");
+        if (!"CONFIRMED".equals(header.getStatus())) throw new ServiceException("只有已确认状态的领料单才能执行出库，当前状态：" + header.getStatus());
 
         WmIssueLine lineQuery = new WmIssueLine();
         lineQuery.setIssueId(issueId);
@@ -166,18 +328,22 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
             stockQuery.setWorkorderId(0L);
             stockQuery.setQualityStatus("NORMAL");
 
-            WmMaterialStock existing = wmMaterialStockMapper.loadMaterialStock(stockQuery);
+            WmMaterialStock existing = wmMaterialStockMapper.loadMaterialStockForUpdate(stockQuery);
             if (existing == null) {
                 throw new ServiceException("物料[" + line.getItemCode() + "]库存记录不存在，无法出库");
             }
 
-            BigDecimal delta = line.getQuantityIssue();
-            BigDecimal result = existing.getQuantityOnhand().subtract(delta);
+            BigDecimal delta = line.getQuantityIssue() != null ? line.getQuantityIssue() : BigDecimal.ZERO;
+            if (delta.compareTo(BigDecimal.ZERO) <= 0) continue; // 跳过零量行
+
+            BigDecimal result = existing.getQuantityOnhand() != null ? existing.getQuantityOnhand().subtract(delta) : delta.negate();
             if (result.compareTo(BigDecimal.ZERO) < 0) {
                 throw new ServiceException("物料[" + line.getItemCode() + "]库存不足！当前库存：" + existing.getQuantityOnhand() + "，需出库：" + delta);
             }
 
+            // 只更新 quantityOnhand（available 在 confirm 时已扣），置空 available 防止动态 UPDATE 误写
             existing.setQuantityOnhand(result);
+            existing.setQuantityAvailable(null); // 不写回 available，避免覆盖并发 confirm 的写入
             existing.setUpdateTime(new Date());
             wmMaterialStockMapper.updateWmMaterialStock(existing);
 
@@ -196,7 +362,7 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
             tx.setUnitOfMeasure(line.getUnitOfMeasure());
             tx.setUnitName(line.getUnitName());
             tx.setQuantity(delta.negate());
-            tx.setBatchId(line.getBatchId());
+            tx.setBatchId(line.getBatchId() != null ? line.getBatchId() : 0L);
             tx.setBatchCode(line.getBatchCode());
             tx.setWarehouseId(line.getWarehouseId() != null ? line.getWarehouseId() : header.getWarehouseId());
             tx.setWorkorderId(header.getWorkorderId());

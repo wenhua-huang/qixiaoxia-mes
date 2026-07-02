@@ -21,6 +21,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="totalAmount"    column="total_amount"    />
         <result property="currency"    column="currency"    />
         <result property="sourceOrderCode"    column="source_order_code"    />
+        <result property="workorderId"    column="workorder_id"    />
+        <result property="workorderCode"    column="workorder_code"    />
         <result property="status"    column="status"    />
         <result property="remark"    column="remark"    />
         <result property="createBy"    column="create_by"    />
@@ -30,7 +32,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectPurOrderVo">
-        select order_id, factory_id, order_code, order_name, vendor_id, vendor_code, vendor_name, purchase_type, order_date, expected_date, purchaser, approver, total_quantity, total_amount, currency, source_order_code, status, remark, create_by, create_time, update_by, update_time from qxx_pur_order
+        select order_id, factory_id, order_code, order_name, vendor_id, vendor_code, vendor_name, purchase_type, order_date, expected_date, purchaser, approver, total_quantity, total_amount, currency, source_order_code, workorder_id, workorder_code, status, remark, create_by, create_time, update_by, update_time from qxx_pur_order
     </sql>
 
     <select id="selectPurOrderList" parameterType="PurOrder" resultMap="PurOrderResult">
@@ -51,6 +53,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="totalAmount != null "> and total_amount = #{totalAmount}</if>
             <if test="currency != null  and currency != ''"> and currency = #{currency}</if>
             <if test="sourceOrderCode != null  and sourceOrderCode != ''"> and source_order_code = #{sourceOrderCode}</if>
+            <if test="workorderId != null "> and workorder_id = #{workorderId}</if>
+            <if test="workorderCode != null  and workorderCode != ''"> and workorder_code = #{workorderCode}</if>
             <if test="status != null  and status != ''"> and status = #{status}</if>
         </where>
         ORDER BY create_time DESC
@@ -77,6 +81,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="totalAmount != null">total_amount,</if>
             <if test="currency != null">currency,</if>
             <if test="sourceOrderCode != null">source_order_code,</if>
+            <if test="workorderId != null">workorder_id,</if>
+            <if test="workorderCode != null">workorder_code,</if>
             <if test="status != null">status,</if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null">create_by,</if>
@@ -98,6 +104,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="totalAmount != null">#{totalAmount},</if>
             <if test="currency != null">#{currency},</if>
             <if test="sourceOrderCode != null">#{sourceOrderCode},</if>
+            <if test="workorderId != null">#{workorderId},</if>
+            <if test="workorderCode != null">#{workorderCode},</if>
             <if test="status != null">#{status},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
@@ -120,6 +128,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="totalAmount != null">total_amount = #{totalAmount},</if>
             <if test="currency != null">currency = #{currency},</if>
             <if test="sourceOrderCode != null">source_order_code = #{sourceOrderCode},</if>
+            <if test="workorderId != null">workorder_id = #{workorderId},</if>
+            <if test="workorderCode != null">workorder_code = #{workorderCode},</if>
             <if test="status != null">status = #{status},</if>
             <if test="remark != null">remark = #{remark},</if>
             <if test="createBy != null">create_by = #{createBy},</if>

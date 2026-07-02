@@ -52,6 +52,10 @@ public class WmIssueLineController extends BaseController
     }
 
     @PreAuthorize("@ss.hasPermi('mes:wm:issue:query')")
+    @GetMapping("/listByIssueId/{issueId}")
+    public AjaxResult listByIssueId(@PathVariable Long issueId) { WmIssueLine q = new WmIssueLine(); q.setIssueId(issueId); return success(wmIssueLineService.selectWmIssueLineList(q)); }
+
+    @PreAuthorize("@ss.hasPermi('mes:wm:issue:query')")
     @GetMapping(value = "/{lineId}")
     public AjaxResult getInfo(@PathVariable("lineId") Long lineId) { return success(wmIssueLineService.selectWmIssueLineByLineId(lineId)); }
 

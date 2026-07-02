@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import com.ruoyi.system.mapper.mes.pur.PurOrderMapper;
 import com.ruoyi.system.domain.mes.pur.PurOrder;
 import com.ruoyi.system.service.mes.pur.IPurOrderService;
+import com.ruoyi.system.service.mes.pur.IPurOrderLineService;
 import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 
 /**
@@ -23,6 +24,9 @@ public class PurOrderServiceImpl implements IPurOrderService
 {
     @Autowired
     private PurOrderMapper purOrderMapper;
+
+    @Autowired
+    private IPurOrderLineService purOrderLineService;
 
     @Autowired
     private AutoCodeGenerator autoCodeGenerator;
@@ -85,26 +89,32 @@ public class PurOrderServiceImpl implements IPurOrderService
     }
 
     /**
-     * 批量删除采购订单头
-     * 
+     * 批量删除采购订单头（级联删除行）
+     *
      * @param orderIds 需要删除的采购订单头主键
      * @return 结果
      */
     @Override
+    @Transactional
     public int deletePurOrderByOrderIds(Long[] orderIds)
     {
+        for (Long orderId : orderIds) {
+            purOrderLineService.deletePurOrderLineByOrderId(orderId);
+        }
         return purOrderMapper.deletePurOrderByOrderIds(orderIds);
     }
 
     /**
-     * 删除采购订单头信息
-     * 
+     * 删除采购订单头信息（级联删除行）
+     *
      * @param orderId 采购订单头主键
      * @return 结果
      */
     @Override
+    @Transactional
     public int deletePurOrderByOrderId(Long orderId)
     {
+        purOrderLineService.deletePurOrderLineByOrderId(orderId);
         return purOrderMapper.deletePurOrderByOrderId(orderId);
     }
 }

@@ -507,6 +507,40 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
     }
 
     /**
+     * 取消工单：PREPARE / PRODUCING → CANCEL
+     *
+     * @param workorderId 生产工单主键
+     * @return 结果
+     */
+    @Override
+    public int cancelWorkorder(Long workorderId)
+    {
+        ProWorkorder wo = selectProWorkorderByWorkorderId(workorderId);
+        if (wo == null) throw new ServiceException("工单不存在");
+        if (!"PREPARE".equals(wo.getStatus()) && !"PRODUCING".equals(wo.getStatus())) {
+            throw new ServiceException("只有待生产或生产中的工单才能取消，当前状态：" + wo.getStatus());
+        }
+
+        // Step 1: 先释放所有已确认领料单的预占库存（每个 releaseAllocation 独立事务提交）
+        WmIssueHeader issueQuery = new WmIssueHeader();
+        issueQuery.setWorkorderId(workorderId);
+        List<WmIssueHeader> issues = wmIssueHeaderService.selectWmIssueHeaderList(issueQuery);
+        if (issues != null) {
+            for (WmIssueHeader issue : issues) {
+                if ("CONFIRMED".equals(issue.getStatus())) {
+                    wmIssueHeaderService.releaseAllocation(issue.getIssueId());
+                }
+            }
+        }
+
+        // Step 2: 全部释放成功后更新工单状态
+        wo.setStatus("CANCEL");
+        wo.setUpdateTime(DateUtils.getNowDate());
+        wo.setUpdateBy(SecurityUtils.getUsername());
+        return qxxProWorkorderMapper.updateProWorkorder(wo);
+    }
+
+    /**
      * 物料齐套检查（实时计算，不持久化）
      * 读取工单 BOM → 实时查询 wm 库存 → 返回每行物料的供需情况
      *
@@ -537,11 +571,13 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
             }
             List<WmMaterialStock> stocks = wmMaterialStockService.selectWmMaterialStockList(query);
 
-            // 汇总可用库存（quantity_available暂未实现，直接用现有库存quantity_onhand）
+            // 汇总可用库存（确认领料时已预占扣减quantity_available）
+            // 存量数据已通过 migration_init_available.sql 初始化为 quantity_onhand
             BigDecimal availableTotal = BigDecimal.ZERO;
             for (WmMaterialStock stock : stocks) {
-                if (stock.getQuantityOnhand() != null) {
-                    availableTotal = availableTotal.add(stock.getQuantityOnhand());
+                BigDecimal avail = stock.getQuantityAvailable();
+                if (avail != null) {
+                    availableTotal = availableTotal.add(avail);
                 }
             }
 

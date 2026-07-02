@@ -1,6 +1,8 @@
 package com.ruoyi.web.controller.mes.wm;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,7 +19,15 @@ import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.system.domain.mes.wm.WmIssueHeader;
+import com.ruoyi.system.domain.mes.wm.WmIssueLine;
+import com.ruoyi.system.domain.mes.wm.WmWarehouse;
+import com.ruoyi.system.domain.mes.wm.WmStorageLocation;
+import com.ruoyi.system.domain.mes.pro.ProWorkorder;
 import com.ruoyi.system.service.mes.wm.IWmIssueHeaderService;
+import com.ruoyi.system.service.mes.wm.IWmIssueLineService;
+import com.ruoyi.system.service.mes.wm.IWmWarehouseService;
+import com.ruoyi.system.service.mes.wm.IWmStorageLocationService;
+import com.ruoyi.system.service.mes.pro.IProWorkorderService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.page.TableDataInfo;
 
@@ -33,6 +43,14 @@ public class WmIssueHeaderController extends BaseController
 {
     @Autowired
     private IWmIssueHeaderService wmIssueHeaderService;
+    @Autowired
+    private IWmIssueLineService wmIssueLineService;
+    @Autowired
+    private IWmWarehouseService wmWarehouseService;
+    @Autowired
+    private IWmStorageLocationService wmStorageLocationService;
+    @Autowired
+    private IProWorkorderService proWorkorderService;
 
     @PreAuthorize("@ss.hasPermi('mes:wm:issue:list')")
     @GetMapping("/list")
@@ -49,6 +67,44 @@ public class WmIssueHeaderController extends BaseController
         List<WmIssueHeader> list = wmIssueHeaderService.selectWmIssueHeaderList(e);
         ExcelUtil<WmIssueHeader> util = new ExcelUtil<WmIssueHeader>(WmIssueHeader.class);
         util.exportExcel(response, list, "生产领料单数据");
+    }
+
+    @PreAuthorize("@ss.hasPermi('mes:wm:issue:query')")
+    @GetMapping("/detail/{issueId}")
+    public AjaxResult detail(@PathVariable Long issueId) {
+        WmIssueHeader header = wmIssueHeaderService.selectWmIssueHeaderByIssueId(issueId);
+        if (header == null) return error("领料单不存在");
+        // 富化工单名称
+        if (header.getWorkorderId() != null) {
+            ProWorkorder wo = proWorkorderService.selectProWorkorderByWorkorderId(header.getWorkorderId());
+            if (wo != null) {
+                if (header.getWorkorderCode() == null) header.setWorkorderCode(wo.getWorkorderCode());
+                if (header.getWorkorderName() == null) header.setWorkorderName(wo.getWorkorderName());
+            }
+        }
+        // 富化仓库名称
+        if (header.getWarehouseId() != null) {
+            WmWarehouse wh = wmWarehouseService.selectWmWarehouseByWarehouseId(header.getWarehouseId());
+            if (wh != null) {
+                if (header.getWarehouseCode() == null) header.setWarehouseCode(wh.getWarehouseCode());
+                if (header.getWarehouseName() == null) header.setWarehouseName(wh.getWarehouseName());
+            }
+        }
+        // 富化库区名称
+        if (header.getLocationId() != null) {
+            WmStorageLocation loc = wmStorageLocationService.selectWmStorageLocationByLocationId(header.getLocationId());
+            if (loc != null) {
+                if (header.getLocationCode() == null) header.setLocationCode(loc.getLocationCode());
+                if (header.getLocationName() == null) header.setLocationName(loc.getLocationName());
+            }
+        }
+        WmIssueLine lineQ = new WmIssueLine();
+        lineQ.setIssueId(issueId);
+        List<WmIssueLine> lines = wmIssueLineService.selectWmIssueLineList(lineQ);
+        Map<String, Object> result = new java.util.HashMap<>();
+        result.put("header", header);
+        result.put("lines", lines);
+        return success(result);
     }
 
     @PreAuthorize("@ss.hasPermi('mes:wm:issue:query')")
@@ -76,6 +132,13 @@ public class WmIssueHeaderController extends BaseController
     @PutMapping("/loadBom/{issueId}/{workorderId}")
     public AjaxResult loadBom(@PathVariable Long issueId, @PathVariable Long workorderId)
     { return toAjax(wmIssueHeaderService.loadBomLines(issueId, workorderId)); }
+
+    /** 确认领料单：DRAFT → CONFIRMED，预占库存 */
+    @PreAuthorize("@ss.hasPermi('mes:wm:issue:edit')")
+    @Log(title = "领料单确认", businessType = BusinessType.UPDATE)
+    @PutMapping("/confirm/{issueId}")
+    public AjaxResult confirm(@PathVariable Long issueId)
+    { return toAjax(wmIssueHeaderService.confirmIssue(issueId)); }
 
     /** 执行出库：扣库存 + 写追溯 + 状态改为POSTED */
     @PreAuthorize("@ss.hasPermi('mes:wm:issue:edit')")

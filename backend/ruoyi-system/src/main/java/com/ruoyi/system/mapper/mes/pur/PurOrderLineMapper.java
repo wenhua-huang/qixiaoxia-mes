@@ -53,9 +53,17 @@ public interface PurOrderLineMapper
 
     /**
      * 批量删除采购订单行
-     * 
+     *
      * @param lineIds 需要删除的数据主键集合
      * @return 结果
      */
     public int deletePurOrderLineByLineIds(Long[] lineIds);
+
+    /**
+     * 按订单ID删除所有行（级联删除）
+     *
+     * @param orderId 采购订单ID
+     * @return 结果
+     */
+    public int deletePurOrderLineByOrderId(Long orderId);
 }

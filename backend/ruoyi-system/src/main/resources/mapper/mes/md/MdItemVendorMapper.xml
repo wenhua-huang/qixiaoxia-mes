@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.md.MdItemVendorMapper">
+
+    <resultMap type="MdItemVendor" id="MdItemVendorResult">
+        <id property="recordId" column="record_id"/>
+        <result property="factoryId" column="factory_id"/>
+        <result property="itemId" column="item_id"/>
+        <result property="itemCode" column="item_code"/>
+        <result property="itemName" column="item_name"/>
+        <result property="vendorId" column="vendor_id"/>
+        <result property="vendorCode" column="vendor_code"/>
+        <result property="vendorName" column="vendor_name"/>
+        <result property="isPreferred" column="is_preferred"/>
+        <result property="minOrderQty" column="min_order_qty"/>
+        <result property="leadTimeDays" column="lead_time_days"/>
+        <result property="enableFlag" column="enable_flag"/>
+        <result property="remark" column="remark"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="selectVo">
+        select record_id, factory_id, item_id, item_code, item_name, vendor_id, vendor_code, vendor_name,
+               is_preferred, min_order_qty, lead_time_days, enable_flag, remark, create_by, create_time, update_by, update_time
+        from qxx_md_item_vendor
+    </sql>
+
+    <select id="selectByRecordId" parameterType="Long" resultMap="MdItemVendorResult">
+        <include refid="selectVo"/> where record_id = #{recordId}
+    </select>
+
+    <select id="selectList" parameterType="MdItemVendor" resultMap="MdItemVendorResult">
+        <include refid="selectVo"/>
+        <where>
+            <if test="vendorId != null"> and vendor_id = #{vendorId}</if>
+            <if test="itemId != null"> and item_id = #{itemId}</if>
+            <if test="isPreferred != null and isPreferred != ''"> and is_preferred = #{isPreferred}</if>
+            <if test="enableFlag != null and enableFlag != ''"> and enable_flag = #{enableFlag}</if>
+        </where>
+        order by is_preferred desc, record_id desc
+    </select>
+
+    <select id="selectByVendorId" parameterType="Long" resultMap="MdItemVendorResult">
+        <include refid="selectVo"/> where vendor_id = #{vendorId} order by is_preferred desc
+    </select>
+
+    <select id="selectByItemId" parameterType="Long" resultMap="MdItemVendorResult">
+        <include refid="selectVo"/> where item_id = #{itemId} order by is_preferred desc
+    </select>
+
+    <insert id="insert" parameterType="MdItemVendor" useGeneratedKeys="true" keyProperty="recordId">
+        insert into qxx_md_item_vendor
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="itemId != null">item_id,</if>
+            <if test="itemCode != null">item_code,</if>
+            <if test="itemName != null">item_name,</if>
+            <if test="vendorId != null">vendor_id,</if>
+            <if test="vendorCode != null">vendor_code,</if>
+            <if test="vendorName != null">vendor_name,</if>
+            <if test="isPreferred != null">is_preferred,</if>
+            <if test="minOrderQty != null">min_order_qty,</if>
+            <if test="leadTimeDays != null">lead_time_days,</if>
+            <if test="enableFlag != null">enable_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            create_time,
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="itemId != null">#{itemId},</if>
+            <if test="itemCode != null">#{itemCode},</if>
+            <if test="itemName != null">#{itemName},</if>
+            <if test="vendorId != null">#{vendorId},</if>
+            <if test="vendorCode != null">#{vendorCode},</if>
+            <if test="vendorName != null">#{vendorName},</if>
+            <if test="isPreferred != null">#{isPreferred},</if>
+            <if test="minOrderQty != null">#{minOrderQty},</if>
+            <if test="leadTimeDays != null">#{leadTimeDays},</if>
+            <if test="enableFlag != null">#{enableFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            sysdate(),
+        </trim>
+    </insert>
+
+    <update id="update" parameterType="MdItemVendor">
+        update qxx_md_item_vendor
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="itemId != null">item_id = #{itemId},</if>
+            <if test="itemCode != null">item_code = #{itemCode},</if>
+            <if test="itemName != null">item_name = #{itemName},</if>
+            <if test="vendorId != null">vendor_id = #{vendorId},</if>
+            <if test="vendorCode != null">vendor_code = #{vendorCode},</if>
+            <if test="vendorName != null">vendor_name = #{vendorName},</if>
+            <if test="isPreferred != null">is_preferred = #{isPreferred},</if>
+            <if test="minOrderQty != null">min_order_qty = #{minOrderQty},</if>
+            <if test="leadTimeDays != null">lead_time_days = #{leadTimeDays},</if>
+            <if test="enableFlag != null">enable_flag = #{enableFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            update_time = sysdate(),
+        </trim>
+        where record_id = #{recordId}
+    </update>
+
+    <delete id="deleteByRecordId" parameterType="Long">
+        delete from qxx_md_item_vendor where record_id = #{recordId}
+    </delete>
+
+    <delete id="deleteByRecordIds">
+        delete from qxx_md_item_vendor where record_id in
+        <foreach item="rid" collection="array" open="(" separator="," close=")">#{rid}</foreach>
+    </delete>
+
+</mapper>

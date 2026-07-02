@@ -22,6 +22,12 @@ public interface IWmIssueHeaderService
     /** 根据工单BOM自动生成领料行 */
     public int loadBomLines(Long issueId, Long workorderId);
 
+    /** 确认领料单：DRAFT → CONFIRMED，预占库存（扣quantityAvailable） */
+    public int confirmIssue(Long issueId);
+
+    /** 释放预占库存：CONFIRMED → DRAFT，恢复quantityAvailable */
+    public int releaseAllocation(Long issueId);
+
     /** 执行出库：扣库存 + 写追溯 + 状态改为POSTED */
     public int executeIssue(Long issueId);
 }

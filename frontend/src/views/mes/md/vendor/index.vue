@@ -43,7 +43,9 @@
     <pagination v-show="total>0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
 
     <!-- 对话框 -->
-    <el-dialog :title="title" v-model="open" width="800px" append-to-body>
+    <el-dialog :title="title" v-model="open" width="900px" append-to-body>
+      <el-tabs v-model="activeTab" v-if="form.vendorId || optType==='add'">
+        <el-tab-pane label="基本信息" name="basic">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
         <el-row>
           <el-col :span="12"><el-form-item label="供应商编码" prop="vendorCode"><el-input v-model="form.vendorCode" placeholder="自动生成或手动输入" :disabled="optType === 'edit' || optType === 'view'" /></el-form-item></el-col>
@@ -129,6 +131,11 @@
           </el-col>
         </el-row>
       </el-form>
+        </el-tab-pane>
+        <el-tab-pane label="供应物料" name="items" v-if="form.vendorId">
+          <ItemVendorList :vendor-id="form.vendorId" />
+        </el-tab-pane>
+      </el-tabs>
       <template #footer><el-button type="primary" @click="submitForm">确 定</el-button><el-button @click="cancel">取 消</el-button></template>
     </el-dialog>
   </div>
@@ -141,6 +148,7 @@ import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import type { MdVendor, VendorQueryParams } from '@/types/api/mes/md/vendor'
 import { listVendor, getVendor, delVendor, addVendor, updateVendor } from '@/api/mes/md/vendor'
 import { listAllFactory } from '@/api/mes/md/factory'
+import ItemVendorList from './components/ItemVendorList.vue'
 
 const { proxy } = getCurrentInstance() as any
 const { sys_yes_no } = useDict('sys_yes_no')
@@ -148,7 +156,7 @@ const { mes_vendor_type, mes_settlement_type, mes_coop_status } = useDict('mes_v
 
 const vendorList = ref<MdVendor[]>([]); const open = ref(false); const loading = ref(true); const showSearch = ref(true)
 const ids = ref<number[]>([]); const single = ref(true); const multiple = ref(true); const total = ref(0); const title = ref('')
-const autoGenFlag = ref(false)
+const autoGenFlag = ref(false); const activeTab = ref('basic')
 const optType = ref<string | undefined>(undefined)
 const factoryOptions = ref<any[]>([])
 

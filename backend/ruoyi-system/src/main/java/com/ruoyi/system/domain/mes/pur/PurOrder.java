@@ -83,6 +83,12 @@ public class PurOrder extends BaseEntity
     @Excel(name = "关联客户订单号(如PO#ORD66003MT)")
     private String sourceOrderCode;
 
+    /** 关联工单ID */
+    private Long workorderId;
+
+    /** 关联工单编码 */
+    private String workorderCode;
+
     /** 状态:DRAFT-草稿,APPROVED-已审批,ORDERED-已下单,RECEIVING-收货中,RECEIVED-已收货,CLOSED-已关闭,CANCEL-已取消 */
     @Excel(name = "状态:DRAFT-草稿,APPROVED-已审批,ORDERED-已下单,RECEIVING-收货中,RECEIVED-已收货,CLOSED-已关闭,CANCEL-已取消")
     private String status;
@@ -237,14 +243,34 @@ public class PurOrder extends BaseEntity
         return currency;
     }
 
-    public void setSourceOrderCode(String sourceOrderCode) 
+    public void setSourceOrderCode(String sourceOrderCode)
     {
         this.sourceOrderCode = sourceOrderCode;
     }
 
-    public String getSourceOrderCode() 
+    public String getSourceOrderCode()
     {
         return sourceOrderCode;
+    }
+
+    public void setWorkorderId(Long workorderId)
+    {
+        this.workorderId = workorderId;
+    }
+
+    public Long getWorkorderId()
+    {
+        return workorderId;
+    }
+
+    public void setWorkorderCode(String workorderCode)
+    {
+        this.workorderCode = workorderCode;
+    }
+
+    public String getWorkorderCode()
+    {
+        return workorderCode;
     }
 
     public void setStatus(String status) 
@@ -276,6 +302,8 @@ public class PurOrder extends BaseEntity
             .append("totalAmount", getTotalAmount())
             .append("currency", getCurrency())
             .append("sourceOrderCode", getSourceOrderCode())
+            .append("workorderId", getWorkorderId())
+            .append("workorderCode", getWorkorderCode())
             .append("status", getStatus())
             .append("remark", getRemark())
             .append("createBy", getCreateBy())

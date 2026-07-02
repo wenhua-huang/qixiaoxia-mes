@@ -20,3 +20,5 @@ export function checkWorkorderMaterial(workorderId) { return request({ url: '/me
 export function startWorkorderWithCheck(workorderId) { return request({ url: '/mes/pro/workorder/startWithCheck/' + workorderId, method: 'put' }) }
 // 偏离检测：比较提交的BOM/参数与路线标准，返回偏离明细（后端权威判定）
 export function checkDeviation(data) { return request({ url: '/mes/pro/workorder/checkDeviation', method: 'post', data }) }
+// 取消工单：PREPARE/PRODUCING → CANCEL
+export function cancelWorkorder(workorderId) { return request({ url: '/mes/pro/workorder/cancel/' + workorderId, method: 'put' }) }

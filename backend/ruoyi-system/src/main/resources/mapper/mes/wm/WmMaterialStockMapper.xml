@@ -245,4 +245,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         limit 1
     </select>
 
+    <select id="loadMaterialStockForUpdate" parameterType="WmMaterialStock" resultMap="WmMaterialStockResult">
+        <include refid="selectWmMaterialStockVo"/>
+        where item_id = #{itemId}
+          and batch_id = #{batchId}
+          and warehouse_id = #{warehouseId}
+          and vendor_id = #{vendorId}
+          and workorder_id = #{workorderId}
+          and quality_status = #{qualityStatus}
+        limit 1
+        for update
+    </select>
+
 </mapper>

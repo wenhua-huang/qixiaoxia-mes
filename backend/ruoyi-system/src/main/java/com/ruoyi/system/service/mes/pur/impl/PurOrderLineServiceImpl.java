@@ -89,7 +89,7 @@ public class PurOrderLineServiceImpl implements IPurOrderLineService
 
     /**
      * 删除采购订单行信息
-     * 
+     *
      * @param lineId 采购订单行主键
      * @return 结果
      */
@@ -97,5 +97,17 @@ public class PurOrderLineServiceImpl implements IPurOrderLineService
     public int deletePurOrderLineByLineId(Long lineId)
     {
         return purOrderLineMapper.deletePurOrderLineByLineId(lineId);
+    }
+
+    /**
+     * 按订单ID删除所有行（级联删除）
+     *
+     * @param orderId 采购订单ID
+     * @return 结果
+     */
+    @Override
+    public int deletePurOrderLineByOrderId(Long orderId)
+    {
+        return purOrderLineMapper.deletePurOrderLineByOrderId(orderId);
     }
 }

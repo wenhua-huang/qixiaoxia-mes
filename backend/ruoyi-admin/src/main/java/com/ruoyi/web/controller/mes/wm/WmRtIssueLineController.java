@@ -52,6 +52,10 @@ public class WmRtIssueLineController extends BaseController
     }
 
     @PreAuthorize("@ss.hasPermi('mes:wm:rtissueline:query')")
+    @GetMapping("/listByRtId/{rtId}")
+    public AjaxResult listByRtId(@PathVariable Long rtId) { WmRtIssueLine q = new WmRtIssueLine(); q.setRtId(rtId); return success(wmRtIssueLineService.selectWmRtIssueLineList(q)); }
+
+    @PreAuthorize("@ss.hasPermi('mes:wm:rtissueline:query')")
     @GetMapping(value = "/{lineId}")
     public AjaxResult getInfo(@PathVariable("lineId") Long lineId) { return success(wmRtIssueLineService.selectWmRtIssueLineByLineId(lineId)); }
 

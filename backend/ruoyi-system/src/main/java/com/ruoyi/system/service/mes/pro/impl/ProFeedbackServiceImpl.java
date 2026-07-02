@@ -7,6 +7,8 @@ import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.core.redis.RedisLockTemplate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
@@ -33,6 +35,7 @@ import com.ruoyi.system.domain.mes.pro.ProCard;
 import com.ruoyi.system.domain.mes.pro.ProMaterialTrace;
 import com.ruoyi.system.domain.mes.md.MdItem;
 import com.ruoyi.system.service.mes.pro.IProFeedbackService;
+import com.ruoyi.system.service.mes.pro.IProWorkorderDocService;
 
 /**
  * 报工记录Service业务层处理
@@ -265,6 +268,11 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
         return rows;
     }
 
+    @Autowired
+    private IProWorkorderDocService proWorkorderDocService;
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ProFeedbackServiceImpl.class);
+
     @Override
     @Transactional
     public void auditFeedback(Long recordId) {
@@ -295,6 +303,13 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
                     // 有工艺路线信息：仅末工序报工才更新工单已生产数
                     if (isLastProcessOfRoute(fb.getRouteId(), fb.getProcessId())) {
                         proWorkorderMapper.addQuantityProduced(fb.getWorkorderId(), deltaProduced);
+                        // 末工序报工审核后：自动生成入库单 + 退料单
+                        try {
+                            proWorkorderDocService.onFeedbackAudited(recordId);
+                        } catch (Exception e) {
+                            log.error("自动生成入库单/退料单失败, feedbackId={}, workorderId={}, err={}",
+                                    recordId, fb.getWorkorderId(), e.getMessage());
+                        }
                     }
                 } else {
                     // 无工艺路线信息（直接从工单报工，不绑定具体工序）：保持原有逻辑

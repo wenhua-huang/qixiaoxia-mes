@@ -20,6 +20,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="recptDate" column="recpt_date" />
         <result property="recptType" column="recpt_type" />
         <result property="totalQuantity" column="total_quantity" />
+        <result property="workorderId" column="workorder_id" />
+        <result property="workorderCode" column="workorder_code" />
         <result property="iqcId" column="iqc_id" />
         <result property="iqcCode" column="iqc_code" />
         <result property="status" column="status" />
@@ -31,7 +33,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectWmItemRecptVo">
-        select recpt_id, factory_id, recpt_code, recpt_name, pur_order_id, pur_order_code, vendor_id, vendor_code, vendor_name, warehouse_id, warehouse_code, warehouse_name, recpt_date, recpt_type, total_quantity, iqc_id, iqc_code, status, remark, create_by, create_time, update_by, update_time from qxx_wm_item_recpt
+        select recpt_id, factory_id, recpt_code, recpt_name, pur_order_id, pur_order_code, vendor_id, vendor_code, vendor_name, warehouse_id, warehouse_code, warehouse_name, recpt_date, recpt_type, total_quantity, workorder_id, workorder_code, iqc_id, iqc_code, status, remark, create_by, create_time, update_by, update_time from qxx_wm_item_recpt
     </sql>
 
     <select id="selectWmItemRecptList" parameterType="WmItemRecpt" resultMap="WmItemRecptResult">
@@ -47,6 +49,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="warehouseCode != null and warehouseCode != ''"> and warehouse_code like concat('%', #{warehouseCode}, '%')</if>
             <if test="warehouseName != null and warehouseName != ''"> and warehouse_name like concat('%', #{warehouseName}, '%')</if>
             <if test="recptType != null and recptType != ''"> and recpt_type like concat('%', #{recptType}, '%')</if>
+            <if test="workorderId != null"> and workorder_id = #{workorderId}</if>
+            <if test="workorderCode != null and workorderCode != ''"> and workorder_code = #{workorderCode}</if>
             <if test="iqcId != null"> and iqc_id = #{iqcId}</if>
             <if test="iqcCode != null and iqcCode != ''"> and iqc_code like concat('%', #{iqcCode}, '%')</if>
             <if test="status != null and status != ''"> and status like concat('%', #{status}, '%')</if>
@@ -80,6 +84,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="recptDate != null">recpt_date,</if>
             <if test="recptType != null">recpt_type,</if>
             <if test="totalQuantity != null">total_quantity,</if>
+            <if test="workorderId != null">workorder_id,</if>
+            <if test="workorderCode != null">workorder_code,</if>
             <if test="iqcId != null">iqc_id,</if>
             <if test="iqcCode != null">iqc_code,</if>
             <if test="status != null">status,</if>
@@ -102,6 +108,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="recptDate != null">#{recptDate},</if>
             <if test="recptType != null">#{recptType},</if>
             <if test="totalQuantity != null">#{totalQuantity},</if>
+            <if test="workorderId != null">#{workorderId},</if>
+            <if test="workorderCode != null">#{workorderCode},</if>
             <if test="iqcId != null">#{iqcId},</if>
             <if test="iqcCode != null">#{iqcCode},</if>
             <if test="status != null">#{status},</if>
@@ -128,6 +136,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="recptDate != null">recpt_date = #{recptDate},</if>
             <if test="recptType != null">recpt_type = #{recptType},</if>
             <if test="totalQuantity != null">total_quantity = #{totalQuantity},</if>
+            <if test="workorderId != null">workorder_id = #{workorderId},</if>
+            <if test="workorderCode != null">workorder_code = #{workorderCode},</if>
             <if test="iqcId != null">iqc_id = #{iqcId},</if>
             <if test="iqcCode != null">iqc_code = #{iqcCode},</if>
             <if test="status != null">status = #{status},</if>

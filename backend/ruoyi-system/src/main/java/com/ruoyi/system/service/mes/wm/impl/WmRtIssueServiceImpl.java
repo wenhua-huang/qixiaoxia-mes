@@ -205,7 +205,7 @@ public class WmRtIssueServiceImpl implements IWmRtIssueService
             stockQuery.setWorkorderId(header.getWorkorderId() != null ? header.getWorkorderId() : 0L);
             stockQuery.setQualityStatus("NORMAL");
 
-            WmMaterialStock existing = wmMaterialStockMapper.loadMaterialStock(stockQuery);
+            WmMaterialStock existing = wmMaterialStockMapper.loadMaterialStockForUpdate(stockQuery);
             BigDecimal delta = line.getQuantityRt();
 
             if (existing != null) {

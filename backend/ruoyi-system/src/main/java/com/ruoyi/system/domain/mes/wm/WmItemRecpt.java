@@ -62,6 +62,12 @@ public class WmItemRecpt extends BaseEntity
     @Excel(name = "入库总数量")
     private BigDecimal totalQuantity;
 
+    /** 关联工单ID(生产入库) */
+    private Long workorderId;
+
+    /** 关联工单编码 */
+    private String workorderCode;
+
     @Excel(name = "质检单ID")
     private Long iqcId;
 
@@ -115,6 +121,12 @@ public class WmItemRecpt extends BaseEntity
 
     public BigDecimal getTotalQuantity() { return totalQuantity; }
     public void setTotalQuantity(BigDecimal v) { this.totalQuantity = v; }
+
+    public Long getWorkorderId() { return workorderId; }
+    public void setWorkorderId(Long v) { this.workorderId = v; }
+
+    public String getWorkorderCode() { return workorderCode; }
+    public void setWorkorderCode(String v) { this.workorderCode = v; }
 
     public Long getIqcId() { return iqcId; }
     public void setIqcId(Long v) { this.iqcId = v; }

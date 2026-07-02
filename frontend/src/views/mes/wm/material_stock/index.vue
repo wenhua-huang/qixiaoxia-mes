@@ -38,6 +38,7 @@
       <el-table-column label="物料名称" align="center" prop="itemName" :show-overflow-tooltip="true" width="150" />
       <el-table-column label="规格型号" align="center" prop="specification" :show-overflow-tooltip="true" width="120" />
       <el-table-column label="库存数量" align="center" prop="quantityOnhand" width="100" sortable />
+	      <el-table-column label="可用库存" align="center" prop="quantityAvailable" width="100" sortable />
       <el-table-column label="单位" align="center" prop="unitName" width="70" />
       <el-table-column label="批次号" align="center" prop="batchCode" width="130" :show-overflow-tooltip="true">
         <template #default="scope">

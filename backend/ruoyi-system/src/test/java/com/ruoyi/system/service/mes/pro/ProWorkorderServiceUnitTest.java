@@ -13,6 +13,7 @@ import com.ruoyi.system.domain.mes.pro.ProWorkorderParam;
 import com.ruoyi.system.domain.mes.wm.WmMaterialStock;
 import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
 import com.ruoyi.system.service.mes.pro.impl.ProWorkorderServiceImpl;
+import com.ruoyi.system.service.mes.wm.IWmIssueHeaderService;
 import com.ruoyi.system.service.mes.wm.IWmMaterialStockService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,6 +46,7 @@ class ProWorkorderServiceUnitTest {
     @Mock private IProWorkorderBomService workorderBomService;
     @Mock private IWmMaterialStockService materialStockService;
     @Mock private IProWorkorderParamService workorderParamService;
+    @Mock private IWmIssueHeaderService wmIssueHeaderService;
     @InjectMocks private ProWorkorderServiceImpl workorderService;
 
     private ProWorkorder testWorkorder;
@@ -375,7 +377,7 @@ class ProWorkorderServiceUnitTest {
         when(workorderBomService.selectProWorkorderBomByWorkorderId(1L)).thenReturn(bomList);
 
         WmMaterialStock stock = new WmMaterialStock();
-        stock.setQuantityOnhand(new BigDecimal("200"));
+        stock.setQuantityAvailable(new BigDecimal("200"));
         List<WmMaterialStock> stocks = new ArrayList<>();
         stocks.add(stock);
         when(materialStockService.selectWmMaterialStockList(any(WmMaterialStock.class))).thenReturn(stocks);
@@ -413,7 +415,7 @@ class ProWorkorderServiceUnitTest {
         when(workorderBomService.selectProWorkorderBomByWorkorderId(1L)).thenReturn(bomList);
 
         WmMaterialStock stock = new WmMaterialStock();
-        stock.setQuantityOnhand(new BigDecimal("800"));
+        stock.setQuantityAvailable(new BigDecimal("800"));
         List<WmMaterialStock> stocks = new ArrayList<>();
         stocks.add(stock);
         when(materialStockService.selectWmMaterialStockList(any(WmMaterialStock.class))).thenReturn(stocks);
@@ -454,13 +456,13 @@ class ProWorkorderServiceUnitTest {
 
         // 物料A库存仅30（不足）
         WmMaterialStock stockA = new WmMaterialStock();
-        stockA.setQuantityOnhand(new BigDecimal("30"));
+        stockA.setQuantityAvailable(new BigDecimal("30"));
         when(materialStockService.selectWmMaterialStockList(argThat(s -> s != null && Long.valueOf(10L).equals(s.getItemId()))))
                 .thenReturn(List.of(stockA));
 
         // 物料B库存200（充足）
         WmMaterialStock stockB = new WmMaterialStock();
-        stockB.setQuantityOnhand(new BigDecimal("200"));
+        stockB.setQuantityAvailable(new BigDecimal("200"));
         when(materialStockService.selectWmMaterialStockList(argThat(s -> s != null && Long.valueOf(20L).equals(s.getItemId()))))
                 .thenReturn(List.of(stockB));
 
@@ -493,9 +495,9 @@ class ProWorkorderServiceUnitTest {
 
         // 两个仓库各100 → 汇总为200，仍不足
         WmMaterialStock stock1 = new WmMaterialStock();
-        stock1.setQuantityOnhand(new BigDecimal("100"));
+        stock1.setQuantityAvailable(new BigDecimal("100"));
         WmMaterialStock stock2 = new WmMaterialStock();
-        stock2.setQuantityOnhand(new BigDecimal("100"));
+        stock2.setQuantityAvailable(new BigDecimal("100"));
         when(materialStockService.selectWmMaterialStockList(any(WmMaterialStock.class)))
                 .thenReturn(List.of(stock1, stock2));
 
@@ -721,5 +723,87 @@ class ProWorkorderServiceUnitTest {
         assertThat(result.getWorkorderId()).isEqualTo(9001L);
         verify(workorderBomService, times(1)).insertProWorkorderBom(any(ProWorkorderBom.class));
         verify(workorderParamService, times(1)).insertProWorkorderParam(any(ProWorkorderParam.class));
+    }
+
+    // ══════════════════════════════════════════════
+    // 13. cancelWorkorder 测试
+    // ══════════════════════════════════════════════
+
+    @Test
+    @DisplayName("13. 取消工单：PREPARE→CANCEL")
+    void testCancelWorkorderPrepare() {
+        testWorkorder.setStatus("PREPARE");
+        when(workorderMapper.selectProWorkorderByWorkorderId(1L)).thenReturn(testWorkorder);
+        when(workorderMapper.updateProWorkorder(any(ProWorkorder.class))).thenReturn(1);
+        when(wmIssueHeaderService.selectWmIssueHeaderList(any())).thenReturn(new ArrayList<>());
+
+        int result = workorderService.cancelWorkorder(1L);
+
+        assertThat(result).isEqualTo(1);
+        ArgumentCaptor<ProWorkorder> captor = ArgumentCaptor.forClass(ProWorkorder.class);
+        verify(workorderMapper).updateProWorkorder(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo("CANCEL");
+    }
+
+    @Test
+    @DisplayName("13b. 取消工单：PRODUCING→CANCEL")
+    void testCancelWorkorderProducing() {
+        testWorkorder.setStatus("PRODUCING");
+        when(workorderMapper.selectProWorkorderByWorkorderId(1L)).thenReturn(testWorkorder);
+        when(workorderMapper.updateProWorkorder(any(ProWorkorder.class))).thenReturn(1);
+        when(wmIssueHeaderService.selectWmIssueHeaderList(any())).thenReturn(new ArrayList<>());
+
+        workorderService.cancelWorkorder(1L);
+        verify(workorderMapper).updateProWorkorder(any(ProWorkorder.class));
+    }
+
+    @Test
+    @DisplayName("13c. 取消工单：COMPLETED状态拒绝")
+    void testCancelWorkorderRejectsCompleted() {
+        testWorkorder.setStatus("COMPLETED");
+        when(workorderMapper.selectProWorkorderByWorkorderId(1L)).thenReturn(testWorkorder);
+
+        assertThatThrownBy(() -> workorderService.cancelWorkorder(1L))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("待生产或生产中");
+    }
+
+    @Test
+    @DisplayName("13d. 取消工单：CANCEL状态拒绝")
+    void testCancelWorkorderRejectsAlreadyCancelled() {
+        testWorkorder.setStatus("CANCEL");
+        when(workorderMapper.selectProWorkorderByWorkorderId(1L)).thenReturn(testWorkorder);
+
+        assertThatThrownBy(() -> workorderService.cancelWorkorder(1L))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("待生产或生产中");
+    }
+
+    @Test
+    @DisplayName("13e. 取消工单：释放已确认领料单的预占库存")
+    void testCancelWorkorderReleasesAllocations() {
+        testWorkorder.setStatus("PRODUCING");
+        when(workorderMapper.selectProWorkorderByWorkorderId(1L)).thenReturn(testWorkorder);
+        when(workorderMapper.updateProWorkorder(any(ProWorkorder.class))).thenReturn(1);
+
+        // 模拟该工单下有2张确认的领料单
+        com.ruoyi.system.domain.mes.wm.WmIssueHeader confirmed1 = new com.ruoyi.system.domain.mes.wm.WmIssueHeader();
+        confirmed1.setIssueId(10L);
+        confirmed1.setStatus("CONFIRMED");
+        com.ruoyi.system.domain.mes.wm.WmIssueHeader confirmed2 = new com.ruoyi.system.domain.mes.wm.WmIssueHeader();
+        confirmed2.setIssueId(20L);
+        confirmed2.setStatus("CONFIRMED");
+        com.ruoyi.system.domain.mes.wm.WmIssueHeader draftOne = new com.ruoyi.system.domain.mes.wm.WmIssueHeader();
+        draftOne.setIssueId(30L);
+        draftOne.setStatus("DRAFT");
+        when(wmIssueHeaderService.selectWmIssueHeaderList(any()))
+                .thenReturn(List.of(confirmed1, confirmed2, draftOne));
+
+        workorderService.cancelWorkorder(1L);
+
+        // 确认的领料单释放预占，草稿的不释放
+        verify(wmIssueHeaderService).releaseAllocation(10L);
+        verify(wmIssueHeaderService).releaseAllocation(20L);
+        verify(wmIssueHeaderService, never()).releaseAllocation(30L);
     }
 }

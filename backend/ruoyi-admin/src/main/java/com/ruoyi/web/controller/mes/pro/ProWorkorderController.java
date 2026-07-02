@@ -21,6 +21,10 @@ import com.ruoyi.system.domain.mes.pro.ProWorkorderCreateRequest;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderDetailVO;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderDeviationVO;
 import com.ruoyi.system.service.mes.pro.IProWorkorderService;
+import com.ruoyi.system.service.mes.pro.IProWorkorderDocService;
+import com.ruoyi.system.domain.mes.pro.ProDocGenerationRequestVO;
+import com.ruoyi.system.domain.mes.pro.ProDocGenerationResultVO;
+import com.ruoyi.system.domain.mes.pro.ProWorkorderKitDashboardVO;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.page.TableDataInfo;
 
@@ -36,6 +40,9 @@ public class ProWorkorderController extends BaseController
 {
     @Autowired
     private IProWorkorderService proWorkorderService;
+
+    @Autowired
+    private IProWorkorderDocService proWorkorderDocService;
 
     /**
      * 查询生产工单列表
@@ -209,5 +216,95 @@ public class ProWorkorderController extends BaseController
     public AjaxResult checkMaterial(@PathVariable Long workorderId)
     {
         return success(proWorkorderService.checkMaterialReadiness(workorderId));
+    }
+
+    /**
+     * 取消工单：PREPARE/PRODUCING → CANCEL
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:edit')")
+    @Log(title = "生产工单取消", businessType = BusinessType.UPDATE)
+    @PutMapping("/cancel/{workorderId}")
+    public AjaxResult cancel(@PathVariable Long workorderId)
+    {
+        return toAjax(proWorkorderService.cancelWorkorder(workorderId));
+    }
+
+    /**
+     * 加载工单齐套看板 — 汇总物料分析及领料/采购/退料/入库四类单据状态
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:query')")
+    @GetMapping("/kitDashboard/{workorderId}")
+    public AjaxResult kitDashboard(@PathVariable Long workorderId)
+    {
+        ProWorkorderKitDashboardVO vo = proWorkorderDocService.loadKitDashboard(workorderId);
+        return success(vo);
+    }
+
+    /**
+     * 一键批量生成单据（齐套看板内操作）
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:edit')")
+    @Log(title = "工单齐套文档生成", businessType = BusinessType.INSERT)
+    @PostMapping("/generateDocs")
+    public AjaxResult generateDocs(@RequestBody ProDocGenerationRequestVO request)
+    {
+        ProDocGenerationResultVO result = proWorkorderDocService.generateDocuments(request);
+        return success(result);
+    }
+
+    /**
+     * 单独生成产品入库单
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:edit')")
+    @Log(title = "生成产品入库单", businessType = BusinessType.INSERT)
+    @PostMapping("/generateReceipt/{workorderId}")
+    public AjaxResult generateReceipt(@PathVariable Long workorderId)
+    {
+        return success(proWorkorderDocService.generateProductReceipt(workorderId));
+    }
+
+    /**
+     * 单独生成退料单
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:edit')")
+    @Log(title = "生成退料单", businessType = BusinessType.INSERT)
+    @PostMapping("/generateReturn/{workorderId}")
+    public AjaxResult generateReturn(@PathVariable Long workorderId)
+    {
+        return success(proWorkorderDocService.generateMaterialReturn(workorderId));
+    }
+
+    /**
+     * 单独生成采购单
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:edit')")
+    @Log(title = "生成采购单", businessType = BusinessType.INSERT)
+    @PostMapping("/generatePurOrder/{workorderId}")
+    public AjaxResult generatePurOrder(@PathVariable Long workorderId)
+    {
+        java.util.Map<String, Object> result = proWorkorderDocService.generatePurchaseOrder(workorderId);
+        return success(result);
+    }
+
+    /**
+     * 采购单快捷创建向导 — 返回推荐数据（供应商、数量），不写库
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:query')")
+    @GetMapping("/purOrderWizard/{workorderId}")
+    public AjaxResult purOrderWizard(@PathVariable Long workorderId)
+    {
+        return success(proWorkorderDocService.buildPurOrderWizard(workorderId));
+    }
+
+    /**
+     * 采购向导弹窗确认提交 — 接收用户勾选/修改后的物料行，按供应商分组生成采购单
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:edit')")
+    @Log(title = "采购向导生成采购单", businessType = BusinessType.INSERT)
+    @PostMapping("/purOrderWizard/{workorderId}/submit")
+    public AjaxResult submitPurOrderWizard(@PathVariable Long workorderId,
+            @RequestBody java.util.List<com.ruoyi.system.domain.mes.pro.PurOrderWizardLineVO> lines)
+    {
+        return success(proWorkorderDocService.submitPurOrderWizard(workorderId, lines));
     }
 }

@@ -28,13 +28,14 @@
       <el-table-column label="状态" align="center" prop="status" width="80"><template #default="scope"><span :style="{color: statusColor[scope.row.status]}">{{ statusMap[scope.row.status] || scope.row.status }}</span></template></el-table-column>
       <el-table-column label="需求日期" align="center" prop="requestDate" width="100"><template #default="scope"><span>{{ parseTime(scope.row.requestDate, '{y}-{m}-{d}') }}</span></template></el-table-column>
       <el-table-column label="创建时间" align="center" prop="createTime" width="150"><template #default="scope"><span>{{ parseTime(scope.row.createTime, '{y}-{m}-{d} {h}:{i}:{s}') }}</span></template></el-table-column>
-      <el-table-column label="操作" align="center" width="185" fixed="right" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="220" fixed="right" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-tooltip content="排产" placement="top" v-if="scope.row.status==='PREPARE' || scope.row.status==='PRODUCING'"><el-button link type="success" icon="Calendar" @click="handleSchedule(scope.row)" v-hasPermi="['mes:pro:task:add']"></el-button></el-tooltip>
           <el-tooltip content="开工" placement="top" v-if="scope.row.status==='PREPARE'"><el-button link type="primary" icon="VideoPlay" @click="handleStart(scope.row)" v-hasPermi="['mes:pro:workorder:edit']"></el-button></el-tooltip>
-          <el-tooltip content="齐套检查" placement="top" v-if="scope.row.status==='PREPARE'"><el-button link type="warning" icon="List" @click="handleCheckMaterial(scope.row)"></el-button></el-tooltip>
+          <el-tooltip content="齐套看板" placement="top"><el-button link type="warning" icon="List" @click="handleCheckMaterial(scope.row)"></el-button></el-tooltip>
           <el-tooltip content="修改" placement="top" v-if="scope.row.status==='PREPARE'"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:pro:workorder:edit']"></el-button></el-tooltip>
           <el-tooltip content="删除" placement="top" v-if="scope.row.status==='PREPARE'"><el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:pro:workorder:remove']"></el-button></el-tooltip>
+          <el-tooltip content="取消" placement="top" v-if="scope.row.status==='PREPARE' || scope.row.status==='PRODUCING'"><el-button link type="danger" icon="Close" @click="handleCancel(scope.row)" v-hasPermi="['mes:pro:workorder:edit']"></el-button></el-tooltip>
           <el-tooltip content="查看" placement="top"><el-button link type="primary" icon="View" @click="handleView(scope.row)"></el-button></el-tooltip>
         </template>
       </el-table-column>
@@ -266,22 +267,8 @@
       <template #footer><el-button type="primary" @click="submitScheduleTask">确 定</el-button><el-button @click="scheduleTaskOpen=false">取 消</el-button></template>
     </el-dialog>
 
-    <!-- 物料齐套检查弹窗 -->
-    <el-dialog :title="'物料齐套检查 — ' + materialCheckWorkorderName" v-model="materialCheckOpen" width="800px" append-to-body>
-      <el-alert :title="materialCheckPassed ? '所有物料齐套，可以开工！' : '以下物料缺料，暂不可开工'" :type="materialCheckPassed ? 'success' : 'warning'" :closable="false" show-icon style="margin-bottom:12px" />
-      <el-table :data="materialCheckList" size="small">
-        <el-table-column label="物料编码" align="center" prop="itemCode" width="120" />
-        <el-table-column label="物料名称" align="center" prop="itemName" :show-overflow-tooltip="true" />
-        <el-table-column label="需求数量" align="center" width="100"><template #default="scope">{{ scope.row.requiredQty }} {{ scope.row.unitName }}</template></el-table-column>
-        <el-table-column label="可用库存" align="center" width="100"><template #default="scope">{{ scope.row.availableQty }} {{ scope.row.unitName }}</template></el-table-column>
-        <el-table-column label="状态" align="center" width="80"><template #default="scope"><el-tag :type="scope.row.sufficient ? 'success' : 'danger'" size="small">{{ scope.row.sufficient ? '充足' : '缺料' }}</el-tag></template></el-table-column>
-        <el-table-column label="缺口" align="center" width="100"><template #default="scope"><span :style="{color:scope.row.sufficient?'#67C23A':'#F56C6C'}">{{ scope.row.shortageQty }} {{ scope.row.unitName }}</span></template></el-table-column>
-      </el-table>
-      <template #footer>
-        <el-button type="primary" @click="confirmStart" :disabled="!materialCheckPassed" v-if="materialCheckWorkorderStatus==='PREPARE'">确认开工</el-button>
-        <el-button @click="materialCheckOpen=false">关 闭</el-button>
-      </template>
-    </el-dialog>
+    <!-- 工单齐套看板 → 触发采购单/领料单/退料单/入库单 -->
+    <KitDashboard v-model="kitDashboardOpen" :workorderId="kitWorkorderId" @refresh="getList" />
 
     <!-- 开工检查流程弹窗 -->
     <el-dialog :title="'开工检查 — ' + startCheckWorkorderName" v-model="startCheckOpen" width="850px" append-to-body @close="startCheckOpen=false" :close-on-click-modal="false">
@@ -352,18 +339,19 @@
 </template>
 
 <script>
-import { listWorkorder, getWorkorderDetail, delWorkorder, createWorkorderWithBom, updateWorkorderWithBom, startWorkorder, checkWorkorderMaterial, startWorkorderWithCheck, checkDeviation } from '@/api/mes/pro/workorder'
+import { listWorkorder, getWorkorderDetail, delWorkorder, createWorkorderWithBom, updateWorkorderWithBom, startWorkorderWithCheck, checkDeviation, cancelWorkorder } from '@/api/mes/pro/workorder'
 import { listRouteProduct } from '@/api/mes/pro/routeproduct'
 import { listRouteProcessByRouteId } from '@/api/mes/pro/routeprocess'
 import { listRoute } from '@/api/mes/pro/proroute'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import ItemSelect from '@/components/itemSelect/single.vue'
 import WorkstationSelect from '@/components/workstationSelect/single.vue'
+import KitDashboard from './KitDashboard.vue'
 import { listAllProcess } from '@/api/mes/pro/process'
 
 export default {
   name: 'Workorder',
-  components: { ItemSelect, WorkstationSelect },
+  components: { ItemSelect, WorkstationSelect, KitDashboard },
   data() {
     return {
       autoGenFlag: false, optType: undefined, step: 1, prorouteId: null,
@@ -380,9 +368,8 @@ export default {
       scheduleTaskOpen: false, scheduleTaskTitle: '', scheduleTaskForm: {}, scheduleEditTaskId: null,
       scheduleStatusMap: { PREPARE:'待排产',NORMAL:'正常',PRODUCING:'生产中',COMPLETED:'已完成',PAUSED:'暂停',CANCEL:'取消' },
       scheduleStatusColor: { PREPARE:'#E6A23C',NORMAL:'#409EFF',PRODUCING:'#67C23A',COMPLETED:'#909399',PAUSED:'#E6A23C',CANCEL:'#F56C6C' },
-      // 物料齐套检查
-      materialCheckOpen: false, materialCheckWorkorderId: null, materialCheckWorkorderName: '', materialCheckWorkorderStatus: '',
-      materialCheckList: [], materialCheckPassed: false,
+      // 工单齐套看板
+      kitDashboardOpen: false, kitWorkorderId: null,
       // 开工检查流程
       startCheckOpen: false, startCheckWorkorderId: null, startCheckWorkorderName: '',
       startCheckSteps: [
@@ -669,18 +656,13 @@ export default {
       const ids=row.workorderId||this.ids.join(',')
       this.$modal.confirm('确认删除工单"'+ids+'"？').then(()=>delWorkorder(ids)).then(()=>{ this.getList(); this.$modal.msgSuccess('删除成功') }).catch(()=>{})
     },
-    // 物料齐套检查
+    handleCancel(row) {
+      this.$modal.confirm('确认取消工单【'+row.workorderName+'】？取消后不可恢复。').then(()=>cancelWorkorder(row.workorderId)).then(()=>{ this.getList(); this.$modal.msgSuccess('已取消') }).catch(()=>{})
+    },
+    // 打开工单齐套看板
     handleCheckMaterial(row) {
-      this.materialCheckWorkorderId = row.workorderId
-      this.materialCheckWorkorderName = row.workorderName
-      this.materialCheckWorkorderStatus = row.status
-      this.materialCheckList = []
-      this.materialCheckPassed = false
-      checkWorkorderMaterial(row.workorderId).then(r => {
-        this.materialCheckList = r.data || []
-        this.materialCheckPassed = this.materialCheckList.every(item => item.sufficient)
-        this.materialCheckOpen = true
-      }).catch(() => {})
+      this.kitWorkorderId = row.workorderId
+      this.kitDashboardOpen = true
     },
     // 开工 — 打开分步检查弹窗
     handleStart(row) {
@@ -827,15 +809,6 @@ export default {
           this.loadScheduleTasks()
         }).catch(() => {})
       })
-    },
-    // 齐套检查通过后确认开工
-    confirmStart() {
-      if (!this.materialCheckPassed) return
-      startWorkorder(this.materialCheckWorkorderId).then(() => {
-        this.$modal.msgSuccess('开工成功')
-        this.materialCheckOpen = false
-        this.getList()
-      }).catch(() => {})
     },
   },
 }

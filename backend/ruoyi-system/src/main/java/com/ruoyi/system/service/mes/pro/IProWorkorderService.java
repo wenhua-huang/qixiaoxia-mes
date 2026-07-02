@@ -86,6 +86,14 @@ public interface IProWorkorderService
     public int startProduction(Long workorderId);
 
     /**
+     * 取消工单：PREPARE/PRODUCING → CANCEL
+     *
+     * @param workorderId 生产工单主键
+     * @return 结果
+     */
+    public int cancelWorkorder(Long workorderId);
+
+    /**
      * 物料齐套检查（实时计算，不持久化）
      * 读取工单 BOM → 实时查询 wm 库存 → 返回每行物料的供需情况
      *

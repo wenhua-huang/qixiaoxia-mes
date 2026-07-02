@@ -390,6 +390,25 @@ async function loadGanttData() {
       } else if (matRes?.data) {
         ganttTasks.value.forEach(p => p.materialStatus = { status: 'ok', shortageNames: '' })
       }
+
+      // 自动排产：无任务时自动调用排产API，用户可见结果
+      const hasTasks = ganttTasks.value.some(p => (p.children || []).length > 0)
+      if (!hasTasks) {
+        ElMessage.info('正在自动排产…')
+        try {
+          await request({ url: `/mes/pro/gantt/schedule/${queryParams.workorderId}`, method: 'post' })
+          const retryRes = await getWorkOrderGantt(queryParams.workorderId)
+          ganttTasks.value = retryRes?.data?.tasks || []
+          const count = ganttTasks.value[0]?.children?.length || 0
+          if (count > 0) {
+            ElMessage.success(`排产完成，共 ${count} 个工序任务`)
+          } else {
+            ElMessage.warning('排产完成但无任务，请检查工单工艺路线是否配置完整')
+          }
+        } catch {
+          ElMessage.error('自动排产失败，请手动点击「自动排产」按钮')
+        }
+      }
     } else if (queryParams.workstationId && viewMode.value === 'workstation') {
       const res = await getWorkstationGantt(queryParams.workstationId)
       ganttTasks.value = (res as any)?.data?.tasks || []

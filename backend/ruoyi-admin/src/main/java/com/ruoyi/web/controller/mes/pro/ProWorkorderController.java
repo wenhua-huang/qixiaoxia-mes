@@ -125,8 +125,8 @@ public class ProWorkorderController extends BaseController
     {
         ProWorkorder workorder = proWorkorderService.createWorkorderWithBom(
             request.getWorkorder(), request.getBomList(), request.getParamList());
-        // 自动排产：工单创建后自动生成工序任务，甘特图即可展示
-        try { scheduleService.scheduleWorkOrder(workorder.getWorkorderId()); } catch (Exception e) { log.warn("自动排产失败: workorderId={}", e.getMessage()); }
+        // 自动排产：工单创建后自动生成工序任务
+        try { scheduleService.scheduleWorkOrder(workorder.getWorkorderId()); } catch (Exception e) { log.warn("自动排产失败: workorderId={}, error={}", workorder.getWorkorderId(), e.toString()); }
         return success(workorder);
     }
 

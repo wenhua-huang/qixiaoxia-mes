@@ -7,9 +7,6 @@
       <el-form-item label="库区名称" prop="locationName">
         <el-input v-model="queryParams.locationName" placeholder="请输入" clearable @keyup.enter="handleQuery" />
       </el-form-item>
-      <el-form-item label="仓库编码" prop="warehouseCode">
-        <el-input v-model="queryParams.warehouseCode" placeholder="请输入" clearable @keyup.enter="handleQuery" />
-      </el-form-item>
       <el-form-item>
         <el-button type="primary" icon="Search" size="small" @click="handleQuery">搜索</el-button>
         <el-button icon="Refresh" size="small" @click="resetQuery">重置</el-button>
@@ -37,7 +34,7 @@
       </el-table-column>
       <el-table-column label="操作" align="center" width="220" class-name="small-padding fixed-width">
         <template #default="scope">
-          <el-button link type="primary" size="small" @click="handleArea(scope.row.locationId)" v-hasPermi="['mes:wm:area:list']">库位</el-button>
+          <el-button link type="primary" size="small" @click="handleArea(scope.row)" v-hasPermi="['mes:wm:area:list']">库位</el-button>
           <el-button link type="primary" size="small" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:location:edit']">修改</el-button>
         </template>
       </el-table-column>
@@ -46,7 +43,7 @@
     <pagination v-show="total>0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
 
     <el-dialog :title="title" v-model="open" width="600px" append-to-body>
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
         <el-row>
           <el-col :span="16">
             <el-form-item label="库区编码" prop="locationCode">
@@ -54,8 +51,8 @@
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item label-width="70" v-if="optType === 'add'">
-              <el-switch v-model="autoGenFlag" active-color="#13ce66" @change="handleAutoGenChange" /><span style="margin-left:6px;font-size:12px;color:#13ce66">自动生成</span>
+            <el-form-item label-width="80" v-if="optType === 'add'">
+              <el-switch v-model="autoGenFlag" size="small" active-color="#13ce66" @change="handleAutoGenChange" /><span style="margin-left:6px;font-size:12px;color:#13ce66">自动生成</span>
             </el-form-item>
           </el-col>
         </el-row>
@@ -68,13 +65,13 @@
         </el-row>
         <el-row>
           <el-col :span="12">
-            <el-form-item label="仓库" prop="warehouseId">
-              <el-input v-model="form.warehouseId" placeholder="仓库ID" />
+            <el-form-item label="仓库编码" prop="warehouseCode">
+              <el-input v-model="form.warehouseCode" placeholder="仓库编码" :disabled="!!route.query.warehouseId" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="仓库名称" prop="warehouseName">
-              <el-input v-model="form.warehouseName" placeholder="仓库名称" />
+              <el-input v-model="form.warehouseName" placeholder="仓库名称" :disabled="!!route.query.warehouseId" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -85,9 +82,10 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="启用" prop="enableFlag">
+            <el-form-item label="是否启用" prop="enableFlag">
               <el-radio-group v-model="form.enableFlag">
-                <el-radio v-for="d in dicts.sys_yes_no" :key="d.value" :value="d.value">{{ d.label }}</el-radio>
+                <el-radio value="1">是</el-radio>
+                <el-radio value="0">否</el-radio>
               </el-radio-group>
             </el-form-item>
           </el-col>
@@ -114,11 +112,9 @@ import { useRoute, useRouter } from 'vue-router'
 import type { WmStorageLocationQueryParams, WmStorageLocation } from '@/types/api/mes/wm/storage_location'
 import { listWmStorageLocation, getWmStorageLocation, delWmStorageLocation, addWmStorageLocation, updateWmStorageLocation } from '@/api/mes/wm/storage_location'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
-
 const { proxy } = getCurrentInstance() as any
 const route = useRoute()
 const router = useRouter()
-const dicts = proxy.useDict('sys_yes_no')
 
 const locationList = ref<WmStorageLocation[]>([])
 const open = ref(false)
@@ -149,13 +145,27 @@ function getList() {
 function cancel() { open.value = false; reset() }
 function reset() { optType.value = undefined; autoGenFlag.value = false; form.value = {} as WmStorageLocation; proxy.resetForm('formRef') }
 function handleAutoGenChange(flag: boolean) {
-  if (flag) genSerialCode('LOCATION_CODE').then((r: any) => { form.value.locationCode = r.data })
-  else form.value.locationCode = ''
+  if (flag) {
+    genSerialCode('LOCATION_CODE').then((r: any) => {
+      if (autoGenFlag.value) form.value.locationCode = r.data
+    }).catch(() => {
+      autoGenFlag.value = false
+    })
+  } else {
+    form.value.locationCode = ''
+  }
 }
 function handleQuery() { queryParams.value.pageNum = 1; getList() }
 function resetQuery() { proxy.resetForm('queryRef'); handleQuery() }
 function handleSelectionChange(s: any[]) { ids.value = s.map(i => i.locationId); single.value = s.length !== 1; multiple.value = !s.length }
-function handleAdd() { reset(); optType.value = 'add'; open.value = true; title.value = '新增库区' }
+function handleAdd() { reset(); optType.value = 'add'; open.value = true; title.value = '新增库区'
+  // 从仓库页面进入时，自动带出仓库信息
+  if (route.query.warehouseId) {
+    form.value.warehouseId = Number(route.query.warehouseId)
+    form.value.warehouseCode = route.query.warehouseCode as string
+    form.value.warehouseName = route.query.warehouseName as string
+  }
+}
 function handleUpdate(row?: WmStorageLocation) {
   reset()
   optType.value = 'edit'
@@ -185,8 +195,8 @@ function handleDelete(row?: WmStorageLocation) {
   const _ids = row?.locationId ? [row.locationId] : ids.value
   proxy.$modal.confirm('是否确认删除？').then(() => delWmStorageLocation(_ids)).then(() => { getList(); proxy.$modal.msgSuccess('删除成功') })
 }
-function handleArea(locationId: number) {
-  router.push({ path: '/mes/wm/storage_area', query: { locationId } })
+function handleArea(row: WmStorageLocation) {
+  router.push({ path: '/mes/wm/storage_area', query: { locationId: row.locationId, locationCode: row.locationCode, locationName: row.locationName, warehouseId: row.warehouseId } })
 }
 
 onMounted(() => {

@@ -1,14 +1,14 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="68px">
+    <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="100px">
       <el-form-item label="入库单号" prop="recptCode">
         <el-input v-model="queryParams.recptCode" placeholder="请输入入库单号" clearable @keyup.enter="handleQuery" />
       </el-form-item>
       <el-form-item label="供应商" prop="vendorId">
-        <el-input v-model="queryParams.vendorId" placeholder="供应商ID" clearable style="width:100px" />
+        <el-input v-model="queryParams.vendorId" placeholder="供应商ID" clearable />
       </el-form-item>
       <el-form-item label="采购订单号" prop="purOrderCode">
-        <el-input v-model="queryParams.purOrderCode" placeholder="请输入采购订单号" clearable style="width:140px" />
+        <el-input v-model="queryParams.purOrderCode" placeholder="请输入采购订单号" clearable />
       </el-form-item>
       <el-form-item label="状态" prop="status">
         <el-select v-model="queryParams.status" placeholder="请选择" clearable style="width:100px">

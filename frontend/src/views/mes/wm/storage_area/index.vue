@@ -48,50 +48,70 @@
 
     <el-dialog :title="title" v-model="open" width="600px" append-to-body>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
-        <el-form-item label="工厂ID" prop="factoryId">
-          <el-input v-model="form.factoryId" placeholder="请输入" clearable />
-        </el-form-item>
-        <el-form-item label="库位编码" prop="areaCode">
-          <el-input v-model="form.areaCode" placeholder="请输入" clearable :disabled="optType === 'edit' || optType === 'view'" />
-        </el-form-item>
-        <el-form-item label="库位名称" prop="areaName">
-          <el-input v-model="form.areaName" placeholder="请输入" clearable />
-        </el-form-item>
-        <el-form-item label="库区ID" prop="locationId">
-          <el-input v-model="form.locationId" placeholder="请输入" clearable />
-        </el-form-item>
-        <el-form-item label="库区编码" prop="locationCode">
-          <el-input v-model="form.locationCode" placeholder="请输入" clearable :disabled="optType === 'edit' || optType === 'view'" />
-        </el-form-item>
-        <el-form-item label="库区名称" prop="locationName">
-          <el-input v-model="form.locationName" placeholder="请输入" clearable />
-        </el-form-item>
-        <el-form-item label="仓库ID" prop="warehouseId">
-          <el-input v-model="form.warehouseId" placeholder="请输入" clearable />
-        </el-form-item>
-        <el-form-item label="仓库编码" prop="warehouseCode">
-          <el-input v-model="form.warehouseCode" placeholder="请输入" clearable />
-        </el-form-item>
-        <el-form-item label="仓库名称" prop="warehouseName">
-          <el-input v-model="form.warehouseName" placeholder="请输入" clearable />
-        </el-form-item>
-        <el-form-item label="最大容积" prop="maxVolume">
-          <el-input v-model="form.maxVolume" placeholder="请输入" clearable />
-        </el-form-item>
-        <el-form-item label="最大承重" prop="maxWeight">
-          <el-input v-model="form.maxWeight" placeholder="请输入" clearable />
-        </el-form-item>
-        <el-form-item label="是否启用" prop="enableFlag">
-          <el-select v-model="form.enableFlag" placeholder="请选择" clearable style="width:100%">
-            <el-option v-for="d in dicts.sys_yes_no" :key="d.value" :label="d.label" :value="d.value" />
-          </el-select>
-        </el-form-item>
+        <el-row>
+          <el-col :span="16">
+            <el-form-item label="库位编码" prop="areaCode">
+              <el-input v-model="form.areaCode" placeholder="请输入库位编码" :disabled="optType === 'edit' || optType === 'view'" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label-width="80" v-if="optType === 'add'">
+              <el-switch v-model="autoGenFlag" size="small" active-color="#13ce66" @change="handleAutoGenChange" /><span style="margin-left:6px;font-size:12px;color:#13ce66">自动生成</span>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row>
+          <el-col :span="24">
+            <el-form-item label="库位名称" prop="areaName">
+              <el-input v-model="form.areaName" placeholder="请输入库位名称" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row>
+          <el-col :span="12">
+            <el-form-item label="库区编码" prop="locationCode">
+              <el-input v-model="form.locationCode" placeholder="库区编码" :disabled="!!route.query.locationId" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="库区名称" prop="locationName">
+              <el-input v-model="form.locationName" placeholder="库区名称" :disabled="!!route.query.locationId" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row>
+          <el-col :span="12">
+            <el-form-item label="最大容积" prop="maxVolume">
+              <el-input v-model="form.maxVolume" placeholder="请输入" clearable />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="最大承重" prop="maxWeight">
+              <el-input v-model="form.maxWeight" placeholder="请输入" clearable />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row>
+          <el-col :span="12">
+            <el-form-item label="是否启用" prop="enableFlag">
+              <el-radio-group v-model="form.enableFlag">
+                <el-radio value="1">是</el-radio>
+                <el-radio value="0">否</el-radio>
+              </el-radio-group>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row>
+          <el-col :span="24">
+            <el-form-item label="备注" prop="remark">
+              <el-input v-model="form.remark" type="textarea" placeholder="备注" />
+            </el-form-item>
+          </el-col>
+        </el-row>
       </el-form>
       <template #footer>
-        <div class="dialog-footer">
-          <el-button type="primary" @click="submitForm">确 定</el-button>
-          <el-button @click="cancel">取 消</el-button>
-        </div>
+        <el-button type="primary" @click="submitForm">确 定</el-button>
+        <el-button @click="cancel">取 消</el-button>
       </template>
     </el-dialog>
   </div>
@@ -102,9 +122,10 @@ import { ref, reactive, toRefs, getCurrentInstance, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import type { WmStorageAreaQueryParams, WmStorageArea } from '@/types/api/mes/wm/storage_area'
 import { listWmStorageArea, getWmStorageArea, delWmStorageArea, addWmStorageArea, updateWmStorageArea } from '@/api/mes/wm/storage_area'
+import { genSerialCode } from '@/api/mes/sys/autocoderule'
 
 const { proxy } = getCurrentInstance() as any
-const dicts = proxy.useDict('sys_yes_no')
+const route = useRoute()
 
 const storageareaList = ref<WmStorageArea[]>([])
 const open = ref(false)
@@ -115,6 +136,7 @@ const single = ref(true)
 const multiple = ref(true)
 const total = ref(0)
 const title = ref('')
+const autoGenFlag = ref(false)
 const optType = ref<string | undefined>(undefined)
 
 const data = reactive({
@@ -134,16 +156,36 @@ function getList() {
 }
 
 function cancel() { open.value = false; reset() }
-function reset() { optType.value = undefined; form.value = {} as WmStorageArea; proxy.resetForm('formRef') }
+function reset() { optType.value = undefined; autoGenFlag.value = false; form.value = {} as WmStorageArea; proxy.resetForm('formRef') }
+function handleAutoGenChange(flag: boolean) {
+  if (flag) {
+    genSerialCode('AREA_CODE').then((r: any) => {
+      // 防止竞态：仅在开关仍为 ON 时才写入
+      if (autoGenFlag.value) form.value.areaCode = r.data
+    }).catch(() => {
+      autoGenFlag.value = false
+    })
+  } else {
+    form.value.areaCode = ''
+  }
+}
 function handleQuery() { queryParams.value.pageNum = 1; getList() }
 function resetQuery() { proxy.resetForm('queryRef'); handleQuery() }
 function handleSelectionChange(s: any[]) { ids.value = s.map(i => i.areaId); single.value = s.length !== 1; multiple.value = !s.length }
-function handleAdd() { reset(); optType.value = 'add'; open.value = true; title.value = '新增库位表' }
+function handleAdd() { reset(); optType.value = 'add'; open.value = true; title.value = '新增库位'
+  // 从库区页面进入时，自动带出库区及仓库信息
+  if (route.query.locationId) {
+    form.value.locationId = Number(route.query.locationId)
+    form.value.locationCode = route.query.locationCode as string
+    form.value.locationName = route.query.locationName as string
+    if (route.query.warehouseId) form.value.warehouseId = Number(route.query.warehouseId)
+  }
+}
 function handleUpdate(row?: WmStorageArea) {
   reset()
   optType.value = 'edit'
   const _id = row?.areaId || ids.value[0]
-  getWmStorageArea(_id).then(r => { form.value = r.data; open.value = true; title.value = '修改库位表' })
+  getWmStorageArea(_id).then(r => { form.value = r.data; open.value = true; title.value = '修改库位' })
 }
 function submitForm() {
   proxy.$refs['formRef'].validate((v: boolean) => {
@@ -170,7 +212,6 @@ function handleDelete(row?: WmStorageArea) {
 }
 function handleExport() { proxy.download('/mes/wm/storage_area/export', { ...queryParams.value }, `storagearea_${Date.now()}.xlsx`) }
 
-const route = useRoute()
 onMounted(() => {
   if (route.query.locationId) {
     queryParams.value.locationId = Number(route.query.locationId)

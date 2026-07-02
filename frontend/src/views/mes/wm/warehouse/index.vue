@@ -44,8 +44,9 @@
           <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="220" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="290" class-name="small-padding fixed-width">
         <template #default="scope">
+          <el-button link type="primary" size="small" @click="handleLocation(scope.row)" v-hasPermi="['mes:wm:storage_location:list']">库区</el-button>
           <el-button link type="primary" size="small" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:warehouse:edit']">修改</el-button>
         </template>
       </el-table-column>
@@ -191,8 +192,8 @@ function handleDelete(row?: WmWarehouse) {
   const _ids = row?.warehouseId ? [row.warehouseId] : ids.value
   proxy.$modal.confirm('是否确认删除？').then(() => delWmWarehouse(_ids)).then(() => { getList(); proxy.$modal.msgSuccess('删除成功') })
 }
-function handleLocation(warehouseId: number) {
-  router.push({ path: '/mes/wm/storage_location', query: { warehouseId } })
+function handleLocation(row: WmWarehouse) {
+  router.push({ path: '/mes/wm/storage_location', query: { warehouseId: row.warehouseId, warehouseCode: row.warehouseCode, warehouseName: row.warehouseName } })
 }
 function handleAutoGenChange(flag: boolean) {
   if (flag) {

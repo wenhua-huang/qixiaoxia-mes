@@ -21,6 +21,7 @@ import com.ruoyi.system.domain.mes.pro.ProWorkorderCreateRequest;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderDetailVO;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderDeviationVO;
 import com.ruoyi.system.service.mes.pro.IProWorkorderService;
+import com.ruoyi.system.service.mes.pro.IScheduleService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.page.TableDataInfo;
 
@@ -36,6 +37,9 @@ public class ProWorkorderController extends BaseController
 {
     @Autowired
     private IProWorkorderService proWorkorderService;
+
+    @Autowired
+    private IScheduleService scheduleService;
 
     /**
      * 查询生产工单列表
@@ -117,6 +121,8 @@ public class ProWorkorderController extends BaseController
     {
         ProWorkorder workorder = proWorkorderService.createWorkorderWithBom(
             request.getWorkorder(), request.getBomList(), request.getParamList());
+        // 自动排产：工单创建后自动生成工序任务，甘特图即可展示
+        try { scheduleService.scheduleWorkOrder(workorder.getWorkorderId()); } catch (Exception ignored) {}
         return success(workorder);
     }
 
@@ -154,6 +160,8 @@ public class ProWorkorderController extends BaseController
     {
         ProWorkorder workorder = proWorkorderService.updateWorkorderWithBom(
             request.getWorkorder(), request.getBomList(), request.getParamList());
+        // 自动排产：工单修改后重新生成工序任务
+        try { scheduleService.scheduleWorkOrder(workorder.getWorkorderId()); } catch (Exception ignored) {}
         return success(workorder);
     }
 

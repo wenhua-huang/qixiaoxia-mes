@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 import com.ruoyi.system.domain.mes.pro.*;
 import com.ruoyi.system.mapper.mes.pro.*;
 import com.ruoyi.system.service.mes.pro.IGanttDataService;
+import com.ruoyi.system.service.mes.pro.IScheduleService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -30,6 +31,9 @@ public class GanttDataServiceImpl implements IGanttDataService
 
     @Autowired
     private ProRouteProductMapper proRouteProductMapper;
+
+    @Autowired
+    private IScheduleService scheduleService;
 
     private static final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
@@ -72,6 +76,16 @@ public class GanttDataServiceImpl implements IGanttDataService
         ProTask taskQuery = new ProTask();
         taskQuery.setWorkorderId(workorderId);
         List<ProTask> taskList = proTaskMapper.selectProTaskList(taskQuery);
+
+        // 自动排产：无任务且有关联工艺路线时，先排产再返回数据
+        if (taskList.isEmpty() && routeId != null) {
+            try {
+                scheduleService.scheduleWorkOrder(workorderId);
+                taskList = proTaskMapper.selectProTaskList(taskQuery);
+            } catch (Exception e) {
+                // 排产失败不影响甘特图返回（如工单无工作站等）
+            }
+        }
 
         // 按 processId 分组
         Map<Long, List<ProTask>> tasksByProcess = taskList.stream()

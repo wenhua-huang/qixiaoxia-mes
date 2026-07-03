@@ -48,6 +48,7 @@ public class ProWorkorderController extends BaseController
 
     @Autowired
     private IScheduleService scheduleService;
+    @Autowired
     private IProWorkorderDocService proWorkorderDocService;
 
     /**

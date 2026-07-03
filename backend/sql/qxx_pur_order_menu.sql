@@ -1,6 +1,6 @@
 -- 菜单 SQL
 insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, update_by, update_time, remark)
-values('采购订单头', '3', '1', 'order', 'mes/pur/order/index', 1, 0, 'C', '0', '0', 'mes:pur:order:list', '#', 'admin', sysdate(), '', null, '采购订单头菜单');
+values('采购订单头', 2006, '1', 'order', 'mes/pur/order/index', 1, 0, 'C', '0', '0', 'mes:pur:order:list', '#', 'admin', sysdate(), '', null, '采购订单头菜单');
 
 -- 按钮父菜单ID
 SELECT @parentId := LAST_INSERT_ID();
@@ -13,7 +13,7 @@ insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame
 values('采购订单头新增', @parentId, '2',  '#', '', 1, 0, 'F', '0', '0', 'mes:pur:order:add',          '#', 'admin', sysdate(), '', null, '');
 
 insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, update_by, update_time, remark)
-values('采购订单头修改', @parentId, '3',  '#', '', 1, 0, 'F', '0', '0', 'mes:pur:order:edit',         '#', 'admin', sysdate(), '', null, '');
+values('采购订单头修改', @parentId, 2006,  '#', '', 1, 0, 'F', '0', '0', 'mes:pur:order:edit',         '#', 'admin', sysdate(), '', null, '');
 
 insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, update_by, update_time, remark)
 values('采购订单头删除', @parentId, '4',  '#', '', 1, 0, 'F', '0', '0', 'mes:pur:order:remove',       '#', 'admin', sysdate(), '', null, '');

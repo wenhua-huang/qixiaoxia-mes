@@ -70,6 +70,14 @@ spring:
     restart:
       # 热部署开关
       enabled: true
+  # Flyway 数据库迁移管理
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    table: flyway_schema_history
+    baseline-on-migrate: true
+    baseline-version: 32
+    # 所有 SQL 已做幂等处理，baseline 跳过 V1-V32（已存在于 DB），仅执行 V33+
   data:
     # redis 配置
     redis:

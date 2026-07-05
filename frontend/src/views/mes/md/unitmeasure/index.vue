@@ -77,7 +77,7 @@
       <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
       <el-table-column label="启用" align="center" width="70">
         <template #default="scope">
-          <el-switch v-model="scope.row.enableFlag" active-value="Y" inactive-value="N" @change="handleEnableChange(scope.row)" />
+          <el-switch :model-value="scope.row.enableFlag" active-value="Y" inactive-value="N" @change="(val: string) => handleEnableChange(scope.row, val)" />
         </template>
       </el-table-column>
       <el-table-column label="操作" align="center" width="150" class-name="small-padding fixed-width">
@@ -287,15 +287,19 @@ function submitForm() {
   })
 }
 
-/** 删除按钮操作 */
-function handleEnableChange(row: any) {
-  const newVal = row.enableFlag
+/** 启停用开关操作 */
+function handleEnableChange(row: any, newVal: string) {
+  const oldVal = row.enableFlag
   const text = newVal === 'Y' ? '启用' : '停用'
+  // 先立即更新本地状态，让开关有即时反馈
+  row.enableFlag = newVal
   proxy.$modal.confirm(`确认要${text}"${row.unitName}"吗？`).then(() => {
-    updateUnitmeasure({ unitId: row.unitId, enableFlag: newVal } as any).then(() => proxy.$modal.msgSuccess(`${text}成功`))
+    return updateUnitmeasure({ unitId: row.unitId, enableFlag: newVal } as any)
+  }).then(() => {
+    proxy.$modal.msgSuccess(`${text}成功`)
   }).catch(() => {
-    row.enableFlag = newVal === 'Y' ? 'N' : 'Y'
-    getList()
+    // 取消时仅回滚本地状态，不调用 getList() 避免触发无限循环
+    row.enableFlag = oldVal
   })
 }
 

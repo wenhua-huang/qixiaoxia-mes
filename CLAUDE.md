@@ -10,10 +10,149 @@ This file provides guidance to Claude Code when working with code in this reposi
 - **所有表都有 `factory_id` 字段**，外协 8 张表额外冗余 `outsource_factory_id`（vendor、workorder、task、route_process、card_process、feedback、outsource_issue、outsource_recpt）
 - **Debug：信任用户判断** — 用户指出问题方向时，先聚焦该方向直接修，修完验证。不要在用户说的方向还没查透时就去翻后端/DB/拦截器等无关代码。用户是实际操作者，判断优先级最高（详见 [[debug-rule-trust-user-judgment]]）
 
-## 🗄️ SQL 执行
+## 🗄️ 数据库迁移 (Flyway)
 
-- 命令：`ssh qxx 'docker exec -i qxx-mysql mysql -uroot -pqxx123456 mes < xxx.sql'`
-- 只执行 SQL，不连带部署/重启等操作
+### 什么是 Flyway
+
+Flyway 是数据库版本管理工具，通过**版本化的 SQL 迁移文件**管理 Schema 变更。每次应用启动时自动比对 `flyway_schema_history` 表，按版本号升序执行未跑过的迁移脚本。
+
+**核心规则**：已执行的迁移文件**禁止修改**（checksum 校验），所有 DML **必须幂等**。
+
+### 当前配置
+
+| 配置项 | 值 | 说明 |
+|--------|-----|------|
+| 迁移文件路径 | `backend/ruoyi-admin/src/main/resources/db/migration/` | classpath 下的 SQL 迁移脚本 |
+| 历史表 | `flyway_schema_history` | 记录已执行的迁移版本 |
+| `baseline-on-migrate` | `true` | 已有数据库自动建立基线 |
+| `baseline-version` | `32` | V1-V32 已存在于 DB，跳过执行 |
+| 当前最新版本 | V39 | 新迁移从 V40 开始 |
+
+### 命名规范
+
+```
+V{版本号}__{描述}.sql
+
+✅ V40__add_product_bom_table.sql
+✅ V41__seed_md_item_menu.sql
+✅ V42__update_order_status_default.sql
+❌ V40_add_bom.sql          （单下划线）
+❌ V40__添加BOM表.sql        （中文文件名）
+❌ 40__add_bom.sql           （缺 V 前缀）
+```
+
+- **前缀 `V`** — 版本化迁移，只执行一次，不可重复
+- **版本号** — 严格递增整数，新需求取最大值 +1
+- **双下划线 `__`** — 分隔符（不是单下划线）
+- **描述** — 下划线分隔的英文，简明描述变更内容
+
+### 🔧 需求涉及 SQL 时的标准流程
+
+每次需求需要新增/修改表结构或种子数据时，必须遵循：
+
+**Step 1 — 查版本号**
+```bash
+ls backend/ruoyi-admin/src/main/resources/db/migration/ | sort -V | tail -3
+# 假设输出 V39，新文件用 V40
+```
+
+**Step 2 — 创建迁移文件**
+```bash
+touch backend/ruoyi-admin/src/main/resources/db/migration/V40__{描述}.sql
+```
+
+**Step 3 — 编写 SQL**（DDL 和 DML 可混在同一个文件，按逻辑顺序编排）
+
+### ⚠️ 核心约束
+
+#### 1. DML 必须幂等
+
+Flyway 的 checksum 只防文件篡改，不防数据重复。一条 `INSERT` 如果重跑，会产生重复行。
+
+```sql
+-- ❌ 不幂等 — 每次启动都插入新行，迟早爆唯一约束
+INSERT INTO sys_menu (menu_name, perms) VALUES ('物料管理', 'mes:md:item:list');
+
+-- ✅ 幂等 — 用 WHERE NOT EXISTS 防重
+INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, perms, status)
+SELECT '物料管理', 2000, 1, 'item', 'mes/md/item/index', 'mes:md:item:list', '0'
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_menu WHERE perms = 'mes:md:item:list'
+);
+```
+
+**所有 DML 语句（INSERT/UPDATE/DELETE）都必须做幂等判断**，不只是 INSERT。
+
+#### 2. 已执行的迁移文件不可修改
+
+```
+V40 执行后 → flyway_schema_history 记录了 checksum
+                    ↓
+如果有人改 V40 的内容 → 启动时 checksum 不匹配 → 💥 报错拒绝启动
+```
+
+**需要调整 Schema？** — 新建一个更高版本号的迁移文件，在里面 `ALTER TABLE` 或 `UPDATE`，永远不修改已执行的旧文件。
+
+#### 3. DDL + DML 混排
+
+一个迁移文件可同时包含 DDL 和 DML，按逻辑顺序编排：
+
+```sql
+-- V40__add_product_bom.sql
+-- Part 1: DDL（建表）
+CREATE TABLE qxx_md_bom (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    item_id BIGINT NOT NULL COMMENT '物料ID',
+    ...
+    PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Part 2: DML（种子数据 — 注意幂等）
+INSERT INTO sys_menu (...) SELECT ... WHERE NOT EXISTS (...);
+INSERT INTO sys_dict_data (...) SELECT ... WHERE NOT EXISTS (...);
+```
+
+#### 4. `factory_id` 处理
+
+Flyway 是裸 JDBC 执行 SQL，**不走 MyBatis 拦截器**。因此：
+
+| SQL 类型 | factory_id 规则 |
+|----------|----------------|
+| `CREATE TABLE` | 必须包含 `factory_id` 字段（所有表） |
+| `INSERT` | **必须显式写 `factory_id`**（拦截器不生效） |
+| `UPDATE` / `DELETE` | WHERE 带 `factory_id` |
+
+```sql
+-- ✅ Flyway 迁移中的 INSERT 必须写 factory_id
+INSERT INTO sys_menu (factory_id, menu_name, perms)
+VALUES (1, '物料管理', 'mes:md:item:list');
+
+-- ❌ 不要依赖拦截器自动注入（Flyway 不走拦截器）
+INSERT INTO sys_menu (menu_name, perms)
+VALUES ('物料管理', 'mes:md:item:list');
+```
+
+### 本地 vs 生产执行
+
+| 场景 | 方式 |
+|------|------|
+| **本地开发** | 启动后端 → Flyway 自动扫描 `db/migration/` → 执行未跑过的版本 |
+| **生产部署** | 同上（后端重启时自动执行）。也可手动兜底：`ssh qxx 'docker exec -i qxx-mysql mysql -uroot -pqxx123456 mes < xxx.sql'` |
+
+> ⚠️ **只执行 SQL，不连带部署/重启等操作**（SQL 执行原则）
+
+### 查看迁移历史
+
+```sql
+-- 查看已执行的迁移记录
+SELECT version, description, installed_on, execution_time, success
+FROM flyway_schema_history
+ORDER BY version DESC
+LIMIT 10;
+
+-- 查看待执行的迁移
+-- 对比 db/migration/ 目录 vs flyway_schema_history 表
+```
 
 ## Project Overview
 
@@ -204,6 +343,7 @@ curl -s http://localhost:8081/getInfo -H "Authorization: Bearer $TOKEN" | python
 ## AI 提交前自检
 
 - [ ] 类型检查通过（frontend: `npx vue-tsc --noEmit`，backend: `mvn compile`）
+- [ ] SQL 迁移文件：命名 `V{next}__{desc}.sql`，DML 已幂等处理，INSERT 显式写 `factory_id`
 - [ ] SQL: 所有 WHERE 带 `factory_id`
 - [ ] 权限: Controller 有 `@PreAuthorize`
 - [ ] 无硬编码魔法数字/字符串

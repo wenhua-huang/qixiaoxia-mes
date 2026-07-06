@@ -4,6 +4,9 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.ruoyi.system.domain.mes.pro.*;
 import com.ruoyi.system.mapper.mes.pro.*;
 import com.ruoyi.system.service.mes.pro.IGanttDataService;
@@ -20,6 +23,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class GanttDataServiceImpl implements IGanttDataService
 {
+    private static final Logger log = LoggerFactory.getLogger(GanttDataServiceImpl.class);
+
     @Autowired
     private ProTaskMapper proTaskMapper;
 
@@ -78,12 +83,13 @@ public class GanttDataServiceImpl implements IGanttDataService
         List<ProTask> taskList = proTaskMapper.selectProTaskList(taskQuery);
 
         // 自动排产：无任务且有关联工艺路线时，先排产再返回数据
+        log.info("甘特图加载: workorderId={}, taskCount={}, routeId={}", workorderId, taskList.size(), routeId);
         if (taskList.isEmpty() && routeId != null) {
             try {
                 scheduleService.scheduleWorkOrder(workorderId);
                 taskList = proTaskMapper.selectProTaskList(taskQuery);
             } catch (Exception e) {
-                // 排产失败不影响甘特图返回（如工单无工作站等）
+                log.warn("自动排产失败: workorderId={}, error={}", workorderId, e.toString());
             }
         }
 

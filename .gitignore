@@ -41,7 +41,8 @@ Desktop.ini
 docker-data/
 
 # --- Claude Code ---
-.claude/
+# .claude/ 纳入版本控制，但排除临时 worktree
+.claude/worktrees/
 
 # --- Logs ---
 *.log

@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Read",
+      "Edit",
+      "Write",
+      "Glob",
+      "Grep",
+      "Agent",
+      "TaskOutput",
+      "TodoWrite",
+      "WebFetch",
+      "WebSearch",
+      "Skill",
+      "Workflow",
+      "EnterPlanMode",
+      "ExitPlanMode",
+      "AskUserQuestion",
+      "NotebookEdit",
+      "CronCreate",
+      "CronDelete",
+      "CronList",
+      "Monitor",
+      "EnterWorktree",
+      "ExitWorktree",
+      "ScheduleWakeup",
+      "PushNotification"
+    ],
+    "deny": [],
+    "defaultMode": "bypassPermissions"
+  },
+  "preferredNotifChannel": "iterm2_with_bell",
+  "inputNeededNotifEnabled": true
+}

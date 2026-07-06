@@ -8,7 +8,7 @@
           icon="el-icon-plus"
           size="small"
           @click="handleAdd"
-          v-hasPermi="['mes:cal:calplan:add']"
+          v-hasPermi="['mes:cal:plan:add']"
         >新增</el-button>
       </el-col>
       <el-col :span="1.5">
@@ -19,7 +19,7 @@
           size="small"
           :disabled="single"
           @click="handleUpdate"
-          v-hasPermi="['mes:cal:calplan:edit']"
+          v-hasPermi="['mes:cal:plan:edit']"
         >修改</el-button>
       </el-col>
       <el-col :span="1.5">
@@ -30,7 +30,7 @@
           size="small"
           :disabled="multiple"
           @click="handleDelete"
-          v-hasPermi="['mes:cal:calplan:remove']"
+          v-hasPermi="['mes:cal:plan:remove']"
         >删除</el-button>
       </el-col>
     </el-row>
@@ -49,14 +49,14 @@
             link
             icon="el-icon-edit"
             @click="handleUpdate(scope.row)"
-            v-hasPermi="['mes:cal:calplan:edit']"
+            v-hasPermi="['mes:cal:plan:edit']"
           >修改</el-button>
           <el-button
             size="small"
             link
             icon="el-icon-delete"
             @click="handleDelete(scope.row)"
-            v-hasPermi="['mes:cal:calplan:remove']"
+            v-hasPermi="['mes:cal:plan:remove']"
           >删除</el-button>
         </template>
       </el-table-column>

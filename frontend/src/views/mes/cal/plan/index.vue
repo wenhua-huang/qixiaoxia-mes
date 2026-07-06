@@ -59,7 +59,7 @@
           icon="el-icon-plus"
           size="small"
           @click="handleAdd"
-          v-hasPermi="['mes:cal:calplan:add']"
+          v-hasPermi="['mes:cal:plan:add']"
         >新增</el-button>
       </el-col>
       <el-col :span="1.5">
@@ -70,7 +70,7 @@
           size="small"
           :disabled="multiple"
           @click="handleDelete"
-          v-hasPermi="['mes:cal:calplan:remove']"
+          v-hasPermi="['mes:cal:plan:remove']"
         >删除</el-button>
       </el-col>
       <el-col :span="1.5">
@@ -80,7 +80,7 @@
           icon="el-icon-download"
           size="small"
           @click="handleExport"
-          v-hasPermi="['mes:cal:calplan:export']"
+          v-hasPermi="['mes:cal:plan:export']"
         >导出</el-button>
       </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList" />
@@ -93,7 +93,7 @@
           <el-button
             link
             @click="handleView(scope.row)"
-            v-hasPermi="['mes:cal:calplan:query']"
+            v-hasPermi="['mes:cal:plan:query']"
           >{{ scope.row.planCode }}</el-button>
         </template>
       </el-table-column>
@@ -136,7 +136,7 @@
             icon="el-icon-edit"
             v-if="scope.row.status === 'PREPARE'"
             @click="handleUpdate(scope.row)"
-            v-hasPermi="['mes:cal:calplan:edit']"
+            v-hasPermi="['mes:cal:plan:edit']"
           >修改</el-button>
           <el-button
             size="small"
@@ -144,7 +144,7 @@
             icon="el-icon-delete"
             v-if="scope.row.status === 'PREPARE'"
             @click="handleDelete(scope.row)"
-            v-hasPermi="['mes:cal:calplan:remove']"
+            v-hasPermi="['mes:cal:plan:remove']"
           >删除</el-button>
         </template>
       </el-table-column>

@@ -11,12 +11,14 @@ import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.system.domain.mes.pur.PurOrder;
 import com.ruoyi.system.domain.mes.pur.PurOrderLine;
 import com.ruoyi.system.domain.mes.wm.ItemRecptReceiveBody;
+import com.ruoyi.system.domain.mes.wm.WmBatch;
 import com.ruoyi.system.domain.mes.wm.WmItemRecpt;
 import com.ruoyi.system.domain.mes.wm.WmItemRecptLine;
 import com.ruoyi.system.domain.mes.wm.tx.ItemRecptTxBean;
 import com.ruoyi.system.mapper.mes.wm.WmItemRecptMapper;
 import com.ruoyi.system.service.mes.pur.IPurOrderLineService;
 import com.ruoyi.system.service.mes.pur.IPurOrderService;
+import com.ruoyi.system.service.mes.wm.IWmBatchService;
 import com.ruoyi.system.service.mes.wm.IWmItemRecptLineService;
 import com.ruoyi.system.service.mes.wm.IWmItemRecptService;
 import com.ruoyi.system.service.mes.wm.IWmStorageCoreService;
@@ -38,6 +40,9 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
 
     @Autowired
     private IWmStorageCoreService storageCoreService;
+
+    @Autowired
+    private IWmBatchService wmBatchService;
 
     @Override
     public List<WmItemRecpt> selectWmItemRecptList(WmItemRecpt entity) {
@@ -175,7 +180,13 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
         if (header == null) throw new RuntimeException("入库单头信息不能为空");
         if (lines == null || lines.isEmpty()) throw new RuntimeException("入库单行不能为空");
 
-        // 1. 创建入库单头
+        // 1. 创建入库单头 — 若 header 未指定仓库，取第一行仓库
+        if (header.getWarehouseId() == null) {
+            WmItemRecptLine firstLine = lines.get(0);
+            header.setWarehouseId(firstLine.getWarehouseId());
+            header.setWarehouseCode(firstLine.getWarehouseCode());
+            header.setWarehouseName(firstLine.getWarehouseName());
+        }
         header.setCreateTime(DateUtils.getNowDate());
         header.setCreateBy(SecurityUtils.getUsername());
         wmItemRecptMapper.insertWmItemRecpt(header);
@@ -188,6 +199,25 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
             if (line.getWarehouseId() == null) line.setWarehouseId(header.getWarehouseId());
             if (line.getWarehouseCode() == null) line.setWarehouseCode(header.getWarehouseCode());
             if (line.getWarehouseName() == null) line.setWarehouseName(header.getWarehouseName());
+            // 自动生成批次号（无 batchCode 时，根据物料+供应商+生产日期+有效期匹配或新建）
+            if (line.getBatchCode() == null) {
+                WmBatch batchParam = new WmBatch();
+                batchParam.setItemId(line.getItemId());
+                batchParam.setItemCode(line.getItemCode());
+                batchParam.setItemName(line.getItemName());
+                batchParam.setSpecification(line.getSpecification());
+                batchParam.setVendorId(header.getVendorId());
+                batchParam.setVendorCode(header.getVendorCode());
+                batchParam.setVendorName(header.getVendorName());
+                batchParam.setProduceDate(line.getProduceDate());
+                batchParam.setExpireDate(line.getExpireDate());
+                batchParam.setLotNumber(line.getLotNumber());
+                WmBatch generated = wmBatchService.getOrGenerateBatchCode(batchParam);
+                if (generated != null) {
+                    line.setBatchId(generated.getBatchId());
+                    line.setBatchCode(generated.getBatchCode());
+                }
+            }
             line.setCreateTime(DateUtils.getNowDate());
             line.setCreateBy(SecurityUtils.getUsername());
             wmItemRecptLineService.insertWmItemRecptLine(line);
@@ -200,8 +230,9 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
         header.setUpdateTime(DateUtils.getNowDate());
         wmItemRecptMapper.updateWmItemRecpt(header);
 
-        // 3. 确认收货（库存更新 + PO回写）
+        // 3. 确认收货 + 过账入库（库存更新 + PO quantityReceived回写 + PO完成判断）
         confirmItemRecpt(recptId);
+        postItemRecpt(recptId);
     }
 
     /**

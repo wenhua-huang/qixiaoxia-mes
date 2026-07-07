@@ -72,6 +72,11 @@
       "enablePullDownRefresh": true
     }
   }, {
+    "path": "pages/mes/pur/history-detail",
+    "style": {
+      "navigationBarTitleText": "收货详情"
+    }
+  }, {
     "path": "pages/common/webview/index",
     "style": {
       "navigationBarTitleText": "浏览网页"

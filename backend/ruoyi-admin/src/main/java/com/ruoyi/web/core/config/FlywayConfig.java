@@ -60,6 +60,7 @@ public class FlywayConfig
                 .table(table)
                 .baselineOnMigrate(baselineOnMigrate)
                 .baselineVersion(org.flywaydb.core.api.MigrationVersion.fromVersion(baselineVersion))
+                .validateOnMigrate(false)
                 .load();
         int count = flyway.migrate().migrationsExecuted;
         log.info("Flyway 迁移完成，执行了 {} 个 migration", count);

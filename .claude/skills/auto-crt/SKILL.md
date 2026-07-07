@@ -80,10 +80,11 @@ cd backend && mvn compile -pl ruoyi-system -am -DskipTests -q 2>&1   # 后端：
 - [ ] 后端单元测试全绿
 - [ ] 后端集成测试全绿（如涉及）
 - [ ] 前端组件测试全绿
+- [ ] e2e测试全绿
 - [ ] Code Review 零 finding（三轮确认）
 - [ ] `vue-tsc --noEmit` 零新增类型错误
 - [ ] `mvn compile` 无报错
 - [ ] Flyway SQL 已在目标 DB 验证通过（如涉及）
-- [ ] 启动前后端
+- [ ] 启动前后端 输出端口
 
 **任何一项不通过 → 修复 → 从 Step 3 重新开始，直到全部通过。**

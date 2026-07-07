@@ -151,6 +151,7 @@
       <el-table-column label="采购员" align="center" prop="purchaser" />
       <el-table-column label="审批人" align="center" prop="approver" />
       <el-table-column label="采购数量" align="center" prop="totalQuantity" />
+      <el-table-column label="到货数量" align="center" prop="receivedQuantity" />
       <el-table-column label="采购金额" align="center" prop="totalAmount" />
       <el-table-column label="币种" align="center" prop="currency" />
       <el-table-column label="关联客户订单" align="center" prop="sourceOrderCode" />
@@ -272,7 +273,7 @@
       </el-form>
       <template v-if="form.orderId">
         <el-divider content-position="center">采购订单行</el-divider>
-        <PurOrderLine :orderId="form.orderId" ref="orderLineRef" />
+        <PurOrderLine :orderId="form.orderId" :initLines="orderLines" ref="orderLineRef" />
       </template>
       <template #footer>
         <div class="dialog-footer">
@@ -286,6 +287,7 @@
 
 <script>
 import { listOrder, getOrder, delOrder, addOrder, updateOrder, approveOrder, orderOrder, closeOrder } from "@/api/mes/pur/order"
+import { listLine } from "@/api/mes/pur/order-line"
 import { genSerialCode } from "@/api/mes/sys/autocoderule"
 import VendorSelect from "@/components/vendorSelect/single.vue"
 import PurOrderLine from "./line.vue"
@@ -341,6 +343,7 @@ export default {
       orderDateRange: null,
       expectedDateRange: null,
       optType: undefined,
+      orderLines: [],
       // 表单校验
       rules: {        orderCode: [
         ],
@@ -360,6 +363,21 @@ export default {
       listOrder(this.queryParams).then(response => {
         this.orderList = response.rows
         this.total = response.total
+        // 聚合订单行已收数量 → 到货数量
+        return listLine({})
+      }).then(lineRes => {
+        const lines = lineRes.rows || []
+        const receivedMap = {}
+        lines.forEach(l => {
+          if (l.orderId && l.quantityReceived) {
+            receivedMap[l.orderId] = (receivedMap[l.orderId] || 0) + Number(l.quantityReceived)
+          }
+        })
+        this.orderList.forEach(o => {
+          o.receivedQuantity = receivedMap[o.orderId] || 0
+        })
+        this.loading = false
+      }).catch(() => {
         this.loading = false
       })
     },
@@ -393,6 +411,7 @@ export default {
         updateTime: null
       }
       this.optType = undefined
+      this.orderLines = []
       this.resetForm("form")
     },
     /** 搜索按钮操作 */
@@ -458,7 +477,8 @@ export default {
       this.optType = 'edit'
       const orderId = row.orderId || this.ids
       getOrder(orderId).then(response => {
-        this.form = response.data
+        this.form = response.data.order
+        this.orderLines = response.data.lines || []
         this.open = true
         this.title = "修改采购订单头"
       })

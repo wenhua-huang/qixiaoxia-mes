@@ -2,6 +2,7 @@ package com.ruoyi.system.domain.mes.wm;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import com.ruoyi.common.annotation.Excel;
@@ -80,9 +81,11 @@ public class WmItemRecptLine extends BaseEntity
     @Excel(name = "库位ID")
     private Long areaId;
 
+    @JsonFormat(pattern = "yyyy-MM-dd")
     @Excel(name = "有效期至")
     private Date expireDate;
 
+    @JsonFormat(pattern = "yyyy-MM-dd")
     @Excel(name = "生产日期")
     private Date produceDate;
 

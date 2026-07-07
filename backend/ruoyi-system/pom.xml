@@ -23,6 +23,13 @@
             <artifactId>ruoyi-common</artifactId>
         </dependency>
 
+        <!-- MapStruct -->
+        <dependency>
+            <groupId>org.mapstruct</groupId>
+            <artifactId>mapstruct</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- Unit test dependencies -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -17,7 +17,11 @@ import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.system.domain.mes.pur.PurOrder;
+import com.ruoyi.system.domain.mes.pur.PurOrderLine;
+import com.ruoyi.system.domain.mes.pur.vo.PurOrderDetailVO;
+import com.ruoyi.system.domain.mes.pur.vo.PurOrderVO;
 import com.ruoyi.system.service.mes.pur.IPurOrderService;
+import com.ruoyi.system.service.mes.pur.IPurOrderLineService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.page.TableDataInfo;
 
@@ -34,6 +38,9 @@ public class PurOrderController extends BaseController
     @Autowired
     private IPurOrderService purOrderService;
 
+    @Autowired
+    private IPurOrderLineService purOrderLineService;
+
     /**
      * 查询采购订单头列表
      */
@@ -42,7 +49,7 @@ public class PurOrderController extends BaseController
     public TableDataInfo list(PurOrder purOrder)
     {
         startPage();
-        List<PurOrder> list = purOrderService.selectPurOrderList(purOrder);
+        List<PurOrderVO> list = purOrderService.selectPurOrderList(purOrder);
         return getDataTable(list);
     }
 
@@ -54,8 +61,8 @@ public class PurOrderController extends BaseController
     @PostMapping("/export")
     public void export(HttpServletResponse response, PurOrder purOrder)
     {
-        List<PurOrder> list = purOrderService.selectPurOrderList(purOrder);
-        ExcelUtil<PurOrder> util = new ExcelUtil<PurOrder>(PurOrder.class);
+        List<PurOrderVO> list = purOrderService.selectPurOrderList(purOrder);
+        ExcelUtil<PurOrderVO> util = new ExcelUtil<PurOrderVO>(PurOrderVO.class);
         util.exportExcel(response, list, "采购订单头数据");
     }
 
@@ -66,7 +73,11 @@ public class PurOrderController extends BaseController
     @GetMapping(value = "/{orderId}")
     public AjaxResult getInfo(@PathVariable("orderId") Long orderId)
     {
-        return success(purOrderService.selectPurOrderByOrderId(orderId));
+        PurOrder order = purOrderService.selectPurOrderByOrderId(orderId);
+        PurOrderLine queryLine = new PurOrderLine();
+        queryLine.setOrderId(orderId);
+        List<PurOrderLine> lines = purOrderLineService.selectPurOrderLineList(queryLine);
+        return success(new PurOrderDetailVO(order, lines));
     }
 
     /**

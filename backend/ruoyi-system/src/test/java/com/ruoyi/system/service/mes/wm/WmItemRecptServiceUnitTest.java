@@ -3,15 +3,21 @@ package com.ruoyi.system.service.mes.wm;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.system.domain.mes.pur.PurOrder;
 import com.ruoyi.system.domain.mes.pur.PurOrderLine;
+import com.ruoyi.system.domain.mes.wm.ItemRecptReceiveBody;
 import com.ruoyi.system.domain.mes.wm.WmItemRecpt;
 import com.ruoyi.system.domain.mes.wm.WmItemRecptLine;
 import com.ruoyi.system.mapper.mes.wm.WmItemRecptMapper;
+import com.ruoyi.system.domain.mes.wm.WmBatch;
 import com.ruoyi.system.service.mes.pur.IPurOrderLineService;
 import com.ruoyi.system.service.mes.pur.IPurOrderService;
+import com.ruoyi.system.service.mes.wm.IWmBatchService;
+import com.ruoyi.system.service.mes.wm.IWmItemRecptLineService;
+import com.ruoyi.system.service.mes.wm.IWmStorageCoreService;
 import com.ruoyi.system.service.mes.wm.impl.WmItemRecptServiceImpl;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -20,6 +26,7 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.Collections;
 
 import static org.assertj.core.api.Assertions.*;
@@ -38,6 +45,7 @@ class WmItemRecptServiceUnitTest {
     @Mock private IPurOrderService purOrderService;
     @Mock private IPurOrderLineService purOrderLineService;
     @Mock private IWmStorageCoreService storageCoreService;
+    @Mock private IWmBatchService wmBatchService;
     @InjectMocks private WmItemRecptServiceImpl service;
 
     private MockedStatic<SecurityUtils> securityUtilsMock;
@@ -255,6 +263,244 @@ class WmItemRecptServiceUnitTest {
 
         verify(purOrderLineService, never()).selectPurOrderLineList(any());
         assertThat(header.getStatus()).isEqualTo("POSTED");
+    }
+
+    @Nested
+    @DisplayName("receiveWithLines — 一键收货 + 仓库传播")
+    class ReceiveWithLinesTests {
+
+        /**
+         * 为 confirmItemRecpt 调用设置通用 mock，避免 NPE。
+         */
+        private void stubConfirmMocks(WmItemRecpt header) {
+            WmItemRecptLine line = new WmItemRecptLine();
+            line.setItemId(201L);
+            line.setQuantityRecpt(new BigDecimal("10.0000"));
+
+            PurOrderLine poLine = new PurOrderLine();
+            poLine.setLineId(1L);
+            poLine.setOrderId(100L);
+            poLine.setItemId(201L);
+
+            PurOrder purOrder = new PurOrder();
+            purOrder.setOrderId(100L);
+            purOrder.setStatus("ORDERED");
+
+            lenient().when(wmItemRecptMapper.selectWmItemRecptByRecptId(header.getRecptId())).thenReturn(header);
+            lenient().when(wmItemRecptLineService.selectWmItemRecptLineList(any())).thenReturn(Collections.singletonList(line));
+            lenient().when(purOrderLineService.selectPurOrderLineList(any())).thenReturn(Collections.singletonList(poLine));
+            lenient().when(purOrderService.selectPurOrderByOrderId(any())).thenReturn(purOrder);
+        }
+
+        @Test
+        @DisplayName("10. header 无仓库 → 取第一行仓库填充 header")
+        void shouldPropagateWarehouseFromFirstLineToHeader() {
+            WmItemRecpt header = draftRecpt();
+            header.setWarehouseId(null);
+            header.setWarehouseCode(null);
+            header.setWarehouseName(null);
+            header.setPurOrderId(100L);
+
+            WmItemRecptLine line1 = new WmItemRecptLine();
+            line1.setItemId(208L);
+            line1.setItemCode("AUX-GLUE-001");
+            line1.setItemName("制袋胶水");
+            line1.setQuantityRecpt(new BigDecimal("10.0000"));
+            line1.setWarehouseId(1L);
+            line1.setWarehouseCode("WH-001");
+            line1.setWarehouseName("原料仓");
+
+            WmItemRecptLine line2 = new WmItemRecptLine();
+            line2.setItemId(209L);
+            line2.setItemCode("AUX-INK-001");
+            line2.setItemName("印刷油墨");
+            line2.setQuantityRecpt(new BigDecimal("11.0000"));
+            line2.setWarehouseId(200L);
+            line2.setWarehouseCode("WH20260707004");
+            line2.setWarehouseName("辅料");
+
+            ItemRecptReceiveBody body = new ItemRecptReceiveBody();
+            body.setHeader(header);
+            body.setLines(Arrays.asList(line1, line2));
+
+            when(wmItemRecptMapper.insertWmItemRecpt(any())).thenReturn(1);
+            when(wmItemRecptMapper.updateWmItemRecpt(any())).thenReturn(1);
+            when(wmItemRecptLineService.insertWmItemRecptLine(any())).thenReturn(1);
+            stubConfirmMocks(header);
+
+            service.receiveWithLines(body);
+
+            // 验证 header insert 前 warehouse 已从第一行填充
+            assertThat(header.getWarehouseId()).isEqualTo(1L);
+            assertThat(header.getWarehouseCode()).isEqualTo("WH-001");
+            assertThat(header.getWarehouseName()).isEqualTo("原料仓");
+
+            // 验证两行都保留了各自仓库
+            assertThat(line1.getWarehouseId()).isEqualTo(1L);
+            assertThat(line1.getWarehouseName()).isEqualTo("原料仓");
+            assertThat(line2.getWarehouseId()).isEqualTo(200L);
+            assertThat(line2.getWarehouseName()).isEqualTo("辅料");
+
+            // 验证行 insert 被调用2次
+            verify(wmItemRecptLineService, times(2)).insertWmItemRecptLine(any());
+            verify(storageCoreService).processItemRecpt(any());
+        }
+
+        @Test
+        @DisplayName("11. header 已有仓库 → 不覆盖")
+        void shouldKeepExistingHeaderWarehouse() {
+            WmItemRecpt header = draftRecpt();
+            header.setWarehouseId(99L);
+            header.setWarehouseCode("WH-099");
+            header.setWarehouseName("已有仓库");
+            header.setPurOrderId(100L);
+
+            WmItemRecptLine line = new WmItemRecptLine();
+            line.setItemId(208L);
+            line.setItemCode("AUX-GLUE-001");
+            line.setItemName("制袋胶水");
+            line.setQuantityRecpt(new BigDecimal("5.0000"));
+            line.setWarehouseId(1L);
+            line.setWarehouseCode("WH-001");
+            line.setWarehouseName("原料仓");
+
+            ItemRecptReceiveBody body = new ItemRecptReceiveBody();
+            body.setHeader(header);
+            body.setLines(Collections.singletonList(line));
+
+            when(wmItemRecptMapper.insertWmItemRecpt(any())).thenReturn(1);
+            when(wmItemRecptMapper.updateWmItemRecpt(any())).thenReturn(1);
+            when(wmItemRecptLineService.insertWmItemRecptLine(any())).thenReturn(1);
+            stubConfirmMocks(header);
+
+            service.receiveWithLines(body);
+
+            // header 仓库保持不变
+            assertThat(header.getWarehouseId()).isEqualTo(99L);
+            assertThat(header.getWarehouseName()).isEqualTo("已有仓库");
+            // 行仓库不变
+            assertThat(line.getWarehouseId()).isEqualTo(1L);
+        }
+
+        @Test
+        @DisplayName("12. header 为空 → 抛异常")
+        void shouldRejectNullHeader() {
+            ItemRecptReceiveBody body = new ItemRecptReceiveBody();
+            body.setLines(Collections.singletonList(new WmItemRecptLine()));
+
+            assertThatThrownBy(() -> service.receiveWithLines(body))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("头信息不能为空");
+        }
+
+        @Test
+        @DisplayName("13. lines 为空 → 抛异常")
+        void shouldRejectEmptyLines() {
+            ItemRecptReceiveBody body = new ItemRecptReceiveBody();
+            body.setHeader(draftRecpt());
+
+            assertThatThrownBy(() -> service.receiveWithLines(body))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("行不能为空");
+        }
+    }
+
+    @Nested
+    @DisplayName("receiveWithLines — 批次号自动生成")
+    class BatchCodeTests {
+
+        private void stubConfirmMocks(WmItemRecpt header) {
+            WmItemRecptLine line = new WmItemRecptLine();
+            line.setItemId(201L);
+            line.setQuantityRecpt(new BigDecimal("10.0000"));
+            PurOrderLine poLine = new PurOrderLine();
+            poLine.setLineId(1L); poLine.setOrderId(100L); poLine.setItemId(201L);
+            PurOrder purOrder = new PurOrder();
+            purOrder.setOrderId(100L); purOrder.setStatus("ORDERED");
+            lenient().when(wmItemRecptMapper.selectWmItemRecptByRecptId(header.getRecptId())).thenReturn(header);
+            lenient().when(wmItemRecptLineService.selectWmItemRecptLineList(any())).thenReturn(Collections.singletonList(line));
+            lenient().when(purOrderLineService.selectPurOrderLineList(any())).thenReturn(Collections.singletonList(poLine));
+            lenient().when(purOrderService.selectPurOrderByOrderId(any())).thenReturn(purOrder);
+        }
+
+        @Test
+        @DisplayName("14. 行无 batchCode → 自动调用 getOrGenerateBatchCode")
+        void shouldAutoGenBatchWhenNoBatchCode() {
+            WmItemRecpt header = draftRecpt(); header.setPurOrderId(100L);
+            WmItemRecptLine line = new WmItemRecptLine();
+            line.setItemId(208L); line.setItemCode("AUX-GLUE-001"); line.setItemName("制袋胶水");
+            line.setQuantityRecpt(new BigDecimal("10.0000"));
+            line.setWarehouseId(1L); line.setWarehouseCode("WH-001"); line.setWarehouseName("原料仓");
+
+            WmBatch generated = new WmBatch();
+            generated.setBatchId(500L); generated.setBatchCode("BAT20260707001");
+
+            ItemRecptReceiveBody body = new ItemRecptReceiveBody();
+            body.setHeader(header); body.setLines(Collections.singletonList(line));
+
+            when(wmItemRecptMapper.insertWmItemRecpt(any())).thenReturn(1);
+            when(wmItemRecptMapper.updateWmItemRecpt(any())).thenReturn(1);
+            when(wmItemRecptLineService.insertWmItemRecptLine(any())).thenReturn(1);
+            when(wmBatchService.getOrGenerateBatchCode(any())).thenReturn(generated);
+            stubConfirmMocks(header);
+
+            service.receiveWithLines(body);
+
+            assertThat(line.getBatchId()).isEqualTo(500L);
+            assertThat(line.getBatchCode()).isEqualTo("BAT20260707001");
+            verify(wmBatchService).getOrGenerateBatchCode(any());
+        }
+
+        @Test
+        @DisplayName("15. 行已有 batchCode → 不覆盖")
+        void shouldNotOverwriteExistingBatchCode() {
+            WmItemRecpt header = draftRecpt(); header.setPurOrderId(100L);
+            WmItemRecptLine line = new WmItemRecptLine();
+            line.setItemId(208L); line.setItemCode("AUX-GLUE-001"); line.setItemName("制袋胶水");
+            line.setQuantityRecpt(new BigDecimal("5.0000"));
+            line.setBatchCode("EXISTING-BATCH");
+            line.setBatchId(999L);
+            line.setWarehouseId(1L); line.setWarehouseCode("WH-001"); line.setWarehouseName("原料仓");
+
+            ItemRecptReceiveBody body = new ItemRecptReceiveBody();
+            body.setHeader(header); body.setLines(Collections.singletonList(line));
+
+            when(wmItemRecptMapper.insertWmItemRecpt(any())).thenReturn(1);
+            when(wmItemRecptMapper.updateWmItemRecpt(any())).thenReturn(1);
+            when(wmItemRecptLineService.insertWmItemRecptLine(any())).thenReturn(1);
+            stubConfirmMocks(header);
+
+            service.receiveWithLines(body);
+
+            assertThat(line.getBatchId()).isEqualTo(999L);
+            assertThat(line.getBatchCode()).isEqualTo("EXISTING-BATCH");
+            verify(wmBatchService, never()).getOrGenerateBatchCode(any());
+        }
+
+        @Test
+        @DisplayName("16. 物料无批次管理 → 跳过")
+        void shouldSkipBatchWhenMaterialNotBatchManaged() {
+            WmItemRecpt header = draftRecpt(); header.setPurOrderId(100L);
+            WmItemRecptLine line = new WmItemRecptLine();
+            line.setItemId(208L); line.setItemCode("AUX-GLUE-001"); line.setItemName("制袋胶水");
+            line.setQuantityRecpt(new BigDecimal("5.0000"));
+            line.setWarehouseId(1L); line.setWarehouseCode("WH-001"); line.setWarehouseName("原料仓");
+
+            ItemRecptReceiveBody body = new ItemRecptReceiveBody();
+            body.setHeader(header); body.setLines(Collections.singletonList(line));
+
+            when(wmItemRecptMapper.insertWmItemRecpt(any())).thenReturn(1);
+            when(wmItemRecptMapper.updateWmItemRecpt(any())).thenReturn(1);
+            when(wmItemRecptLineService.insertWmItemRecptLine(any())).thenReturn(1);
+            when(wmBatchService.getOrGenerateBatchCode(any())).thenReturn(null);
+            stubConfirmMocks(header);
+
+            service.receiveWithLines(body);
+
+            assertThat(line.getBatchId()).isNull();
+            assertThat(line.getBatchCode()).isNull();
+            verify(wmBatchService).getOrGenerateBatchCode(any());
+        }
     }
 
     private WmItemRecpt draftRecpt() {

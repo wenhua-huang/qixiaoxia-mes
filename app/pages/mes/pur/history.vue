@@ -119,7 +119,7 @@ function loadData() {
 }
 
 function viewDetail(item) {
-  proxy.$modal.msgSuccess('入库单 ' + item.recptCode + ' — 状态: ' + (statusMap[item.status] || item.status))
+  uni.navigateTo({ url: '/pages/mes/pur/history-detail?recptId=' + item.recptId })
 }
 
 onPullDownRefresh(() => {

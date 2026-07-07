@@ -122,9 +122,16 @@ public class FactoryIdInterceptor implements Interceptor
     {
         String s = sql.replaceAll("\\s+", " ");
         java.util.regex.Matcher m = FROM_ALIAS.matcher(s);
+
+        // 计算每个位置的括号深度，跳过子查询内的 FROM/JOIN
+        int[] depthAt = parenDepth(s);
+
         String fallbackTable = null;
         while (m.find())
         {
+            // 跳过子查询内的 FROM/JOIN（括号深度 > 0）
+            if (depthAt[m.start()] > 0) continue;
+
             String table = m.group(1);
             if (FACTORY_ID_TABLE.matcher(table).matches())
             {
@@ -137,6 +144,23 @@ public class FactoryIdInterceptor implements Interceptor
             }
         }
         return fallbackTable != null ? fallbackTable : "";  // 全部是关键字别名 → 用最后一个表名
+    }
+
+    /** 计算每个字符位置的括号嵌套深度（( ) 未匹配数），下标 i 表示 s.charAt(i) 之前的深度。visible for testing */
+    int[] parenDepth(String s)
+    {
+        int n = s.length();
+        int[] depthAt = new int[n + 1];
+        int depth = 0;
+        for (int i = 0; i < n; i++)
+        {
+            depthAt[i] = depth;
+            char c = s.charAt(i);
+            if (c == '(') depth++;
+            else if (c == ')') depth--;
+        }
+        depthAt[n] = depth;
+        return depthAt;
     }
 
     boolean isSqlKeyword(String w)   // visible for testing

@@ -44,7 +44,7 @@
         </view>
       </view>
 
-      <!-- 物料行 — 填入实收数量 -->
+      <!-- 物料行 — 填入实收数量 + 仓库 -->
       <view class="line-header">
         <text class="bold">物料明细</text>
         <text class="text-grey">填写实收数量</text>
@@ -52,7 +52,11 @@
       <view v-for="(line, idx) in lines" :key="idx" class="line-item">
         <view class="line-info">
           <text class="bold">{{ line.itemName }}</text>
-          <text class="text-grey">{{ line.itemCode }} / {{ line.specification || '-' }}</text>
+          <text class="text-grey">{{ line.itemCode }}</text>
+        </view>
+        <view class="line-spec">
+          <text class="label">规格型号</text>
+          <uni-easyinput v-model="line.specification" placeholder="请输入" :inputBorder="true" class="spec-field" />
         </view>
         <view class="line-qty">
           <text class="label">订购: {{ line.quantityOrdered }} {{ line.unitName }}</text>
@@ -70,6 +74,35 @@
           <text v-if="line.quantityReceived" class="text-green">
             已收: {{ line.quantityReceived }}
           </text>
+        </view>
+        <view class="line-warehouse">
+          <text class="label">入库仓库</text>
+          <picker :value="warehouseList.findIndex(w => w.warehouseId === line.warehouseId)"
+            :range="warehouseList" range-key="warehouseName"
+            @change="(e) => line.warehouseId = warehouseList[e.detail.value].warehouseId">
+            <view class="picker-value-sm">
+              {{ warehouseNameOf(line.warehouseId) || '请选择' }}
+              <uni-icons type="right" size="12" color="#999" />
+            </view>
+          </picker>
+        </view>
+        <view class="line-extra">
+          <view class="extra-row">
+            <text class="label">生产日期</text>
+            <picker mode="date" :value="line.produceDate" @change="(e) => line.produceDate = e.detail.value">
+              <view class="picker-value-sm">{{ line.produceDate || '请选择' }}</view>
+            </picker>
+          </view>
+          <view class="extra-row">
+            <text class="label">有效期至</text>
+            <picker mode="date" :value="line.expireDate" @change="(e) => line.expireDate = e.detail.value">
+              <view class="picker-value-sm">{{ line.expireDate || '请选择' }}</view>
+            </picker>
+          </view>
+          <view class="extra-row">
+            <text class="label">生产批号</text>
+            <uni-easyinput v-model="line.lotNumber" placeholder="供应商批号" :inputBorder="true" class="extra-field" />
+          </view>
         </view>
       </view>
     </view>
@@ -121,8 +154,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, getCurrentInstance } from 'vue'
-import { listOrder, listOrderLine, receiveItemRecpt } from '@/api/mes/pur/order'
+import { ref, reactive, getCurrentInstance, onMounted } from 'vue'
+import { listOrder, listOrderLine, receiveItemRecpt, listWarehouseAll } from '@/api/mes/pur/order'
 import { isValidReceiptQty, genRecptCode } from '@/utils/pur.js'
 
 const { proxy } = getCurrentInstance()
@@ -131,7 +164,11 @@ const order = ref(null)
 const lines = ref([])
 const photos = ref([])
 const submitting = ref(false)
-const warehouseId = ref(1) // 默认仓库，后续可从用户配置获取
+const warehouseList = ref([])
+function warehouseNameOf(id) {
+  const found = warehouseList.value.find(w => w.warehouseId === id)
+  return found ? found.warehouseName : ''
+}
 const arrivalInfo = reactive({
   logisticsNo: '',
   vehiclePlate: '',
@@ -212,6 +249,10 @@ function loadLines(orderId) {
     lines.value = (res.rows || []).map(l => ({
       ...l,
       receiptQty: '',
+      warehouseId: null,
+      produceDate: '',
+      expireDate: '',
+      lotNumber: l.lotNumber || '',
       quantityReceived: l.quantityReceived || 0
     }))
   })
@@ -249,6 +290,11 @@ function submitReceipt() {
     proxy.$modal.msgError('请至少填写一行的实收数量')
     return
   }
+  const filledLines = lines.value.filter(l => isValidReceiptQty(l.receiptQty))
+  if (filledLines.some(l => !l.warehouseId)) {
+    proxy.$modal.msgError('请为每个已填数量的行选择入库仓库')
+    return
+  }
 
   proxy.$modal.confirm('确认提交收货？确认后将更新库存。').then(() => {
     submitting.value = true
@@ -261,7 +307,6 @@ function submitReceipt() {
         vendorId: order.value.vendorId,
         vendorCode: order.value.vendorCode,
         vendorName: order.value.vendorName,
-        warehouseId: warehouseId.value,
         recptType: 'PURCHASE',
         status: 'DRAFT',
         remark: [
@@ -274,7 +319,13 @@ function submitReceipt() {
         itemId: l.itemId, itemCode: l.itemCode, itemName: l.itemName,
         specification: l.specification,
         unitOfMeasure: l.unitOfMeasure, unitName: l.unitName,
-        quantityRecpt: parseFloat(l.receiptQty)
+        quantityRecpt: parseFloat(l.receiptQty),
+        warehouseId: l.warehouseId,
+        warehouseCode: warehouseList.value.find(w => w.warehouseId === l.warehouseId)?.warehouseCode || '',
+        warehouseName: warehouseNameOf(l.warehouseId),
+        produceDate: l.produceDate || null,
+        expireDate: l.expireDate || null,
+        lotNumber: l.lotNumber || null
       }))
     }
 
@@ -289,6 +340,10 @@ function submitReceipt() {
     })
   }).catch(() => {})
 }
+
+onMounted(() => {
+  listWarehouseAll().then(res => { warehouseList.value = res.data || [] })
+})
 </script>
 
 <style lang="scss" scoped>
@@ -377,6 +432,32 @@ page { background-color: #f5f6f7; min-height: 100%; }
   justify-content: center; gap: 8rpx;
   color: #999;
 }
+
+.line-warehouse {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 12rpx; padding-top: 12rpx;
+  border-top: 1px dashed #e5e5e5;
+}
+.picker-value-sm {
+  display: flex; align-items: center; gap: 6rpx;
+  color: #333; font-size: 26rpx;
+}
+
+.line-spec {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 8rpx;
+}
+.spec-field { width: 280rpx; }
+
+.line-extra {
+  margin-top: 8rpx; padding-top: 8rpx;
+  border-top: 1px dashed #e5e5e5;
+}
+.extra-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4rpx 0;
+}
+.extra-field { width: 260rpx; }
 
 .form-box { padding: 16rpx 24rpx; }
 

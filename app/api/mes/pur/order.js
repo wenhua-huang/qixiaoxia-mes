@@ -75,11 +75,36 @@ export function postItemRecpt(recptId) {
   })
 }
 
+// 查询入库单详情（单条）
+export function getItemRecpt(recptId) {
+  return request({
+    url: '/mes/wm/item_recpt/' + recptId,
+    method: 'get'
+  })
+}
+
+// 查询入库单行列表
+export function listItemRecptLines(query) {
+  return request({
+    url: '/mes/wm/item_recpt_line/list',
+    method: 'get',
+    params: query
+  })
+}
+
 // 一键收货：入库单头+行+确认，单接口原子完成
 export function receiveItemRecpt(data) {
   return request({
     url: '/mes/wm/item_recpt/receive',
     method: 'post',
     data: data
+  })
+}
+
+// 查询仓库列表（用于下拉选择）
+export function listWarehouseAll() {
+  return request({
+    url: '/mes/wm/warehouse/listAll',
+    method: 'get'
   })
 }

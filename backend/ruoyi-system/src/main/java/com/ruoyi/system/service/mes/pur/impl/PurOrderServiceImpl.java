@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import com.ruoyi.system.mapper.mes.pur.PurOrderMapper;
 import com.ruoyi.system.domain.mes.pur.PurOrder;
 import com.ruoyi.system.domain.mes.pur.PurOrderLine;
+import com.ruoyi.system.domain.mes.pur.vo.PurOrderVO;
 import com.ruoyi.system.service.mes.pur.IPurOrderService;
 import com.ruoyi.system.service.mes.pur.IPurOrderLineService;
 import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
@@ -52,7 +53,7 @@ public class PurOrderServiceImpl implements IPurOrderService
      * @return 采购订单头
      */
     @Override
-    public List<PurOrder> selectPurOrderList(PurOrder purOrder)
+    public List<PurOrderVO> selectPurOrderList(PurOrder purOrder)
     {
         return purOrderMapper.selectPurOrderList(purOrder);
     }

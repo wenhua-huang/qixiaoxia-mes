@@ -31,13 +31,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="updateTime"    column="update_time"    />
     </resultMap>
 
+    <resultMap type="com.ruoyi.system.domain.mes.pur.vo.PurOrderVO" id="PurOrderVOResult" extends="PurOrderResult">
+        <result property="receivedQuantity" column="received_quantity"/>
+    </resultMap>
+
     <sql id="selectPurOrderVo">
-        select order_id, factory_id, order_code, order_name, vendor_id, vendor_code, vendor_name, purchase_type, order_date, expected_date, purchaser, approver, total_quantity, total_amount, currency, source_order_code, workorder_id, workorder_code, status, remark, create_by, create_time, update_by, update_time from qxx_pur_order
+        select o.order_id, o.factory_id, o.order_code, o.order_name, o.vendor_id, o.vendor_code, o.vendor_name, o.purchase_type, o.order_date, o.expected_date, o.purchaser, o.approver, o.total_quantity, (SELECT COALESCE(SUM(l.quantity_recpt), 0) FROM qxx_wm_item_recpt_line l JOIN qxx_wm_item_recpt r ON l.recpt_id = r.recpt_id WHERE r.pur_order_id = o.order_id AND r.status IN ('CONFIRMED', 'POSTED')) AS received_quantity, o.total_amount, o.currency, o.source_order_code, o.workorder_id, o.workorder_code, o.status, o.remark, o.create_by, o.create_time, o.update_by, o.update_time from qxx_pur_order o
     </sql>
 
-    <select id="selectPurOrderList" parameterType="PurOrder" resultMap="PurOrderResult">
+    <select id="selectPurOrderList" parameterType="PurOrder" resultMap="PurOrderVOResult">
         <include refid="selectPurOrderVo"/>
-        <where>            <if test="orderCode != null  and orderCode != ''"> and order_code = #{orderCode}</if>
+        <where>1=1
+            <if test="orderCode != null  and orderCode != ''"> and order_code = #{orderCode}</if>
             <if test="orderName != null  and orderName != ''"> and order_name like concat('%', #{orderName}, '%')</if>
             <if test="vendorId != null "> and vendor_id = #{vendorId}</if>
             <if test="vendorCode != null  and vendorCode != ''"> and vendor_code = #{vendorCode}</if>

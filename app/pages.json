@@ -61,6 +61,17 @@
       "navigationBarTitleText": "关于我们"
     }
   }, {
+    "path": "pages/mes/pur/receipt",
+    "style": {
+      "navigationBarTitleText": "采购收货"
+    }
+  }, {
+    "path": "pages/mes/pur/history",
+    "style": {
+      "navigationBarTitleText": "收货历史",
+      "enablePullDownRefresh": true
+    }
+  }, {
     "path": "pages/common/webview/index",
     "style": {
       "navigationBarTitleText": "浏览网页"

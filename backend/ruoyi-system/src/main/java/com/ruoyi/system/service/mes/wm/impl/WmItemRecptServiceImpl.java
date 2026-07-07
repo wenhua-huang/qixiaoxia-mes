@@ -10,6 +10,7 @@ import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.system.domain.mes.pur.PurOrder;
 import com.ruoyi.system.domain.mes.pur.PurOrderLine;
+import com.ruoyi.system.domain.mes.wm.ItemRecptReceiveBody;
 import com.ruoyi.system.domain.mes.wm.WmItemRecpt;
 import com.ruoyi.system.domain.mes.wm.WmItemRecptLine;
 import com.ruoyi.system.domain.mes.wm.tx.ItemRecptTxBean;
@@ -161,6 +162,38 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
         if (header.getPurOrderId() != null && header.getPurOrderId() > 0) {
             writebackPoOnPost(header);
         }
+    }
+
+    /**
+     * 一键收货（移动端）：创建入库单头+行+确认收货，单个事务原子完成。
+     */
+    @Override
+    @Transactional
+    public void receiveWithLines(ItemRecptReceiveBody body) {
+        WmItemRecpt header = body.getHeader();
+        List<WmItemRecptLine> lines = body.getLines();
+        if (header == null) throw new RuntimeException("入库单头信息不能为空");
+        if (lines == null || lines.isEmpty()) throw new RuntimeException("入库单行不能为空");
+
+        // 1. 创建入库单头
+        header.setCreateTime(DateUtils.getNowDate());
+        header.setCreateBy(SecurityUtils.getUsername());
+        wmItemRecptMapper.insertWmItemRecpt(header);
+        Long recptId = header.getRecptId();
+
+        // 2. 创建入库单行（继承头部的仓库信息）
+        for (WmItemRecptLine line : lines) {
+            line.setRecptId(recptId);
+            if (line.getWarehouseId() == null) line.setWarehouseId(header.getWarehouseId());
+            if (line.getWarehouseCode() == null) line.setWarehouseCode(header.getWarehouseCode());
+            if (line.getWarehouseName() == null) line.setWarehouseName(header.getWarehouseName());
+            line.setCreateTime(DateUtils.getNowDate());
+            line.setCreateBy(SecurityUtils.getUsername());
+            wmItemRecptLineService.insertWmItemRecptLine(line);
+        }
+
+        // 3. 确认收货（库存更新 + PO回写）
+        confirmItemRecpt(recptId);
     }
 
     /**

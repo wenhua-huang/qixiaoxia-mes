@@ -122,7 +122,8 @@
 
 <script setup>
 import { ref, reactive, getCurrentInstance } from 'vue'
-import { listOrder, listOrderLine, confirmItemRecpt, addWmItemRecpt, addWmItemRecptLine } from '@/api/mes/pur/order'
+import { listOrder, listOrderLine, receiveItemRecpt } from '@/api/mes/pur/order'
+import { isValidReceiptQty, genRecptCode } from '@/utils/pur.js'
 
 const { proxy } = getCurrentInstance()
 const orderCode = ref('')
@@ -241,10 +242,9 @@ function removePhoto(idx) {
   photos.value.splice(idx, 1)
 }
 
-// 提交收货
+// 提交收货 — 单接口完成（头+行+确认，后端事务保证原子性）
 function submitReceipt() {
-  // 校验：至少一行有实收数量
-  const hasQty = lines.value.some(l => parseFloat(l.receiptQty) > 0)
+  const hasQty = lines.value.some(l => isValidReceiptQty(l.receiptQty))
   if (!hasQty) {
     proxy.$modal.msgError('请至少填写一行的实收数量')
     return
@@ -252,64 +252,39 @@ function submitReceipt() {
 
   proxy.$modal.confirm('确认提交收货？确认后将更新库存。').then(() => {
     submitting.value = true
-    // 构建入库单数据
-    const recptData = {
-      recptCode: 'RCP-' + Date.now().toString(36).toUpperCase(),
-      recptName: '移动端收货-' + (order.value.orderCode || ''),
-      purOrderId: order.value.orderId,
-      purOrderCode: order.value.orderCode,
-      vendorId: order.value.vendorId,
-      vendorCode: order.value.vendorCode,
-      vendorName: order.value.vendorName,
-      warehouseId: warehouseId.value,
-      recptType: 'PURCHASE',
-      status: 'DRAFT',
-      remark: [
-        arrivalInfo.logisticsNo && '物流:' + arrivalInfo.logisticsNo,
-        arrivalInfo.vehiclePlate && '车牌:' + arrivalInfo.vehiclePlate,
-        arrivalInfo.vendorDeliveryNo && '送货单:' + arrivalInfo.vendorDeliveryNo
-      ].filter(Boolean).join('; ')
+    const body = {
+      header: {
+        recptCode: genRecptCode(),
+        recptName: '移动端收货-' + (order.value.orderCode || ''),
+        purOrderId: order.value.orderId,
+        purOrderCode: order.value.orderCode,
+        vendorId: order.value.vendorId,
+        vendorCode: order.value.vendorCode,
+        vendorName: order.value.vendorName,
+        warehouseId: warehouseId.value,
+        recptType: 'PURCHASE',
+        status: 'DRAFT',
+        remark: [
+          arrivalInfo.logisticsNo && '物流:' + arrivalInfo.logisticsNo,
+          arrivalInfo.vehiclePlate && '车牌:' + arrivalInfo.vehiclePlate,
+          arrivalInfo.vendorDeliveryNo && '送货单:' + arrivalInfo.vendorDeliveryNo
+        ].filter(Boolean).join('; ')
+      },
+      lines: lines.value.filter(l => isValidReceiptQty(l.receiptQty)).map(l => ({
+        itemId: l.itemId, itemCode: l.itemCode, itemName: l.itemName,
+        specification: l.specification,
+        unitOfMeasure: l.unitOfMeasure, unitName: l.unitName,
+        quantityRecpt: parseFloat(l.receiptQty)
+      }))
     }
 
-    // 先创建入库单头 → 再创建行 → 再确认收货
-    addWmItemRecpt(recptData).then(headerRes => {
-      const recptId = headerRes.data?.recptId || headerRes.recptId
-      if (!recptId) {
-        proxy.$modal.msgError('创建入库单失败')
-        submitting.value = false
-        return
-      }
-      // 创建入库行
-      const linePromises = lines.value
-        .filter(l => parseFloat(l.receiptQty) > 0)
-        .map(l => addWmItemRecptLine({
-          recptId,
-          itemId: l.itemId,
-          itemCode: l.itemCode,
-          itemName: l.itemName,
-          specification: l.specification,
-          unitOfMeasure: l.unitOfMeasure,
-          unitName: l.unitName,
-          quantityRecpt: parseFloat(l.receiptQty)
-        }))
-
-      Promise.all(linePromises).then(() => {
-        // 确认收货
-        confirmItemRecpt(recptId).then(() => {
-          proxy.$modal.msgSuccess('收货确认成功！库存已更新')
-          submitting.value = false
-          // 返回上一页
-          setTimeout(() => { proxy.$tab.navigateBack() }, 1500)
-        }).catch(e => {
-          proxy.$modal.msgError('确认收货失败：' + (e.msg || '未知错误') + '。入库单已创建(编号:' + recptData.recptCode + ')，可稍后在PC端确认。')
-          submitting.value = false
-        })
-      }).catch(() => {
-        proxy.$modal.msgError('创建入库行失败，入库单头已创建(编号:' + recptData.recptCode + ')，请手动补充行数据。')
-        submitting.value = false
-      })
-    }).catch(() => {
-      proxy.$modal.msgError('创建入库单失败')
+    // 单接口调用，后端原子完成：创建头 → 创建行 → 确认收货 → 回写PO
+    receiveItemRecpt(body).then(() => {
+      proxy.$modal.msgSuccess('收货确认成功！库存已更新')
+      setTimeout(() => { proxy.$tab.navigateBack() }, 1500)
+    }).catch(e => {
+      proxy.$modal.msgError('收货失败：' + (e.msg || '未知错误'))
+    }).finally(() => {
       submitting.value = false
     })
   }).catch(() => {})

@@ -75,19 +75,10 @@ export function postItemRecpt(recptId) {
   })
 }
 
-// 新增入库单头
-export function addWmItemRecpt(data) {
+// 一键收货：入库单头+行+确认，单接口原子完成
+export function receiveItemRecpt(data) {
   return request({
-    url: '/mes/wm/item_recpt',
-    method: 'post',
-    data: data
-  })
-}
-
-// 新增入库单行
-export function addWmItemRecptLine(data) {
-  return request({
-    url: '/mes/wm/item_recpt_line',
+    url: '/mes/wm/item_recpt/receive',
     method: 'post',
     data: data
   })

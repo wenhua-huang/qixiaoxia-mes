@@ -1,8 +1,8 @@
-import { defineConfig } from 'vite'
-import uni from '@dcloudio/vite-plugin-uni'
+const { defineConfig } = require('vite')
+const uni = require('@dcloudio/vite-plugin-uni')
 
-export default defineConfig({
-  plugins: [uni()],
+module.exports = defineConfig({
+  plugins: [(uni.default || uni)()],
   server: {
     port: 8081,
     proxy: {

@@ -92,12 +92,3 @@ export function addWmItemRecptLine(data) {
     data: data
   })
 }
-
-// 查询入库单行列表
-export function listItemRecptLine(query) {
-  return request({
-    url: '/mes/wm/item_recpt_line/list',
-    method: 'get',
-    params: query
-  })
-}

@@ -119,7 +119,7 @@ function loadData() {
 }
 
 function viewDetail(item) {
-  console.log('查看详情:', item.recptCode)
+  proxy.$modal.msgSuccess('入库单 ' + item.recptCode + ' — 状态: ' + (statusMap[item.status] || item.status))
 }
 
 onPullDownRefresh(() => {

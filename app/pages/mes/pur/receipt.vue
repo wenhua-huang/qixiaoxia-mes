@@ -36,7 +36,7 @@
         </view>
         <view class="info-row">
           <text class="label">采购类型</text>
-          <text class="value">{{ order.purchaseType }}</text>
+          <text class="value">{{ purchaseTypeText(order.purchaseType) }}</text>
         </view>
         <view class="info-row">
           <text class="label">状态</text>
@@ -122,7 +122,7 @@
 
 <script setup>
 import { ref, reactive, getCurrentInstance } from 'vue'
-import { getOrder, listOrderLine, confirmItemRecpt, addWmItemRecpt, addWmItemRecptLine } from '@/api/mes/pur/order'
+import { listOrder, listOrderLine, confirmItemRecpt, addWmItemRecpt, addWmItemRecptLine } from '@/api/mes/pur/order'
 
 const { proxy } = getCurrentInstance()
 const orderCode = ref('')
@@ -130,6 +130,7 @@ const order = ref(null)
 const lines = ref([])
 const photos = ref([])
 const submitting = ref(false)
+const warehouseId = ref(1) // 默认仓库，后续可从用户配置获取
 const arrivalInfo = reactive({
   logisticsNo: '',
   vehiclePlate: '',
@@ -175,22 +176,28 @@ function handleScan() {
   // #endif
 }
 
-// 搜索PO
+// 搜索PO（通过列表API按编码搜索）
 function searchOrder() {
   if (!orderCode.value.trim()) {
     proxy.$modal.msgError('请输入PO单号')
     return
   }
   proxy.$modal.loading('查询中...')
-  getOrder(orderCode.value.trim()).then(res => {
+  // 使用列表API按订单编码搜索（getOrder 需要数字ID）
+  listOrder({ orderCode: orderCode.value.trim() }).then(res => {
     proxy.$modal.closeLoading()
-    if (!res.data || !res.data.orderId) {
+    const rows = res.rows || []
+    if (rows.length === 0) {
       proxy.$modal.msgError('未找到该采购订单')
       return
     }
-    order.value = res.data
-    // 修正显示字段
-    order.value.purchaseType = purchaseTypeText(order.value.purchaseType)
+    const found = rows[0]
+    if (found.status !== 'ORDERED' && found.status !== 'RECEIVING') {
+      proxy.$modal.msgError('该订单状态为"' + statusText(found.status) + '"，仅已下单/收货中的订单可收货')
+      return
+    }
+    // 存储原始数据，模板中用 purchaseTypeText() 显示中文
+    order.value = found
     loadLines(order.value.orderId)
   }).catch(() => {
     proxy.$modal.closeLoading()
@@ -254,7 +261,7 @@ function submitReceipt() {
       vendorId: order.value.vendorId,
       vendorCode: order.value.vendorCode,
       vendorName: order.value.vendorName,
-      warehouseId: 1, // 默认仓库
+      warehouseId: warehouseId.value,
       recptType: 'PURCHASE',
       status: 'DRAFT',
       remark: [
@@ -294,11 +301,11 @@ function submitReceipt() {
           // 返回上一页
           setTimeout(() => { proxy.$tab.navigateBack() }, 1500)
         }).catch(e => {
-          proxy.$modal.msgError('确认收货失败：' + (e.msg || '未知错误'))
+          proxy.$modal.msgError('确认收货失败：' + (e.msg || '未知错误') + '。入库单已创建(编号:' + recptData.recptCode + ')，可稍后在PC端确认。')
           submitting.value = false
         })
       }).catch(() => {
-        proxy.$modal.msgError('创建入库行失败')
+        proxy.$modal.msgError('创建入库行失败，入库单头已创建(编号:' + recptData.recptCode + ')，请手动补充行数据。')
         submitting.value = false
       })
     }).catch(() => {

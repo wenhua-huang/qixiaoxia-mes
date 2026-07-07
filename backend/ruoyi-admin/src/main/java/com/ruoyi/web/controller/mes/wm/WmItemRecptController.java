@@ -4,7 +4,6 @@ import java.util.List;
 import jakarta.servlet.http.HttpServletResponse;
 import com.ruoyi.system.service.mes.wm.IWmItemRecptService;
 import com.ruoyi.system.service.mes.wm.IWmItemRecptLineService;
-import com.ruoyi.system.service.mes.wm.IWmStorageCoreService;
 import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
@@ -12,12 +11,9 @@ import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.system.domain.mes.wm.WmItemRecpt;
-import com.ruoyi.system.domain.mes.wm.WmItemRecptLine;
-import com.ruoyi.system.domain.mes.wm.tx.ItemRecptTxBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import java.util.ArrayList;
 
 /**
  * 物料入库单表Controller（factory_id 由 FactoryIdInterceptor 自动注入）
@@ -32,11 +28,6 @@ public class WmItemRecptController extends BaseController
     @Autowired
     private IWmItemRecptService wmItemRecptService;
 
-    @Autowired
-    private IWmItemRecptLineService wmItemRecptLineService;
-
-    @Autowired
-    private IWmStorageCoreService storageCoreService;
 
     @PreAuthorize("@ss.hasPermi('mes:wm:item_recpt:list')")
     @GetMapping("/list")
@@ -97,53 +88,32 @@ public class WmItemRecptController extends BaseController
     }
 
     /**
-     * 确认入库 — 更新状态 + 生成库存事务
+     * 确认收货 — 更新库存 + 回写PO到货标记（在同一事务中）
      */
     @PreAuthorize("@ss.hasPermi('mes:wm:item_recpt:edit')")
-    @Log(title = "物料入库单确认", businessType = BusinessType.UPDATE)
+    @Log(title = "物料入库单确认收货", businessType = BusinessType.UPDATE)
     @PutMapping("/confirm/{recptId}")
     public AjaxResult confirm(@PathVariable Long recptId) {
-        WmItemRecpt header = wmItemRecptService.selectWmItemRecptByRecptId(recptId);
-        if (header == null) return AjaxResult.error("入库单不存在");
-        if (!"DRAFT".equals(header.getStatus())) return AjaxResult.error("仅草稿状态可确认");
-
-        // 加载行 → 构建 TxBean
-        WmItemRecptLine q = new WmItemRecptLine();
-        q.setRecptId(recptId);
-        java.util.List<WmItemRecptLine> lines = wmItemRecptLineService.selectWmItemRecptLineList(q);
-
-        java.util.List<ItemRecptTxBean> txBeans = new ArrayList<>();
-        for (WmItemRecptLine line : lines) {
-            ItemRecptTxBean b = new ItemRecptTxBean();
-            b.setSourceDocType("wm_item_recpt");
-            b.setSourceDocId(recptId);
-            b.setSourceDocCode(header.getRecptCode());
-            b.setSourceDocLineId(line.getLineId());
-            b.setItemId(line.getItemId());
-            b.setItemCode(line.getItemCode());
-            b.setItemName(line.getItemName());
-            b.setSpecification(line.getSpecification());
-            b.setUnitOfMeasure(line.getUnitOfMeasure());
-            b.setUnitName(line.getUnitName());
-            b.setTransactionQuantity(line.getQuantityRecpt());
-            b.setBatchId(line.getBatchId());
-            b.setBatchCode(line.getBatchCode());
-            b.setWarehouseId(line.getWarehouseId() != null ? line.getWarehouseId() : header.getWarehouseId());
-            b.setWarehouseCode(line.getWarehouseCode());
-            b.setWarehouseName(line.getWarehouseName());
-            b.setLocationId(line.getLocationId());
-            b.setAreaId(line.getAreaId());
-            b.setVendorId(header.getVendorId());
-            b.setVendorCode(header.getVendorId() != null ? header.getVendorId().toString() : null);
-            txBeans.add(b);
+        try {
+            wmItemRecptService.confirmItemRecpt(recptId);
+            return AjaxResult.success();
+        } catch (RuntimeException e) {
+            return AjaxResult.error(e.getMessage());
         }
+    }
 
-        if (txBeans.isEmpty()) return AjaxResult.error("没有入库行，无法确认");
-
-        storageCoreService.processItemRecpt(txBeans);
-
-        header.setStatus("CONFIRMED");
-        wmItemRecptService.updateWmItemRecpt(header);
-        return AjaxResult.success();
+    /**
+     * 过账入库（CONFIRMED → POSTED）— 回写PO已收数量
+     */
+    @PreAuthorize("@ss.hasPermi('mes:wm:item_recpt:edit')")
+    @Log(title = "物料入库单过账", businessType = BusinessType.UPDATE)
+    @PutMapping("/post/{recptId}")
+    public AjaxResult post(@PathVariable Long recptId) {
+        try {
+            wmItemRecptService.postItemRecpt(recptId);
+            return AjaxResult.success();
+        } catch (RuntimeException e) {
+            return AjaxResult.error(e.getMessage());
+        }
     }
 }

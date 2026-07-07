@@ -53,9 +53,33 @@ public interface IPurOrderService
 
     /**
      * 删除采购订单头信息
-     * 
+     *
      * @param orderId 采购订单头主键
      * @return 结果
      */
     public int deletePurOrderByOrderId(Long orderId);
+
+    /**
+     * 审批采购订单（DRAFT → APPROVED）
+     *
+     * @param orderId 采购订单ID
+     * @return 结果
+     */
+    public int approvePurOrder(Long orderId);
+
+    /**
+     * 下达采购订单（APPROVED → ORDERED）
+     *
+     * @param orderId 采购订单ID
+     * @return 结果
+     */
+    public int orderPurOrder(Long orderId);
+
+    /**
+     * 关闭采购订单（RECEIVED → CLOSED）
+     *
+     * @param orderId 采购订单ID
+     * @return 结果
+     */
+    public int closePurOrder(Long orderId);
 }

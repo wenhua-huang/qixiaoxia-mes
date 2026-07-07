@@ -77,8 +77,8 @@ public class PurOrderController extends BaseController
     @PostMapping
     public AjaxResult add(@RequestBody PurOrder purOrder)
     {
-        purOrderService.insertPurOrder(purOrder);
-        return success(purOrder);
+        int rows = purOrderService.insertPurOrder(purOrder);
+        return toAjax(rows, purOrder, "新增采购订单失败");
     }
 
     /**
@@ -101,5 +101,53 @@ public class PurOrderController extends BaseController
     public AjaxResult remove(@PathVariable Long[] orderIds)
     {
         return toAjax(purOrderService.deletePurOrderByOrderIds(orderIds));
+    }
+
+    /**
+     * 审批采购订单（DRAFT → APPROVED）
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pur:order:approve')")
+    @Log(title = "采购订单审批", businessType = BusinessType.UPDATE)
+    @PostMapping("/{orderId}/approve")
+    public AjaxResult approve(@PathVariable Long orderId)
+    {
+        try {
+            purOrderService.approvePurOrder(orderId);
+            return success();
+        } catch (RuntimeException e) {
+            return error(e.getMessage());
+        }
+    }
+
+    /**
+     * 下达采购订单（APPROVED → ORDERED）
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pur:order:order')")
+    @Log(title = "采购订单下达", businessType = BusinessType.UPDATE)
+    @PostMapping("/{orderId}/order")
+    public AjaxResult order(@PathVariable Long orderId)
+    {
+        try {
+            purOrderService.orderPurOrder(orderId);
+            return success();
+        } catch (RuntimeException e) {
+            return error(e.getMessage());
+        }
+    }
+
+    /**
+     * 关闭采购订单（RECEIVED → CLOSED）
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pur:order:close')")
+    @Log(title = "采购订单关闭", businessType = BusinessType.UPDATE)
+    @PostMapping("/{orderId}/close")
+    public AjaxResult close(@PathVariable Long orderId)
+    {
+        try {
+            purOrderService.closePurOrder(orderId);
+            return success();
+        } catch (RuntimeException e) {
+            return error(e.getMessage());
+        }
     }
 }

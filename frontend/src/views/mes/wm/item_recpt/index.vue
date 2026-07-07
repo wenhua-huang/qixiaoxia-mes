@@ -47,11 +47,12 @@
           <dict-tag :options="mes_itemrecpt_status" :value="scope.row.status" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="105" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="140" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-tooltip content="修改" placement="top" v-if="isEditable(scope.row)"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:itemrecpt:edit']"></el-button></el-tooltip>
           <el-tooltip content="删除" placement="top" v-if="isEditable(scope.row)"><el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:wm:itemrecpt:remove']"></el-button></el-tooltip>
-          <el-tooltip content="确认" placement="top" v-if="scope.row.status === 'DRAFT'"><el-button link type="success" icon="Check" @click="handleConfirm(scope.row)"></el-button></el-tooltip>
+          <el-tooltip content="确认收货" placement="top" v-if="scope.row.status === 'DRAFT'"><el-button link type="success" icon="Check" @click="handleConfirm(scope.row)"></el-button></el-tooltip>
+          <el-button v-if="scope.row.status === 'CONFIRMED'" link type="warning" size="small" @click="handlePost(scope.row)" v-hasPermi="['mes:wm:itemrecpt:edit']">过账</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -260,10 +261,18 @@ function handleExport() { proxy.download('/mes/wm/item_recpt/export', { ...query
 function handleConfirm(row?: WmItemRecpt) {
   const target = row || form.value
   if (!target?.recptId || !target?.recptCode) return
-  proxy.$modal.confirm(`确认入库单 "${target.recptCode}" 并生成库存记录？`).then(() => {
+  proxy.$modal.confirm(`确认收货 "${target.recptCode}"？系统将更新库存并通知采购订单。`).then(() => {
     request({ url: `/mes/wm/item_recpt/confirm/${target.recptId}`, method: 'put' }).then(() => {
-      proxy.$modal.msgSuccess('确认成功，库存已更新')
+      proxy.$modal.msgSuccess('收货确认成功，库存已更新')
       open.value = false
+      getList()
+    })
+  }).catch(() => {})
+}
+function handlePost(row: WmItemRecpt) {
+  proxy.$modal.confirm(`确认过账入库单 "${row.recptCode}"？过账后将回写采购订单已收数量。`).then(() => {
+    request({ url: `/mes/wm/item_recpt/post/${row.recptId}`, method: 'put' }).then(() => {
+      proxy.$modal.msgSuccess('过账成功，已回写采购订单')
       getList()
     })
   }).catch(() => {})

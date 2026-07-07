@@ -42,3 +42,27 @@ export function delOrder(orderId) {
     method: 'delete'
   })
 }
+
+// 审批采购订单（DRAFT → APPROVED）
+export function approveOrder(orderId) {
+  return request({
+    url: '/mes/pur/order/' + orderId + '/approve',
+    method: 'post'
+  })
+}
+
+// 下达采购订单（APPROVED → ORDERED）
+export function orderOrder(orderId) {
+  return request({
+    url: '/mes/pur/order/' + orderId + '/order',
+    method: 'post'
+  })
+}
+
+// 关闭采购订单（RECEIVED → CLOSED）
+export function closeOrder(orderId) {
+  return request({
+    url: '/mes/pur/order/' + orderId + '/close',
+    method: 'post'
+  })
+}

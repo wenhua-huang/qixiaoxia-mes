@@ -5,6 +5,7 @@ import java.util.Date;
 import java.util.List;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
+import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.domain.mes.wm.WmMaterialStock;
 import com.ruoyi.system.domain.mes.wm.WmTransaction;
@@ -104,6 +105,7 @@ public class WmTransactionServiceImpl implements IWmTransactionService
 
         transaction.setMaterialStockId(stock.getMaterialStockId());
         transaction.setCreateTime(DateUtils.getNowDate());
+        transaction.setCreateBy(SecurityUtils.getUsername());
         wmTransactionMapper.insertWmTransaction(transaction);
         return transaction;
     }

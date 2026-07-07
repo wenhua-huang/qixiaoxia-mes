@@ -65,7 +65,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         ORDER BY create_time DESC
     </select>
     
-    <select id="selectPurOrderByOrderId" parameterType="Long" resultMap="PurOrderResult">
+    <select id="selectPurOrderByOrderId" parameterType="Long" resultMap="PurOrderVOResult">
         <include refid="selectPurOrderVo"/>
         where order_id = #{orderId}
     </select>

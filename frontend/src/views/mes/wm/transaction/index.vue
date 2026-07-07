@@ -33,8 +33,8 @@
       <el-table-column label="物料名称" align="center" prop="itemName" width="180" :show-overflow-tooltip="true" />
       <el-table-column label="变动数量" align="center" prop="quantity" width="120">
         <template #default="scope">
-          <span :style="{ color: scope.row.quantity > 0 ? '#67c23a' : scope.row.quantity < 0 ? '#f56c6c' : '#909399', fontWeight: 'bold' }">
-            {{ scope.row.quantity > 0 ? '+' : '' }}{{ scope.row.quantity }}
+          <span :style="{ color: Number(scope.row.quantity) > 0 ? '#67c23a' : Number(scope.row.quantity) < 0 ? '#f56c6c' : '#909399', fontWeight: 'bold' }">
+            {{ Number(scope.row.quantity) > 0 ? '+' : '' }}{{ scope.row.quantity }}
           </span>
         </template>
       </el-table-column>
@@ -92,12 +92,12 @@
         <el-row>
           <el-col :span="12">
             <el-form-item label="变动数量">
-              <span :style="{ color: Number(form.quantity) > 0 ? '#67c23a' : Number(form.quantity) < 0 ? '#f56c6c' : '#909399', fontWeight: 'bold', lineHeight: '32px' }">
-                {{ Number(form.quantity) > 0 ? '+' : '' }}{{ form.quantity }}
+              <span :style="{ color: Number(form.quantity ?? 0) > 0 ? '#67c23a' : Number(form.quantity ?? 0) < 0 ? '#f56c6c' : '#909399', fontWeight: 'bold', lineHeight: '32px' }">
+                {{ Number(form.quantity ?? 0) > 0 ? '+' : '' }}{{ form.quantity }}
               </span>
             </el-form-item>
           </el-col>
-          <el-col :span="12" v-if="form.quantity2">
+          <el-col :span="12" v-if="form.quantity2 != null">
             <el-form-item label="辅助变动数量">
               <el-input v-model="form.quantity2" disabled style="width:100%" />
             </el-form-item>

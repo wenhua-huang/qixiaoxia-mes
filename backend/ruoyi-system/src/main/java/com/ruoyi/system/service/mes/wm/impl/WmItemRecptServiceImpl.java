@@ -181,7 +181,8 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
         wmItemRecptMapper.insertWmItemRecpt(header);
         Long recptId = header.getRecptId();
 
-        // 2. 创建入库单行（继承头部的仓库信息）
+        // 2. 创建入库单行 + 汇总 totalQuantity
+        BigDecimal totalQty = BigDecimal.ZERO;
         for (WmItemRecptLine line : lines) {
             line.setRecptId(recptId);
             if (line.getWarehouseId() == null) line.setWarehouseId(header.getWarehouseId());
@@ -190,7 +191,14 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
             line.setCreateTime(DateUtils.getNowDate());
             line.setCreateBy(SecurityUtils.getUsername());
             wmItemRecptLineService.insertWmItemRecptLine(line);
+            if (line.getQuantityRecpt() != null) {
+                totalQty = totalQty.add(line.getQuantityRecpt());
+            }
         }
+        // 回写头部的入库总数量
+        header.setTotalQuantity(totalQty);
+        header.setUpdateTime(DateUtils.getNowDate());
+        wmItemRecptMapper.updateWmItemRecpt(header);
 
         // 3. 确认收货（库存更新 + PO回写）
         confirmItemRecpt(recptId);

@@ -42,7 +42,12 @@ import java.util.Map;
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     classes = RuoYiApplication.class,
-    properties = {"spring.profiles.active=test,druid"}
+    properties = {
+        "spring.profiles.active=test,druid",
+        // 修复 Flyway "connection disabled" — Druid 借出连接前必须先验证
+        "spring.datasource.druid.testOnBorrow=true",
+        "spring.datasource.druid.validationQuery=SELECT 1"
+    }
 )
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class BaseIntegrationTest {

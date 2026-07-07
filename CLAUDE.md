@@ -483,9 +483,11 @@ curl -s -o /dev/null -w "HTTP %{http_code}" http://localhost/
 - 若依官方: http://doc.ruoyi.vip
 - Element Plus: https://element-plus.org/zh-CN/
 
-## 🔁 新功能实现后自检工作流（CRT）
+## 🔁 新功能实现后自检工作流（CRT）⚠️ 自动执行
 
-> ⚠️ **每完成一个新功能（MES 模块/Controller/Service/页面）后，必须按顺序执行以下三步，禁止省略或跳步。**
+> 🚫 **禁止等待用户来手动启动测试或 Code Review。**
+> 任何代码变更完成后，**必须立即自动执行** `/auto-crt`（或手动按顺序完成 CRT 三步）。
+> **CRT 全部绿色通过 = 任务完成。CRT 未通过 = 任务未完成，禁止停止。**
 
 ### C — Code Review（三轮找 Bug）
 

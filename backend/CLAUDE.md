@@ -249,6 +249,22 @@ mvn failsafe:integration-test -pl ruoyi-admin -Dit.test="XxxControllerIT"  # 单
 - **Service**：`@Transactional(rollbackFor = Exception.class)`，通过 `SecurityUtils.getUsername()` 取操作人。**库存变更等需加锁的方法禁止 @Transactional，改用 TransactionTemplate（见 Redis 分布式锁节）**
 - **Mapper XML**：**所有 SELECT/UPDATE/DELETE WHERE 必须带 `factory_id = #{factoryId}`**（拦截器自动注入参数值，但 SQL 需有 `<if test>` 条件）
 
+### 🚫 禁止让前端分步调接口拼业务
+
+**任何多步原子操作，必须封装为一个后端接口，在一个事务中完成。** 绝对不允许：
+```java
+// ❌ 暴露 3 个独立接口给前端串行调用
+POST /mes/wm/item_recpt          // 创建头
+POST /mes/wm/item_recpt_line      // 创建行
+PUT  /mes/wm/item_recpt/confirm   // 确认收货
+```
+正确做法：
+```java
+// ✅ 一个接口完成全部操作，内部 @Transactional 保证原子性
+POST /mes/wm/item_recpt/receive   // 请求体: { header: {...}, lines: [...] }
+```
+**判断标准**：如果前端要调 ≥2 个接口才能完成一个用户操作 → 合并。
+
 ## Redis 分布式锁 ✅
 
 > 库存变更（入库/出库/调拨/退货）**必须用 Redisson 分布式锁**，禁止 `synchronized`（仅限单 JVM）。

@@ -1,5 +1,6 @@
 package com.ruoyi.system.service.mes.pur.impl;
 
+import java.math.BigDecimal;
 import java.util.List;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
@@ -9,9 +10,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
 import com.ruoyi.system.mapper.mes.pur.PurOrderMapper;
 import com.ruoyi.system.domain.mes.pur.PurOrder;
+import com.ruoyi.system.domain.mes.pur.PurOrderLine;
+import com.ruoyi.system.domain.mes.pur.vo.PurOrderVO;
 import com.ruoyi.system.service.mes.pur.IPurOrderService;
 import com.ruoyi.system.service.mes.pur.IPurOrderLineService;
 import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
+import com.ruoyi.common.enums.PurOrderStatus;
 
 /**
  * 采购订单头Service业务层处理
@@ -38,7 +42,7 @@ public class PurOrderServiceImpl implements IPurOrderService
      * @return 采购订单头
      */
     @Override
-    public PurOrder selectPurOrderByOrderId(Long orderId)
+    public PurOrderVO selectPurOrderByOrderId(Long orderId)
     {
         return purOrderMapper.selectPurOrderByOrderId(orderId);
     }
@@ -50,7 +54,7 @@ public class PurOrderServiceImpl implements IPurOrderService
      * @return 采购订单头
      */
     @Override
-    public List<PurOrder> selectPurOrderList(PurOrder purOrder)
+    public List<PurOrderVO> selectPurOrderList(PurOrder purOrder)
     {
         return purOrderMapper.selectPurOrderList(purOrder);
     }
@@ -116,5 +120,102 @@ public class PurOrderServiceImpl implements IPurOrderService
     {
         purOrderLineService.deletePurOrderLineByOrderId(orderId);
         return purOrderMapper.deletePurOrderByOrderId(orderId);
+    }
+
+    /**
+     * 审批采购订单（DRAFT → APPROVED）
+     * 校验：status == DRAFT，自动写入审批人
+     */
+    @Override
+    @Transactional
+    public int approvePurOrder(Long orderId)
+    {
+        PurOrder order = purOrderMapper.selectPurOrderByOrderId(orderId);
+        if (order == null) {
+            throw new RuntimeException("采购订单不存在");
+        }
+        if (!PurOrderStatus.DRAFT.is(order.getStatus())) {
+            throw new RuntimeException("只有草稿状态的采购订单才能审批，当前状态：" + order.getStatus());
+        }
+        order.setStatus(PurOrderStatus.APPROVED.getCode());
+        order.setApprover(SecurityUtils.getUsername());
+        order.setUpdateTime(DateUtils.getNowDate());
+        order.setUpdateBy(SecurityUtils.getUsername());
+        return purOrderMapper.updatePurOrder(order);
+    }
+
+    /**
+     * 下达采购订单（APPROVED → ORDERED）
+     * 校验：status == APPROVED，自动设置下单日期，所有行状态 → ORDERED
+     */
+    @Override
+    @Transactional
+    public int orderPurOrder(Long orderId)
+    {
+        PurOrder order = purOrderMapper.selectPurOrderByOrderId(orderId);
+        if (order == null) {
+            throw new RuntimeException("采购订单不存在");
+        }
+        if (!PurOrderStatus.APPROVED.is(order.getStatus())) {
+            throw new RuntimeException("只有已审批的采购订单才能下达，当前状态：" + order.getStatus());
+        }
+        // 更新头：状态 + 下单日期
+        order.setStatus(PurOrderStatus.ORDERED.getCode());
+        order.setOrderDate(DateUtils.getNowDate());
+        order.setUpdateTime(DateUtils.getNowDate());
+        order.setUpdateBy(SecurityUtils.getUsername());
+        int result = purOrderMapper.updatePurOrder(order);
+        // 批量更新所有行状态 → ORDERED
+        PurOrderLine queryLine = new PurOrderLine();
+        queryLine.setOrderId(orderId);
+        List<PurOrderLine> lines = purOrderLineService.selectPurOrderLineList(queryLine);
+        for (PurOrderLine line : lines) {
+            line.setStatus(PurOrderStatus.ORDERED.getCode());
+            line.setUpdateTime(DateUtils.getNowDate());
+            line.setUpdateBy(SecurityUtils.getUsername());
+            purOrderLineService.updatePurOrderLine(line);
+        }
+        return result;
+    }
+
+    /**
+     * 关闭采购订单（RECEIVED → CLOSED）
+     * 校验：status == RECEIVED，全部行已收完
+     */
+    @Override
+    @Transactional
+    public int closePurOrder(Long orderId)
+    {
+        PurOrder order = purOrderMapper.selectPurOrderByOrderId(orderId);
+        if (order == null) {
+            throw new RuntimeException("采购订单不存在");
+        }
+        if (!PurOrderStatus.RECEIVED.is(order.getStatus())) {
+            throw new RuntimeException("只有已收货的采购订单才能关闭，当前状态：" + order.getStatus());
+        }
+        // 校验全部行已收完
+        PurOrderLine queryLine = new PurOrderLine();
+        queryLine.setOrderId(orderId);
+        List<PurOrderLine> lines = purOrderLineService.selectPurOrderLineList(queryLine);
+        for (PurOrderLine line : lines) {
+            BigDecimal received = line.getQuantityReceived() != null ? line.getQuantityReceived() : BigDecimal.ZERO;
+            BigDecimal ordered = line.getQuantityOrdered() != null ? line.getQuantityOrdered() : BigDecimal.ZERO;
+            if (received.compareTo(ordered) < 0) {
+                throw new RuntimeException("存在未收完的物料行(" + line.getItemName()
+                    + ")，已收" + received + "/订购" + ordered);
+            }
+        }
+        // 更新头 + 所有行 → CLOSED
+        order.setStatus(PurOrderStatus.CLOSED.getCode());
+        order.setUpdateTime(DateUtils.getNowDate());
+        order.setUpdateBy(SecurityUtils.getUsername());
+        int result = purOrderMapper.updatePurOrder(order);
+        for (PurOrderLine line : lines) {
+            line.setStatus(PurOrderStatus.CLOSED.getCode());
+            line.setUpdateTime(DateUtils.getNowDate());
+            line.setUpdateBy(SecurityUtils.getUsername());
+            purOrderLineService.updatePurOrderLine(line);
+        }
+        return result;
     }
 }

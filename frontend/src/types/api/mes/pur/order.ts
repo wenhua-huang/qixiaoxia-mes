@@ -24,6 +24,7 @@ export interface PurOrder extends BaseEntity {
   purchaser?: string;
   approver?: string;
   totalQuantity?: number;
+  receivedQuantity?: number;
   totalAmount?: number;
   currency?: string;
   sourceOrderCode?: string;

@@ -1,5 +1,95 @@
 -- test MES DDL for integration tests
 
+-- ============================================================
+-- 系统配置表（生产环境由 Flyway V15 创建，但集成测试 baseline=V32 跳过了 V15）
+-- V40 依赖这两张表，集成测试必须手动创建
+-- ============================================================
+CREATE TABLE IF NOT EXISTS sys_auto_code_rule (
+  rule_id            bigint          not null auto_increment    comment '规则ID',
+  factory_id         bigint          not null                   comment '工厂ID',
+  rule_code          varchar(64)     not null                   comment '规则编码',
+  rule_name          varchar(255)    not null                   comment '规则名称',
+  rule_desc          varchar(500)    default null               comment '规则描述',
+  max_length         int             default null               comment '最大长度',
+  is_padded          char(1)         not null                   comment '是否补位',
+  padded_char        varchar(20)     default null               comment '补位字符',
+  padded_method      char(1)         default 'L'                comment '补位方式',
+  enable_flag        char(1)         not null default '1'       comment '是否启用',
+  remark             varchar(500)    default ''                 comment '备注',
+  create_by          varchar(64)     default ''                 comment '创建者',
+  create_time        datetime        default current_timestamp  comment '创建时间',
+  update_by          varchar(64)     default ''                 comment '更新者',
+  update_time        datetime        default current_timestamp on update current_timestamp comment '更新时间',
+  primary key (rule_id),
+  unique key uk_rule_code (rule_code)
+) engine=innodb DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '编码规则定义表';
+
+CREATE TABLE IF NOT EXISTS sys_auto_code_part (
+  part_id            bigint          not null auto_increment    comment '分段ID',
+  factory_id         bigint          not null                   comment '工厂ID',
+  rule_id            bigint          not null                   comment '规则ID',
+  part_index         int             not null                   comment '分段序号',
+  part_type          varchar(20)     not null                   comment '分段类型',
+  part_code          varchar(64)     default null               comment '分段编码',
+  part_name          varchar(255)    default null               comment '分段名称',
+  part_length        int             not null                   comment '分段长度',
+  date_format        varchar(20)     default null               comment '日期格式',
+  input_character    varchar(64)     default null               comment '输入字符',
+  fix_character      varchar(64)     default null               comment '固定字符',
+  seria_start_no     int             default null               comment '序列起始号',
+  seria_step         int             default null               comment '序列步长',
+  seria_now_no       int             default null               comment '序列当前号',
+  cycle_flag         char(1)         default null               comment '是否周期重置',
+  cycle_method       varchar(20)     default null               comment '重置周期',
+  remark             varchar(500)    default ''                 comment '备注',
+  create_by          varchar(64)     default ''                 comment '创建者',
+  create_time        datetime        default current_timestamp  comment '创建时间',
+  update_by          varchar(64)     default ''                 comment '更新者',
+  update_time        datetime        default current_timestamp on update current_timestamp comment '更新时间',
+  primary key (part_id)
+) engine=innodb DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '编码规则分段表';
+
+CREATE TABLE IF NOT EXISTS sys_auto_code_result (
+  code_id            bigint          not null auto_increment    comment '编码结果ID',
+  factory_id         bigint          not null                   comment '工厂ID',
+  rule_id            bigint          not null                   comment '规则ID',
+  gen_date           varchar(20)     not null                   comment '生成日期',
+  gen_index          int             default null               comment '生成序号',
+  last_result        varchar(64)     default null               comment '上次完整结果',
+  last_serial_no     int             default null               comment '上次流水号',
+  last_input_char    varchar(64)     default null               comment '上次输入字符',
+  remark             varchar(500)    default ''                 comment '备注',
+  create_by          varchar(64)     default ''                 comment '创建者',
+  create_time        datetime        default current_timestamp  comment '创建时间',
+  update_by          varchar(64)     default ''                 comment '更新者',
+  update_time        datetime        default current_timestamp on update current_timestamp comment '更新时间',
+  primary key (code_id)
+) engine=innodb DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '编码结果记录表';
+
+-- 集成测试种子数据：供应商（PO创建需要vendor_id）
+CREATE TABLE IF NOT EXISTS qxx_md_vendor (
+  vendor_id          bigint(20)      not null auto_increment    comment '供应商ID',
+  factory_id         bigint(20)      not null                   comment '工厂ID',
+  vendor_code        varchar(64)     not null                   comment '供应商编码',
+  vendor_name        varchar(255)    not null                   comment '供应商名称',
+  vendor_type        varchar(50)     default 'MATERIAL'         comment '供应商类型',
+  contact            varchar(64)     default null               comment '联系人',
+  phone              varchar(64)     default null               comment '电话',
+  address            varchar(500)    default null               comment '地址',
+  enable_flag        char(1)         default '1'                comment '是否启用',
+  remark             varchar(500)    default ''                 comment '备注',
+  create_by          varchar(64)     default ''                 comment '创建者',
+  create_time        datetime        default current_timestamp  comment '创建时间',
+  update_by          varchar(64)     default ''                 comment '更新者',
+  update_time        datetime        default current_timestamp on update current_timestamp comment '更新时间',
+  primary key (vendor_id),
+  unique key uk_vendor_code (vendor_code)
+) engine=innodb DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '供应商表';
+
+-- 插入测试供应商
+INSERT IGNORE INTO qxx_md_vendor (vendor_id, factory_id, vendor_code, vendor_name, vendor_type) VALUES
+(1, 1, 'V001', '测试供应商', 'MATERIAL');
+
 -- from mes-md.sql
 CREATE TABLE IF NOT EXISTS qxx_md_factory (
   factory_id        bigint(20)      not null auto_increment    comment '工厂ID',
@@ -247,4 +337,74 @@ CREATE TABLE IF NOT EXISTS qxx_tm_tool_type (
   primary key (tool_type_id),
   unique key uk_tool_type_code (tool_type_code)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '工装夹具类型表';
+
+-- ============================================================
+-- 采购管理 (pur) — V06 被 baseline 跳过, 集成测试必须手动创建
+-- ============================================================
+CREATE TABLE IF NOT EXISTS qxx_pur_order (
+  order_id          bigint(20)      not null auto_increment    comment '采购订单ID',
+  factory_id        bigint(20)      not null                   comment '工厂ID',
+  order_code        varchar(64)     not null                   comment '采购订单编码(唯一)',
+  order_name        varchar(255)    default null               comment '采购订单名称',
+  vendor_id         bigint(20)      not null                   comment '供应商ID',
+  vendor_code       varchar(64)     default null               comment '供应商编码',
+  vendor_name       varchar(255)    default null               comment '供应商名称',
+  purchase_type     varchar(50)     default 'PAPER'            comment '采购类型',
+  order_date        datetime        default current_timestamp  comment '下单日期',
+  expected_date     datetime        default null               comment '预计到货日期',
+  purchaser         varchar(64)     default null               comment '采购员',
+  approver          varchar(64)     default null               comment '审批人',
+  total_quantity    decimal(14,4)   default 0.0000             comment '采购总数量',
+  total_amount      decimal(14,2)   default 0.00               comment '采购总金额',
+  currency          varchar(10)     default 'CNY'              comment '币种',
+  source_order_code varchar(64)     default null               comment '关联客户订单号',
+  workorder_id      bigint(20)      default null               comment '关联工单ID',
+  workorder_code    varchar(64)     default null               comment '关联工单编码',
+  status            varchar(50)     default 'DRAFT'            comment '状态',
+  remark            varchar(500)    default ''                 comment '备注',
+  create_by         varchar(64)     default ''                 comment '创建者',
+  create_time       datetime        default current_timestamp  comment '创建时间',
+  update_by         varchar(64)     default ''                 comment '更新者',
+  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
+  key idx_factory_id (factory_id),
+  primary key (order_id),
+  unique key uk_order_code (order_code)
+) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '采购订单头表';
+
+CREATE TABLE IF NOT EXISTS qxx_pur_order_line (
+  line_id           bigint(20)      not null auto_increment    comment '行ID',
+  factory_id        bigint(20)      not null                   comment '工厂ID',
+  order_id          bigint(20)      not null                   comment '采购订单ID',
+  item_id           bigint(20)      not null                   comment '物料ID',
+  item_code         varchar(64)     not null                   comment '物料编码',
+  item_name         varchar(255)    not null                   comment '物料名称',
+  specification     varchar(500)    default null               comment '规格型号',
+  unit_of_measure   varchar(64)     not null                   comment '主单位编码',
+  unit_name         varchar(64)     not null                   comment '主单位名称',
+  unit2             varchar(64)     default null               comment '辅助单位编码',
+  unit2_name        varchar(64)     default null               comment '辅助单位名称',
+  conversion_rate   decimal(10,4)   default 1.0000             comment '换算率',
+  quantity_ordered  decimal(14,4)   default 0.0000             comment '订购数量(主单位)',
+  quantity_ordered2 decimal(14,4)   default 0.0000             comment '订购数量(辅助单位)',
+  quantity_received decimal(14,4)   default 0.0000             comment '已收货数量(主单位)',
+  quantity_received2 decimal(14,4)  default 0.0000             comment '已收货数量(辅助单位)',
+  unit_price        decimal(14,4)   default 0.0000             comment '单价(元/主单位)',
+  amount            decimal(14,2)   default 0.00               comment '行金额(不含税)',
+  tax_rate          decimal(5,2)    default 0.00               comment '税率(%)',
+  paper_width       varchar(20)     default null               comment '门幅要求(mm)',
+  paper_weight      varchar(20)     default null               comment '克重要求(g)',
+  paper_type        varchar(50)     default null               comment '纸张种类',
+  roll_count        int(11)         default 0                  comment '预计卷数',
+  source_order_code varchar(64)     default null               comment '关联客户订单号',
+  expected_date     datetime        default null               comment '预计到货日期',
+  arrival_notice_id bigint(20)      default null               comment '到货通知单ID',
+  status            varchar(50)     default 'ORDERED'          comment '行状态',
+  remark            varchar(500)    default ''                 comment '备注',
+  create_by         varchar(64)     default ''                 comment '创建者',
+  create_time       datetime        default current_timestamp  comment '创建时间',
+  update_by         varchar(64)     default ''                 comment '更新者',
+  update_time       datetime        default current_timestamp on update current_timestamp comment '更新时间',
+  key idx_factory_id (factory_id),
+  primary key (line_id)
+) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '采购订单行表';
 

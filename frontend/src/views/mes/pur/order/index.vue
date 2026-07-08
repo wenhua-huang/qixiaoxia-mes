@@ -151,19 +151,26 @@
       <el-table-column label="采购员" align="center" prop="purchaser" />
       <el-table-column label="审批人" align="center" prop="approver" />
       <el-table-column label="采购数量" align="center" prop="totalQuantity" />
+      <el-table-column label="到货数量" align="center" prop="receivedQuantity" />
       <el-table-column label="采购金额" align="center" prop="totalAmount" />
       <el-table-column label="币种" align="center" prop="currency" />
       <el-table-column label="关联客户订单" align="center" prop="sourceOrderCode" />
-      <el-table-column label="状态" align="center" prop="status" width="90">
+      <el-table-column label="状态" align="center" prop="status" width="110">
           <template #default="scope">
             <span><dict-tag :options="mes_order_status" :value="scope.row.status" /></span>
+            <el-tooltip v-if="isOverdue(scope.row)" content="已超期未到货" placement="top">
+              <span style="color:#f56c6c;margin-left:2px;cursor:help">⚠</span>
+            </el-tooltip>
           </template>
         </el-table-column>
       <el-table-column label="备注" align="center" prop="remark" />
-      <el-table-column label="操作" align="center" width="150" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="260" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-tooltip content="修改" placement="top"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:pur:order:edit']"></el-button></el-tooltip>
           <el-tooltip content="删除" placement="top"><el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:pur:order:remove']"></el-button></el-tooltip>
+          <el-button v-if="scope.row.status === 'DRAFT'" link type="success" size="small" @click="handleApprove(scope.row)" v-hasPermi="['mes:pur:order:approve']">审批</el-button>
+          <el-button v-if="scope.row.status === 'APPROVED'" link type="warning" size="small" @click="handleOrder(scope.row)" v-hasPermi="['mes:pur:order:order']">下单</el-button>
+          <el-button v-if="scope.row.status === 'RECEIVED'" link type="info" size="small" @click="handleClose(scope.row)" v-hasPermi="['mes:pur:order:close']">关闭</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -266,7 +273,7 @@
       </el-form>
       <template v-if="form.orderId">
         <el-divider content-position="center">采购订单行</el-divider>
-        <PurOrderLine :orderId="form.orderId" ref="orderLineRef" />
+        <PurOrderLine :orderId="form.orderId" :initLines="orderLines" ref="orderLineRef" />
       </template>
       <template #footer>
         <div class="dialog-footer">
@@ -279,7 +286,7 @@
 </template>
 
 <script>
-import { listOrder, getOrder, delOrder, addOrder, updateOrder } from "@/api/mes/pur/order"
+import { listOrder, getOrder, delOrder, addOrder, updateOrder, approveOrder, orderOrder, closeOrder } from "@/api/mes/pur/order"
 import { genSerialCode } from "@/api/mes/sys/autocoderule"
 import VendorSelect from "@/components/vendorSelect/single.vue"
 import PurOrderLine from "./line.vue"
@@ -335,6 +342,7 @@ export default {
       orderDateRange: null,
       expectedDateRange: null,
       optType: undefined,
+      orderLines: [],
       // 表单校验
       rules: {        orderCode: [
         ],
@@ -354,6 +362,8 @@ export default {
       listOrder(this.queryParams).then(response => {
         this.orderList = response.rows
         this.total = response.total
+        this.loading = false
+      }).catch(() => {
         this.loading = false
       })
     },
@@ -387,6 +397,7 @@ export default {
         updateTime: null
       }
       this.optType = undefined
+      this.orderLines = []
       this.resetForm("form")
     },
     /** 搜索按钮操作 */
@@ -452,7 +463,8 @@ export default {
       this.optType = 'edit'
       const orderId = row.orderId || this.ids
       getOrder(orderId).then(response => {
-        this.form = response.data
+        this.form = response.data.order
+        this.orderLines = response.data.lines || []
         this.open = true
         this.title = "修改采购订单头"
       })
@@ -486,6 +498,41 @@ export default {
         this.getList()
         this.$modal.msgSuccess("删除成功")
       }).catch(() => {})
+    },
+    /** 审批操作 */
+    handleApprove(row) {
+      this.$modal.confirm('确认审批采购订单 "' + row.orderCode + '" 吗？').then(() => {
+        return approveOrder(row.orderId)
+      }).then(() => {
+        this.getList()
+        this.$modal.msgSuccess("审批成功")
+      }).catch(() => {})
+    },
+    /** 下单操作 */
+    handleOrder(row) {
+      this.$modal.confirm('确认下达采购订单 "' + row.orderCode + '" 给供应商吗？').then(() => {
+        return orderOrder(row.orderId)
+      }).then(() => {
+        this.getList()
+        this.$modal.msgSuccess("下单成功")
+      }).catch(() => {})
+    },
+    /** 关闭操作 */
+    handleClose(row) {
+      this.$modal.confirm('确认关闭采购订单 "' + row.orderCode + '" 吗？关闭后不可恢复。').then(() => {
+        return closeOrder(row.orderId)
+      }).then(() => {
+        this.getList()
+        this.$modal.msgSuccess("关闭成功")
+      }).catch(() => {})
+    },
+    /** 判断是否超期未到货 */
+    isOverdue(row) {
+      if (row.status !== 'ORDERED' && row.status !== 'RECEIVING') return false
+      if (!row.expectedDate) return false
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      return new Date(row.expectedDate) < today
     },
     /** 导出按钮操作 */
     handleExport() {

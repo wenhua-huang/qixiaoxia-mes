@@ -53,7 +53,7 @@ public class WmMaterialStock extends BaseEntity
     @Excel(name = "现有库存量")
     private BigDecimal quantityOnhand;
 
-    @Excel(name = "现有库存量")
+    @Excel(name = "现有库存量(辅)")
     private BigDecimal quantityOnhand2;
 
     @Excel(name = "可用库存量")

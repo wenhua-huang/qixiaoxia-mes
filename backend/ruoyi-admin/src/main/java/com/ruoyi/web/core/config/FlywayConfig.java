@@ -46,12 +46,14 @@ public class FlywayConfig
     private String masterPassword;
 
     /**
-     * 注：validateOnMigrate 设为 false 是因为 Druid 连接池在 Spring SQL init 之后
-     * 可能将连接标记为 disabled，Flyway 使用独立 DriverManagerDataSource（不走连接池）
-     * 绕过此问题。校验关闭的代价是：已执行的迁移文件被修改后不会报错，静默跳过。
+     * 注：Flyway 使用独立 DriverManagerDataSource（不走 Druid 连接池），因为 Druid 在
+     * Spring SQL init 之后可能将连接标记为 disabled。此机制与 validateOnMigrate 无关。
      *
-     * 缓解措施：迁移文件通过 Git 版本控制，禁止修改已合并主分支的迁移文件。
-     * 新需求如需调整 Schema，创建新版本迁移文件（V{N+1}__xxx.sql）。
+     * validateOnMigrate 设为 true：flyway_schema_history 已对齐本地迁移文件
+     * （测试环境 V43/V50 checksum 已修正、V44/45/46 missing 记录已清理；生产环境 checksum 本就一致），
+     * 可正常开启校验，防止已执行迁移被篡改。
+     *
+     * 约束：已执行的迁移文件禁止修改（checksum 会变导致启动失败），新需求创建新版本迁移文件（V{N+1}__xxx.sql）。
      */
     @Bean
     public Flyway flyway()
@@ -68,7 +70,7 @@ public class FlywayConfig
                 .table(table)
                 .baselineOnMigrate(baselineOnMigrate)
                 .baselineVersion(org.flywaydb.core.api.MigrationVersion.fromVersion(baselineVersion))
-                .validateOnMigrate(false)  // 原因见上方 Javadoc
+                .validateOnMigrate(true)  // history 已对齐，开启校验
                 .load();
         int count = flyway.migrate().migrationsExecuted;
         log.info("Flyway 迁移完成，执行了 {} 个 migration", count);

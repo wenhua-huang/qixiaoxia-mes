@@ -60,6 +60,14 @@
           <el-table-column label="可用库存" width="110" align="center">
             <template #default="scope">{{ scope.row.availableQty }} {{ scope.row.unitName }}</template>
           </el-table-column>
+          <el-table-column label="本单已领/预占" width="120" align="center">
+            <template #default="scope">
+              <span v-if="(scope.row.reservedForOrder ?? 0) > 0" style="color: #409EFF">
+                {{ scope.row.reservedForOrder }} {{ scope.row.unitName }}
+              </span>
+              <span v-else style="color: #909399">0</span>
+            </template>
+          </el-table-column>
           <el-table-column label="缺口" width="100" align="center">
             <template #default="scope">
               <span :style="{ color: scope.row.sufficient ? '#67C23A' : '#F56C6C' }">

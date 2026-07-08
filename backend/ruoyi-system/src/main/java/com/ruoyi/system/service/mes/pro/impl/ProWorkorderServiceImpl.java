@@ -569,6 +569,10 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         // 2. 获取工单信息（用于 factory_id 过滤）
         ProWorkorder wo = selectProWorkorderByWorkorderId(workorderId);
 
+        // 3. 本工单已备料量（领料单 ALLOCATED/PARTIAL_ISSUED/ISSUED）—— 预占/出库时已扣
+        //    quantity_available，齐套计算需加回，否则发料后永远显示缺料
+        Map<Long, BigDecimal> reservedByItem = sumReservedByItem(workorderId);
+
         List<Map<String, Object>> result = new ArrayList<>();
         boolean allSufficient = true;
 
@@ -591,9 +595,14 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
                 }
             }
 
+            // 本工单已备料量（已预占或已发料，库存 available 已被扣除，需加回）
+            BigDecimal reserved = reservedByItem.getOrDefault(bom.getItemId(), BigDecimal.ZERO);
+            // 有效可用量 = 纯库存可用 + 本工单已备料
+            BigDecimal effectiveQty = availableTotal.add(reserved);
+
             // 所需用量
             BigDecimal required = bom.getTotalQuantity() != null ? bom.getTotalQuantity() : BigDecimal.ZERO;
-            boolean sufficient = availableTotal.compareTo(required) >= 0;
+            boolean sufficient = effectiveQty.compareTo(required) >= 0;
 
             Map<String, Object> row = new HashMap<>();
             row.put("lineId", bom.getLineId());
@@ -603,8 +612,10 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
             row.put("unitName", bom.getUnitName());
             row.put("requiredQty", required);
             row.put("availableQty", availableTotal);
+            row.put("reservedForOrder", reserved);
+            row.put("effectiveQty", effectiveQty);
             row.put("sufficient", sufficient);
-            row.put("shortageQty", sufficient ? BigDecimal.ZERO : required.subtract(availableTotal));
+            row.put("shortageQty", sufficient ? BigDecimal.ZERO : required.subtract(effectiveQty));
             result.add(row);
 
             if (!sufficient) {
@@ -613,6 +624,49 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         }
 
         return result;
+    }
+
+    /**
+     * 汇总本工单领料单中已为各物料备好的数量（按 itemId 聚合）
+     *
+     * <p>只统计状态 ∈ {ALLOCATED, PARTIAL_ISSUED, ISSUED} 的领料单：这三种状态下，
+     * 对应 quantity_available 均已被（预占或出库冻结）扣除，料已为工单备好，
+     * 齐套分析需将其加回，否则发料后会持续误报缺料。</p>
+     *
+     * @param workorderId 生产工单主键
+     * @return itemId → 已备料量
+     */
+    private Map<Long, BigDecimal> sumReservedByItem(Long workorderId)
+    {
+        Map<Long, BigDecimal> reservedByItem = new HashMap<>();
+        WmIssueHeader hQuery = new WmIssueHeader();
+        hQuery.setWorkorderId(workorderId);
+        List<WmIssueHeader> headers = wmIssueHeaderService.selectWmIssueHeaderList(hQuery);
+
+        // 仅统计已预占/已发料的领料单（草稿、待审、已下达未预占的不算备好）
+        List<Long> issueIds = new ArrayList<>();
+        for (WmIssueHeader h : headers) {
+            String st = h.getStatus();
+            if (WmIssueConstants.STATUS_ALLOCATED.equals(st)
+                    || WmIssueConstants.STATUS_PARTIAL_ISSUED.equals(st)
+                    || WmIssueConstants.STATUS_ISSUED.equals(st)) {
+                issueIds.add(h.getIssueId());
+            }
+        }
+        if (issueIds.isEmpty()) {
+            return reservedByItem;
+        }
+
+        // 按物料聚合领料数量（quantity_issue：应发量；预占/出库态下等于已备好量）
+        for (Long issueId : issueIds) {
+            WmIssueLine lQuery = new WmIssueLine();
+            lQuery.setIssueId(issueId);
+            for (WmIssueLine line : wmIssueLineService.selectWmIssueLineList(lQuery)) {
+                BigDecimal qty = line.getQuantityIssue() != null ? line.getQuantityIssue() : BigDecimal.ZERO;
+                reservedByItem.merge(line.getItemId(), qty, BigDecimal::add);
+            }
+        }
+        return reservedByItem;
     }
 
     /**

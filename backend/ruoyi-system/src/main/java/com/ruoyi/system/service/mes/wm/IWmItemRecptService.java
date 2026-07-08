@@ -9,6 +9,11 @@ public interface IWmItemRecptService
     public List<WmItemRecpt> selectWmItemRecptList(WmItemRecpt entity);
     public List<WmItemRecpt> selectWmItemRecptAll();
     public WmItemRecpt selectWmItemRecptByRecptId(Long recptId);
+
+    /**
+     * 查询入库单详情（头 + 行）。供详情页一次请求取回，避免前端分两次调用。
+     */
+    public WmItemRecpt selectWmItemRecptDetail(Long recptId);
     public int insertWmItemRecpt(WmItemRecpt entity);
     public int updateWmItemRecpt(WmItemRecpt entity);
     public int deleteWmItemRecptByRecptId(Long recptId);

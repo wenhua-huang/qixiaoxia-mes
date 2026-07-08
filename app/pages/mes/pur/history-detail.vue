@@ -96,7 +96,7 @@
 <script setup>
 import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { getItemRecpt, listItemRecptLines } from '@/api/mes/pur/order'
+import { getItemRecpt } from '@/api/mes/pur/order'
 import { recptStatusText, recptStatusTagType } from '@/utils/pur.js'
 
 const header = ref({})
@@ -111,12 +111,11 @@ onLoad((options) => {
     loading.value = false
     return
   }
-  Promise.all([
-    getItemRecpt(recptId),
-    listItemRecptLines({ recptId: Number(recptId) })
-  ]).then(([res1, res2]) => {
-    header.value = res1.data || {}
-    lines.value = res2.rows || []
+  // 详情接口一次返回头 + 行（header.lines）
+  getItemRecpt(recptId).then((res) => {
+    const data = res.data || {}
+    header.value = data
+    lines.value = data.lines || []
   }).catch(() => {
     // ignore
   }).finally(() => {

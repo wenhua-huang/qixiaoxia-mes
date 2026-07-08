@@ -2,6 +2,7 @@ package com.ruoyi.system.domain.mes.wm;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.List;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import com.ruoyi.common.annotation.Excel;
@@ -77,6 +78,9 @@ public class WmItemRecpt extends BaseEntity
     @Excel(name = "状态:DRAFT-草稿")
     private String status;
 
+    /** 入库单行列表（详情接口返回，非持久化字段） */
+    private List<WmItemRecptLine> lines;
+
     public Long getRecptId() { return recptId; }
     public void setRecptId(Long v) { this.recptId = v; }
 
@@ -136,6 +140,9 @@ public class WmItemRecpt extends BaseEntity
 
     public String getStatus() { return status; }
     public void setStatus(String v) { this.status = v; }
+
+    public List<WmItemRecptLine> getLines() { return lines; }
+    public void setLines(List<WmItemRecptLine> lines) { this.lines = lines; }
 
     @Override
     public String toString() {

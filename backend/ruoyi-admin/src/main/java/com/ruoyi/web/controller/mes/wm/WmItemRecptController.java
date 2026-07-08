@@ -61,7 +61,7 @@ public class WmItemRecptController extends BaseController
     @GetMapping(value = "/{recptId}")
     public AjaxResult getInfo(@PathVariable("recptId") Long recptId)
     {
-        return AjaxResult.success(wmItemRecptService.selectWmItemRecptByRecptId(recptId));
+        return AjaxResult.success(wmItemRecptService.selectWmItemRecptDetail(recptId));
     }
 
     @PreAuthorize("@ss.hasPermi('mes:wm:item_recpt:add')")

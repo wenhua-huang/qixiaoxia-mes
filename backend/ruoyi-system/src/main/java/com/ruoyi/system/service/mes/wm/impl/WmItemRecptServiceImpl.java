@@ -66,6 +66,16 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
     }
 
     @Override
+    public WmItemRecpt selectWmItemRecptDetail(Long recptId) {
+        WmItemRecpt header = wmItemRecptMapper.selectWmItemRecptByRecptId(recptId);
+        if (header == null) {
+            return null;
+        }
+        header.setLines(loadRecptLines(recptId));
+        return header;
+    }
+
+    @Override
     @Transactional
     public int insertWmItemRecpt(WmItemRecpt entity) {
         entity.setCreateTime(DateUtils.getNowDate());

@@ -33,11 +33,22 @@ export JAVA_HOME=/usr/lib/jvm/java-17-alibaba-dragonwell-17.0.9.0.10.9-1.al8.x86
 export PATH=$JAVA_HOME/bin:$PATH
 cd backend && mvn clean package -pl ruoyi-admin -am -DskipTests -Dcheckstyle.skip=true -q
 
-# 重启
+# 重启（⚠️ 服务器仅 1.8GB 内存，必须限制堆内存，否则 OOM Killer 会杀进程）
+pkill -f 'org.codehaus.plexus.classworlds.launcher.Launcher' 2>/dev/null  # 清 Maven 残留进程
+sleep 2
 kill $(lsof -ti :8081) 2>/dev/null; sleep 2
-nohup java -jar /var/www/qixiaoxia-mes/backend/ruoyi-admin/target/ruoyi-admin.jar \
+nohup java -Xms256m -Xmx768m -XX:+UseG1GC \
+  -jar /var/www/qixiaoxia-mes/backend/ruoyi-admin/target/ruoyi-admin.jar \
   --server.port=8081 --ruoyi.profile=/var/www/qixiaoxia-mes/uploadPath \
   > /tmp/qxx-backend.log 2>&1 &
+
+# 等待就绪（最多 150s，Flyway 迁移 + Spring 启动约需 20-40s）
+for i in $(seq 1 150); do
+  code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/login -X POST -H "Content-Type: application/json" -d '{}' 2>/dev/null)
+  if [ "$code" != "000" ] && [ -n "$code" ]; then echo "后端就绪 HTTP $code (${i}s)"; break; fi
+  if ! kill -0 $! 2>/dev/null; then echo "❌ 进程退出（查 /tmp/qxx-backend.log）"; tail -20 /tmp/qxx-backend.log; exit 1; fi
+  sleep 1
+done
 EOF
 ```
 
@@ -73,6 +84,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost/
 | 现象 | 原因 | 解决 |
 |------|------|------|
 | 后端启动后立即退出 | Docker 容器未启动 | `docker start qxx-mysql qxx-redis qxx-minio` |
+| 后端进程被 Killed（OOM） | 编译后内存不足，java 进程被 OOM Killer 杀 | 启动前 `pkill -f classworlds` 清 Maven 残留；启动命令必须带 `-Xmx768m`（见步骤 2）；等 `free -m` available > 800MB 再启 |
 | Nginx 502 | 后端未就绪 | 等 `curl :8081` 返回 200 后再重载 |
 | 前端 404 | dist/ 未上传或路径错误 | 确认 scp 目标路径 `/var/www/qixiaoxia-mes/frontend/dist/` |
 | 登录验证码报错 | 服务器已关闭验证码 | `"uuid":""` 传空字符串 |

@@ -25,7 +25,7 @@ public interface WmMaterialStockMapper
     public int deleteWmMaterialStockByMaterialStockIds(Long[] materialStockIds);
 
     /**
-     * FIFO 批次自动分配：按 itemId 查可用库存（quantity_available > 0），
+     * FIFO 批次自动分配（预占用）：按 itemId 查可用库存（quantity_available > 0），
      * 可选限定 warehouseId（为 null 表示跨仓），按 create_time 升序（先进先出）并加行锁。
      * 不限定 vendor_id/workorder_id/batch_id —— 跨任意批次/vendor 分配。
      */

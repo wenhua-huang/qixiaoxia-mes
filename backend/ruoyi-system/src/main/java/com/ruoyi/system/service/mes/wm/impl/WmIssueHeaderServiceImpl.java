@@ -470,25 +470,30 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
             if (qty.compareTo(BigDecimal.ZERO) <= 0) continue;
 
             WmIssueLine line = lineMap.get(d.getLineId());
-            Long preferWh = d.getWarehouseId() != null ? d.getWarehouseId()
-                    : (line != null && line.getWarehouseId() != null ? line.getWarehouseId() : header.getWarehouseId());
 
             if (d.getBatchId() != null) {
                 // 指定批次：精确匹配扣 onhand
-                WmMaterialStock existing = loadStockForUpdate(d.getItemId(), d.getBatchId(), preferWh);
+                Long wh = d.getWarehouseId() != null ? d.getWarehouseId()
+                        : (line != null && line.getWarehouseId() != null ? line.getWarehouseId() : header.getWarehouseId());
+                WmMaterialStock existing = loadStockForUpdate(d.getItemId(), d.getBatchId(), wh);
                 if (existing == null) {
                     throw new ServiceException("物料[" + d.getItemCode() + "]库存记录不存在，无法发料");
                 }
                 issueOutSingleBatch(header, d, qty, existing);
-                issuedThisTime = issuedThisTime.add(qty);
             } else {
-                // 未指定批次：FIFO 扣 onhand（仓库优先，不足跨仓），多批次各写一条 detail
-                BigDecimal remaining = issueOutFifo(header, d, qty, preferWh);
-                if (remaining.compareTo(BigDecimal.ZERO) > 0) {
-                    throw new ServiceException("物料[" + d.getItemCode() + "]库存不足！仍需：" + remaining);
+                // 未指定批次：按预占记录扣 onhand（预占哪个批次就发哪个，不重新 FIFO）
+                // 净预占 = ALLOCATE + RELEASE + 已 ISSUE_OUT，按 materialStockId 汇总
+                Map<Long, BigDecimal> netAlloc = computeNetAllocation(issueId, d.getLineId());
+                if (netAlloc.isEmpty()) {
+                    throw new ServiceException("物料[" + d.getItemCode() + "]未预占库存，无法发料，请先预占");
                 }
-                issuedThisTime = issuedThisTime.add(qty);
+                // 按预占批次 FIFO 顺序扣减，直到满足本次发料量
+                BigDecimal remaining = issueOutFromAllocation(header, d, qty, netAlloc);
+                if (remaining.compareTo(BigDecimal.ZERO) > 0) {
+                    throw new ServiceException("物料[" + d.getItemCode() + "]预占库存不足！本次需：" + qty);
+                }
             }
+            issuedThisTime = issuedThisTime.add(qty);
 
             // 累加行的 quantityIssued
             if (line != null) {
@@ -690,30 +695,23 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
     }
 
     /**
-     * 发料单 FIFO 出库：扣 onhand，仓库优先（preferWh），不足跨仓。
-     * 每个扣减批次写一条 detail（detailId 各自独立），返回未满足的剩余量。
+     * 按预占记录发料出库：从 netAlloc（净预占，materialStockId→预占量）逐条扣 onhand。
+     * 预占哪个批次就发哪个批次，按 materialStockId 顺序（事务写入顺序）消费，每个写一条 detail。
+     * 返回未满足的剩余量。
      */
-    private BigDecimal issueOutFifo(WmIssueHeader header, WmIssueDetail d, BigDecimal need, Long preferWh) {
-        BigDecimal remaining = issueOutFifoFrom(header, d, need, preferWh);
-        if (remaining.compareTo(BigDecimal.ZERO) > 0) {
-            remaining = issueOutFifoFrom(header, d, remaining, null); // 跨仓补
-        }
-        return remaining;
-    }
-
-    /** 从指定仓库（null=所有仓）FIFO 扣 onhand，返回剩余量 */
-    private BigDecimal issueOutFifoFrom(WmIssueHeader header, WmIssueDetail d, BigDecimal need, Long warehouseId) {
-        if (need.compareTo(BigDecimal.ZERO) <= 0) return BigDecimal.ZERO;
-        List<WmMaterialStock> stocks = wmMaterialStockMapper.selectAvailableStocksForFifo(
-                d.getItemId(), warehouseId, WmIssueConstants.QUALITY_NORMAL);
-        // 注意：FIFO 出库查询按 quantity_available>0 过滤，但出库扣的是 onhand，
-        // onhand >= available，故 available>0 隐含 onhand>0，可用此结果集
+    private BigDecimal issueOutFromAllocation(WmIssueHeader header, WmIssueDetail d, BigDecimal need, Map<Long, BigDecimal> netAlloc) {
         BigDecimal remaining = need;
-        for (WmMaterialStock stock : stocks) {
+        for (Map.Entry<Long, BigDecimal> e : netAlloc.entrySet()) {
             if (remaining.compareTo(BigDecimal.ZERO) <= 0) break;
+            BigDecimal allocQty = e.getValue(); // 该批次净预占量（正数）
+            if (allocQty.compareTo(BigDecimal.ZERO) <= 0) continue;
+            WmMaterialStock stock = wmMaterialStockMapper.selectWmMaterialStockByMaterialStockId(e.getKey());
+            if (stock == null) continue;
+            // 本次从该批次发的量 = min(剩余需求, 净预占量, 实际 onhand)
             BigDecimal onhand = stock.getQuantityOnhand() != null ? stock.getQuantityOnhand() : BigDecimal.ZERO;
-            if (onhand.compareTo(BigDecimal.ZERO) <= 0) continue;
-            BigDecimal take = onhand.compareTo(remaining) >= 0 ? remaining : onhand;
+            BigDecimal take = allocQty.compareTo(remaining) <= 0 ? allocQty : remaining;
+            if (take.compareTo(onhand) > 0) take = onhand;
+            if (take.compareTo(BigDecimal.ZERO) <= 0) continue;
             issueOutSingleBatch(header, d, take, stock);
             remaining = remaining.subtract(take);
         }

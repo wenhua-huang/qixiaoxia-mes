@@ -39,6 +39,11 @@
       <el-table-column label="规格型号" align="center" prop="specification" :show-overflow-tooltip="true" width="120" />
       <el-table-column label="库存数量" align="center" prop="quantityOnhand" width="100" sortable />
 	      <el-table-column label="可用库存" align="center" prop="quantityAvailable" width="100" sortable />
+      <el-table-column label="占用库存" align="center" width="100" sortable :sort-method="(a,b) => occupied(a) - occupied(b)">
+        <template #default="scope">
+          <span :class="{ 'occu-pending': occupied(scope.row) > 0 }">{{ occupied(scope.row) }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="单位" align="center" prop="unitName" width="70" />
       <el-table-column label="批次号" align="center" prop="batchCode" width="130" :show-overflow-tooltip="true">
         <template #default="scope">
@@ -99,5 +104,19 @@ function handleBatchClick(row: WmMaterialStock) {
   }
 }
 
+/** 占用库存 = 现有量 - 可用量（已预占未出库的部分） */
+function occupied(row: WmMaterialStock): number {
+  const onhand = Number(row.quantityOnhand) || 0
+  const avail = Number(row.quantityAvailable) || 0
+  return Math.max(0, onhand - avail)
+}
+
 getList()
 </script>
+
+<style lang="scss" scoped>
+.occu-pending {
+  color: #e6a23c;
+  font-weight: 600;
+}
+</style>

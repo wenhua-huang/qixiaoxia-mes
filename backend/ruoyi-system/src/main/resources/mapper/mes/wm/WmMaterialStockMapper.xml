@@ -257,4 +257,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         for update
     </select>
 
+    <!-- FIFO 批次自动分配：查可用库存，按先进先出排序并加行锁 -->
+    <select id="selectAvailableStocksForFifo" resultMap="WmMaterialStockResult">
+        <include refid="selectWmMaterialStockVo"/>
+        where item_id = #{itemId}
+          and quantity_available > 0
+          and quality_status = #{qualityStatus}
+          <if test="warehouseId != null"> and warehouse_id = #{warehouseId}</if>
+        order by create_time asc
+        for update
+    </select>
+
 </mapper>

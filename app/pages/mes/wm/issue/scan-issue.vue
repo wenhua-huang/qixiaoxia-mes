@@ -9,12 +9,19 @@
       <text class="sub">扫码物料条码，自动匹配领料行并发料</text>
     </view>
 
-    <!-- 扫码区 -->
+    <!-- 扫码/输入区 -->
     <view class="scan-bar">
-      <view class="scan-input" @click="scanCode">
-        <uni-icons type="scan" size="28" color="#409eff" />
-        <text class="scan-tip">{{ lastScanCode || '点击扫码（物料条码）' }}</text>
+      <view class="scan-input">
+        <uni-icons type="scan" size="28" color="#409eff" @click="scanCode" />
+        <input
+          class="code-input"
+          v-model="inputCode"
+          placeholder="扫码或输入物料编码"
+          confirm-type="search"
+          @confirm="onInputConfirm"
+        />
       </view>
+      <button class="btn-add" @click="onInputConfirm">添加</button>
       <button class="btn-scan" @click="scanCode">扫码</button>
     </view>
 
@@ -63,6 +70,7 @@ const header = ref({})
 const lines = ref([])
 const issueList = ref([])  // 本次发料清单
 const lastScanCode = ref('')
+const inputCode = ref('')  // 手动输入的物料编码
 
 const STATUS_MAP = {
   DRAFT: '草稿', PENDING: '待审核', APPROVED: '已下达', ALLOCATED: '已预占',
@@ -78,6 +86,15 @@ async function loadData() {
     header.value = res.data?.header || res.data || {}
     lines.value = res.data?.lines || []
   } catch (e) {}
+}
+
+// 手动输入物料编码 → 匹配领料行
+function onInputConfirm() {
+  const code = (inputCode.value || '').trim()
+  if (!code) { proxy.$modal.msgError('请输入物料编码'); return }
+  lastScanCode.value = code
+  matchItem(code)
+  inputCode.value = ''
 }
 
 // 扫码
@@ -181,14 +198,18 @@ onLoad((options) => {
 .scan-bar {
   display: flex; gap: 16rpx; padding: 0 16rpx; margin-bottom: 16rpx;
   .scan-input {
-    flex: 1; background: #fff; border-radius: 8rpx; padding: 20rpx;
-    display: flex; align-items: center; gap: 12rpx;
-    .scan-tip { font-size: 28rpx; color: #909399; margin-left: 8rpx; }
+    flex: 1; background: #fff; border-radius: 8rpx; padding: 0 20rpx;
+    display: flex; align-items: center; gap: 12rpx; height: 80rpx;
   }
-  .btn-scan {
-    background: #409eff; color: #fff; border-radius: 8rpx; font-size: 28rpx; padding: 0 32rpx; border: none;
+  .code-input {
+    flex: 1; font-size: 28rpx; color: #303133; height: 80rpx;
+  }
+  .btn-add, .btn-scan {
+    border-radius: 8rpx; font-size: 28rpx; padding: 0 28rpx; border: none; line-height: 80rpx;
     &::after { border: none; }
   }
+  .btn-add { background: #67c23a; color: #fff; }
+  .btn-scan { background: #409eff; color: #fff; }
 }
 .section-title {
   display: flex; justify-content: space-between; align-items: center;

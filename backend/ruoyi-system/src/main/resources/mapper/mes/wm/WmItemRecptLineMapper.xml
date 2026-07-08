@@ -26,8 +26,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="warehouseName" column="warehouse_name" />
         <result property="locationId" column="location_id" />
         <result property="areaId" column="area_id" />
-        <result property="expireDate" column="expire_date" />
         <result property="produceDate" column="produce_date" />
+        <result property="expireDate" column="expire_date" />
         <result property="lotNumber" column="lot_number" />
         <result property="noticeLineId" column="notice_line_id" />
         <result property="remark" column="remark" />
@@ -38,7 +38,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectWmItemRecptLineVo">
-        select line_id, factory_id, recpt_id, item_id, item_code, item_name, specification, unit_of_measure, unit_name, unit2, unit2_name, conversion_rate, quantity_recpt, quantity_recpt2, batch_id, batch_code, warehouse_id, warehouse_code, warehouse_name, location_id, area_id, expire_date, produce_date, lot_number, notice_line_id, remark, create_by, create_time, update_by, update_time from qxx_wm_item_recpt_line
+        select line_id, factory_id, recpt_id, item_id, item_code, item_name, specification, unit_of_measure, unit_name, unit2, unit2_name, conversion_rate, quantity_recpt, quantity_recpt2, batch_id, batch_code, warehouse_id, warehouse_code, warehouse_name, location_id, area_id, produce_date, expire_date, lot_number, notice_line_id, remark, create_by, create_time, update_by, update_time from qxx_wm_item_recpt_line
     </sql>
 
     <select id="selectWmItemRecptLineList" parameterType="WmItemRecptLine" resultMap="WmItemRecptLineResult">
@@ -96,8 +96,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="warehouseName != null">warehouse_name,</if>
             <if test="locationId != null">location_id,</if>
             <if test="areaId != null">area_id,</if>
-            <if test="expireDate != null">expire_date,</if>
             <if test="produceDate != null">produce_date,</if>
+            <if test="expireDate != null">expire_date,</if>
             <if test="lotNumber != null and lotNumber != ''">lot_number,</if>
             <if test="noticeLineId != null">notice_line_id,</if>
             <if test="remark != null">remark,</if>
@@ -125,8 +125,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="warehouseName != null">#{warehouseName},</if>
             <if test="locationId != null">#{locationId},</if>
             <if test="areaId != null">#{areaId},</if>
-            <if test="expireDate != null">#{expireDate},</if>
             <if test="produceDate != null">#{produceDate},</if>
+            <if test="expireDate != null">#{expireDate},</if>
             <if test="lotNumber != null and lotNumber != ''">#{lotNumber},</if>
             <if test="noticeLineId != null">#{noticeLineId},</if>
             <if test="remark != null">#{remark},</if>
@@ -158,8 +158,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="warehouseName != null">warehouse_name = #{warehouseName},</if>
             <if test="locationId != null">location_id = #{locationId},</if>
             <if test="areaId != null">area_id = #{areaId},</if>
-            <if test="expireDate != null">expire_date = #{expireDate},</if>
             <if test="produceDate != null">produce_date = #{produceDate},</if>
+            <if test="expireDate != null">expire_date = #{expireDate},</if>
             <if test="lotNumber != null and lotNumber != ''">lot_number = #{lotNumber},</if>
             <if test="noticeLineId != null">notice_line_id = #{noticeLineId},</if>
             <if test="remark != null">remark = #{remark},</if>

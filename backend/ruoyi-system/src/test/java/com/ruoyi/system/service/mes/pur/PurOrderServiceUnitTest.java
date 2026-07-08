@@ -3,6 +3,7 @@ package com.ruoyi.system.service.mes.pur;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.system.domain.mes.pur.PurOrder;
 import com.ruoyi.system.domain.mes.pur.PurOrderLine;
+import com.ruoyi.system.domain.mes.pur.vo.PurOrderVO;
 import com.ruoyi.system.mapper.mes.pur.PurOrderMapper;
 import com.ruoyi.system.service.mes.pur.impl.PurOrderServiceImpl;
 import org.junit.jupiter.api.AfterEach;
@@ -97,7 +98,7 @@ class PurOrderServiceUnitTest {
     @Test
     @DisplayName("4. 审批：DRAFT → APPROVED，自动写入审批人")
     void testApproveFromDraft() {
-        PurOrder order = draftOrder();
+        PurOrderVO order = draftOrder();
         when(purOrderMapper.selectPurOrderByOrderId(1L)).thenReturn(order);
         when(purOrderMapper.updatePurOrder(any(PurOrder.class))).thenReturn(1);
 
@@ -111,7 +112,7 @@ class PurOrderServiceUnitTest {
     @Test
     @DisplayName("5. 审批：非DRAFT状态拒绝审批")
     void testApproveRejectsNonDraft() {
-        PurOrder order = draftOrder();
+        PurOrderVO order = draftOrder();
         order.setStatus("ORDERED");
         when(purOrderMapper.selectPurOrderByOrderId(1L)).thenReturn(order);
 
@@ -134,7 +135,7 @@ class PurOrderServiceUnitTest {
     @Test
     @DisplayName("7. 下单：APPROVED → ORDERED，行状态同步更新")
     void testOrderFromApproved() {
-        PurOrder order = draftOrder();
+        PurOrderVO order = draftOrder();
         order.setStatus("APPROVED");
         PurOrderLine line = new PurOrderLine();
         line.setLineId(1L);
@@ -154,7 +155,7 @@ class PurOrderServiceUnitTest {
     @Test
     @DisplayName("8. 下单：非APPROVED状态拒绝")
     void testOrderRejectsNonApproved() {
-        PurOrder order = draftOrder();
+        PurOrderVO order = draftOrder();
         when(purOrderMapper.selectPurOrderByOrderId(1L)).thenReturn(order);
 
         assertThatThrownBy(() -> service.orderPurOrder(1L))
@@ -165,7 +166,7 @@ class PurOrderServiceUnitTest {
     @Test
     @DisplayName("9. 关闭：全部收完 → CLOSED")
     void testCloseWhenAllReceived() {
-        PurOrder order = draftOrder();
+        PurOrderVO order = draftOrder();
         order.setStatus("RECEIVED");
         PurOrderLine line = new PurOrderLine();
         line.setItemName("测试物料");
@@ -185,7 +186,7 @@ class PurOrderServiceUnitTest {
     @Test
     @DisplayName("10. 关闭：未收完拒绝关闭")
     void testCloseRejectsWhenNotFullyReceived() {
-        PurOrder order = draftOrder();
+        PurOrderVO order = draftOrder();
         order.setStatus("RECEIVED");
         PurOrderLine line = new PurOrderLine();
         line.setItemName("测试物料");
@@ -203,7 +204,7 @@ class PurOrderServiceUnitTest {
     @Test
     @DisplayName("11. 关闭：quantityOrdered为null时安全处理")
     void testCloseWithNullQuantityOrdered() {
-        PurOrder order = draftOrder();
+        PurOrderVO order = draftOrder();
         order.setStatus("RECEIVED");
         PurOrderLine line = new PurOrderLine();
         line.setItemName("测试物料");
@@ -222,7 +223,7 @@ class PurOrderServiceUnitTest {
     @Test
     @DisplayName("12. 关闭：非RECEIVED状态拒绝")
     void testCloseRejectsNonReceived() {
-        PurOrder order = draftOrder();
+        PurOrderVO order = draftOrder();
         order.setStatus("ORDERED");
         when(purOrderMapper.selectPurOrderByOrderId(1L)).thenReturn(order);
 
@@ -232,8 +233,8 @@ class PurOrderServiceUnitTest {
     }
 
     // helper
-    private PurOrder draftOrder() {
-        PurOrder order = new PurOrder();
+    private PurOrderVO draftOrder() {
+        PurOrderVO order = new PurOrderVO();
         order.setOrderId(1L);
         order.setOrderCode("PO-TEST-001");
         order.setStatus("DRAFT");

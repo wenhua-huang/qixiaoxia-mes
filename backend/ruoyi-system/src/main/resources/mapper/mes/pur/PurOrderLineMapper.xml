@@ -191,4 +191,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <delete id="deletePurOrderLineByOrderId" parameterType="Long">
         delete from qxx_pur_order_line where order_id = #{orderId}
     </delete>
+
+    <update id="addQuantityReceived">
+        UPDATE qxx_pur_order_line
+        SET quantity_received = quantity_received + #{delta}
+        WHERE line_id = #{lineId}
+    </update>
 </mapper>

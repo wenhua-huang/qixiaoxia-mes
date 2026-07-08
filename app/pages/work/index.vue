@@ -11,7 +11,7 @@
       </swiper>
     </uni-swiper-dot>
 
-    <!-- 宫格组件 -->
+    <!-- 宫格组件 — 仓储管理 -->
     <uni-section title="仓储管理" type="line"></uni-section>
     <view class="grid-body">
       <uni-grid :column="4" :showBorder="false" @change="changeWmGrid">
@@ -36,6 +36,26 @@
       </uni-grid>
     </view>
 
+    <!-- 宫格组件 — 采购管理 -->
+    <uni-section title="采购管理" type="line"></uni-section>
+    <view class="grid-body">
+      <uni-grid :column="4" :showBorder="false" @change="changeGrid">
+        <uni-grid-item @click="goReceipt">
+          <view class="grid-item-box">
+            <uni-icons type="checkbox-filled" size="30"></uni-icons>
+            <text class="text">采购收货</text>
+          </view>
+        </uni-grid-item>
+        <uni-grid-item @click="goHistory">
+          <view class="grid-item-box">
+            <uni-icons type="list" size="30"></uni-icons>
+            <text class="text">收货历史</text>
+          </view>
+        </uni-grid-item>
+      </uni-grid>
+    </view>
+
+    <!-- 宫格组件 — 系统管理 -->
     <uni-section title="系统管理" type="line"></uni-section>
     <view class="grid-body">
       <uni-grid :column="4" :showBorder="false" @change="changeGrid">
@@ -114,6 +134,12 @@
     current.value = e.detail.current
   }
 
+  function goReceipt() {
+    proxy.$tab.navigateTo('/pages/mes/pur/receipt')
+  }
+  function goHistory() {
+    proxy.$tab.navigateTo('/pages/mes/pur/history')
+  }
   function changeGrid(e) {
     proxy.$modal.showToast('模块建设中~')
   }

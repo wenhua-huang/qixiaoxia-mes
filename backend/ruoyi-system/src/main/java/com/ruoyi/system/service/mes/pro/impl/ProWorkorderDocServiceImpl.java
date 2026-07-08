@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import com.ruoyi.system.domain.mes.pro.*;
 import com.ruoyi.system.domain.mes.wm.*;
 import com.ruoyi.system.domain.mes.pur.*;
+import com.ruoyi.system.domain.mes.pur.vo.*;
 import com.ruoyi.system.mapper.mes.pro.*;
 import com.ruoyi.system.mapper.mes.pur.*;
 import com.ruoyi.system.mapper.mes.wm.*;
@@ -696,7 +697,7 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
         // 标记已生成 PO 的物料
         PurOrder poQuery = new PurOrder();
         poQuery.setWorkorderId(workorderId);
-        List<PurOrder> existingPOs = purOrderService.selectPurOrderList(poQuery);
+        List<PurOrderVO> existingPOs = purOrderService.selectPurOrderList(poQuery);
         Map<Long, String> itemPOStatus = new HashMap<>();
         if (existingPOs != null) {
             for (PurOrder po : existingPOs) {

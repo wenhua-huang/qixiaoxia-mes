@@ -10,6 +10,7 @@ import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.system.domain.mes.wm.ItemRecptReceiveBody;
 import com.ruoyi.system.domain.mes.wm.WmItemRecpt;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -111,6 +112,23 @@ public class WmItemRecptController extends BaseController
     public AjaxResult post(@PathVariable Long recptId) {
         try {
             wmItemRecptService.postItemRecpt(recptId);
+            return AjaxResult.success();
+        } catch (RuntimeException e) {
+            return AjaxResult.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 一键收货（移动端）：创建入库单头+行+确认收货，单个事务原子完成。
+     *
+     * 前端只需调这一个接口，无需分步调 add + addLine + confirm。
+     */
+    @PreAuthorize("@ss.hasPermi('mes:wm:item_recpt:add')")
+    @Log(title = "移动端一键收货", businessType = BusinessType.INSERT)
+    @PostMapping("/receive")
+    public AjaxResult receive(@RequestBody ItemRecptReceiveBody body) {
+        try {
+            wmItemRecptService.receiveWithLines(body);
             return AjaxResult.success();
         } catch (RuntimeException e) {
             return AjaxResult.error(e.getMessage());

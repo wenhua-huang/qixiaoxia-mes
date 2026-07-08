@@ -126,7 +126,7 @@ export default {
     const { mes_order_status } = useDict("mes_order_status")
     return { mes_order_status }
   },
-  props: { orderId: { type: Number, default: null } },
+    props: { orderId: { type: Number, default: null }, initLines: { type: Array, default: null } },
   data() {
     return {
       loading: false, lineList: [], ids: [], single: true, multiple: true,
@@ -139,9 +139,17 @@ export default {
       }
     }
   },
-  watch: { orderId(val) { if (val) this.getList() } },
-  created() { if (this.orderId) this.getList() },
+  watch: { orderId(val) { if (val) this.loadLines() } },
+  created() { this.loadLines() },
   methods: {
+    loadLines() {
+      if (this.initLines !== null) {
+        this.lineList = this.initLines
+      } else if (this.orderId) {
+        this.getList()
+      }
+    },
+
     getList() {
       if (!this.orderId) return
       this.loading = true

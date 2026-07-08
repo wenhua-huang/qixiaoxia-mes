@@ -2,6 +2,7 @@ package com.ruoyi.system.service.mes.pur;
 
 import java.util.List;
 import com.ruoyi.system.domain.mes.pur.PurOrder;
+import com.ruoyi.system.domain.mes.pur.vo.PurOrderVO;
 
 /**
  * 采购订单头Service接口
@@ -17,7 +18,7 @@ public interface IPurOrderService
      * @param orderId 采购订单头主键
      * @return 采购订单头
      */
-    public PurOrder selectPurOrderByOrderId(Long orderId);
+    public PurOrderVO selectPurOrderByOrderId(Long orderId);
 
     /**
      * 查询采购订单头列表
@@ -25,7 +26,7 @@ public interface IPurOrderService
      * @param purOrder 采购订单头
      * @return 采购订单头集合
      */
-    public List<PurOrder> selectPurOrderList(PurOrder purOrder);
+    public List<PurOrderVO> selectPurOrderList(PurOrder purOrder);
 
     /**
      * 新增采购订单头

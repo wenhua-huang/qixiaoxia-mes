@@ -5,6 +5,7 @@ import java.util.Date;
 import java.util.List;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
+import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.domain.mes.wm.WmMaterialStock;
 import com.ruoyi.system.domain.mes.wm.WmTransaction;
@@ -81,6 +82,12 @@ public class WmTransactionServiceImpl implements IWmTransactionService
                         + "，变动：" + delta);
             }
             stock.setQuantityOnhand(result);
+            // 入库时同步增加可用库存，出库时不减（由领料 confirm 时扣减）
+            if (delta.compareTo(BigDecimal.ZERO) > 0) {
+                stock.setQuantityAvailable(
+                    (existing.getQuantityAvailable() != null ? existing.getQuantityAvailable() : BigDecimal.ZERO)
+                        .add(delta));
+            }
             stock.setMaterialStockId(existing.getMaterialStockId());
             stock.setUpdateTime(new Date());
             wmMaterialStockMapper.updateWmMaterialStock(stock);
@@ -89,6 +96,8 @@ public class WmTransactionServiceImpl implements IWmTransactionService
                 throw new ServiceException("库存记录不存在，不能执行出库操作");
             }
             stock.setQuantityOnhand(delta);
+            // 新建库存记录时，入库数量即为可用库存
+            stock.setQuantityAvailable(delta);
             stock.setCreateTime(new Date());
             stock.setUpdateTime(new Date());
             wmMaterialStockMapper.insertWmMaterialStock(stock);
@@ -96,6 +105,7 @@ public class WmTransactionServiceImpl implements IWmTransactionService
 
         transaction.setMaterialStockId(stock.getMaterialStockId());
         transaction.setCreateTime(DateUtils.getNowDate());
+        transaction.setCreateBy(SecurityUtils.getUsername());
         wmTransactionMapper.insertWmTransaction(transaction);
         return transaction;
     }

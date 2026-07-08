@@ -213,12 +213,12 @@ public class PurOrder extends BaseEntity
         return approver;
     }
 
-    public void setTotalQuantity(BigDecimal totalQuantity) 
+    public void setTotalQuantity(BigDecimal totalQuantity)
     {
         this.totalQuantity = totalQuantity;
     }
 
-    public BigDecimal getTotalQuantity() 
+    public BigDecimal getTotalQuantity()
     {
         return totalQuantity;
     }

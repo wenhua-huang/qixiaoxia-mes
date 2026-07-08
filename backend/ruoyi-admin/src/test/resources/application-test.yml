@@ -16,6 +16,16 @@ server:
 
 # Redis — 连接本地 Docker (docker compose up -d redis)
 spring:
+  datasource:
+    druid:
+      # 借出连接前验证，防止 Spring SQL init 后连接被标记为 disabled
+      # 导致 Flyway 报 "connection disabled" → "Unable to determine 'foreign_key_checks'"
+      testOnBorrow: true
+      validationQuery: SELECT 1
+      testWhileIdle: true
+      # 延长超时，避免长时间 SQL 初始化期间连接超时
+      socketTimeout: 120000
+      connectTimeout: 60000
   data:
     redis:
       host: localhost

@@ -44,6 +44,9 @@ docker-data/
 # .claude/ 纳入版本控制，但排除临时 worktree
 .claude/worktrees/
 
+# --- ZCode ---
+.zcode/
+
 # --- Logs ---
 *.log
 logs/

@@ -74,3 +74,7 @@ tmp/
 temp/
 frontend/node_modules
 .session-baseline
+
+# --- DB backups ---
+mes_full_backup_*.sql
+mes_full_backup_*.sql.gz

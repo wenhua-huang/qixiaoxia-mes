@@ -52,6 +52,8 @@ class WmIssueHeaderServiceUnitTest {
     @Mock private WmMaterialStockMapper materialStockMapper;
     @Mock private WmTransactionMapper transactionMapper;
     @Mock private ProMaterialTraceMapper materialTraceMapper;
+    @Mock private com.ruoyi.system.mapper.mes.wm.WmIssueDetailMapper issueDetailMapper;
+    @Mock private com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator autoCodeGenerator;
     @Mock private RedisLockTemplate lockTemplate;
     @Mock private PlatformTransactionManager transactionManager;
     @InjectMocks private WmIssueHeaderServiceImpl service;
@@ -116,7 +118,7 @@ class WmIssueHeaderServiceUnitTest {
     // ══════════════════════════════════════════════
 
     @Test
-    @DisplayName("1. 确认领料单：成功预占库存（DRAFT→CONFIRMED，扣quantityAvailable）")
+    @DisplayName("1. 确认领料单：成功预占库存（DRAFT→ALLOCATED，扣quantityAvailable）")
     void testConfirmIssueSuccess() {
         when(issueHeaderMapper.selectWmIssueHeaderByIssueId(1L)).thenReturn(testHeader);
         when(issueLineMapper.selectWmIssueLineList(any(WmIssueLine.class))).thenReturn(List.of(testLine));
@@ -136,10 +138,10 @@ class WmIssueHeaderServiceUnitTest {
         assertThat(txCaptor.getValue().getTransactionType()).isEqualTo("ALLOCATE");
         assertThat(txCaptor.getValue().getQuantity()).isEqualByComparingTo(new BigDecimal("-50"));
 
-        // 验证 header 状态改为 CONFIRMED
+        // 验证 header 状态改为 ALLOCATED（已预占）
         ArgumentCaptor<WmIssueHeader> headerCaptor = ArgumentCaptor.forClass(WmIssueHeader.class);
         verify(issueHeaderMapper).updateWmIssueHeader(headerCaptor.capture());
-        assertThat(headerCaptor.getValue().getStatus()).isEqualTo("CONFIRMED");
+        assertThat(headerCaptor.getValue().getStatus()).isEqualTo("ALLOCATED");
     }
 
     @Test
@@ -159,7 +161,7 @@ class WmIssueHeaderServiceUnitTest {
     @Test
     @DisplayName("3. 确认领料单：非DRAFT状态拒绝")
     void testConfirmIssueRejectsNonDraft() {
-        testHeader.setStatus("CONFIRMED");
+        testHeader.setStatus("ALLOCATED");
         when(issueHeaderMapper.selectWmIssueHeaderByIssueId(1L)).thenReturn(testHeader);
 
         assertThatThrownBy(() -> service.confirmIssue(1L))
@@ -236,9 +238,9 @@ class WmIssueHeaderServiceUnitTest {
     // ══════════════════════════════════════════════
 
     @Test
-    @DisplayName("9. 释放预占：CONFIRMED→DRAFT，恢复quantityAvailable")
+    @DisplayName("9. 释放预占：ALLOCATED→APPROVED，恢复quantityAvailable")
     void testReleaseAllocationSuccess() {
-        testHeader.setStatus("CONFIRMED");
+        testHeader.setStatus("ALLOCATED");
         testStock.setQuantityAvailable(new BigDecimal("150")); // 已预占50
         when(issueHeaderMapper.selectWmIssueHeaderByIssueId(1L)).thenReturn(testHeader);
         when(issueLineMapper.selectWmIssueLineList(any(WmIssueLine.class))).thenReturn(List.of(testLine));
@@ -258,27 +260,27 @@ class WmIssueHeaderServiceUnitTest {
         assertThat(txCaptor.getValue().getTransactionType()).isEqualTo("RELEASE");
         assertThat(txCaptor.getValue().getQuantity()).isEqualByComparingTo(new BigDecimal("50")); // 正数=释放
 
-        // 验证 header 恢复为 DRAFT
+        // 验证 header 恢复为 APPROVED（释放预占后回到已下达，可再次预占）
         ArgumentCaptor<WmIssueHeader> headerCaptor = ArgumentCaptor.forClass(WmIssueHeader.class);
         verify(issueHeaderMapper).updateWmIssueHeader(headerCaptor.capture());
-        assertThat(headerCaptor.getValue().getStatus()).isEqualTo("DRAFT");
+        assertThat(headerCaptor.getValue().getStatus()).isEqualTo("APPROVED");
     }
 
     @Test
-    @DisplayName("10. 释放预占：非CONFIRMED状态拒绝")
-    void testReleaseAllocationRejectsNonConfirmed() {
+    @DisplayName("10. 释放预占：非ALLOCATED状态拒绝")
+    void testReleaseAllocationRejectsNonAllocated() {
         testHeader.setStatus("DRAFT");
         when(issueHeaderMapper.selectWmIssueHeaderByIssueId(1L)).thenReturn(testHeader);
 
         assertThatThrownBy(() -> service.releaseAllocation(1L))
                 .isInstanceOf(ServiceException.class)
-                .hasMessageContaining("已确认");
+                .hasMessageContaining("已预占");
     }
 
     @Test
     @DisplayName("11. 释放预占：库存已不存在时跳过（不抛异常）")
     void testReleaseAllocationStockGone() {
-        testHeader.setStatus("CONFIRMED");
+        testHeader.setStatus("ALLOCATED");
         when(issueHeaderMapper.selectWmIssueHeaderByIssueId(1L)).thenReturn(testHeader);
         when(issueLineMapper.selectWmIssueLineList(any(WmIssueLine.class))).thenReturn(List.of(testLine));
         when(materialStockMapper.loadMaterialStockForUpdate(any(WmMaterialStock.class))).thenReturn(null);
@@ -293,20 +295,20 @@ class WmIssueHeaderServiceUnitTest {
     // ══════════════════════════════════════════════
 
     @Test
-    @DisplayName("12. 执行出库：DRAFT状态拒绝（必须先确认）")
+    @DisplayName("12. 执行出库：DRAFT状态拒绝（必须先预占）")
     void testExecuteIssueRejectsDraft() {
         testHeader.setStatus("DRAFT");
         when(issueHeaderMapper.selectWmIssueHeaderByIssueId(1L)).thenReturn(testHeader);
 
         assertThatThrownBy(() -> service.executeIssue(1L))
                 .isInstanceOf(ServiceException.class)
-                .hasMessageContaining("已确认");
+                .hasMessageContaining("已预占");
     }
 
     @Test
-    @DisplayName("13. 执行出库：CONFIRMED状态允许执行")
-    void testExecuteIssueAllowsConfirmed() {
-        testHeader.setStatus("CONFIRMED");
+    @DisplayName("13. 执行出库：ALLOCATED状态允许执行")
+    void testExecuteIssueAllowsAllocated() {
+        testHeader.setStatus("ALLOCATED");
         testStock.setQuantityAvailable(new BigDecimal("150")); // available != onhand（已预占）
         when(issueHeaderMapper.selectWmIssueHeaderByIssueId(1L)).thenReturn(testHeader);
         when(issueLineMapper.selectWmIssueLineList(any(WmIssueLine.class))).thenReturn(List.of(testLine));
@@ -322,16 +324,16 @@ class WmIssueHeaderServiceUnitTest {
         // available 应为 null（防止误写回DB）
         assertThat(stockCaptor.getValue().getQuantityAvailable()).isNull();
 
-        // header 状态改为 POSTED
+        // header 状态改为 ISSUED（已发料）
         ArgumentCaptor<WmIssueHeader> headerCaptor = ArgumentCaptor.forClass(WmIssueHeader.class);
         verify(issueHeaderMapper).updateWmIssueHeader(headerCaptor.capture());
-        assertThat(headerCaptor.getValue().getStatus()).isEqualTo("POSTED");
+        assertThat(headerCaptor.getValue().getStatus()).isEqualTo("ISSUED");
     }
 
     @Test
-    @DisplayName("14. 执行出库：已POSTED拒绝重复执行")
+    @DisplayName("14. 执行出库：已ISSUED拒绝重复执行")
     void testExecuteIssueRejectsReExecution() {
-        testHeader.setStatus("POSTED");
+        testHeader.setStatus("ISSUED");
         when(issueHeaderMapper.selectWmIssueHeaderByIssueId(1L)).thenReturn(testHeader);
 
         assertThatThrownBy(() -> service.executeIssue(1L))
@@ -342,7 +344,7 @@ class WmIssueHeaderServiceUnitTest {
     @Test
     @DisplayName("15. 执行出库：库存不足拒绝")
     void testExecuteIssueInsufficientOnhand() {
-        testHeader.setStatus("CONFIRMED");
+        testHeader.setStatus("ALLOCATED");
         testStock.setQuantityOnhand(new BigDecimal("10")); // 只有10，需50
         when(issueHeaderMapper.selectWmIssueHeaderByIssueId(1L)).thenReturn(testHeader);
         when(issueLineMapper.selectWmIssueLineList(any(WmIssueLine.class))).thenReturn(List.of(testLine));
@@ -371,7 +373,7 @@ class WmIssueHeaderServiceUnitTest {
         assertThat(testStock.getQuantityAvailable()).isEqualByComparingTo(new BigDecimal("150"));
 
         // === Step 2: 执行出库 ===
-        testHeader.setStatus("CONFIRMED"); // 模拟确认后状态变更
+        testHeader.setStatus("ALLOCATED"); // 模拟确认（预占）后状态变更
         when(issueHeaderMapper.selectWmIssueHeaderByIssueId(1L)).thenReturn(testHeader);
         when(issueLineMapper.selectWmIssueLineList(any(WmIssueLine.class))).thenReturn(List.of(testLine));
         // 重新 mock stock（available 已被扣过）

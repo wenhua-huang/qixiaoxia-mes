@@ -20,6 +20,7 @@ import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.system.domain.mes.wm.WmIssueHeader;
 import com.ruoyi.system.domain.mes.wm.WmIssueLine;
+import com.ruoyi.system.domain.mes.wm.WmIssueDetail;
 import com.ruoyi.system.domain.mes.wm.WmWarehouse;
 import com.ruoyi.system.domain.mes.wm.WmStorageLocation;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
@@ -133,17 +134,76 @@ public class WmIssueHeaderController extends BaseController
     public AjaxResult loadBom(@PathVariable Long issueId, @PathVariable Long workorderId)
     { return toAjax(wmIssueHeaderService.loadBomLines(issueId, workorderId)); }
 
-    /** 确认领料单：DRAFT → CONFIRMED，预占库存 */
+    /** 确认领料单：DRAFT → ALLOCATED（已预占），扣减可用库存 */
     @PreAuthorize("@ss.hasPermi('mes:wm:issue:edit')")
     @Log(title = "领料单确认", businessType = BusinessType.UPDATE)
     @PutMapping("/confirm/{issueId}")
     public AjaxResult confirm(@PathVariable Long issueId)
     { return toAjax(wmIssueHeaderService.confirmIssue(issueId)); }
 
-    /** 执行出库：扣库存 + 写追溯 + 状态改为POSTED */
+    /** 释放预占：ALLOCATED → DRAFT，恢复可用库存（反确认） */
+    @PreAuthorize("@ss.hasPermi('mes:wm:issue:edit')")
+    @Log(title = "领料单释放预占", businessType = BusinessType.UPDATE)
+    @PutMapping("/release/{issueId}")
+    public AjaxResult release(@PathVariable Long issueId)
+    { return toAjax(wmIssueHeaderService.releaseAllocation(issueId)); }
+
+    /** 执行出库：ALLOCATED → ISSUED，扣减现有库存 + 写追溯（旧接口，全量发料） */
     @PreAuthorize("@ss.hasPermi('mes:wm:issue:edit')")
     @Log(title = "生产领料单", businessType = BusinessType.UPDATE)
     @PutMapping("/execute/{issueId}")
     public AjaxResult execute(@PathVariable Long issueId)
     { return toAjax(wmIssueHeaderService.executeIssue(issueId)); }
+
+    // ══════════════════════════════════════════════
+    // Phase 2：完整生命周期接口
+    // ══════════════════════════════════════════════
+
+    /** 提交审核：DRAFT → PENDING */
+    @PreAuthorize("@ss.hasPermi('mes:wm:issue:submit')")
+    @Log(title = "领料单提交审核", businessType = BusinessType.UPDATE)
+    @PutMapping("/submit/{issueId}")
+    public AjaxResult submit(@PathVariable Long issueId)
+    { return toAjax(wmIssueHeaderService.submitForApprove(issueId)); }
+
+    /** 审核通过：PENDING → APPROVED */
+    @PreAuthorize("@ss.hasPermi('mes:wm:issue:approve')")
+    @Log(title = "领料单审核通过", businessType = BusinessType.UPDATE)
+    @PutMapping("/approve/{issueId}")
+    public AjaxResult approve(@PathVariable Long issueId)
+    { return toAjax(wmIssueHeaderService.approve(issueId)); }
+
+    /** 审核退回：PENDING → DRAFT */
+    @PreAuthorize("@ss.hasPermi('mes:wm:issue:approve')")
+    @Log(title = "领料单审核退回", businessType = BusinessType.UPDATE)
+    @PutMapping("/reject/{issueId}")
+    public AjaxResult reject(@PathVariable Long issueId)
+    { return toAjax(wmIssueHeaderService.reject(issueId)); }
+
+    /**
+     * 发料出库（支持分批）：ALLOCATED/PARTIAL_ISSUED → PARTIAL_ISSUED/ISSUED。
+     * body：本次发料明细数组（item/batch/数量/库位）
+     */
+    @PreAuthorize("@ss.hasPermi('mes:wm:issue:issueOut')")
+    @Log(title = "领料单发料出库", businessType = BusinessType.UPDATE)
+    @PutMapping("/issueOut/{issueId}")
+    public AjaxResult issueOut(@PathVariable Long issueId, @RequestBody List<WmIssueDetail> details)
+    { return toAjax(wmIssueHeaderService.issueOut(issueId, details)); }
+
+    /** 关闭：ISSUED/PARTIAL_ISSUED → CLOSED（终态） */
+    @PreAuthorize("@ss.hasPermi('mes:wm:issue:close')")
+    @Log(title = "领料单关闭", businessType = BusinessType.UPDATE)
+    @PutMapping("/close/{issueId}")
+    public AjaxResult close(@PathVariable Long issueId)
+    { return toAjax(wmIssueHeaderService.close(issueId)); }
+
+    /** 作废：非终态 → CANCELED（body 可选含 reason） */
+    @PreAuthorize("@ss.hasPermi('mes:wm:issue:cancel')")
+    @Log(title = "领料单作废", businessType = BusinessType.UPDATE)
+    @PutMapping("/cancel/{issueId}")
+    public AjaxResult cancel(@PathVariable Long issueId, @RequestBody(required = false) Map<String, String> body)
+    {
+        String reason = body != null ? body.get("reason") : null;
+        return toAjax(wmIssueHeaderService.cancel(issueId, reason));
+    }
 }

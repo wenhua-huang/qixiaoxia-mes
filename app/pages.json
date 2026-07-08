@@ -70,6 +70,27 @@
     "style": {
       "navigationBarTitleText": "浏览文本"
     }
+  }, {
+    "path": "pages/mes/wm/issue/list",
+    "style": {
+      "navigationBarTitleText": "领料单",
+      "enablePullDownRefresh": true
+    }
+  }, {
+    "path": "pages/mes/wm/issue/detail",
+    "style": {
+      "navigationBarTitleText": "领料单详情"
+    }
+  }, {
+    "path": "pages/mes/wm/issue/scan-issue",
+    "style": {
+      "navigationBarTitleText": "扫码发料"
+    }
+  }, {
+    "path": "pages/mes/wm/issue/scan-query",
+    "style": {
+      "navigationBarTitleText": "扫码查库存"
+    }
   }],
   "tabBar": {
     "color": "#000000",

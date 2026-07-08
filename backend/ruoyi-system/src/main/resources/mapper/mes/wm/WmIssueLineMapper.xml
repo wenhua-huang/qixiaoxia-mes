@@ -5,33 +5,46 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 <mapper namespace="com.ruoyi.system.mapper.mes.wm.WmIssueLineMapper">
 
     <resultMap type="WmIssueLine" id="WmIssueLineResult">
-        <result property="lineId"    column="line_id"    />
-        <result property="factoryId"    column="factory_id"    />
-        <result property="issueId"    column="issue_id"    />
-        <result property="issueCode"    column="issue_code"    />
-        <result property="itemId"    column="item_id"    />
-        <result property="itemCode"    column="item_code"    />
-        <result property="itemName"    column="item_name"    />
-        <result property="itemSpc"    column="specification"    />
-        <result property="unitOfMeasure"    column="unit_of_measure"    />
-        <result property="unitName"    column="unit_name"    />
+        <result property="lineId"           column="line_id"           />
+        <result property="factoryId"        column="factory_id"        />
+        <result property="issueId"          column="issue_id"          />
+        <result property="issueCode"        column="issue_code"        />
+        <result property="itemId"           column="item_id"           />
+        <result property="itemCode"         column="item_code"         />
+        <result property="itemName"         column="item_name"         />
+        <result property="itemSpc"          column="specification"     />
+        <result property="unitOfMeasure"    column="unit_of_measure"   />
+        <result property="unitName"         column="unit_name"         />
         <result property="quantityIssue"    column="quantity_issue"    />
-        <result property="unit2"    column="unit2"    />
-        <result property="unit2Name"    column="unit2_name"    />
-        <result property="conversionRate"    column="conversion_rate"    />
-        <result property="quantityIssue2"    column="quantity_issue2"    />
-        <result property="warehouseId"    column="warehouse_id"    />
-        <result property="locationId"    column="location_id"    />
-        <result property="areaId"    column="area_id"    />
-        <result property="remark"    column="remark"    />
-        <result property="createBy"    column="create_by"    />
-        <result property="createTime"    column="create_time"    />
-        <result property="updateBy"    column="update_by"    />
-        <result property="updateTime"    column="update_time"    />
+        <result property="quantityIssued"   column="quantity_issued"   />
+        <result property="unit2"            column="unit2"             />
+        <result property="unit2Name"        column="unit2_name"        />
+        <result property="conversionRate"   column="conversion_rate"   />
+        <result property="quantityIssue2"   column="quantity_issue2"   />
+        <result property="quantityIssued2"  column="quantity_issued2"  />
+        <result property="processId"        column="process_id"        />
+        <result property="processCode"      column="process_code"      />
+        <result property="processName"      column="process_name"      />
+        <result property="batchId"          column="batch_id"          />
+        <result property="batchCode"        column="batch_code"        />
+        <result property="warehouseId"      column="warehouse_id"      />
+        <result property="locationId"       column="location_id"       />
+        <result property="areaId"           column="area_id"           />
+        <result property="remark"           column="remark"            />
+        <result property="createBy"         column="create_by"         />
+        <result property="createTime"       column="create_time"       />
+        <result property="updateBy"         column="update_by"         />
+        <result property="updateTime"       column="update_time"       />
     </resultMap>
 
     <sql id="selectWmIssueLineVo">
-        select line_id, factory_id, issue_id, item_id, item_code, item_name, specification, unit_of_measure, unit_name, quantity_issue, quantity_recpt, batch_id, batch_code, warehouse_id, location_id, area_id, remark, create_by, create_time, update_by, update_time from qxx_wm_issue_line
+        select line_id, factory_id, issue_id, issue_code, item_id, item_code, item_name, specification,
+               unit_of_measure, unit_name, quantity_issue, quantity_issued,
+               unit2, unit2_name, conversion_rate, quantity_issue2, quantity_issued2,
+               process_id, process_code, process_name, batch_id, batch_code,
+               warehouse_id, location_id, area_id, remark,
+               create_by, create_time, update_by, update_time
+        from qxx_wm_issue_line
     </sql>
 
     <select id="selectWmIssueLineList" parameterType="WmIssueLine" resultMap="WmIssueLineResult">
@@ -40,6 +53,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="issueId != null"> and issue_id = #{issueId}</if>
             <if test="itemId != null"> and item_id = #{itemId}</if>
             <if test="itemCode != null  and itemCode != ''"> and item_code = #{itemCode}</if>
+            <if test="processId != null"> and process_id = #{processId}</if>
         </where>
         order by line_id desc
     </select>
@@ -49,10 +63,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where line_id = #{lineId}
     </select>
 
-            <insert id="insertWmIssueLine" parameterType="WmIssueLine" useGeneratedKeys="true" keyProperty="lineId">
+    <insert id="insertWmIssueLine" parameterType="WmIssueLine" useGeneratedKeys="true" keyProperty="lineId">
         insert into qxx_wm_issue_line
         <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
             <if test="issueId != null">issue_id,</if>
+            <if test="issueCode != null and issueCode != ''">issue_code,</if>
             <if test="itemId != null">item_id,</if>
             <if test="itemCode != null and itemCode != ''">item_code,</if>
             <if test="itemName != null and itemName != ''">item_name,</if>
@@ -60,15 +76,28 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="unitOfMeasure != null and unitOfMeasure != ''">unit_of_measure,</if>
             <if test="unitName != null and unitName != ''">unit_name,</if>
             <if test="quantityIssue != null">quantity_issue,</if>
+            <if test="quantityIssued != null">quantity_issued,</if>
+            <if test="unit2 != null">unit2,</if>
+            <if test="unit2Name != null">unit2_name,</if>
+            <if test="conversionRate != null">conversion_rate,</if>
+            <if test="quantityIssue2 != null">quantity_issue2,</if>
+            <if test="quantityIssued2 != null">quantity_issued2,</if>
+            <if test="processId != null">process_id,</if>
+            <if test="processCode != null and processCode != ''">process_code,</if>
+            <if test="processName != null and processName != ''">process_name,</if>
+            <if test="batchId != null">batch_id,</if>
+            <if test="batchCode != null and batchCode != ''">batch_code,</if>
             <if test="warehouseId != null">warehouse_id,</if>
             <if test="locationId != null">location_id,</if>
             <if test="areaId != null">area_id,</if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
-         </trim>
+        </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
             <if test="issueId != null">#{issueId},</if>
+            <if test="issueCode != null and issueCode != ''">#{issueCode},</if>
             <if test="itemId != null">#{itemId},</if>
             <if test="itemCode != null and itemCode != ''">#{itemCode},</if>
             <if test="itemName != null and itemName != ''">#{itemName},</if>
@@ -76,36 +105,59 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="unitOfMeasure != null and unitOfMeasure != ''">#{unitOfMeasure},</if>
             <if test="unitName != null and unitName != ''">#{unitName},</if>
             <if test="quantityIssue != null">#{quantityIssue},</if>
+            <if test="quantityIssued != null">#{quantityIssued},</if>
+            <if test="unit2 != null">#{unit2},</if>
+            <if test="unit2Name != null">#{unit2Name},</if>
+            <if test="conversionRate != null">#{conversionRate},</if>
+            <if test="quantityIssue2 != null">#{quantityIssue2},</if>
+            <if test="quantityIssued2 != null">#{quantityIssued2},</if>
+            <if test="processId != null">#{processId},</if>
+            <if test="processCode != null and processCode != ''">#{processCode},</if>
+            <if test="processName != null and processName != ''">#{processName},</if>
+            <if test="batchId != null">#{batchId},</if>
+            <if test="batchCode != null and batchCode != ''">#{batchCode},</if>
             <if test="warehouseId != null">#{warehouseId},</if>
             <if test="locationId != null">#{locationId},</if>
             <if test="areaId != null">#{areaId},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
-         </trim>
+        </trim>
     </insert>
-
 
     <update id="updateWmIssueLine" parameterType="WmIssueLine">
         update qxx_wm_issue_line
         <trim prefix="SET" suffixOverrides=",">
-            <if test="itemId != null">item_id = #itemId,</if>
-            <if test="itemCode != null and itemCode != ''">item_code = #itemCode,</if>
-            <if test="itemName != null and itemName != ''">item_name = #itemName,</if>
-            <if test="itemSpc != null">specification = #itemSpc,</if>
-            <if test="unitOfMeasure != null and unitOfMeasure != ''">unit_of_measure = #unitOfMeasure,</if>
-            <if test="unitName != null and unitName != ''">unit_name = #unitName,</if>
-            <if test="quantityIssue != null">quantity_issue = #quantityIssue,</if>
-            <if test="warehouseId != null">warehouse_id = #warehouseId,</if>
-            <if test="locationId != null">location_id = #locationId,</if>
-            <if test="areaId != null">area_id = #areaId,</if>
-            <if test="remark != null">remark = #remark,</if>
+            <if test="factoryId != null">factory_id = #{factoryId},</if>
+            <if test="issueId != null">issue_id = #{issueId},</if>
+            <if test="issueCode != null and issueCode != ''">issue_code = #{issueCode},</if>
+            <if test="itemId != null">item_id = #{itemId},</if>
+            <if test="itemCode != null and itemCode != ''">item_code = #{itemCode},</if>
+            <if test="itemName != null and itemName != ''">item_name = #{itemName},</if>
+            <if test="itemSpc != null">specification = #{itemSpc},</if>
+            <if test="unitOfMeasure != null and unitOfMeasure != ''">unit_of_measure = #{unitOfMeasure},</if>
+            <if test="unitName != null and unitName != ''">unit_name = #{unitName},</if>
+            <if test="quantityIssue != null">quantity_issue = #{quantityIssue},</if>
+            <if test="quantityIssued != null">quantity_issued = #{quantityIssued},</if>
+            <if test="unit2 != null">unit2 = #{unit2},</if>
+            <if test="unit2Name != null">unit2_name = #{unit2Name},</if>
+            <if test="conversionRate != null">conversion_rate = #{conversionRate},</if>
+            <if test="quantityIssue2 != null">quantity_issue2 = #{quantityIssue2},</if>
+            <if test="quantityIssued2 != null">quantity_issued2 = #{quantityIssued2},</if>
+            <if test="processId != null">process_id = #{processId},</if>
+            <if test="processCode != null and processCode != ''">process_code = #{processCode},</if>
+            <if test="processName != null and processName != ''">process_name = #{processName},</if>
+            <if test="batchId != null">batch_id = #{batchId},</if>
+            <if test="batchCode != null and batchCode != ''">batch_code = #{batchCode},</if>
+            <if test="warehouseId != null">warehouse_id = #{warehouseId},</if>
+            <if test="locationId != null">location_id = #{locationId},</if>
+            <if test="areaId != null">area_id = #{areaId},</if>
+            <if test="remark != null">remark = #{remark},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="updateTime != null">update_time = #{updateTime},</if>
         </trim>
         where line_id = #{lineId}
     </update>
-
 
     <delete id="deleteWmIssueLineByLineId" parameterType="Long">
         delete from qxx_wm_issue_line where line_id = #{lineId}
@@ -116,5 +168,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <foreach item="lineId" collection="array" open="(" separator="," close=")">
             #{lineId}
         </foreach>
+    </delete>
+
+    <delete id="deleteWmIssueLineByIssueId" parameterType="Long">
+        delete from qxx_wm_issue_line where issue_id = #{issueId}
     </delete>
 </mapper>

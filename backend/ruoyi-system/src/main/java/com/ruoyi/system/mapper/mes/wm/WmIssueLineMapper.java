@@ -10,4 +10,5 @@ public interface WmIssueLineMapper {
     int updateWmIssueLine(WmIssueLine e);
     int deleteWmIssueLineByLineId(Long lineId);
     int deleteWmIssueLineByLineIds(Long[] lineIds);
+    int deleteWmIssueLineByIssueId(Long issueId);
 }

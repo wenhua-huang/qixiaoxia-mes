@@ -3,7 +3,7 @@ import App from './App'
 import store from './store' // store
 import { install } from './plugins' // plugins
 import './permission' // permission
-import { useDict } from '@/utils/dict'
+import { useDict } from './utils/dict'
 
 export function createApp() {
   const app = createSSRApp(App)

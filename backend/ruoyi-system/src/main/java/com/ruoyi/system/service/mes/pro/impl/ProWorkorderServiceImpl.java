@@ -10,6 +10,7 @@ import java.util.Map;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.enums.WmIssueConstants;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
@@ -521,14 +522,23 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
             throw new ServiceException("只有待生产或生产中的工单才能取消，当前状态：" + wo.getStatus());
         }
 
-        // Step 1: 先释放所有已确认领料单的预占库存（每个 releaseAllocation 独立事务提交）
+        // Step 1: 作废工单下所有非终态领料单（ALLOCATED 态会自动恢复预占库存）
+        // 已发料(ISSUED/PARTIAL_ISSUED)的不作废（已扣库存，需走退料流程）
         WmIssueHeader issueQuery = new WmIssueHeader();
         issueQuery.setWorkorderId(workorderId);
         List<WmIssueHeader> issues = wmIssueHeaderService.selectWmIssueHeaderList(issueQuery);
         if (issues != null) {
             for (WmIssueHeader issue : issues) {
-                if ("CONFIRMED".equals(issue.getStatus())) {
-                    wmIssueHeaderService.releaseAllocation(issue.getIssueId());
+                String st = issue.getStatus();
+                // 草稿/待审核/已下达/已预占 → 作废（cancel 内部对 ALLOCATED 会先恢复库存）
+                if (WmIssueConstants.STATUS_DRAFT.equals(st) || WmIssueConstants.STATUS_PENDING.equals(st)
+                        || WmIssueConstants.STATUS_APPROVED.equals(st) || WmIssueConstants.STATUS_ALLOCATED.equals(st)
+                        || "CONFIRMED".equals(st)) {
+                    try {
+                        wmIssueHeaderService.cancel(issue.getIssueId(), "工单取消，关联领料单自动作废");
+                    } catch (Exception ex) {
+                        // 单张作废失败不阻断工单取消，忽略继续
+                    }
                 }
             }
         }

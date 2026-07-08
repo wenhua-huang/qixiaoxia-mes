@@ -12,6 +12,30 @@
     </uni-swiper-dot>
 
     <!-- 宫格组件 -->
+    <uni-section title="仓储管理" type="line"></uni-section>
+    <view class="grid-body">
+      <uni-grid :column="4" :showBorder="false" @change="changeWmGrid">
+        <uni-grid-item>
+          <view class="grid-item-box">
+            <uni-icons type="paperplane-filled" size="30" color="#409eff"></uni-icons>
+            <text class="text">领料单</text>
+          </view>
+        </uni-grid-item>
+        <uni-grid-item>
+          <view class="grid-item-box">
+            <uni-icons type="scan" size="30" color="#67c23a"></uni-icons>
+            <text class="text">扫码发料</text>
+          </view>
+        </uni-grid-item>
+        <uni-grid-item>
+          <view class="grid-item-box">
+            <uni-icons type="search" size="30" color="#e6a23c"></uni-icons>
+            <text class="text">扫码查库存</text>
+          </view>
+        </uni-grid-item>
+      </uni-grid>
+    </view>
+
     <uni-section title="系统管理" type="line"></uni-section>
     <view class="grid-body">
       <uni-grid :column="4" :showBorder="false" @change="changeGrid">
@@ -92,6 +116,14 @@
 
   function changeGrid(e) {
     proxy.$modal.showToast('模块建设中~')
+  }
+
+  // 仓储管理宫格：0=领料单列表, 1=扫码发料(先选领料单), 2=扫码查库存
+  function changeWmGrid(e) {
+    const idx = e.detail.index
+    if (idx === 0) proxy.$tab.navigateTo('/pages/mes/wm/issue/list')
+    else if (idx === 1) proxy.$tab.navigateTo('/pages/mes/wm/issue/list?from=scan')
+    else if (idx === 2) proxy.$tab.navigateTo('/pages/mes/wm/issue/scan-query')
   }
 </script>
 

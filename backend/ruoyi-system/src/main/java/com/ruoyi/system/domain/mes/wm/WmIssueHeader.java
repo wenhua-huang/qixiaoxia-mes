@@ -47,12 +47,19 @@ public class WmIssueHeader extends BaseEntity
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "领料日期", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     private Date issueDate;
-    @Excel(name = "总数")
+    @Excel(name = "申请总数")
     private BigDecimal quantityTotal;
-    private String unitOfMeasure;
-    private String unitName;
+    @Excel(name = "已发料累计")
+    private BigDecimal quantityIssuedTotal;
+    @Excel(name = "已收料累计")
+    private BigDecimal quantityReceived;
+    private Integer version;
     @Excel(name = "状态")
     private String status;
+    private String approveBy;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date approveTime;
+    private String cancelReason;
 
     public Long getIssueId() { return issueId; }
     public void setIssueId(Long v) { this.issueId = v; }
@@ -102,12 +109,20 @@ public class WmIssueHeader extends BaseEntity
     public void setIssueDate(Date v) { this.issueDate = v; }
     public BigDecimal getQuantityTotal() { return quantityTotal; }
     public void setQuantityTotal(BigDecimal v) { this.quantityTotal = v; }
-    public String getUnitOfMeasure() { return unitOfMeasure; }
-    public void setUnitOfMeasure(String v) { this.unitOfMeasure = v; }
-    public String getUnitName() { return unitName; }
-    public void setUnitName(String v) { this.unitName = v; }
+    public BigDecimal getQuantityIssuedTotal() { return quantityIssuedTotal; }
+    public void setQuantityIssuedTotal(BigDecimal v) { this.quantityIssuedTotal = v; }
+    public BigDecimal getQuantityReceived() { return quantityReceived; }
+    public void setQuantityReceived(BigDecimal v) { this.quantityReceived = v; }
+    public Integer getVersion() { return version; }
+    public void setVersion(Integer v) { this.version = v; }
     public String getStatus() { return status; }
     public void setStatus(String v) { this.status = v; }
+    public String getApproveBy() { return approveBy; }
+    public void setApproveBy(String v) { this.approveBy = v; }
+    public Date getApproveTime() { return approveTime; }
+    public void setApproveTime(Date v) { this.approveTime = v; }
+    public String getCancelReason() { return cancelReason; }
+    public void setCancelReason(String v) { this.cancelReason = v; }
 
     @Override
     public String toString() {

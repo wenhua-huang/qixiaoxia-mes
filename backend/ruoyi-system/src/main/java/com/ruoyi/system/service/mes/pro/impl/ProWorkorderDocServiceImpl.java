@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.ruoyi.common.enums.WmIssueConstants;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.exception.ServiceException;
@@ -102,9 +103,14 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
         vo.setHasIssueDocs(!issueStatuses.isEmpty());
         int draft = 0, confirmed = 0, posted = 0;
         for (ProKitIssueStatusVO is : issueStatuses) {
-            if ("DRAFT".equals(is.getStatus())) draft++;
-            else if ("CONFIRMED".equals(is.getStatus())) confirmed++;
-            else if ("POSTED".equals(is.getStatus())) posted++;
+            String st = is.getStatus();
+            // 兼容历史值：CONFIRMED→confirmed，POSTED→posted
+            if (WmIssueConstants.STATUS_DRAFT.equals(st) || WmIssueConstants.STATUS_PENDING.equals(st)) draft++;
+            else if (WmIssueConstants.STATUS_APPROVED.equals(st) || WmIssueConstants.STATUS_ALLOCATED.equals(st)
+                    || "CONFIRMED".equals(st)) confirmed++;
+            else if (WmIssueConstants.STATUS_PARTIAL_ISSUED.equals(st)
+                    || WmIssueConstants.STATUS_ISSUED.equals(st)
+                    || "POSTED".equals(st)) posted++;
         }
         vo.setIssueDraftCount(draft);
         vo.setIssueConfirmedCount(confirmed);
@@ -247,11 +253,17 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
 
     private boolean hasUnconsumedMaterials(Long workorderId)
     {
-        // 简单判定：如果有已过账的领料单且工单已完成，则认为可能有未用完物料
+        // 简单判定：如果有已发料的领料单且工单已完成，则认为可能有未用完物料
+        // 状态值由 POSTED 迁移为 ISSUED（见 WmIssueConstants）
         WmIssueHeader query = new WmIssueHeader();
         query.setWorkorderId(workorderId);
-        query.setStatus("POSTED");
+        query.setStatus(WmIssueConstants.STATUS_ISSUED);
         List<WmIssueHeader> issues = wmIssueHeaderService.selectWmIssueHeaderList(query);
+        if (issues == null || issues.isEmpty()) {
+            // 兼容历史 POSTED 数据
+            query.setStatus("POSTED");
+            issues = wmIssueHeaderService.selectWmIssueHeaderList(query);
+        }
         return issues != null && !issues.isEmpty();
     }
 
@@ -460,11 +472,16 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
         ProWorkorder wo = proWorkorderMapper.selectProWorkorderByWorkorderId(workorderId);
         List<Map<String, Object>> result = new ArrayList<>();
 
-        // 查询已过账的领料单
+        // 查询已发料的领料单（状态值由 POSTED 迁移为 ISSUED，兼容历史数据）
         WmIssueHeader issueQuery = new WmIssueHeader();
         issueQuery.setWorkorderId(workorderId);
-        issueQuery.setStatus("POSTED");
+        issueQuery.setStatus(WmIssueConstants.STATUS_ISSUED);
         List<WmIssueHeader> issues = wmIssueHeaderService.selectWmIssueHeaderList(issueQuery);
+        if (issues == null || issues.isEmpty()) {
+            // 兼容历史 POSTED 数据
+            issueQuery.setStatus("POSTED");
+            issues = wmIssueHeaderService.selectWmIssueHeaderList(issueQuery);
+        }
         if (issues == null || issues.isEmpty()) return result;
 
         Long defaultWarehouseId = findDefaultWarehouse(wo.getFactoryId());

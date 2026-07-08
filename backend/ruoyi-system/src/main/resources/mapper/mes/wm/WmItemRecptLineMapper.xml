@@ -158,7 +158,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="warehouseName != null">warehouse_name = #{warehouseName},</if>
             <if test="locationId != null">location_id = #{locationId},</if>
             <if test="areaId != null">area_id = #{areaId},</if>
+            <if test="produceDate != null">produce_date = #{produceDate},</if>
             <if test="expireDate != null">expire_date = #{expireDate},</if>
+            <if test="lotNumber != null and lotNumber != ''">lot_number = #{lotNumber},</if>
             <if test="noticeLineId != null">notice_line_id = #{noticeLineId},</if>
             <if test="remark != null">remark = #{remark},</if>
             <if test="createBy != null">create_by = #{createBy},</if>

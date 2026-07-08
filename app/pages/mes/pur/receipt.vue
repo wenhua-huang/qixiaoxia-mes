@@ -40,7 +40,7 @@
         </view>
         <view class="info-row">
           <text class="label">状态</text>
-          <uni-tag :type="statusTagType(order.status)" :text="statusText(order.status)" size="small" />
+          <uni-tag :type="orderStatusTagType(order.status)" :text="orderStatusText(order.status)" size="small" />
         </view>
       </view>
 
@@ -156,7 +156,7 @@
 <script setup>
 import { ref, reactive, getCurrentInstance, onMounted } from 'vue'
 import { listOrder, listOrderLine, receiveItemRecpt, listWarehouseAll } from '@/api/mes/pur/order'
-import { isValidReceiptQty, genRecptCode } from '@/utils/pur.js'
+import { isValidReceiptQty, genRecptCode, purchaseTypeText, orderStatusTagType, orderStatusText, canReceive } from '@/utils/pur.js'
 
 const { proxy } = getCurrentInstance()
 const orderCode = ref('')
@@ -174,20 +174,6 @@ const arrivalInfo = reactive({
   vehiclePlate: '',
   vendorDeliveryNo: ''
 })
-
-// 订单类型文本
-const purchaseTypeMap = { PAPER: '纸张', AUX: '辅料', PACK: '包材', OTHER: '其他' }
-function purchaseTypeText(type) { return purchaseTypeMap[type] || type }
-
-// 状态标签
-function statusTagType(status) {
-  const map = { DRAFT: 'default', APPROVED: 'primary', ORDERED: 'warning', RECEIVING: 'warning', RECEIVED: 'success', CLOSED: 'info', CANCEL: 'danger' }
-  return map[status] || 'default'
-}
-function statusText(status) {
-  const map = { DRAFT: '草稿', APPROVED: '已审批', ORDERED: '已下单', RECEIVING: '收货中', RECEIVED: '已收货', CLOSED: '已关闭', CANCEL: '已取消' }
-  return map[status] || status
-}
 
 // 扫码
 function handleScan() {
@@ -230,8 +216,8 @@ function searchOrder() {
       return
     }
     const found = rows[0]
-    if (found.status !== 'ORDERED' && found.status !== 'RECEIVING') {
-      proxy.$modal.msgError('该订单状态为"' + statusText(found.status) + '"，仅已下单/收货中的订单可收货')
+    if (!canReceive(found.status)) {
+      proxy.$modal.msgError('该订单状态为"' + orderStatusText(found.status) + '"，仅已下单/收货中的订单可收货')
       return
     }
     // 存储原始数据，模板中用 purchaseTypeText() 显示中文
@@ -334,7 +320,7 @@ function submitReceipt() {
       proxy.$modal.msgSuccess('收货确认成功！库存已更新')
       setTimeout(() => { proxy.$tab.navigateBack() }, 1500)
     }).catch(e => {
-      proxy.$modal.msgError('收货失败：' + (e.msg || '未知错误'))
+      proxy.$modal.msgError('收货失败：' + (typeof e === 'string' ? e : (e.msg || e.message || '未知错误')))
     }).finally(() => {
       submitting.value = false
     })

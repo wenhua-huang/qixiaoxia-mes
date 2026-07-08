@@ -18,7 +18,7 @@ public interface IPurOrderService
      * @param orderId 采购订单头主键
      * @return 采购订单头
      */
-    public PurOrder selectPurOrderByOrderId(Long orderId);
+    public PurOrderVO selectPurOrderByOrderId(Long orderId);
 
     /**
      * 查询采购订单头列表

@@ -9,7 +9,7 @@
       <view class="card">
         <view class="card-header">
           <text class="recpt-code">{{ header.recptCode || '-' }}</text>
-          <uni-tag :type="tagType(header.status)" :text="statusMap[header.status] || header.status" size="small" />
+          <uni-tag :type="recptStatusTagType(header.status)" :text="recptStatusText(header.status)" size="small" />
         </view>
         <view class="card-body">
           <view class="info-row">
@@ -94,21 +94,16 @@
 </template>
 
 <script setup>
-import { ref, getCurrentInstance } from 'vue'
+import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { getItemRecpt, listItemRecptLines } from '@/api/mes/pur/order'
+import { recptStatusText, recptStatusTagType } from '@/utils/pur.js'
 
 const header = ref({})
 const lines = ref([])
 const loading = ref(true)
 
-const statusMap = { DRAFT: '草稿', CONFIRMED: '已确认', POSTED: '已过账', CANCEL: '已取消' }
 const recptTypeMap = { PURCHASE: '采购入库', RETURN: '退货入库', MISC: '杂项入库' }
-
-function tagType(status) {
-  const map = { DRAFT: 'default', CONFIRMED: 'primary', POSTED: 'success', CANCEL: 'danger' }
-  return map[status] || 'default'
-}
 
 onLoad((options) => {
   const recptId = options.recptId

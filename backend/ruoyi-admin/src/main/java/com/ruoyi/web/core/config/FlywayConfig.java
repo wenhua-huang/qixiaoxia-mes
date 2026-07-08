@@ -45,6 +45,14 @@ public class FlywayConfig
     @Value("${spring.datasource.druid.master.password}")
     private String masterPassword;
 
+    /**
+     * 注：validateOnMigrate 设为 false 是因为 Druid 连接池在 Spring SQL init 之后
+     * 可能将连接标记为 disabled，Flyway 使用独立 DriverManagerDataSource（不走连接池）
+     * 绕过此问题。校验关闭的代价是：已执行的迁移文件被修改后不会报错，静默跳过。
+     *
+     * 缓解措施：迁移文件通过 Git 版本控制，禁止修改已合并主分支的迁移文件。
+     * 新需求如需调整 Schema，创建新版本迁移文件（V{N+1}__xxx.sql）。
+     */
     @Bean
     public Flyway flyway()
     {
@@ -60,7 +68,7 @@ public class FlywayConfig
                 .table(table)
                 .baselineOnMigrate(baselineOnMigrate)
                 .baselineVersion(org.flywaydb.core.api.MigrationVersion.fromVersion(baselineVersion))
-                .validateOnMigrate(false)
+                .validateOnMigrate(false)  // 原因见上方 Javadoc
                 .load();
         int count = flyway.migrate().migrationsExecuted;
         log.info("Flyway 迁移完成，执行了 {} 个 migration", count);

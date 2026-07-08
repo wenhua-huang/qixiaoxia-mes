@@ -287,7 +287,6 @@
 
 <script>
 import { listOrder, getOrder, delOrder, addOrder, updateOrder, approveOrder, orderOrder, closeOrder } from "@/api/mes/pur/order"
-import { listLine } from "@/api/mes/pur/order-line"
 import { genSerialCode } from "@/api/mes/sys/autocoderule"
 import VendorSelect from "@/components/vendorSelect/single.vue"
 import PurOrderLine from "./line.vue"
@@ -363,19 +362,6 @@ export default {
       listOrder(this.queryParams).then(response => {
         this.orderList = response.rows
         this.total = response.total
-        // 聚合订单行已收数量 → 到货数量
-        return listLine({})
-      }).then(lineRes => {
-        const lines = lineRes.rows || []
-        const receivedMap = {}
-        lines.forEach(l => {
-          if (l.orderId && l.quantityReceived) {
-            receivedMap[l.orderId] = (receivedMap[l.orderId] || 0) + Number(l.quantityReceived)
-          }
-        })
-        this.orderList.forEach(o => {
-          o.receivedQuantity = receivedMap[o.orderId] || 0
-        })
         this.loading = false
       }).catch(() => {
         this.loading = false

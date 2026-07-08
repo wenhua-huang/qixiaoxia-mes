@@ -15,6 +15,7 @@ import com.ruoyi.system.domain.mes.pur.vo.PurOrderVO;
 import com.ruoyi.system.service.mes.pur.IPurOrderService;
 import com.ruoyi.system.service.mes.pur.IPurOrderLineService;
 import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
+import com.ruoyi.common.enums.PurOrderStatus;
 
 /**
  * 采购订单头Service业务层处理
@@ -41,7 +42,7 @@ public class PurOrderServiceImpl implements IPurOrderService
      * @return 采购订单头
      */
     @Override
-    public PurOrder selectPurOrderByOrderId(Long orderId)
+    public PurOrderVO selectPurOrderByOrderId(Long orderId)
     {
         return purOrderMapper.selectPurOrderByOrderId(orderId);
     }
@@ -133,10 +134,10 @@ public class PurOrderServiceImpl implements IPurOrderService
         if (order == null) {
             throw new RuntimeException("采购订单不存在");
         }
-        if (!"DRAFT".equals(order.getStatus())) {
+        if (!PurOrderStatus.DRAFT.is(order.getStatus())) {
             throw new RuntimeException("只有草稿状态的采购订单才能审批，当前状态：" + order.getStatus());
         }
-        order.setStatus("APPROVED");
+        order.setStatus(PurOrderStatus.APPROVED.getCode());
         order.setApprover(SecurityUtils.getUsername());
         order.setUpdateTime(DateUtils.getNowDate());
         order.setUpdateBy(SecurityUtils.getUsername());
@@ -155,11 +156,11 @@ public class PurOrderServiceImpl implements IPurOrderService
         if (order == null) {
             throw new RuntimeException("采购订单不存在");
         }
-        if (!"APPROVED".equals(order.getStatus())) {
+        if (!PurOrderStatus.APPROVED.is(order.getStatus())) {
             throw new RuntimeException("只有已审批的采购订单才能下达，当前状态：" + order.getStatus());
         }
         // 更新头：状态 + 下单日期
-        order.setStatus("ORDERED");
+        order.setStatus(PurOrderStatus.ORDERED.getCode());
         order.setOrderDate(DateUtils.getNowDate());
         order.setUpdateTime(DateUtils.getNowDate());
         order.setUpdateBy(SecurityUtils.getUsername());
@@ -169,7 +170,7 @@ public class PurOrderServiceImpl implements IPurOrderService
         queryLine.setOrderId(orderId);
         List<PurOrderLine> lines = purOrderLineService.selectPurOrderLineList(queryLine);
         for (PurOrderLine line : lines) {
-            line.setStatus("ORDERED");
+            line.setStatus(PurOrderStatus.ORDERED.getCode());
             line.setUpdateTime(DateUtils.getNowDate());
             line.setUpdateBy(SecurityUtils.getUsername());
             purOrderLineService.updatePurOrderLine(line);
@@ -189,7 +190,7 @@ public class PurOrderServiceImpl implements IPurOrderService
         if (order == null) {
             throw new RuntimeException("采购订单不存在");
         }
-        if (!"RECEIVED".equals(order.getStatus())) {
+        if (!PurOrderStatus.RECEIVED.is(order.getStatus())) {
             throw new RuntimeException("只有已收货的采购订单才能关闭，当前状态：" + order.getStatus());
         }
         // 校验全部行已收完
@@ -205,12 +206,12 @@ public class PurOrderServiceImpl implements IPurOrderService
             }
         }
         // 更新头 + 所有行 → CLOSED
-        order.setStatus("CLOSED");
+        order.setStatus(PurOrderStatus.CLOSED.getCode());
         order.setUpdateTime(DateUtils.getNowDate());
         order.setUpdateBy(SecurityUtils.getUsername());
         int result = purOrderMapper.updatePurOrder(order);
         for (PurOrderLine line : lines) {
-            line.setStatus("CLOSED");
+            line.setStatus(PurOrderStatus.CLOSED.getCode());
             line.setUpdateTime(DateUtils.getNowDate());
             line.setUpdateBy(SecurityUtils.getUsername());
             purOrderLineService.updatePurOrderLine(line);

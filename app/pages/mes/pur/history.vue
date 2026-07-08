@@ -35,7 +35,7 @@
       <view v-for="item in list" :key="item.recptId" class="list-item" @click="viewDetail(item)">
         <view class="item-header">
           <text class="bold">{{ item.recptCode }}</text>
-          <uni-tag :type="tagType(item.status)" :text="statusMap[item.status] || item.status" size="small" />
+          <uni-tag :type="recptStatusTagType(item.status)" :text="recptStatusText(item.status)" size="small" />
         </view>
         <view class="item-body">
           <view class="item-row">
@@ -70,6 +70,7 @@
 import { ref, reactive, getCurrentInstance } from 'vue'
 import { onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
 import { listItemRecpt } from '@/api/mes/pur/order'
+import { recptStatusText, recptStatusTagType } from '@/utils/pur.js'
 
 const { proxy } = getCurrentInstance()
 const list = ref([])
@@ -89,12 +90,6 @@ const statusFilters = [
   { label: '已确认', value: 'CONFIRMED' },
   { label: '已过账', value: 'POSTED' }
 ]
-
-const statusMap = { DRAFT: '草稿', CONFIRMED: '已确认', POSTED: '已过账', CANCEL: '已取消' }
-function tagType(status) {
-  const map = { DRAFT: 'default', CONFIRMED: 'primary', POSTED: 'success', CANCEL: 'danger' }
-  return map[status] || 'default'
-}
 
 function filterStatus(val) {
   queryParams.status = val

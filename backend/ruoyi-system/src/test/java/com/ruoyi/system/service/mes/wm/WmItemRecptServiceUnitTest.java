@@ -3,11 +3,13 @@ package com.ruoyi.system.service.mes.wm;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.system.domain.mes.pur.PurOrder;
 import com.ruoyi.system.domain.mes.pur.PurOrderLine;
+import com.ruoyi.system.domain.mes.pur.vo.PurOrderVO;
 import com.ruoyi.system.domain.mes.wm.ItemRecptReceiveBody;
 import com.ruoyi.system.domain.mes.wm.WmItemRecpt;
 import com.ruoyi.system.domain.mes.wm.WmItemRecptLine;
 import com.ruoyi.system.mapper.mes.wm.WmItemRecptMapper;
 import com.ruoyi.system.domain.mes.wm.WmBatch;
+import com.ruoyi.system.mapper.mes.pur.PurOrderLineMapper;
 import com.ruoyi.system.service.mes.pur.IPurOrderLineService;
 import com.ruoyi.system.service.mes.pur.IPurOrderService;
 import com.ruoyi.system.service.mes.wm.IWmBatchService;
@@ -23,6 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
+import static org.mockito.ArgumentMatchers.eq;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
@@ -44,6 +47,7 @@ class WmItemRecptServiceUnitTest {
     @Mock private IWmItemRecptLineService wmItemRecptLineService;
     @Mock private IPurOrderService purOrderService;
     @Mock private IPurOrderLineService purOrderLineService;
+    @Mock private PurOrderLineMapper purOrderLineMapper;
     @Mock private IWmStorageCoreService storageCoreService;
     @Mock private IWmBatchService wmBatchService;
     @InjectMocks private WmItemRecptServiceImpl service;
@@ -81,7 +85,7 @@ class WmItemRecptServiceUnitTest {
         poLine.setOrderId(100L);
         poLine.setItemId(201L);
 
-        PurOrder purOrder = new PurOrder();
+        PurOrderVO purOrder = new PurOrderVO();
         purOrder.setOrderId(100L);
         purOrder.setStatus("ORDERED");
 
@@ -159,6 +163,9 @@ class WmItemRecptServiceUnitTest {
         when(wmItemRecptMapper.updateWmItemRecpt(any())).thenReturn(1);
         when(wmItemRecptLineService.selectWmItemRecptLineList(any())).thenReturn(Collections.singletonList(recptLine));
         when(purOrderLineService.selectPurOrderLineList(any())).thenReturn(Collections.singletonList(poLine));
+        // 模拟原子 SQL increment
+        when(purOrderLineMapper.addQuantityReceived(eq(1L), any()))
+            .thenAnswer(inv -> { poLine.setQuantityReceived(poLine.getQuantityReceived().add(inv.getArgument(1))); return 1; });
 
         service.postItemRecpt(1L);
 
@@ -187,7 +194,7 @@ class WmItemRecptServiceUnitTest {
         poLine.setQuantityOrdered(new BigDecimal("10.0000"));
         poLine.setStatus("RECEIVING");
 
-        PurOrder purOrder = new PurOrder();
+        PurOrderVO purOrder = new PurOrderVO();
         purOrder.setOrderId(100L);
 
         when(wmItemRecptMapper.selectWmItemRecptByRecptId(1L)).thenReturn(header);
@@ -197,6 +204,9 @@ class WmItemRecptServiceUnitTest {
             .thenReturn(Collections.singletonList(poLine))
             .thenReturn(Collections.singletonList(poLine));
         when(purOrderService.selectPurOrderByOrderId(100L)).thenReturn(purOrder);
+        // 模拟原子 SQL increment
+        when(purOrderLineMapper.addQuantityReceived(eq(1L), any()))
+            .thenAnswer(inv -> { poLine.setQuantityReceived(poLine.getQuantityReceived().add(inv.getArgument(1))); return 1; });
 
         service.postItemRecpt(1L);
 
@@ -229,6 +239,9 @@ class WmItemRecptServiceUnitTest {
         when(purOrderLineService.selectPurOrderLineList(any()))
             .thenReturn(Collections.singletonList(poLine))
             .thenReturn(Collections.singletonList(poLine));
+        // 模拟原子 SQL increment
+        when(purOrderLineMapper.addQuantityReceived(eq(1L), any()))
+            .thenAnswer(inv -> { poLine.setQuantityReceived(poLine.getQuantityReceived().add(inv.getArgument(1))); return 1; });
 
         service.postItemRecpt(1L);
 
@@ -282,7 +295,7 @@ class WmItemRecptServiceUnitTest {
             poLine.setOrderId(100L);
             poLine.setItemId(201L);
 
-            PurOrder purOrder = new PurOrder();
+            PurOrderVO purOrder = new PurOrderVO();
             purOrder.setOrderId(100L);
             purOrder.setStatus("ORDERED");
 
@@ -415,7 +428,7 @@ class WmItemRecptServiceUnitTest {
             line.setQuantityRecpt(new BigDecimal("10.0000"));
             PurOrderLine poLine = new PurOrderLine();
             poLine.setLineId(1L); poLine.setOrderId(100L); poLine.setItemId(201L);
-            PurOrder purOrder = new PurOrder();
+            PurOrderVO purOrder = new PurOrderVO();
             purOrder.setOrderId(100L); purOrder.setStatus("ORDERED");
             lenient().when(wmItemRecptMapper.selectWmItemRecptByRecptId(header.getRecptId())).thenReturn(header);
             lenient().when(wmItemRecptLineService.selectWmItemRecptLineList(any())).thenReturn(Collections.singletonList(line));

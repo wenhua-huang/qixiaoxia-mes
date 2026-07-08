@@ -5,7 +5,7 @@ import com.ruoyi.common.annotation.Excel;
 import com.ruoyi.system.domain.mes.pur.PurOrder;
 
 /**
- * 采购订单头 VO — 含计算字段 receivedQuantity（由 SQL 子查询或 MapStruct 后补充）
+ * 采购订单头 VO — 含计算字段 receivedQuantity（由 SQL 子查询直接映射）
  *
  * @author qixiaoxia
  * @date 2026-07-07

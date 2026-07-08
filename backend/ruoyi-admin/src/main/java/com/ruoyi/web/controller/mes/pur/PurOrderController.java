@@ -73,8 +73,10 @@ public class PurOrderController extends BaseController
     @GetMapping(value = "/{orderId}")
     public AjaxResult getInfo(@PathVariable("orderId") Long orderId)
     {
-        PurOrder order = purOrderService.selectPurOrderByOrderId(orderId);
-        PurOrderVO orderVO = (PurOrderVO) order;  // MyBatis 通过 PurOrderVOResult 返回 PurOrderVO 实例
+        PurOrderVO orderVO = purOrderService.selectPurOrderByOrderId(orderId);
+        if (orderVO == null) {
+            return error("采购订单不存在");
+        }
         PurOrderLine queryLine = new PurOrderLine();
         queryLine.setOrderId(orderId);
         List<PurOrderLine> lines = purOrderLineService.selectPurOrderLineList(queryLine);

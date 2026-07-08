@@ -232,6 +232,35 @@ DELIMITER ;
 CALL proc_add_issue_approve_cols();
 DROP PROCEDURE IF EXISTS proc_add_issue_approve_cols;
 
+-- 7.1b 补齐早期手工建表缺失的基础列（幂等）
+--     部分生产环境 issue_header 是 V50 之前手工建表，缺 issue_date / total_quantity /
+--     unit_of_measure / unit_name；CREATE TABLE IF NOT EXISTS 不会补列，后续 §7.2 的
+--     AFTER total_quantity 会 1054。此处统一补齐，列已存在则跳过。
+DROP PROCEDURE IF EXISTS proc_add_issue_header_base_cols;
+DELIMITER $$
+CREATE PROCEDURE proc_add_issue_header_base_cols()
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.COLUMNS
+                   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'qxx_wm_issue_header' AND COLUMN_NAME = 'issue_date') THEN
+        ALTER TABLE qxx_wm_issue_header ADD COLUMN issue_date datetime default current_timestamp comment '领料日期' AFTER area_name;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.COLUMNS
+                   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'qxx_wm_issue_header' AND COLUMN_NAME = 'total_quantity') THEN
+        ALTER TABLE qxx_wm_issue_header ADD COLUMN total_quantity decimal(14,4) default 0.0000 comment '领料总数量(申请量)' AFTER issue_date;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.COLUMNS
+                   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'qxx_wm_issue_header' AND COLUMN_NAME = 'unit_of_measure') THEN
+        ALTER TABLE qxx_wm_issue_header ADD COLUMN unit_of_measure varchar(64) default null comment '主单位编码' AFTER total_quantity;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.COLUMNS
+                   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'qxx_wm_issue_header' AND COLUMN_NAME = 'unit_name') THEN
+        ALTER TABLE qxx_wm_issue_header ADD COLUMN unit_name varchar(64) default null comment '主单位名称' AFTER unit_of_measure;
+    END IF;
+END$$
+DELIMITER ;
+CALL proc_add_issue_header_base_cols();
+DROP PROCEDURE IF EXISTS proc_add_issue_header_base_cols;
+
 -- 7.2 quantity_issued_total — 已发料累计（分批发料累加）
 DROP PROCEDURE IF EXISTS proc_add_qty_issued_total;
 DELIMITER $$
@@ -239,7 +268,7 @@ CREATE PROCEDURE proc_add_qty_issued_total()
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.COLUMNS
                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'qxx_wm_issue_header' AND COLUMN_NAME = 'quantity_issued_total') THEN
-        ALTER TABLE qxx_wm_issue_header ADD COLUMN quantity_issued_total decimal(14,4) default 0.0000 comment '已发料累计数量' AFTER total_quantity;
+        ALTER TABLE qxx_wm_issue_header ADD COLUMN quantity_issued_total decimal(14,4) default 0.0000 comment '已发料累计数量' AFTER unit_name;
     END IF;
 END$$
 DELIMITER ;

@@ -49,7 +49,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, getCurrentInstance } from 'vue'
 import { getItemStock } from '@/api/mes/wm/issue'
 
 const { proxy } = getCurrentInstance()

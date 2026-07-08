@@ -53,7 +53,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, getCurrentInstance } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { getIssueDetail, issueOut } from '@/api/mes/wm/issue'
 

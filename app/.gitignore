@@ -4,6 +4,7 @@
 /unpackage/*
 /node_modules/*
 /dist/*
+/.vite/*
 
 ######################################################################
 # Development Tools

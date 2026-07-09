@@ -66,7 +66,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <insert id="insertWmIssueLine" parameterType="WmIssueLine" useGeneratedKeys="true" keyProperty="lineId">
         insert into qxx_wm_issue_line
         <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">factory_id,</if>
             <if test="issueId != null">issue_id,</if>
             <if test="issueCode != null and issueCode != ''">issue_code,</if>
             <if test="itemId != null">item_id,</if>
@@ -95,7 +94,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="createTime != null">create_time,</if>
         </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="factoryId != null">#{factoryId},</if>
             <if test="issueId != null">#{issueId},</if>
             <if test="issueCode != null and issueCode != ''">#{issueCode},</if>
             <if test="itemId != null">#{itemId},</if>

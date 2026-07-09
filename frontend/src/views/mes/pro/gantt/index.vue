@@ -300,6 +300,8 @@ watch(() => taskForm.duration, (val) => {
 })
 
 onMounted(async () => {
+  // 预加载完整工作站列表，供编辑弹窗下拉选择 + 根据 id 显示名称（避免弹窗显示裸 id）
+  loadWorkstations()
   // 从URL query参数获取workorderId（来自工单列表的"排产"按钮跳转）
   const rawId = route.query.workorderId
   const woId = Array.isArray(rawId) ? rawId[0] : rawId  // #7 防数组NaN
@@ -349,6 +351,21 @@ function searchWorkstations(kw: string) {
       workstationList.value = res?.rows || []
     } finally { wsLoading.value = false }
   }, 300)
+}
+
+// 无条件加载完整工作站列表（供编辑弹窗下拉选择 + 根据 id 匹配名称显示，区别于搜索栏的 searchWorkstations）
+let wsLoadLock = false
+async function loadWorkstations() {
+  if (wsLoadLock) return
+  wsLoadLock = true
+  wsLoading.value = true
+  try {
+    const res: any = await listWorkstation({ pageSize: 999 } as any)
+    workstationList.value = res?.rows || []
+  } finally {
+    wsLoading.value = false
+    wsLoadLock = false
+  }
 }
 
 function onQueueSelect(id: number) {
@@ -408,7 +425,7 @@ function resetQuery() {
   ganttTasks.value = []
 }
 
-function onTaskSelect(task: GanttTask) {
+async function onTaskSelect(task: GanttTask) {
   selectedTask.value = task
   taskDialogMode.value = 'edit'
   // 填充表单数据
@@ -423,13 +440,18 @@ function onTaskSelect(task: GanttTask) {
   taskForm.duration = task.duration || 1
   taskForm.setupDuration = (task as any).setupDuration || 0
   taskForm.colorCode = task.colorCode || '#409eff'
+  // 确保工作站列表已加载，使下拉能根据 id 显示名称（而非裸 id）
+  const wid = (task as any).workstationId
+  if (wid && !workstationList.value.some(w => w.workstationId === wid)) {
+    await loadWorkstations()
+  }
   detailOpen.value = true
 }
 
 // 工作站下拉框聚焦时加载列表
 function onWorkstationFocus() {
   if (workstationList.value.length === 0) {
-    searchWorkstations('')
+    loadWorkstations()
   }
 }
 
@@ -448,6 +470,10 @@ function handleAddTask() {
   // 从甘特图 project 获取默认数量
   const project = ganttTasks.value[0]
   taskForm.quantity = (project as any).quantity || 1
+  // 确保工作站下拉有选项可选
+  if (workstationList.value.length === 0) {
+    loadWorkstations()
+  }
   detailOpen.value = true
 }
 

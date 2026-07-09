@@ -1,6 +1,8 @@
 // 应用全局配置
+// 生产构建(uni build)用 /prod-api 走 Nginx 代理,本地开发(uni)用 localhost
+const isProd = process.env.NODE_ENV === 'production'
 export default {
-  baseUrl: 'http://localhost:8081',
+  baseUrl: isProd ? '/prod-api' : 'http://localhost:8081',
   // baseUrl: 'https://vue.ruoyi.vip/prod-api',
   // 应用信息
   appInfo: {

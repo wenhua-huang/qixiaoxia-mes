@@ -7,7 +7,11 @@
 </template>
 
 <script>
+  // 显式引入 uni-ui 组件（绕过 HBuilderX 发行 H5 时 easycom 失效）
+  import UniCard from '@/uni_modules/uni-card/components/uni-card/uni-card.vue'
+
   export default {
+    components: { UniCard },
     data() {
       return {
         title: '',

@@ -68,6 +68,11 @@
 
 <script setup>
 import { ref, reactive, getCurrentInstance } from 'vue'
+// 显式引入 uni-ui 组件（绕过 HBuilderX 发行 H5 时 easycom 失效）
+import UniEasyInput from '@/uni_modules/uni-easyinput/components/uni-easyinput/uni-easyinput.vue'
+import UniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue'
+import UniLoadMore from '@/uni_modules/uni-load-more/components/uni-load-more/uni-load-more.vue'
+import UniTag from '@/uni_modules/uni-tag/components/uni-tag/uni-tag.vue'
 import { onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
 import { listItemRecpt } from '@/api/mes/pur/order'
 import { recptStatusText, recptStatusTagType } from '@/utils/pur.js'

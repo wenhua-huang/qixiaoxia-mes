@@ -155,6 +155,13 @@
 
 <script setup>
 import { ref, reactive, getCurrentInstance, onMounted } from 'vue'
+// 显式引入 uni-ui 组件（绕过 HBuilderX 发行 H5 时 easycom 失效）
+import UniEasyInput from '@/uni_modules/uni-easyinput/components/uni-easyinput/uni-easyinput.vue'
+import UniForms from '@/uni_modules/uni-forms/components/uni-forms/uni-forms.vue'
+import UniFormsItem from '@/uni_modules/uni-forms/components/uni-forms-item/uni-forms-item.vue'
+import UniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue'
+import UniSection from '@/components/uni-section/uni-section.vue'
+import UniTag from '@/uni_modules/uni-tag/components/uni-tag/uni-tag.vue'
 import { listOrder, listOrderLine, receiveItemRecpt, listWarehouseAll } from '@/api/mes/pur/order'
 import { isValidReceiptQty, genRecptCode, purchaseTypeText, orderStatusTagType, orderStatusText, canReceive } from '@/utils/pur.js'
 

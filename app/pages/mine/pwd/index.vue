@@ -17,6 +17,11 @@
 
 <script setup>
   import { updateUserPwd } from "@/api/system/user"
+  // 显式引入 uni-ui 组件（绕过 HBuilderX 发行 H5 时 easycom 失效）
+  import UniEasyInput from '@/uni_modules/uni-easyinput/components/uni-easyinput/uni-easyinput.vue'
+  import UniForms from '@/uni_modules/uni-forms/components/uni-forms/uni-forms.vue'
+  import UniFormsItem from '@/uni_modules/uni-forms/components/uni-forms-item/uni-forms-item.vue'
+  import UniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue'
   import { ref, reactive , getCurrentInstance } from "vue"
   import { onReady } from  "@dcloudio/uni-app"
 

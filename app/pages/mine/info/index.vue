@@ -14,6 +14,11 @@
 <script setup>
   import { getUserProfile } from "@/api/system/user"
   import { ref, reactive } from "vue"
+  // 显式引入 uni-ui 组件（绕过 HBuilderX 发行 H5 时 easycom 失效）
+  import UniList from '@/uni_modules/uni-list/components/uni-list/uni-list.vue'
+  import UniListItem from '@/uni_modules/uni-list/components/uni-list-item/uni-list-item.vue'
+  import UniBadge from '@/uni_modules/uni-badge/components/uni-badge/uni-badge.vue'
+  import UniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue'
 
   const user = ref({})
   const roleGroup = ref("")

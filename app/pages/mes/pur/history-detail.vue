@@ -95,6 +95,9 @@
 
 <script setup>
 import { ref } from 'vue'
+// 显式引入 uni-ui 组件（绕过 HBuilderX 发行 H5 时 easycom 失效）
+import UniLoadMore from '@/uni_modules/uni-load-more/components/uni-load-more/uni-load-more.vue'
+import UniTag from '@/uni_modules/uni-tag/components/uni-tag/uni-tag.vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { getItemRecpt } from '@/api/mes/pur/order'
 import { recptStatusText, recptStatusTagType } from '@/utils/pur.js'

@@ -120,6 +120,12 @@
 
 <script setup>
   import { ref, getCurrentInstance } from "vue"
+  // 显式引入 uni-ui 组件（绕过 HBuilderX 发行 H5 时 easycom 失效，导致组件未打包）
+  import UniSwiperDot from '@/uni_modules/uni-swiper-dot/components/uni-swiper-dot/uni-swiper-dot.vue'
+  import UniSection from '@/components/uni-section/uni-section.vue'
+  import UniGrid from '@/uni_modules/uni-grid/components/uni-grid/uni-grid.vue'
+  import UniGridItem from '@/uni_modules/uni-grid/components/uni-grid-item/uni-grid-item.vue'
+  import UniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue'
 
   const { proxy } = getCurrentInstance()
   const current = ref(0)

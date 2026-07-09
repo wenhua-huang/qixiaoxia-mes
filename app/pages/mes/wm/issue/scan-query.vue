@@ -51,6 +51,9 @@
 <script setup>
 import { ref, getCurrentInstance } from 'vue'
 import { getItemStock } from '@/api/mes/wm/issue'
+// 显式引入 uni-ui 组件（绕过 HBuilderX 发行 H5 时 easycom 失效）
+import UniEasyInput from '@/uni_modules/uni-easyinput/components/uni-easyinput/uni-easyinput.vue'
+import UniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue'
 
 const { proxy } = getCurrentInstance()
 const itemCode = ref('')

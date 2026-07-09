@@ -1,4 +1,14 @@
 {
+  "easycom": {
+    "autoscan": true,
+    "custom": {
+      "^uni-grid-item$": "@/uni_modules/uni-grid/components/uni-grid-item/uni-grid-item.vue",
+      "^uni-forms-item$": "@/uni_modules/uni-forms/components/uni-forms-item/uni-forms-item.vue",
+      "^uni-list-item$": "@/uni_modules/uni-list/components/uni-list-item/uni-list-item.vue",
+      "^uni-section$": "@/components/uni-section/uni-section.vue",
+      "^uni-(.*)$": "@/uni_modules/uni-$1/components/uni-$1/uni-$1.vue"
+    }
+  },
   "pages": [{
     "path": "pages/login",
     "style": {

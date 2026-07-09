@@ -45,6 +45,9 @@
 
 <script setup>
   import { useConfigStore } from '@/store'
+  // 显式引入 uni-ui 组件（绕过 HBuilderX 发行 H5 时 easycom 失效）
+  import UniLink from '@/uni_modules/uni-link/components/uni-link/uni-link.vue'
+  import UniTitle from '@/uni_modules/uni-title/components/uni-title/uni-title.vue'
 
   const url = useConfigStore().config.appInfo.site_url
   const version = useConfigStore().config.appInfo.version

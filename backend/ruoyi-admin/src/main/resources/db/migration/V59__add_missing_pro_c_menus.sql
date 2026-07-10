@@ -91,22 +91,25 @@ FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_id = 23044);
 -- 3. 角色授权
 -- ════════════════════════════════════════════
 
+-- ⚠️ sys_role_menu 主键含 factory_id（NOT NULL，Flyway 裸 JDBC 不走拦截器）→ 必须显式写 factory_id=0（全局）
+--    sys_menu 为系统表无 factory_id，上面的 INSERT 不涉及。
+
 -- admin (role_id=1)：全部新菜单
-INSERT INTO sys_role_menu (role_id, menu_id)
-SELECT 1, menu_id FROM sys_menu WHERE menu_id IN (
+INSERT INTO sys_role_menu (role_id, menu_id, factory_id)
+SELECT 1, menu_id, 0 FROM sys_menu WHERE menu_id IN (
     2302, 23021, 23022, 23023, 23024, 23025,
     2303, 23031, 23032, 23033, 23034, 23035,
     2304, 23041, 23042, 23043, 23044, 23045
 ) AND NOT EXISTS (
-    SELECT 1 FROM sys_role_menu rm WHERE rm.role_id = 1 AND rm.menu_id = sys_menu.menu_id
+    SELECT 1 FROM sys_role_menu rm WHERE rm.role_id = 1 AND rm.menu_id = sys_menu.menu_id AND rm.factory_id = 0
 );
 
 -- 生产角色 (role_id=11)：全部新菜单（与 V18 授予生产角色的模式一致）
-INSERT INTO sys_role_menu (role_id, menu_id)
-SELECT 11, menu_id FROM sys_menu WHERE menu_id IN (
+INSERT INTO sys_role_menu (role_id, menu_id, factory_id)
+SELECT 11, menu_id, 0 FROM sys_menu WHERE menu_id IN (
     2302, 23021, 23022, 23023, 23024, 23025,
     2303, 23031, 23032, 23033, 23034, 23035,
     2304, 23041, 23042, 23043, 23044, 23045
 ) AND NOT EXISTS (
-    SELECT 1 FROM sys_role_menu rm WHERE rm.role_id = 11 AND rm.menu_id = sys_menu.menu_id
+    SELECT 1 FROM sys_role_menu rm WHERE rm.role_id = 11 AND rm.menu_id = sys_menu.menu_id AND rm.factory_id = 0
 );

@@ -209,63 +209,6 @@
       <template #footer><el-button type="primary" @click="confirmBomEdit">确 定</el-button><el-button @click="bomEditOpen=false">取 消</el-button></template>
     </el-dialog>
 
-    <!-- 排产弹窗：工单 → 工序步骤 → 每步骤管理任务 -->
-    <el-dialog :title="'排产 — ' + scheduleWorkorderName" v-model="scheduleOpen" width="1100px" append-to-body @close="scheduleOpen=false">
-      <el-row :gutter="16">
-        <el-col :span="8">
-          <el-descriptions title="工单信息" :column="1" size="small" border>
-            <el-descriptions-item label="工单编码">{{ scheduleWorkorderCode }}</el-descriptions-item>
-            <el-descriptions-item label="产品">{{ scheduleProductName }}</el-descriptions-item>
-            <el-descriptions-item label="计划数量">{{ scheduleQuantity }} {{ scheduleUnitName }}</el-descriptions-item>
-            <el-descriptions-item label="已排产">{{ scheduleQuantityScheduled }}</el-descriptions-item>
-            <el-descriptions-item label="已生产">{{ scheduleQuantityProduced }}</el-descriptions-item>
-          </el-descriptions>
-        </el-col>
-        <el-col :span="16">
-          <el-steps :active="scheduleActiveStep" align-center simple style="margin-bottom: 12px; cursor: pointer">
-            <el-step v-for="(item, idx) in scheduleSteps" :key="item.processId" :title="item.processName" @click="handleScheduleStepClick(idx)" />
-          </el-steps>
-          <div v-if="scheduleSteps.length>0" v-for="(step, idx) in scheduleSteps" :key="step.processId" v-show="scheduleActiveStep===idx">
-            <el-row class="mb8">
-              <el-col :span="1.5"><el-button type="primary" plain icon="Plus" size="small" @click="handleScheduleAddTask(step)" v-hasPermi="['mes:pro:task:add']">新增任务</el-button></el-col>
-            </el-row>
-            <el-table :data="scheduleTasksByProcess[step.processId] || []" size="small">
-              <el-table-column label="任务编码" prop="taskCode" width="130" :show-overflow-tooltip="true" />
-              <el-table-column label="任务名称" prop="taskName" :show-overflow-tooltip="true" min-width="150" />
-              <el-table-column label="工作站" prop="workstationName" width="100" />
-              <el-table-column label="排产数量" prop="quantity" width="90" />
-              <el-table-column label="已生产" prop="quantityProduced" width="80" />
-              <el-table-column label="开始时间" width="100"><template #default="s">{{ parseTime(s.row.startTime, '{y}-{m}-{d}') }}</template></el-table-column>
-              <el-table-column label="时长(h)" prop="duration" width="70" />
-              <el-table-column label="状态" width="70"><template #default="s"><span :style="{color:scheduleStatusColor[s.row.status]}">{{ scheduleStatusMap[s.row.status]||s.row.status }}</span></template></el-table-column>
-              <el-table-column label="操作" width="80" class-name="small-padding fixed-width">
-                <template #default="s">
-                  <el-tooltip content="编辑"><el-button link type="primary" icon="Edit" size="small" @click="handleScheduleEditTask(s.row)"></el-button></el-tooltip>
-                  <el-tooltip content="删除"><el-button link type="primary" icon="Delete" size="small" @click="handleScheduleDelTask(s.row)"></el-button></el-tooltip>
-                </template>
-              </el-table-column>
-            </el-table>
-            <el-empty v-if="!(scheduleTasksByProcess[step.processId]||[]).length" description="该工序暂无排产任务" :image-size="60" />
-          </div>
-          <el-empty v-if="scheduleSteps.length===0" description="该工单产品未配置工艺路线，无法排产" :image-size="80" />
-        </el-col>
-      </el-row>
-      <template #footer><el-button @click="scheduleOpen=false">关 闭</el-button></template>
-    </el-dialog>
-
-    <!-- 排产任务编辑弹窗（在排产对话框内） -->
-    <el-dialog :title="scheduleTaskTitle" v-model="scheduleTaskOpen" width="600px" append-to-body>
-      <el-form ref="scheduleTaskForm" :model="scheduleTaskForm" label-width="100px">
-        <el-row><el-col :span="18"><el-form-item label="工作站" prop="workstationName"><el-input v-model="scheduleTaskForm.workstationName" placeholder="请选择工作站" readonly><template #append><el-button icon="Search" @click="handleOpenWorkstationSelect" /></template></el-input></el-form-item></el-col>
-        <el-col :span="12"><el-form-item label="排产数量" prop="quantity"><el-input-number v-model="scheduleTaskForm.quantity" :min="1" style="width:100%" /></el-form-item></el-col></el-row>
-        <el-row><el-col :span="12"><el-form-item label="开始时间"><el-date-picker v-model="scheduleTaskForm.startTime" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" style="width:100%" /></el-form-item></el-col>
-        <el-col :span="12"><el-form-item label="时长(小时)" prop="duration"><el-input-number v-model="scheduleTaskForm.duration" :min="1" style="width:100%" /></el-form-item></el-col></el-row>
-        <el-row><el-col :span="12"><el-form-item label="机台号"><el-input v-model="scheduleTaskForm.machineCode" /></el-form-item></el-col>
-        <el-col :span="12"><el-form-item label="结束时间"><el-date-picker v-model="scheduleTaskForm.endTime" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" style="width:100%" /></el-form-item></el-col></el-row>
-        <el-row><el-col :span="24"><el-form-item label="备注"><el-input v-model="scheduleTaskForm.remark" /></el-form-item></el-col></el-row>
-      </el-form>
-      <template #footer><el-button type="primary" @click="submitScheduleTask">确 定</el-button><el-button @click="scheduleTaskOpen=false">取 消</el-button></template>
-    </el-dialog>
 
     <!-- 工单齐套看板 → 触发采购单/领料单/退料单/入库单 -->
     <KitDashboard v-model="kitDashboardOpen" :workorderId="kitWorkorderId" @refresh="getList" />
@@ -286,8 +229,8 @@
       <!-- 当前步骤结果 -->
       <div v-if="!startCheckRunning && startCheckActiveStep < 4">
         <div v-for="(s, i) in startCheckSteps" :key="i">
-          <div v-if="i === startCheckActiveStep || s.status === 'error' || s.status === 'success'">
-            <el-alert :title="s.message" :type="s.status==='success'?'success':(s.status==='error'?'error':'info')" :closable="false" show-icon style="margin-bottom:12px" />
+          <div v-if="i === startCheckActiveStep || s.status === 'error' || s.status === 'success' || s.status === 'warning'">
+            <el-alert :title="s.message" :type="s.status==='success'?'success':(s.status==='error'?'error':(s.status==='warning'?'warning':'info'))" :closable="false" show-icon style="margin-bottom:12px" />
 
             <!-- Step 1: 物料齐套明细 -->
             <el-table v-if="i===0 && s.details && s.details.length>0" :data="s.details" size="small" max-height="300">
@@ -318,6 +261,7 @@
       </div>
 
       <template #footer>
+        <el-button v-if="canOverrideStart()" v-hasPermi="['mes:pro:workorder:override']" type="warning" @click="handleOverrideStart">豁免开工</el-button>
         <el-button type="primary" @click="startCheckOpen=false">{{ startCheckAllPassed ? '完 成' : '关 闭' }}</el-button>
       </template>
     </el-dialog>
@@ -359,14 +303,6 @@ export default {
       activeProcesses: [], showProcessSelector: false,
       title: '', open: false,
       bomEditOpen: false, bomEditTitle: '', bomEditForm: {},
-      // 排产对话框
-      scheduleOpen: false, scheduleActiveStep: 0, scheduleSteps: [], scheduleTasksByProcess: {},
-      scheduleWorkorderId: null, scheduleWorkorderCode: '', scheduleWorkorderName: '',
-      scheduleProductName: '', scheduleQuantity: 0, scheduleUnitName: '',
-      scheduleQuantityProduced: 0, scheduleQuantityScheduled: 0,
-      scheduleTaskOpen: false, scheduleTaskTitle: '', scheduleTaskForm: {}, scheduleEditTaskId: null,
-      scheduleStatusMap: { PREPARE:'待排产',NORMAL:'正常',PRODUCING:'生产中',COMPLETED:'已完成',PAUSED:'暂停',CANCEL:'取消' },
-      scheduleStatusColor: { PREPARE:'#E6A23C',NORMAL:'#409EFF',PRODUCING:'#67C23A',COMPLETED:'#909399',PAUSED:'#E6A23C',CANCEL:'#F56C6C' },
       // 工单齐套看板
       kitDashboardOpen: false, kitWorkorderId: null,
       // 开工检查流程
@@ -680,20 +616,7 @@ export default {
       this.startCheckOpen = true
       // 调用后端一键执行全流程
       startWorkorderWithCheck(row.workorderId).then(r => {
-        const steps = r.data || []
-        this.startCheckActiveStep = 0
-        // 逐步骤更新状态
-        steps.forEach((s, i) => {
-          if (i < 4) {
-            this.startCheckSteps[i].status = s.status === 'PASS' ? 'success' : (s.status === 'FAIL' ? 'error' : 'wait')
-            this.startCheckSteps[i].message = s.message || ''
-            this.startCheckSteps[i].details = s.details || []
-          }
-        })
-        // 找到第一个失败的步骤作为 active step，全通过则显示最后一步
-        const failIdx = steps.findIndex(s => s.status === 'FAIL')
-        this.startCheckActiveStep = failIdx >= 0 ? failIdx : Math.min(steps.length, 3)
-        this.startCheckAllPassed = steps.length === 4 && steps.every(s => s.status === 'PASS')
+        this.applyStartCheckResult(r.data || [])
       }).catch(() => {
         // 网络异常等
         this.startCheckSteps.forEach(s => { if (s.status === 'wait') s.status = 'error'; s.message = s.message || '执行异常，请稍后重试' })
@@ -705,9 +628,56 @@ export default {
         }
       })
     },
+    // 应用后端四步结果到弹窗（PASS→success / FAIL→error / OVERRIDE→warning / 其他→wait）
+    applyStartCheckResult(steps) {
+      this.startCheckActiveStep = 0
+      const statusMap = { PASS: 'success', FAIL: 'error', OVERRIDE: 'warning' }
+      steps.forEach((s, i) => {
+        if (i < 4) {
+          this.startCheckSteps[i].status = statusMap[s.status] || 'wait'
+          this.startCheckSteps[i].message = s.message || ''
+          this.startCheckSteps[i].details = s.details || []
+        }
+      })
+      // 第一个 FAIL 为 active；无 FAIL 则指向最后一步
+      const failIdx = steps.findIndex(s => s.status === 'FAIL')
+      this.startCheckActiveStep = failIdx >= 0 ? failIdx : Math.min(steps.length, 3)
+      // 全通过 = 无 FAIL（PASS 或 OVERRIDE 都算走通）
+      this.startCheckAllPassed = steps.length === 4 && steps.every(s => s.status === 'PASS' || s.status === 'OVERRIDE')
+    },
+    // 是否可豁免：非加载中、未全通过、且排产检查(step1)为 FAIL
+    canOverrideStart() {
+      return !this.startCheckRunning
+        && !this.startCheckAllPassed
+        && this.startCheckSteps[1]
+        && this.startCheckSteps[1].status === 'error'
+    },
+    // 豁免开工：填理由 → force=true 重走四步
+    handleOverrideStart() {
+      this.$modal.prompt('排产检查未通过，确认豁免开工？请填写豁免理由（将记入工单变更记录）', '豁免开工', {
+        inputPlaceholder: '如：急单优先，事后补排产',
+        inputValidator: (v) => (v && v.trim()) ? true : '豁免理由不能为空'
+      }).then(({ value }) => {
+        this.startCheckRunning = true
+        startWorkorderWithCheck(this.startCheckWorkorderId, true, value.trim()).then(r => {
+          this.applyStartCheckResult(r.data || [])
+          if (this.startCheckAllPassed) {
+            this.$modal.msgSuccess('已豁免开工')
+          }
+        }).catch(() => {}).finally(() => {
+          this.startCheckRunning = false
+          if (this.startCheckAllPassed) {
+            this.getList()
+          }
+        })
+      }).catch(() => {})
+    },
     // 步骤图标状态映射
     stepIconStatus(status) {
-      return status === 'success' ? 'success' : (status === 'error' ? 'error' : status === 'wait' ? 'wait' : 'finish')
+      if (status === 'success') return 'success'
+      if (status === 'error') return 'error'
+      if (status === 'wait') return 'wait'
+      return 'finish' // warning(OVERRIDE) 等 → finish(打勾)
     },
     // 排产：跳转甘特图排产页面
     handleSchedule(row) {

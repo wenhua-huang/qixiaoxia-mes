@@ -64,7 +64,9 @@
 
     <UtilizationBar :tasks="ganttTasks" />
 
-    <SnapShotPanel ref="snapRef" :workorder-id="queryParams.workorderId" @refresh="loadGanttData" />
+    <!-- 排产快照面板暂时下线（半成品：预览未接通/列表未按工单过滤/数据可能截断），恢复时取消本注释即可
+    <SnapShotPanel ref="snapRef" :workorder-id="queryParams.workorderId" :tasks="ganttTasks" @refresh="loadGanttData" />
+    -->
 
     <!-- 任务详情/编辑弹窗 -->
     <el-dialog :title="taskDialogTitle" v-model="detailOpen" width="500px" append-to-body @close="onDialogClose">
@@ -83,7 +85,8 @@
             :disabled="taskDialogMode==='view'"
             @focus="onWorkstationFocus">
             <el-option v-for="ws in filteredWorkstationList" :key="ws.workstationId"
-              :label="ws.workstationName" :value="ws.workstationId" />
+              :label="ws.workstationName + (ws.idle === false ? '（占用）' : (ws.idle === true ? '（空闲）' : ''))"
+              :value="ws.workstationId" />
           </el-select>
         </el-form-item>
         <el-form-item label="排产数量">
@@ -102,7 +105,8 @@
           <el-input-number v-model="taskForm.setupDuration" :min="0" style="width:100%" :disabled="taskDialogMode==='view'" />
         </el-form-item>
         <el-form-item label="状态">
-          <el-tag :type="statusMap[selectedTask.status]?.type">{{ statusMap[selectedTask.status]?.label || selectedTask.status }}</el-tag>
+          <dict-tag v-if="mes_pro_task_status" :options="mes_pro_task_status" :value="selectedTask.status" />
+          <span v-else>{{ selectedTask.status }}</span>
         </el-form-item>
         <el-form-item label="已生产">{{ selectedTask.quantityProduced || 0 }}</el-form-item>
         <el-form-item label="颜色">
@@ -119,22 +123,26 @@
 </template>
 
 <script setup lang="ts" name="ProGantt">
-import { ref, reactive, onMounted, computed, watch } from 'vue'
+import { ref, reactive, onMounted, computed, watch, getCurrentInstance } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh } from '@element-plus/icons-vue'
 import request from '@/utils/request'
-import { getWorkOrderGantt, getWorkstationGantt } from '@/api/mes/pro/gantt'
+import { getWorkOrderGantt, getWorkstationGantt, getAvailableWorkstations } from '@/api/mes/pro/gantt'
 import { listWorkorder, getWorkorderDetail } from '@/api/mes/pro/workorder'
 import { listWorkstation } from '@/api/mes/md/workstation'
 import { addTask, updateTask, delTask } from '@/api/mes/pro/task'
 import GanttChart from '@/components/GanttChart/index.vue'
-import SnapShotPanel from './SnapShotPanel.vue'
+// import SnapShotPanel from './SnapShotPanel.vue'  // 排产快照面板暂时下线，恢复时取消注释
 import WorkOrderQueue from './WorkOrderQueue.vue'
 import UtilizationBar from './UtilizationBar.vue'
 import type { GanttTask } from '@/types/api/mes/pro/gantt'
 
 const route = useRoute()
+const { proxy } = getCurrentInstance() as any
+// 任务状态走字典 mes_pro_task_status（取代硬编码 statusMap）
+// useDict 返回 toRefs，必须解构为顶层 ref，模板才能自动解包成数组
+const { mes_pro_task_status } = proxy.useDict('mes_pro_task_status')
 
 const showSearch = ref(true)
 const loading = ref(false)
@@ -157,14 +165,7 @@ const queryParams = reactive({
 const detailOpen = ref(false)
 const selectedTask = ref<any>({})
 
-const statusMap: Record<string, any> = {
-  PREPARE: { label: '待排产', type: 'info' },
-  NORMAL: { label: '正常', type: 'success' },
-  PRODUCING: { label: '生产中', type: 'warning' },
-  COMPLETED: { label: '已完成', type: '' },
-  PAUSED: { label: '暂停', type: 'danger' },
-  CANCEL: { label: '取消', type: 'info' }
-}
+// 任务状态改用 useDict('mes_pro_task_status') + dict-tag 渲染，不再硬编码 statusMap
 
 // 任务编辑弹窗状态
 const taskDialogMode = ref<'view'|'edit'>('view')
@@ -192,7 +193,8 @@ const taskDialogTitle = computed(() => {
 const processOptions = computed(() => {
   if (routeProcesses.value.length > 0) {
     return routeProcesses.value.map((p: any) => ({
-      processId: p.processId, processName: p.processName || p.processCode, processCode: p.processCode
+      processId: p.processId, processName: p.processName || p.processCode, processCode: p.processCode,
+      processType: p.processType
     }))
   }
   // 从已加载的甘特图任务中提取去重工序
@@ -210,10 +212,35 @@ const processOptions = computed(() => {
   return list
 })
 
-// 按工序过滤工作站列表（#4）
-const filteredWorkstationList = computed(() => {
-  return workstationList.value
+// 按工序过滤的工作站列表：优先用后端 availableWorkstations（含 idle 标记），无则回退全量（避免用户选不到）
+const availableWorkstations = ref<any[]>([])
+// 当前选中工序的 processType（传后端做类型兜底匹配）
+const currentProcessType = computed(() => {
+  const p = processOptions.value.find((o: any) => o.processId === taskForm.processId)
+  return p?.processType as string | undefined
 })
+const filteredWorkstationList = computed(() =>
+  availableWorkstations.value.length ? availableWorkstations.value : workstationList.value
+)
+
+// 加载某工序的可用工作站：按工序类型过滤 + 给定时段空闲标记（300ms 防抖，避免时间联动频繁请求）
+let awsTimer: any = null
+function loadAvailableWorkstations() {
+  if (!taskForm.processId) { availableWorkstations.value = []; return }
+  clearTimeout(awsTimer)
+  awsTimer = setTimeout(async () => {
+    try {
+      const res: any = await getAvailableWorkstations({
+        processId: taskForm.processId,
+        processType: currentProcessType.value,
+        startTime: taskForm.startTime || undefined,
+        endTime: taskForm.endTime || undefined,
+        excludeTaskId: taskForm.taskId || undefined
+      })
+      availableWorkstations.value = res?.data || []
+    } catch { /* 静默，保留旧列表 */ }
+  }, 300)
+}
 
 // 工序变更时更新 taskForm
 function onProcessChange(processId: number | null) {
@@ -223,12 +250,16 @@ function onProcessChange(processId: number | null) {
     taskForm.processId = proc.processId
     taskForm.processName = proc.processName || ''
   }
+  // 切换工序后重置工作站选择，按新工序加载可用工作站
+  taskForm.workstationId = null
+  loadAvailableWorkstations()
 }
 
 // 对话框关闭时重置状态
 function onDialogClose() {
   taskDialogMode.value = 'edit'
   resetTaskForm()
+  availableWorkstations.value = []
 }
 
 function resetTaskForm() {
@@ -297,6 +328,11 @@ watch(() => taskForm.duration, (val) => {
     taskForm.endTime = formatLocalTime(new Date(s.getTime() + val * 60000))
     _timeLock = false
   }
+})
+
+// 时间变更后重新判定工作站空闲（仅弹窗打开时；防抖在 loadAvailableWorkstations 内）
+watch([() => taskForm.startTime, () => taskForm.endTime], () => {
+  if (detailOpen.value) loadAvailableWorkstations()
 })
 
 onMounted(async () => {
@@ -446,6 +482,8 @@ async function onTaskSelect(task: GanttTask) {
     await loadWorkstations()
   }
   detailOpen.value = true
+  // 编辑时按当前工序+时段加载可用工作站
+  loadAvailableWorkstations()
 }
 
 // 工作站下拉框聚焦时加载列表
@@ -495,6 +533,11 @@ async function handleDeleteTask() {
 
 // 提交任务编辑
 async function submitTaskEdit() {
+  // 工作站为必填：DB 字段 workstation_id NOT NULL 无默认值，未选会导致后端 SQL 异常
+  if (!taskForm.workstationId) {
+    ElMessage.warning('请选择工作站')
+    return
+  }
   taskSaving.value = true
   try {
     const payload: any = {

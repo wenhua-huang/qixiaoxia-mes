@@ -10,6 +10,7 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.system.domain.mes.pro.ProMaterialTrace;
+import com.ruoyi.system.domain.mes.wm.WmIssueDetail;
 import com.ruoyi.system.domain.mes.wm.WmIssueHeader;
 import com.ruoyi.system.domain.mes.wm.WmIssueLine;
 import com.ruoyi.system.domain.mes.wm.WmMaterialStock;
@@ -41,7 +42,7 @@ import static org.mockito.Mockito.*;
 
 /**
  * 领料单 Service 单元测试
- * 覆盖：confirmIssue（预占库存）、releaseAllocation（释放预占）、executeIssue（出库状态校验）
+ * 覆盖：confirmIssue（预占库存）、releaseAllocation（释放预占）、executeIssue（出库状态校验）、issueOut（分批发料 + available 钳制）
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("领料单服务单元测试")
@@ -99,6 +100,7 @@ class WmIssueHeaderServiceUnitTest {
         testLine.setUnitOfMeasure("KG");
         testLine.setUnitName("千克");
         testLine.setWarehouseId(1L);
+        testLine.setBatchId(1L); // 指定批次 → confirm 走 loadStockForUpdate 精确匹配路径
 
         testStock = new WmMaterialStock();
         testStock.setMaterialStockId(1L);
@@ -131,6 +133,8 @@ class WmIssueHeaderServiceUnitTest {
         verify(materialStockMapper).updateWmMaterialStock(stockCaptor.capture());
         assertThat(stockCaptor.getValue().getQuantityAvailable())
                 .isEqualByComparingTo(new BigDecimal("150")); // 200-50
+        assertThat(stockCaptor.getValue().getQuantityOnhand())
+                .isEqualByComparingTo(new BigDecimal("200")); // 预占不动 onhand → occupied=onhand-available=50 体现
 
         // 验证事务记录：ALLOCATE
         ArgumentCaptor<WmTransaction> txCaptor = ArgumentCaptor.forClass(WmTransaction.class);
@@ -244,7 +248,13 @@ class WmIssueHeaderServiceUnitTest {
         testStock.setQuantityAvailable(new BigDecimal("150")); // 已预占50
         when(issueHeaderMapper.selectWmIssueHeaderByIssueId(1L)).thenReturn(testHeader);
         when(issueLineMapper.selectWmIssueLineList(any(WmIssueLine.class))).thenReturn(List.of(testLine));
-        when(materialStockMapper.loadMaterialStockForUpdate(any(WmMaterialStock.class))).thenReturn(testStock);
+        // release 反查 ALLOCATE 事务 + 按 materialStockId 归还 available
+        WmTransaction allocTx = new WmTransaction();
+        allocTx.setMaterialStockId(1L);
+        allocTx.setTransactionType("ALLOCATE");
+        allocTx.setQuantity(new BigDecimal("-50"));
+        when(transactionMapper.selectWmTransactionList(any(WmTransaction.class))).thenReturn(List.of(allocTx));
+        when(materialStockMapper.selectWmMaterialStockByMaterialStockId(1L)).thenReturn(testStock);
 
         service.releaseAllocation(1L);
 
@@ -283,7 +293,12 @@ class WmIssueHeaderServiceUnitTest {
         testHeader.setStatus("ALLOCATED");
         when(issueHeaderMapper.selectWmIssueHeaderByIssueId(1L)).thenReturn(testHeader);
         when(issueLineMapper.selectWmIssueLineList(any(WmIssueLine.class))).thenReturn(List.of(testLine));
-        when(materialStockMapper.loadMaterialStockForUpdate(any(WmMaterialStock.class))).thenReturn(null);
+        WmTransaction allocTx = new WmTransaction();
+        allocTx.setMaterialStockId(1L);
+        allocTx.setTransactionType("ALLOCATE");
+        allocTx.setQuantity(new BigDecimal("-50"));
+        when(transactionMapper.selectWmTransactionList(any(WmTransaction.class))).thenReturn(List.of(allocTx));
+        when(materialStockMapper.selectWmMaterialStockByMaterialStockId(1L)).thenReturn(null); // 库存已不存在
 
         // 不抛异常，正常恢复状态
         service.releaseAllocation(1L);
@@ -321,8 +336,9 @@ class WmIssueHeaderServiceUnitTest {
         verify(materialStockMapper).updateWmMaterialStock(stockCaptor.capture());
         assertThat(stockCaptor.getValue().getQuantityOnhand())
                 .isEqualByComparingTo(new BigDecimal("150")); // 200-50
-        // available 应为 null（防止误写回DB）
-        assertThat(stockCaptor.getValue().getQuantityAvailable()).isNull();
+        // available 钳制为 min(原150, 新onhand150)=150（消费预占不变，与原语义一致）
+        assertThat(stockCaptor.getValue().getQuantityAvailable())
+                .isEqualByComparingTo(new BigDecimal("150"));
 
         // header 状态改为 ISSUED（已发料）
         ArgumentCaptor<WmIssueHeader> headerCaptor = ArgumentCaptor.forClass(WmIssueHeader.class);
@@ -385,8 +401,176 @@ class WmIssueHeaderServiceUnitTest {
         when(materialStockMapper.loadMaterialStockForUpdate(any(WmMaterialStock.class))).thenReturn(stockAfterConfirm);
 
         service.executeIssue(1L);
-        // onhand 减少，但 execute 不写 available
+        // onhand 减少；available = min(原150, 新onhand150) = 150（消费预占，不变）
         assertThat(stockAfterConfirm.getQuantityOnhand()).isEqualByComparingTo(new BigDecimal("150"));
-        // available 在 execute 中被置 null（跳过动态 UPDATE），保持 DB 中的 150
+        assertThat(stockAfterConfirm.getQuantityAvailable()).isEqualByComparingTo(new BigDecimal("150"));
+    }
+
+    // ══════════════════════════════════════════════
+    // issueOut 测试（分批发料出库 + available 钳制）
+    // ══════════════════════════════════════════════
+
+    @Test
+    @DisplayName("17. 发料出库：available 钳制 ≤ onhand（修复 available 虚高根因）")
+    void testIssueOutClampsAvailableToOnhand() {
+        testHeader.setStatus("ALLOCATED");
+        testHeader.setQuantityTotal(new BigDecimal("10"));
+        when(issueHeaderMapper.selectWmIssueHeaderByIssueId(1L)).thenReturn(testHeader);
+        when(issueLineMapper.selectWmIssueLineList(any(WmIssueLine.class))).thenReturn(List.of(testLine));
+        // 模拟脏数据：available(100) 虚高 > onhand(20)
+        WmMaterialStock dirtyStock = new WmMaterialStock();
+        dirtyStock.setMaterialStockId(1L);
+        dirtyStock.setItemId(100L);
+        dirtyStock.setItemCode("MAT-001");
+        dirtyStock.setQuantityOnhand(new BigDecimal("20"));
+        dirtyStock.setQuantityAvailable(new BigDecimal("100"));
+        when(materialStockMapper.loadMaterialStockForUpdate(any(WmMaterialStock.class))).thenReturn(dirtyStock);
+
+        WmIssueDetail d = new WmIssueDetail();
+        d.setLineId(1L);
+        d.setItemId(100L);
+        d.setItemCode("MAT-001");
+        d.setItemName("测试物料");
+        d.setUnitOfMeasure("KG");
+        d.setBatchId(999L); // 指定批次 → issueOutSingleBatch
+        d.setQuantity(new BigDecimal("10"));
+
+        service.issueOut(1L, List.of(d));
+
+        // 出库后 onhand=10；available=min(100,10)=10（被钳到 onhand，不再虚高）
+        ArgumentCaptor<WmMaterialStock> stockCaptor = ArgumentCaptor.forClass(WmMaterialStock.class);
+        verify(materialStockMapper).updateWmMaterialStock(stockCaptor.capture());
+        assertThat(stockCaptor.getValue().getQuantityOnhand()).isEqualByComparingTo(new BigDecimal("10"));
+        assertThat(stockCaptor.getValue().getQuantityAvailable()).isEqualByComparingTo(new BigDecimal("10"));
+    }
+
+    @Test
+    @DisplayName("18. 发料出库：净预占足但 onhand 不足 → 报预占库存不足（回归 issue 231）")
+    void testIssueOutThrowsWhenAllocatedOnhandInsufficient() {
+        testHeader.setStatus("ALLOCATED");
+        testHeader.setQuantityTotal(new BigDecimal("100"));
+        when(issueHeaderMapper.selectWmIssueHeaderByIssueId(1L)).thenReturn(testHeader);
+        when(issueLineMapper.selectWmIssueLineList(any(WmIssueLine.class))).thenReturn(List.of(testLine));
+        // 净预占 stock5=100（ALLOCATE -100）
+        WmTransaction allocTx = new WmTransaction();
+        allocTx.setMaterialStockId(5L);
+        allocTx.setTransactionType("ALLOCATE");
+        allocTx.setQuantity(new BigDecimal("-100"));
+        when(transactionMapper.selectWmTransactionList(any(WmTransaction.class))).thenReturn(List.of(allocTx));
+        // 实际 onhand 只有 14（被历史发料扣走，available 却虚高）
+        WmMaterialStock phantomStock = new WmMaterialStock();
+        phantomStock.setMaterialStockId(5L);
+        phantomStock.setItemId(100L);
+        phantomStock.setItemCode("MAT-001");
+        phantomStock.setItemName("测试物料");
+        phantomStock.setUnitOfMeasure("KG");
+        phantomStock.setQuantityOnhand(new BigDecimal("14"));
+        when(materialStockMapper.selectWmMaterialStockByMaterialStockId(5L)).thenReturn(phantomStock);
+
+        WmIssueDetail d = new WmIssueDetail();
+        d.setLineId(1L);
+        d.setItemId(100L);
+        d.setItemCode("MAT-001");
+        d.setBatchId(null); // 未指定批次 → 按净预占扣
+        d.setQuantity(new BigDecimal("100"));
+
+        assertThatThrownBy(() -> service.issueOut(1L, List.of(d)))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("预占库存不足");
+    }
+
+    @Test
+    @DisplayName("19. 发料出库：净预占与 onhand 都足 → 成功，available 消费预占不变，状态→ISSUED")
+    void testIssueOutSuccessWhenAllocationMeetsDemand() {
+        testHeader.setStatus("ALLOCATED");
+        testHeader.setQuantityTotal(new BigDecimal("100"));
+        when(issueHeaderMapper.selectWmIssueHeaderByIssueId(1L)).thenReturn(testHeader);
+        when(issueLineMapper.selectWmIssueLineList(any(WmIssueLine.class))).thenReturn(List.of(testLine));
+        WmTransaction allocTx = new WmTransaction();
+        allocTx.setMaterialStockId(5L);
+        allocTx.setTransactionType("ALLOCATE");
+        allocTx.setQuantity(new BigDecimal("-100"));
+        when(transactionMapper.selectWmTransactionList(any(WmTransaction.class))).thenReturn(List.of(allocTx));
+        WmMaterialStock stock = new WmMaterialStock();
+        stock.setMaterialStockId(5L);
+        stock.setItemId(100L);
+        stock.setItemCode("MAT-001");
+        stock.setItemName("测试物料");
+        stock.setUnitOfMeasure("KG");
+        stock.setQuantityOnhand(new BigDecimal("200"));
+        stock.setQuantityAvailable(new BigDecimal("100")); // 已预占 100
+        when(materialStockMapper.selectWmMaterialStockByMaterialStockId(5L)).thenReturn(stock);
+
+        WmIssueDetail d = new WmIssueDetail();
+        d.setLineId(1L);
+        d.setItemId(100L);
+        d.setItemCode("MAT-001");
+        d.setBatchId(null);
+        d.setQuantity(new BigDecimal("100"));
+
+        service.issueOut(1L, List.of(d));
+
+        // onhand 扣 100；available=min(原100, 新onhand100)=100（消费预占，不变）
+        ArgumentCaptor<WmMaterialStock> stockCaptor = ArgumentCaptor.forClass(WmMaterialStock.class);
+        verify(materialStockMapper).updateWmMaterialStock(stockCaptor.capture());
+        assertThat(stockCaptor.getValue().getQuantityOnhand()).isEqualByComparingTo(new BigDecimal("100"));
+        assertThat(stockCaptor.getValue().getQuantityAvailable()).isEqualByComparingTo(new BigDecimal("100"));
+        ArgumentCaptor<WmIssueHeader> headerCaptor = ArgumentCaptor.forClass(WmIssueHeader.class);
+        verify(issueHeaderMapper).updateWmIssueHeader(headerCaptor.capture());
+        assertThat(headerCaptor.getValue().getStatus()).isEqualTo("ISSUED");
+    }
+
+    @Test
+    @DisplayName("20. 释放预占：净预占为 0 时幂等（已释放过不重复归还 available）")
+    void testReleaseNoOpWhenNetAllocationZero() {
+        testHeader.setStatus("ALLOCATED");
+        when(issueHeaderMapper.selectWmIssueHeaderByIssueId(1L)).thenReturn(testHeader);
+        when(issueLineMapper.selectWmIssueLineList(any(WmIssueLine.class))).thenReturn(List.of(testLine));
+        // 事务历史含 ALLOCATE(-50) + 已有 RELEASE(+50) → 净预占 0（模拟已释放过）
+        WmTransaction allocTx = new WmTransaction();
+        allocTx.setMaterialStockId(1L);
+        allocTx.setTransactionType("ALLOCATE");
+        allocTx.setQuantity(new BigDecimal("-50"));
+        WmTransaction prevRelease = new WmTransaction();
+        prevRelease.setMaterialStockId(1L);
+        prevRelease.setTransactionType("RELEASE");
+        prevRelease.setQuantity(new BigDecimal("50"));
+        when(transactionMapper.selectWmTransactionList(any(WmTransaction.class)))
+                .thenReturn(List.of(allocTx, prevRelease));
+
+        service.releaseAllocation(1L);
+
+        // 净预占 0 → 不归还 available、不写 RELEASE（幂等，防 release 重复归还根因）
+        verify(materialStockMapper, never()).updateWmMaterialStock(any(WmMaterialStock.class));
+        verify(transactionMapper, never()).insertWmTransaction(any(WmTransaction.class));
+        // 状态仍正常流转 APPROVED
+        verify(issueHeaderMapper).updateWmIssueHeader(any(WmIssueHeader.class));
+    }
+
+    @Test
+    @DisplayName("21. 确认预占：FIFO 多批次自动分配，按批次扣 available + 写 ALLOCATE")
+    void testConfirmFifoAllocation() {
+        testLine.setBatchId(null); // 未指定批次 → 走 selectAvailableStocksForFifo FIFO
+        when(issueHeaderMapper.selectWmIssueHeaderByIssueId(1L)).thenReturn(testHeader);
+        when(issueLineMapper.selectWmIssueLineList(any(WmIssueLine.class))).thenReturn(List.of(testLine));
+        WmMaterialStock s1 = new WmMaterialStock();
+        s1.setMaterialStockId(10L);
+        s1.setItemId(100L);
+        s1.setItemCode("MAT-001");
+        s1.setItemName("测试物料");
+        s1.setUnitOfMeasure("KG");
+        s1.setQuantityOnhand(new BigDecimal("100"));
+        s1.setQuantityAvailable(new BigDecimal("100"));
+        when(materialStockMapper.selectAvailableStocksForFifo(eq(100L), any(), eq("NORMAL")))
+                .thenReturn(List.of(s1));
+
+        service.confirmIssue(1L);
+
+        // FIFO 预占 50：s1 avail 100→50，onhand 不变
+        ArgumentCaptor<WmMaterialStock> stockCaptor = ArgumentCaptor.forClass(WmMaterialStock.class);
+        verify(materialStockMapper).updateWmMaterialStock(stockCaptor.capture());
+        assertThat(stockCaptor.getValue().getQuantityAvailable()).isEqualByComparingTo(new BigDecimal("50"));
+        assertThat(stockCaptor.getValue().getQuantityOnhand()).isEqualByComparingTo(new BigDecimal("100"));
+        verify(transactionMapper).insertWmTransaction(any(WmTransaction.class));
     }
 }

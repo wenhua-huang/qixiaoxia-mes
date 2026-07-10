@@ -262,6 +262,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <include refid="selectWmMaterialStockVo"/>
         where item_id = #{itemId}
           and quantity_available > 0
+          and quantity_onhand > 0
+          and quantity_available &lt;= quantity_onhand
           and quality_status = #{qualityStatus}
           <if test="warehouseId != null"> and warehouse_id = #{warehouseId}</if>
         order by create_time asc

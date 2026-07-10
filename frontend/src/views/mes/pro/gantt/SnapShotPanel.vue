@@ -35,7 +35,7 @@ import { Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/utils/request'
 
-const props = defineProps<{ workorderId?: number | null }>()
+const props = defineProps<{ workorderId?: number | null; tasks?: any[] }>()
 const emit = defineEmits<{ (e: 'preview', id: number): void; (e: 'refresh'): void }>()
 
 const loading = ref(false)
@@ -52,6 +52,18 @@ async function load() {
 
 async function createSnapshot() {
   if (!props.workorderId) { ElMessage.warning('请先选择工单再保存快照'); return }
+  // 保存快照前提醒：若存在未选择工作站的任务，提示用户确认
+  const allTasks = (props.tasks || []).flatMap((p: any) => p.children || [])
+  const unassigned = allTasks.filter((t: any) => !t.workstationId)
+  if (unassigned.length > 0) {
+    try {
+      await ElMessageBox.confirm(
+        `有 ${unassigned.length} 个任务未选择工作站，是否继续保存快照？`,
+        '提示',
+        { type: 'warning', confirmButtonText: '继续保存', cancelButtonText: '去选择工作站' }
+      )
+    } catch { return }  // 用户取消，返回选择工作站
+  }
   creating.value = true
   try {
     await request({

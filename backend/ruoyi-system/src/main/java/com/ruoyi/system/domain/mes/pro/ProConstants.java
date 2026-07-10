@@ -20,6 +20,12 @@ public class ProConstants
     /** 任务状态 */
     public static final String TASK_STATUS_NORMAL = "NORMAL";
     public static final String TASK_STATUS_PREPARE = "PREPARE";
+    public static final String TASK_STATUS_PRODUCING = "PRODUCING";
+    public static final String TASK_STATUS_PAUSED = "PAUSED";
+    public static final String TASK_STATUS_COMPLETED = "COMPLETED";
+    public static final String TASK_STATUS_CANCEL = "CANCEL";
+    /** 已结束、不再占用工作站的终态（空闲判定时排除） */
+    public static final String[] TASK_STATUS_INACTIVE = {TASK_STATUS_COMPLETED, TASK_STATUS_CANCEL};
 
     /** 排产默认值 */
     public static final int DEFAULT_DURATION_MINUTES = 60;

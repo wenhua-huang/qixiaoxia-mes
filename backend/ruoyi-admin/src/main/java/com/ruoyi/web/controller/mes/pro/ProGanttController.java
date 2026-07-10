@@ -144,6 +144,19 @@ public class ProGanttController extends BaseController
         return success(r);
     }
 
+    /** 查询某工序可用工作站：按工序类型过滤，并标记给定时段是否空闲（供排产弹窗下拉） */
+    @PreAuthorize("@ss.hasPermi('mes:pro:gantt:query')")
+    @GetMapping("/availableWorkstations")
+    public AjaxResult availableWorkstations(
+            @RequestParam Long processId,
+            @RequestParam(required = false) String processType,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") Date startTime,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") Date endTime,
+            @RequestParam(required = false) Long excludeTaskId) {
+        return success(ganttDataService.availableWorkstations(
+                processId, processType, startTime, endTime, excludeTaskId, currentFactoryId()));
+    }
+
     /** 拖拽移动任务 + 级联更新，直接返回最新甘特图数据 */
     @PreAuthorize("@ss.hasPermi('mes:pro:gantt:edit')")
     @PutMapping("/task/{taskId}/move")

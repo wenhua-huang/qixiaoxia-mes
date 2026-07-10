@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -187,35 +188,18 @@ public class ProWorkorderController extends BaseController
     }
 
     /**
-     * 开工：PREPARE → PRODUCING
-     * 执行物料齐套检查，全部满足才允许开工
-     */
-    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:edit')")
-    @Log(title = "生产工单开工", businessType = BusinessType.UPDATE)
-    @PutMapping("/start/{workorderId}")
-    public AjaxResult start(@PathVariable Long workorderId)
-    {
-        // 1. 物料齐套检查
-        List<java.util.Map<String, Object>> checkResult = proWorkorderService.checkMaterialReadiness(workorderId);
-        for (java.util.Map<String, Object> row : checkResult) {
-            if (Boolean.FALSE.equals(row.get("sufficient"))) {
-                return error("物料齐套检查未通过：" + row.get("itemName") + " 缺少 " + row.get("shortageQty") + " " + row.get("unitName"));
-            }
-        }
-        // 2. 全部满足，执行开工
-        return toAjax(proWorkorderService.startProduction(workorderId));
-    }
-
-    /**
      * 开工前检查 + 自动生成领料单 + 开工
      * 四步：物料齐套检查 → 排产检查 → 按工序生成领料单 → 开工
+     * 排产检查FAIL时，有 mes:pro:workorder:override 权限可传 force=true 豁免开工（需填 reason）
      */
-    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:edit')")
+    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:edit') and (!#force or @ss.hasPermi('mes:pro:workorder:override'))")
     @Log(title = "生产工单开工检查", businessType = BusinessType.UPDATE)
     @PutMapping("/startWithCheck/{workorderId}")
-    public AjaxResult startWithCheck(@PathVariable Long workorderId)
+    public AjaxResult startWithCheck(@PathVariable Long workorderId,
+                                     @RequestParam(defaultValue = "false") boolean force,
+                                     @RequestParam(required = false) String reason)
     {
-        List<java.util.Map<String, Object>> steps = proWorkorderService.preStartCheck(workorderId);
+        List<java.util.Map<String, Object>> steps = proWorkorderService.preStartCheck(workorderId, force, reason);
         return success(steps);
     }
 

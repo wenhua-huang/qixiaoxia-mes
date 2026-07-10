@@ -188,18 +188,17 @@ describe('工作站管理 — processId 工序选择', () => {
   })
 
   // ══════════════════════════════════════════════
-  // 表单 rules：processId 必填
+  // 表单 rules：processId 可选（DB 字段可空，排产 matchCandidates 对空 processId 走 processType 兜底）
   // ══════════════════════════════════════════════
 
-  it('表单校验规则应包含 processId 必填', async () => {
+  it('processId 不应设为必填（工作站可仅按工序类型匹配）', async () => {
     const wrapper = mountWorkstation()
     await nextTick()
     await nextTick()
 
     const vm = wrapper.vm as any
-    expect(vm.rules.processId).toBeDefined()
-    expect(vm.rules.processId[0].required).toBe(true)
-    expect(vm.rules.processId[0].message).toBe('请选择工序')
+    // processId 可空：DB 字段 nullable，排产服务对空 processId 用 processType 兜底匹配
+    expect(vm.rules?.processId?.[0]?.required).not.toBe(true)
   })
 
   // ══════════════════════════════════════════════

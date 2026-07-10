@@ -17,3 +17,18 @@ export function getWorkstationGantt(workstationId: number, startDate?: string, e
     params: { startDate, endDate }
   })
 }
+
+/** 查询某工序可用工作站：按工序类型(process_type)过滤，并标记给定时段是否空闲 */
+export function getAvailableWorkstations(params: {
+  processId: number
+  processType?: string
+  startTime?: string
+  endTime?: string
+  excludeTaskId?: number
+}) {
+  return request<{ code: number; data: any[]; msg: string }>({
+    url: '/mes/pro/gantt/availableWorkstations',
+    method: 'get',
+    params
+  })
+}

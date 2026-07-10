@@ -268,4 +268,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             quantity_unqualified = quantity_unqualified + #{deltaUnqualified}
         where task_id = #{taskId}
     </update>
+
+    <!-- 时段占用冲突计数：终态 COMPLETED/CANCEL 不再占用工作站（对应 ProConstants.TASK_STATUS_INACTIVE） -->
+    <select id="countConflict" resultType="int">
+        select count(*) from qxx_pro_task
+        where factory_id = #{factoryId}
+          and workstation_id = #{workstationId}
+          and status not in ('COMPLETED','CANCEL')
+          and start_time &lt; #{endTime}
+          and end_time &gt; #{startTime}
+          <if test="excludeTaskId != null"> and task_id != #{excludeTaskId}</if>
+    </select>
 </mapper>

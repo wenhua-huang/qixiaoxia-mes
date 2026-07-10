@@ -9,7 +9,11 @@ vi.mock('@/utils/request', () => ({
 
 vi.mock('@/api/mes/pro/gantt', () => ({
   getWorkOrderGantt: vi.fn().mockResolvedValue({ data: { tasks: [], links: [] } }),
-  getWorkstationGantt: vi.fn().mockResolvedValue({ data: { tasks: [], links: [] } })
+  getWorkstationGantt: vi.fn().mockResolvedValue({ data: { tasks: [], links: [] } }),
+  getAvailableWorkstations: vi.fn().mockResolvedValue({ data: [
+    { workstationId: 1, workstationName: '印刷机1号', idle: true },
+    { workstationId: 2, workstationName: '印刷机2号', idle: false }
+  ] })
 }))
 
 vi.mock('@/api/mes/pro/workorder', () => ({
@@ -64,7 +68,7 @@ vi.mock('@/store/modules/user', () => ({
 
 // ── 组件导入 ──
 import ProGantt from '@/views/mes/pro/gantt/index.vue'
-import { getWorkOrderGantt } from '@/api/mes/pro/gantt'
+import { getWorkOrderGantt, getAvailableWorkstations } from '@/api/mes/pro/gantt'
 import { getWorkorderDetail } from '@/api/mes/pro/workorder'
 import { addTask, delTask } from '@/api/mes/pro/task'
 
@@ -82,6 +86,7 @@ function mountGantt() {
         'el-input-number': { template: '<input type="number" />', inheritAttrs: true },
         'el-date-picker': { template: '<input type="datetime" />', inheritAttrs: true },
         'el-tag': { template: '<span><slot /></span>' },
+        'dict-tag': { template: '<span class="mock-dict-tag" />' },
         'el-color-picker': { template: '<input type="color" />', inheritAttrs: true },
         'el-descriptions': { template: '<div><slot /></div>' },
         'el-descriptions-item': { template: '<div><slot /></div>' },
@@ -346,6 +351,7 @@ describe('甘特图任务CRUD — 单元测试', () => {
       vm.queryParams.workorderId = 1
       vm.taskForm.processId = 10
       vm.taskForm.processName = '印刷'
+      vm.taskForm.workstationId = 1   // 必填：未选工作站会被前端拦截
       vm.taskForm.quantity = 100
       vm.taskForm.startTime = '2026-07-01 08:00:00'
       vm.taskForm.endTime = '2026-07-01 09:00:00'
@@ -373,6 +379,7 @@ describe('甘特图任务CRUD — 单元测试', () => {
       vm.taskForm.taskId = 99
       vm.taskForm.processId = 10
       vm.taskForm.processName = '印刷'
+      vm.taskForm.workstationId = 1   // 必填：未选工作站会被前端拦截
       vm.taskForm.quantity = 50
 
       await vm.submitTaskEdit()
@@ -383,6 +390,38 @@ describe('甘特图任务CRUD — 单元测试', () => {
         taskId: 99,
         processId: 10,
       }))
+    })
+
+    it('未选择工作站时警告且不调用 addTask', async () => {
+      const wrapper = mountGantt()
+      const vm = wrapper.vm as any
+      vm.queryParams.workorderId = 1
+      vm.taskForm.processId = 10
+      vm.taskForm.workstationId = null  // 未选工作站
+      vm.taskForm.taskId = null
+
+      const warnSpy = vi.spyOn(ElMessage, 'warning')
+      await vm.submitTaskEdit()
+      await nextTick()
+
+      expect(warnSpy).toHaveBeenCalledWith('请选择工作站')
+      expect(addTask).not.toHaveBeenCalled()
+    })
+
+    it('未选择工作站时不调用 updateTask', async () => {
+      const wrapper = mountGantt()
+      const vm = wrapper.vm as any
+      vm.queryParams.workorderId = 1
+      vm.taskForm.taskId = 99
+      vm.taskForm.workstationId = null  // 未选工作站
+
+      const warnSpy = vi.spyOn(ElMessage, 'warning')
+      await vm.submitTaskEdit()
+      await nextTick()
+
+      expect(warnSpy).toHaveBeenCalledWith('请选择工作站')
+      const { updateTask } = await import('@/api/mes/pro/task')
+      expect(updateTask).not.toHaveBeenCalled()
     })
   })
 
@@ -459,6 +498,20 @@ describe('甘特图任务CRUD — 单元测试', () => {
       await nextTick()
 
       expect(vm.taskForm.duration).toBe(1)  // 最小为1
+    })
+  })
+
+  // ═══ 工作站选择（按工序类型过滤 + 空闲标注）═══
+  describe('工作站选择', () => {
+    it('编辑任务后按当前工序加载可用工作站', async () => {
+      const wrapper = mountGantt()
+      // .gc-bar click → onTaskSelect（携带 processId=10）→ loadAvailableWorkstations
+      await wrapper.find('.gc-bar').trigger('click')
+      await new Promise(r => setTimeout(r, 400))  // 等 loadAvailableWorkstations 的 300ms 防抖
+      await nextTick()
+      expect(getAvailableWorkstations).toHaveBeenCalledWith(
+        expect.objectContaining({ processId: 10 })
+      )
     })
   })
 })

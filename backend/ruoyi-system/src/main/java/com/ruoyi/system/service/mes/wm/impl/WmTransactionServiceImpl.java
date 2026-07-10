@@ -82,11 +82,15 @@ public class WmTransactionServiceImpl implements IWmTransactionService
                         + "，变动：" + delta);
             }
             stock.setQuantityOnhand(result);
-            // 入库时同步增加可用库存，出库时不减（由领料 confirm 时扣减）
+            // 入库：available 同步增加；出库：钳制 available ≤ onhand
+            // （消费预占时 min 取原值=不减，与原语义一致；无预占/超发时随 onhand 下降，避免 available 虚高）
             if (delta.compareTo(BigDecimal.ZERO) > 0) {
                 stock.setQuantityAvailable(
                     (existing.getQuantityAvailable() != null ? existing.getQuantityAvailable() : BigDecimal.ZERO)
                         .add(delta));
+            } else {
+                BigDecimal oldAvail = existing.getQuantityAvailable() != null ? existing.getQuantityAvailable() : BigDecimal.ZERO;
+                stock.setQuantityAvailable(oldAvail.min(result));
             }
             stock.setMaterialStockId(existing.getMaterialStockId());
             stock.setUpdateTime(new Date());

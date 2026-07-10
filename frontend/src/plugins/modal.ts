@@ -59,12 +59,13 @@ export default {
       type: "warning",
     })
   },
-  // 提交内容
-  prompt(content: string) {
-    return ElMessageBox.prompt(content, "系统提示", {
+  // 提交内容（title/options 可选，不传则用默认值；options 透传 ElMessageBox.prompt）
+  prompt(content: string, title: string = "系统提示", options: any = {}) {
+    return ElMessageBox.prompt(content, title, {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: "warning",
+      ...options,
     })
   },
   // 打开遮罩层

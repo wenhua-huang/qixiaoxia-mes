@@ -19,7 +19,6 @@ vi.mock('@/api/mes/pro/workorder', () => ({
   delWorkorder: vi.fn().mockResolvedValue({}),
   createWorkorderWithBom: mockCreateWithBom,
   updateWorkorderWithBom: vi.fn().mockResolvedValue({ code: 200 }),
-  startWorkorder: vi.fn().mockResolvedValue({}),
   checkWorkorderMaterial: vi.fn().mockResolvedValue({ data: [] }),
   startWorkorderWithCheck: vi.fn().mockResolvedValue({ data: [] }),
   checkDeviation: mockCheckDeviation,

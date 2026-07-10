@@ -84,7 +84,8 @@ public class ScheduleServiceImpl implements IScheduleService
         for (ProTask t : tasks) {
             taskMap.computeIfAbsent(t.getProcessId(), k -> new ArrayList<>()).add(t);
         }
-        // 自动为无任务的工序创建任务
+        // 自动为无任务的工序创建任务（candidateMap 暂存新建任务的候选工作站，供第6步空闲换站）
+        Map<Long, List<MdWorkstation>> candidateMap = new HashMap<>();
         for (ProRouteProcess rp : processes) {
             if (!taskMap.containsKey(rp.getProcessId())) {
                 ProTask newTask = new ProTask();
@@ -102,15 +103,13 @@ public class ScheduleServiceImpl implements IScheduleService
                 newTask.setQuantity(wo.getQuantity() != null ? wo.getQuantity() : BigDecimal.ONE);
                 newTask.setUnitOfMeasure(wo.getUnitOfMeasure() != null ? wo.getUnitOfMeasure() : DEFAULT_UNIT);
                 newTask.setUnitName(wo.getUnitName() != null ? wo.getUnitName() : DEFAULT_UNIT);
-                // 先匹配工作站
-                MdWorkstation wsQ = new MdWorkstation();
-                wsQ.setProcessId(rp.getProcessId());
-                wsQ.setFactoryId(factoryId);
-                List<MdWorkstation> wss = workstationMapper.selectMdWorkstationList(wsQ);
-                if (!wss.isEmpty()) {
-                    newTask.setWorkstationId(wss.get(0).getWorkstationId());
-                    newTask.setWorkstationCode(wss.get(0).getWorkstationCode());
-                    newTask.setWorkstationName(wss.get(0).getWorkstationName());
+                // 匹配候选工作站：process_id 精确 → process_type 兜底（覆盖 process_id 为空的工作站）
+                List<MdWorkstation> candidates = matchCandidates(rp.getProcessId(), rp.getProcessType(), factoryId);
+                if (!candidates.isEmpty()) {
+                    MdWorkstation first = candidates.get(0);
+                    newTask.setWorkstationId(first.getWorkstationId());
+                    newTask.setWorkstationCode(first.getWorkstationCode());
+                    newTask.setWorkstationName(first.getWorkstationName());
                 } else {
                     newTask.setWorkstationId(0L);
                     newTask.setWorkstationCode("AUTO");
@@ -118,8 +117,8 @@ public class ScheduleServiceImpl implements IScheduleService
                 }
                 // 从产能计算 unitDuration（个/分钟 = 产能/60）
                 BigDecimal unitDur = BigDecimal.ZERO;
-                if (!wss.isEmpty() && wss.get(0).getCapacity() != null && wss.get(0).getCapacity() > 0) {
-                    unitDur = BigDecimal.valueOf(60.0 / wss.get(0).getCapacity());
+                if (!candidates.isEmpty() && candidates.get(0).getCapacity() != null && candidates.get(0).getCapacity() > 0) {
+                    unitDur = BigDecimal.valueOf(60.0 / candidates.get(0).getCapacity());
                 }
                 newTask.setUnitDuration(unitDur);
                 newTask.setSetupDuration(0);
@@ -132,6 +131,10 @@ public class ScheduleServiceImpl implements IScheduleService
                 // taskCode/taskName auto-generated in insert
                 taskMapper.insertProTask(newTask);
                 taskMap.computeIfAbsent(rp.getProcessId(), k -> new ArrayList<>()).add(newTask);
+                // 暂存候选，第6步算出时间后据此选空闲工作站
+                if (!candidates.isEmpty()) {
+                    candidateMap.put(newTask.getTaskId(), candidates);
+                }
             }
         }
 
@@ -176,6 +179,16 @@ public class ScheduleServiceImpl implements IScheduleService
                 task.setStartTime(currentTime);
                 task.setEndTime(calendarService.calculateEndTime(currentTime, durationMins * 60L, factoryId));
                 task.setDuration((int) durationMins);
+                // 仅本次新建的默认任务：算出时间后在候选中选空闲工作站（已有任务不换站）
+                List<MdWorkstation> cands = candidateMap.get(task.getTaskId());
+                if (cands != null && !cands.isEmpty()) {
+                    MdWorkstation idle = pickIdle(cands, task.getStartTime(), task.getEndTime(), factoryId, task.getTaskId());
+                    if (idle != null && !idle.getWorkstationId().equals(task.getWorkstationId())) {
+                        task.setWorkstationId(idle.getWorkstationId());
+                        task.setWorkstationCode(idle.getWorkstationCode());
+                        task.setWorkstationName(idle.getWorkstationName());
+                    }
+                }
                 task.setUpdateTime(DateUtils.getNowDate());
                 taskMapper.updateProTask(task);
                 currentTime = task.getEndTime();
@@ -371,5 +384,42 @@ public class ScheduleServiceImpl implements IScheduleService
         q.setProcessId(processId);
         List<ProRouteProcess> list = routeProcessMapper.selectProRouteProcessList(q);
         return (!list.isEmpty()) ? list.get(0).getLinkType() : LINK_TYPE_SS;
+    }
+
+    /**
+     * 按工序匹配候选工作站：优先 process_id 精确匹配；为空时退回 process_type 匹配
+     * （兼容 process_id 为 NULL、仅登记 process_type 的工作站）。仅取启用的工作站。
+     */
+    @Override
+    public List<MdWorkstation> matchCandidates(Long processId, String processType, Long factoryId) {
+        MdWorkstation q = new MdWorkstation();
+        q.setFactoryId(factoryId);
+        q.setEnableFlag("1");
+        q.setProcessId(processId);
+        List<MdWorkstation> list = workstationMapper.selectMdWorkstationList(q);
+        if (!list.isEmpty()) return list;
+        if (processType != null && !processType.isEmpty()) {
+            MdWorkstation q2 = new MdWorkstation();
+            q2.setFactoryId(factoryId);
+            q2.setEnableFlag("1");
+            q2.setProcessType(processType);
+            return workstationMapper.selectMdWorkstationList(q2);
+        }
+        return Collections.emptyList();
+    }
+
+    /**
+     * 从候选工作站中选该计划时段 [start,end] 无冲突的第一个；全部冲突则返回候选首个；
+     * 候选为空返回 null；时间为空（尚未排产）返回候选首个。excludeTaskId 排除任务自身。
+     */
+    private MdWorkstation pickIdle(List<MdWorkstation> candidates, Date start, Date end,
+                                   Long factoryId, Long excludeTaskId) {
+        if (candidates == null || candidates.isEmpty()) return null;
+        if (start == null || end == null) return candidates.get(0);
+        for (MdWorkstation ws : candidates) {
+            int conflict = taskMapper.countConflict(ws.getWorkstationId(), start, end, factoryId, excludeTaskId);
+            if (conflict == 0) return ws;
+        }
+        return candidates.get(0);
     }
 }

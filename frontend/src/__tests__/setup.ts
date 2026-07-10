@@ -50,5 +50,16 @@ config.global.plugins = [ElementPlus]
 // 避免全局 stub 掩盖渲染回归。
 config.global.stubs = {
   'svg-icon': { template: '<span class="mock-svg-icon" />' },
-  'AppIcon': { template: '<span class="mock-app-icon" />' }
+  'AppIcon': { template: '<span class="mock-app-icon" />' },
+  'dict-tag': { template: '<span class="mock-dict-tag" />' }
 }
+
+// ==================== 全局方法（RuoYi globalProperties）====================
+// useDict stub：通过 plugin 注册到 app.config.globalProperties，使 setup 中
+// getCurrentInstance().proxy.useDict 可用。返回空对象，模板用 v-if 守卫跳过 dict-tag。
+const useDictPlugin = {
+  install(app: any) {
+    app.config.globalProperties.useDict = () => ({})
+  }
+}
+config.global.plugins = [ElementPlus, useDictPlugin]

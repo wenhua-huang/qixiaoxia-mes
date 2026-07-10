@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.ruoyi.system.domain.mes.md.MdWorkstation;
 import com.ruoyi.system.domain.mes.pro.*;
 import com.ruoyi.system.mapper.mes.pro.*;
 import com.ruoyi.system.service.mes.pro.IGanttDataService;
@@ -206,6 +207,40 @@ public class GanttDataServiceImpl implements IGanttDataService
 
         result.put("tasks", tasks);
         result.put("links", links);
+        return result;
+    }
+
+    @Override
+    public List<Map<String, Object>> availableWorkstations(Long processId, String processType,
+                                                            Date startTime, Date endTime,
+                                                            Long excludeTaskId, Long factoryId) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        List<MdWorkstation> candidates = scheduleService.matchCandidates(processId, processType, factoryId);
+        boolean checkIdle = startTime != null && endTime != null;
+        for (MdWorkstation ws : candidates) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("workstationId", ws.getWorkstationId());
+            m.put("workstationCode", ws.getWorkstationCode());
+            m.put("workstationName", ws.getWorkstationName());
+            m.put("workstationType", ws.getWorkstationType());
+            m.put("processId", ws.getProcessId());
+            m.put("processType", ws.getProcessType());
+            m.put("processName", ws.getProcessName());
+            m.put("capacity", ws.getCapacity());
+            m.put("status", ws.getStatus());
+            // 未提供时段时 idle=null（前端不标注），避免误标"空闲"；提供了则按冲突判定
+            Boolean idle = null;
+            if (checkIdle) {
+                int conflict = proTaskMapper.countConflict(ws.getWorkstationId(), startTime, endTime, factoryId, excludeTaskId);
+                idle = (conflict == 0);
+            }
+            m.put("idle", idle);
+            result.add(m);
+        }
+        // 空闲排前（仅当时段判定有效时）
+        if (checkIdle) {
+            result.sort((a, b) -> Boolean.compare((Boolean) a.get("idle"), (Boolean) b.get("idle")) * -1);
+        }
         return result;
     }
 }

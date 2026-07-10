@@ -10,9 +10,13 @@ import java.util.Map;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.common.core.redis.RedisLockTemplate;
 import com.ruoyi.common.enums.WmIssueConstants;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.stereotype.Service;
 import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
@@ -115,6 +119,12 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
 
     @Autowired
     private com.ruoyi.system.service.mes.md.IMdProductBomService mdProductBomService;
+
+    @Autowired
+    private RedisLockTemplate lockTemplate;
+
+    @Autowired
+    private PlatformTransactionManager txManager;
 
     /**
      * 查询生产工单
@@ -535,6 +545,10 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
                         || WmIssueConstants.STATUS_APPROVED.equals(st) || WmIssueConstants.STATUS_ALLOCATED.equals(st)
                         || "CONFIRMED".equals(st)) {
                     try {
+                        // CONFIRMED 领料单已确认并预占库存，作废前先释放预占
+                        if ("CONFIRMED".equals(st)) {
+                            wmIssueHeaderService.releaseAllocation(issue.getIssueId());
+                        }
                         wmIssueHeaderService.cancel(issue.getIssueId(), "工单取消，关联领料单自动作废");
                     } catch (Exception ex) {
                         // 单张作废失败不阻断工单取消，忽略继续
@@ -672,18 +686,32 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
     /**
      * 开工前检查 + 自动生成领料单 + 开工（事务性）
      * 四步：物料齐套检查 → 排产检查 → 按工序生成领料单 → 开工
-     * 任一步骤失败则事务回滚，返回每步检查结果
+     * 物料是硬约束（FAIL必短路）；排产是软约束，forceSchedule=true 可豁免（记变更记录）
      *
      * @param workorderId 生产工单主键
-     * @return 每步检查结果列表 [{step, stepName, status:PASS/FAIL/SKIP, message, details}]
+     * @param forceSchedule 排产FAIL时是否豁免开工
+     * @param overrideReason 豁免理由（forceSchedule=true且排产FAIL时必填）
+     * @return 每步检查结果列表 [{step, stepName, status:PASS/FAIL/SKIP/OVERRIDE, message, details}]
      */
     @Override
-    @Transactional
-    public List<Map<String, Object>> preStartCheck(Long workorderId)
+    public List<Map<String, Object>> preStartCheck(Long workorderId, boolean forceSchedule, String overrideReason)
     {
+        TransactionTemplate tt = new TransactionTemplate(txManager);
+        tt.setTimeout(30);
+        return lockTemplate.execute("pro:workorder:start:" + workorderId,
+                () -> tt.execute(status -> doPreStartCheck(workorderId, forceSchedule, overrideReason)));
+    }
+
+    private List<Map<String, Object>> doPreStartCheck(Long workorderId, boolean forceSchedule, String overrideReason)
+    {
+        ProWorkorder wo = selectProWorkorderByWorkorderId(workorderId);
+        if (wo == null)
+        {
+            throw new ServiceException("工单不存在");
+        }
         List<Map<String, Object>> steps = new ArrayList<>();
 
-        // Step 1: 物料齐套检查（只读，先执行）
+        // Step 1: 物料齐套检查（只读，物料是硬约束，不豁免）
         Map<String, Object> step1 = doMaterialCheck(workorderId);
         steps.add(step1);
         if ("FAIL".equals(step1.get("status")))
@@ -692,9 +720,12 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
             return steps;
         }
 
-        // Step 2: 排产检查
-        ProWorkorder wo = selectProWorkorderByWorkorderId(workorderId);
+        // Step 2: 排产检查（软约束，forceSchedule=true 且填了理由可豁免）
         Map<String, Object> step2 = doSchedulingCheck(wo);
+        if ("FAIL".equals(step2.get("status")) && forceSchedule)
+        {
+            step2 = overrideSchedulingStep(wo, step2, overrideReason);
+        }
         steps.add(step2);
         if ("FAIL".equals(step2.get("status")))
         {
@@ -712,10 +743,23 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         }
 
         // Step 4: 开工
-        Map<String, Object> step4 = doStartProduction(workorderId);
-        steps.add(step4);
+        steps.add(doStartProduction(workorderId));
 
         return steps;
+    }
+
+    /** 排产检查FAIL时的豁免处理：校验理由 → 标记OVERRIDE → 写工单变更记录（与主流程同事务） */
+    private Map<String, Object> overrideSchedulingStep(ProWorkorder wo, Map<String, Object> step, String reason)
+    {
+        if (StringUtils.isEmpty(reason))
+        {
+            step.put("message", step.get("message") + "；豁免开工需填写豁免理由");
+            return step; // 理由为空则保持 FAIL，不豁免
+        }
+        step.put("status", "OVERRIDE");
+        step.put("message", step.get("message") + "（已豁免开工，理由：" + reason + "）");
+        createChange(wo.getWorkorderId(), "OVERRIDE_START", "scheduling", "FAIL", "OVERRIDE", reason);
+        return step;
     }
 
     /** Step 1: 物料齐套检查 */

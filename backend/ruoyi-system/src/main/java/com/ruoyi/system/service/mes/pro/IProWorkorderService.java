@@ -108,9 +108,11 @@ public interface IProWorkorderService
      * 任一步骤失败则事务回滚，返回每步检查结果
      *
      * @param workorderId 生产工单主键
-     * @return 每步检查结果列表 [{step, stepName, status:PASS/FAIL/SKIP, message, details}]
+     * @param forceSchedule 排产检查FAIL时是否豁免开工（true=跳过排产强制开工，需配overrideReason）
+     * @param overrideReason 豁免理由（forceSchedule=true且排产FAIL时必填，记入工单变更记录）
+     * @return 每步检查结果列表 [{step, stepName, status:PASS/FAIL/SKIP/OVERRIDE, message, details}]
      */
-    public List<java.util.Map<String, Object>> preStartCheck(Long workorderId);
+    public List<java.util.Map<String, Object>> preStartCheck(Long workorderId, boolean forceSchedule, String overrideReason);
 
     /**
      * 创建生产工单（含BOM和工序参数）

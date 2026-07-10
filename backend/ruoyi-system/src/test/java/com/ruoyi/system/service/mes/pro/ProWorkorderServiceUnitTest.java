@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.core.redis.RedisLockTemplate;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderBom;
@@ -15,6 +16,17 @@ import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
 import com.ruoyi.system.service.mes.pro.impl.ProWorkorderServiceImpl;
 import com.ruoyi.system.service.mes.wm.IWmIssueHeaderService;
 import com.ruoyi.system.service.mes.wm.IWmMaterialStockService;
+import com.ruoyi.system.service.mes.wm.IWmWarehouseService;
+import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
+import com.ruoyi.system.domain.mes.pro.ProRouteProduct;
+import com.ruoyi.system.domain.mes.pro.ProTask;
+import com.ruoyi.system.domain.mes.pro.ProWorkorderChange;
+import com.ruoyi.system.service.mes.pro.IProRouteProcessService;
+import com.ruoyi.system.service.mes.pro.IProRouteProductService;
+import com.ruoyi.system.service.mes.pro.IProTaskService;
+import com.ruoyi.system.service.mes.pro.IProWorkorderChangeService;
+import org.springframework.transaction.PlatformTransactionManager;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -46,7 +58,14 @@ class ProWorkorderServiceUnitTest {
     @Mock private IProWorkorderBomService workorderBomService;
     @Mock private IWmMaterialStockService materialStockService;
     @Mock private IProWorkorderParamService workorderParamService;
+    @Mock private IProRouteProductService proRouteProductService;
+    @Mock private IProRouteProcessService proRouteProcessService;
+    @Mock private IProTaskService proTaskService;
+    @Mock private IProWorkorderChangeService proWorkorderChangeService;
     @Mock private IWmIssueHeaderService wmIssueHeaderService;
+    @Mock private IWmWarehouseService wmWarehouseService;
+    @Mock private RedisLockTemplate lockTemplate;
+    @Mock private PlatformTransactionManager transactionManager;
     @InjectMocks private ProWorkorderServiceImpl workorderService;
 
     private ProWorkorder testWorkorder;
@@ -354,6 +373,76 @@ class ProWorkorderServiceUnitTest {
                 .hasMessageContaining("不存在");
 
         verify(workorderMapper, never()).updateProWorkorder(any(ProWorkorder.class));
+    }
+
+    // ══════════════════════════════════════════════
+    // 开工豁免（preStartCheck 的 force/reason 分支）
+    // ══════════════════════════════════════════════
+
+    /** 构造"物料齐套PASS + 排产FAIL（工序未排产）"的 mock 场景 */
+    private void mockSchedulingFail() {
+        // preStartCheck 加了 Redis 锁：透传执行 Supplier 绕过 Redis；txManager 走 mock 默认即可
+        when(lockTemplate.execute(anyString(), any(Supplier.class)))
+                .thenAnswer(inv -> ((Supplier<?>) inv.getArgument(1)).get());
+        testWorkorder.setRouteProductId(10L);
+        when(workorderMapper.selectProWorkorderByWorkorderId(1L)).thenReturn(testWorkorder);
+        // 物料齐套 PASS：1 行 BOM + 充足库存（空 BOM 会被 checkMaterialReadiness 抛 ServiceException）
+        ProWorkorderBom bom = new ProWorkorderBom();
+        bom.setItemId(10L);
+        bom.setItemCode("M1");
+        bom.setItemName("物料1");
+        bom.setUnitName("kg");
+        bom.setTotalQuantity(new BigDecimal("10"));
+        when(workorderBomService.selectProWorkorderBomByWorkorderId(1L)).thenReturn(List.of(bom));
+        WmMaterialStock stock = new WmMaterialStock();
+        stock.setQuantityAvailable(new BigDecimal("100"));
+        when(materialStockService.selectWmMaterialStockList(any(WmMaterialStock.class))).thenReturn(List.of(stock));
+        ProRouteProduct rp = new ProRouteProduct();
+        rp.setRouteId(5L);
+        when(proRouteProductService.selectProRouteProductByRecordId(10L)).thenReturn(rp);
+        ProRouteProcess rproc = new ProRouteProcess();
+        rproc.setProcessId(7L);
+        rproc.setProcessCode("PX");
+        rproc.setProcessName("工序X");
+        rproc.setOrderNum(1);
+        List<ProRouteProcess> routeProcesses = new ArrayList<>();
+        routeProcesses.add(rproc);
+        when(proRouteProcessService.selectProRouteProcessByRouteId(5L)).thenReturn(routeProcesses);
+        when(proTaskService.selectProTaskList(any(ProTask.class))).thenReturn(new ArrayList<>());
+    }
+
+    @Test
+    @DisplayName("开工豁免：排产FAIL+force=true+理由 → step2=OVERRIDE 并记变更")
+    void testPreStartCheckOverrideSuccess() {
+        mockSchedulingFail();
+        List<Map<String, Object>> result = workorderService.preStartCheck(1L, true, "急单优先");
+        assertThat(result.get(1).get("status")).isEqualTo("OVERRIDE");
+        assertThat(result.get(1).get("message").toString()).contains("已豁免开工");
+        ArgumentCaptor<ProWorkorderChange> captor = ArgumentCaptor.forClass(ProWorkorderChange.class);
+        verify(proWorkorderChangeService).insertProWorkorderChange(captor.capture());
+        assertThat(captor.getValue().getChangeType()).isEqualTo("OVERRIDE_START");
+        assertThat(captor.getValue().getChangeReason()).isEqualTo("急单优先");
+    }
+
+    @Test
+    @DisplayName("开工豁免：排产FAIL+force=true 但理由为空 → 保持FAIL不豁免")
+    void testPreStartCheckOverrideNoReason() {
+        mockSchedulingFail();
+        List<Map<String, Object>> result = workorderService.preStartCheck(1L, true, "");
+        assertThat(result.get(1).get("status")).isEqualTo("FAIL");
+        assertThat(result.get(1).get("message").toString()).contains("豁免理由");
+        verify(proWorkorderChangeService, never()).insertProWorkorderChange(any(ProWorkorderChange.class));
+    }
+
+    @Test
+    @DisplayName("开工检查：排产FAIL+force=false → FAIL短路，step3/4 跳过")
+    void testPreStartCheckNoForce() {
+        mockSchedulingFail();
+        List<Map<String, Object>> result = workorderService.preStartCheck(1L, false, null);
+        assertThat(result.get(1).get("status")).isEqualTo("FAIL");
+        assertThat(result.get(2).get("status")).isEqualTo("SKIP");
+        assertThat(result.get(3).get("status")).isEqualTo("SKIP");
+        verify(proWorkorderChangeService, never()).insertProWorkorderChange(any(ProWorkorderChange.class));
     }
 
     // ══════════════════════════════════════════════

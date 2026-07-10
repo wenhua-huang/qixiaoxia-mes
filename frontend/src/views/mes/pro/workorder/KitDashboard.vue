@@ -246,6 +246,8 @@ function loadData() {
     if (dashboard.value?.hasIssueDocs) panels.push('issue')
     if (dashboard.value?.receiptReady) panels.push('receipt')
     activePanels.value = panels
+  }).catch(() => {
+    // 错误提示由 request 拦截器统一处理（ElMessage），此处仅兜底避免未捕获拒绝
   }).finally(() => { loading.value = false })
 }
 

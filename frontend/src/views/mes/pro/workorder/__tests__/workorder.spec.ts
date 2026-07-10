@@ -3,9 +3,10 @@ import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 
 // ==================== Hoisted mock functions (vi.mock is hoisted above imports) ====================
-const { mockCreateWithBom, mockUpdateWithBom } = vi.hoisted(() => ({
+const { mockCreateWithBom, mockUpdateWithBom, mockStartWithCheck } = vi.hoisted(() => ({
   mockCreateWithBom: vi.fn().mockResolvedValue({ code: 200, data: { workorderId: 999 } }),
   mockUpdateWithBom: vi.fn().mockResolvedValue({ code: 200 }),
+  mockStartWithCheck: vi.fn().mockResolvedValue({ data: [] }),
 }))
 
 // ==================== Mock API: workorder ====================
@@ -15,8 +16,8 @@ vi.mock('@/api/mes/pro/workorder', () => ({
   delWorkorder: vi.fn().mockResolvedValue({}),
   createWorkorderWithBom: mockCreateWithBom,
   updateWorkorderWithBom: mockUpdateWithBom,
-  startWorkorder: vi.fn().mockResolvedValue({}),
   checkWorkorderMaterial: vi.fn().mockResolvedValue({ data: [] }),
+  startWorkorderWithCheck: mockStartWithCheck,
   // 偏离检测：默认无偏离，让 submitForm 直达 doSubmitForm
   checkDeviation: vi.fn().mockResolvedValue({ code: 200, data: { hasDeviation: false, deviations: [] } }),
 }))
@@ -383,43 +384,40 @@ describe('生产工单 — workorder/index.vue submitForm', () => {
   })
 
   // ══════════════════════════════════════════════
-  // 排产：handleScheduleAddTask → processCode + processType
+  // 开工检查弹窗 — 豁免按钮显示条件（canOverrideStart）
   // ══════════════════════════════════════════════
 
-  it('handleScheduleAddTask 应设置 scheduleTaskForm 含 processCode 和 processType', async () => {
+  it('开工检查排产FAIL时 canOverrideStart 应为 true（豁免按钮显示）', async () => {
+    mockStartWithCheck.mockResolvedValueOnce({ data: [
+      { step: 1, status: 'PASS', message: '齐套', details: [] },
+      { step: 2, status: 'FAIL', message: '工序未排产', details: [{ processId: 7 }] },
+    ] })
     const wrapper = mountWorkorder()
-    await nextTick()
+    await nextTick(); await nextTick()
     const vm = wrapper.vm as any
+    vm.handleStart({ workorderId: 1, workorderName: 'WO-豁免测试' })
+    await nextTick(); await nextTick(); await nextTick()
 
-    vm.scheduleWorkorderId = 1
-    vm.scheduleWorkorderCode = 'WO-001'
-    vm.scheduleWorkorderName = '测试工单'
-
-    const step = { processId: 203, processCode: 'SLITTING', processName: '纸张分切', processType: 'SLITTING', routeId: 10 }
-    vm.handleScheduleAddTask(step)
-    await nextTick()
-
-    expect(vm.scheduleTaskOpen).toBe(true)
-    expect(vm.scheduleTaskForm.processId).toBe(203)
-    expect(vm.scheduleTaskForm.processCode).toBe('SLITTING')
-    expect(vm.scheduleTaskForm.processType).toBe('SLITTING')
-    expect(vm.scheduleTaskForm.processName).toBe('纸张分切')
-    expect(vm.scheduleTaskTitle).toContain('纸张分切')
+    expect(vm.startCheckOpen).toBe(true)
+    expect(vm.startCheckRunning).toBe(false)
+    expect(vm.startCheckSteps[1].status).toBe('error') // 排产FAIL→error
+    expect(vm.canOverrideStart()).toBe(true)
   })
 
-  it('handleScheduleAddTask processType 为空时也能正常打开', async () => {
+  it('开工检查全通过时 canOverrideStart 应为 false（无豁免按钮）', async () => {
+    mockStartWithCheck.mockResolvedValueOnce({ data: [
+      { step: 1, status: 'PASS', message: '齐套', details: [] },
+      { step: 2, status: 'PASS', message: '已排产', details: [] },
+      { step: 3, status: 'PASS', message: '领料单已生成', details: [] },
+      { step: 4, status: 'PASS', message: '已开工', details: [] },
+    ] })
     const wrapper = mountWorkorder()
-    await nextTick()
+    await nextTick(); await nextTick()
     const vm = wrapper.vm as any
+    vm.handleStart({ workorderId: 2, workorderName: 'WO-正常' })
+    await nextTick(); await nextTick(); await nextTick()
 
-    const step = { processId: 99, processCode: '', processName: '测试工序', processType: '', routeId: 5 }
-    vm.handleScheduleAddTask(step)
-    await nextTick()
-
-    expect(vm.scheduleTaskForm.processType).toBe('')
-    expect(vm.scheduleTaskOpen).toBe(true)
+    expect(vm.startCheckAllPassed).toBe(true)
+    expect(vm.canOverrideStart()).toBe(false)
   })
-
-  // handleOpenWorkstationSelect 由 E2E 覆盖（涉及 $refs 操作，单测难以 mock）
-  // 其核心逻辑「从 scheduleTaskForm.processId 取值并传给 WorkstationSelect」已在 handleScheduleAddTask 测试中验证（processId 与 processType 均来自 step 对象）
 })

@@ -1,6 +1,9 @@
 package com.ruoyi.web.controller.mes.pro;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,10 +23,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
+import com.ruoyi.system.domain.mes.pro.ProTask;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderCreateRequest;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderDetailVO;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderDeviationVO;
 import com.ruoyi.system.service.mes.pro.IProWorkorderService;
+import com.ruoyi.system.service.mes.pro.IProTaskService;
 import com.ruoyi.system.service.mes.pro.IScheduleService;
 import com.ruoyi.system.service.mes.pro.IProWorkorderDocService;
 import com.ruoyi.system.domain.mes.pro.ProDocGenerationRequestVO;
@@ -51,6 +56,8 @@ public class ProWorkorderController extends BaseController
     private IScheduleService scheduleService;
     @Autowired
     private IProWorkorderDocService proWorkorderDocService;
+    @Autowired
+    private IProTaskService proTaskService;
 
     /**
      * 查询生产工单列表
@@ -301,5 +308,34 @@ public class ProWorkorderController extends BaseController
             @RequestBody java.util.List<com.ruoyi.system.domain.mes.pro.PurOrderWizardLineVO> lines)
     {
         return success(proWorkorderDocService.submitPurOrderWizard(workorderId, lines));
+    }
+
+    /**
+     * 移动端报工入口：按工单编码一次查询工单 + 可报工任务列表（PRODUCING 状态）。
+     * 替代移动端原先的两次请求（先查工单列表再查任务列表）。
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:feedback:add')")
+    @GetMapping("/feedbackEntry/{workorderCode}")
+    public AjaxResult feedbackEntry(@PathVariable String workorderCode)
+    {
+        ProWorkorder wo = proWorkorderService.selectProWorkorderByWorkorderCode(workorderCode);
+        if (wo == null) {
+            return error("未找到工单：" + workorderCode);
+        }
+        if (!"PREPARE".equals(wo.getStatus()) && !"PRODUCING".equals(wo.getStatus())) {
+            return error("该工单状态为「" + wo.getStatus() + "」，仅待生产/生产中可报工");
+        }
+        // 查该工单的任务，只返回 PRODUCING 状态（可报工的任务）
+        ProTask taskQuery = new ProTask();
+        taskQuery.setWorkorderId(wo.getWorkorderId());
+        List<ProTask> allTasks = proTaskService.selectProTaskList(taskQuery);
+        List<ProTask> reportableTasks = allTasks.stream()
+                .filter(t -> "PRODUCING".equals(t.getStatus()))
+                .collect(Collectors.toList());
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("workorder", wo);
+        result.put("tasks", reportableTasks);
+        return success(result);
     }
 }

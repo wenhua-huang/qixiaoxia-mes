@@ -2,12 +2,15 @@ package com.ruoyi.system.service.mes.pro.impl;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
+import com.ruoyi.common.exception.ServiceException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
@@ -248,5 +251,96 @@ public class ProTaskServiceImpl implements IProTaskService
     public int deleteProTaskByTaskId(Long taskId)
     {
         return proTaskMapper.deleteProTaskByTaskId(taskId);
+    }
+
+    // ==================== 任务状态流转（从 Controller 下沉到 Service）====================
+
+    /** 终态集合：已结束不再占用工作站 */
+    private static final List<String> TASK_INACTIVE = Arrays.asList("COMPLETED", "CANCEL");
+    /** 可下发的前置状态 */
+    private static final List<String> TASK_DISPATCHABLE = Arrays.asList("NORMAL", "PREPARE");
+    /** 可取消的前置状态（所有非终态）*/
+    private static final List<String> TASK_CANCELLABLE = Arrays.asList("NORMAL", "PREPARE", "PRODUCING", "PAUSED");
+
+    @Override
+    public void dispatchTask(Long taskId)
+    {
+        ProTask task = proTaskMapper.selectProTaskByTaskId(taskId);
+        if (task == null) throw new ServiceException("任务不存在");
+        if (!TASK_DISPATCHABLE.contains(task.getStatus()))
+            throw new ServiceException("只有待排产/正常状态的任务才能下发，当前状态：" + task.getStatus());
+        task.setStatus("PRODUCING");
+        task.setUpdateTime(DateUtils.getNowDate());
+        task.setUpdateBy(SecurityUtils.getUsername());
+        proTaskMapper.updateProTask(task);
+    }
+
+    @Override
+    public void completeTask(Long taskId)
+    {
+        ProTask task = proTaskMapper.selectProTaskByTaskId(taskId);
+        if (task == null) throw new ServiceException("任务不存在");
+        if (!"PRODUCING".equals(task.getStatus()))
+            throw new ServiceException("只有生产中的任务才能完成，当前状态：" + task.getStatus());
+        task.setStatus("COMPLETED");
+        task.setUpdateTime(DateUtils.getNowDate());
+        task.setUpdateBy(SecurityUtils.getUsername());
+        proTaskMapper.updateProTask(task);
+
+        // 末工序任务完成 → 检查工单是否可自动完工（双保险，与报工审核的自动完工互补）
+        tryAutoCompleteWorkorder(task);
+    }
+
+    @Override
+    public void cancelTask(Long taskId)
+    {
+        ProTask task = proTaskMapper.selectProTaskByTaskId(taskId);
+        if (task == null) throw new ServiceException("任务不存在");
+        if (TASK_INACTIVE.contains(task.getStatus()))
+            throw new ServiceException("已完成/取消的任务不能操作，当前状态：" + task.getStatus());
+        task.setStatus("CANCEL");
+        task.setUpdateTime(DateUtils.getNowDate());
+        task.setUpdateBy(SecurityUtils.getUsername());
+        proTaskMapper.updateProTask(task);
+    }
+
+    // ==================== 工单级联 ====================
+
+    @Override
+    public void dispatchByWorkorder(Long workorderId)
+    {
+        proTaskMapper.updateStatusByWorkorder(workorderId, TASK_DISPATCHABLE, "PRODUCING");
+    }
+
+    @Override
+    public void cancelByWorkorder(Long workorderId)
+    {
+        proTaskMapper.updateStatusByWorkorder(workorderId, TASK_CANCELLABLE, "CANCEL");
+    }
+
+    /**
+     * 末工序任务完成时，检查工单是否可自动完工。
+     * 条件：完成的是末工序 + 工单 PRODUCING + 已生产 ≥ 计划 → 工单 COMPLETED。
+     * 与报工审核（onFeedbackAudited）的自动完工逻辑互补，确保任务完成路径也能触发完工。
+     */
+    private void tryAutoCompleteWorkorder(ProTask task)
+    {
+        if (task.getWorkorderId() == null || task.getRouteId() == null) return;
+        ProRouteProcess lastProc = proRouteProcessMapper.selectLastProcessByRouteId(task.getRouteId());
+        if (lastProc == null || !lastProc.getProcessId().equals(task.getProcessId())) return;
+
+        ProWorkorder wo = proWorkorderMapper.selectProWorkorderByWorkorderId(task.getWorkorderId());
+        if (wo == null || !"PRODUCING".equals(wo.getStatus())) return;
+
+        BigDecimal produced = wo.getQuantityProduced() != null ? wo.getQuantityProduced() : BigDecimal.ZERO;
+        BigDecimal planned = wo.getQuantity() != null ? wo.getQuantity() : BigDecimal.ZERO;
+        if (produced.compareTo(planned) >= 0)
+        {
+            wo.setStatus("COMPLETED");
+            wo.setFinishDate(new Date());
+            wo.setUpdateTime(DateUtils.getNowDate());
+            wo.setUpdateBy(SecurityUtils.getUsername());
+            proWorkorderMapper.updateProWorkorder(wo);
+        }
     }
 }

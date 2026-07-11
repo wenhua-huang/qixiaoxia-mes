@@ -41,6 +41,9 @@ public class ProFeedbackController extends BaseController
     @Autowired
     private ProWorkorderBomMapper proWorkorderBomMapper;
 
+    @Autowired(required = false)
+    private com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator autoCodeGenerator;
+
     /**
      * 获取工单默认物料消耗（新增报工时预填）
      */
@@ -116,6 +119,16 @@ public class ProFeedbackController extends BaseController
     @PostMapping
     public AjaxResult add(@RequestBody ProFeedback proFeedback)
     {
+        // feedbackCode 为空时自动生成（移动端不传编码，PC端已通过 genSerialCode 生成）
+        if (proFeedback.getFeedbackCode() == null || proFeedback.getFeedbackCode().isEmpty()) {
+            if (autoCodeGenerator != null) {
+                try { proFeedback.setFeedbackCode(autoCodeGenerator.genSerialCode("FEEDBACK_CODE", null)); }
+                catch (Exception e) { /* 自动编码失败则由 checkFeedbackCodeUnique 兜底校验 */ }
+            }
+            if (proFeedback.getFeedbackCode() == null || proFeedback.getFeedbackCode().isEmpty()) {
+                proFeedback.setFeedbackCode("FB" + System.currentTimeMillis());
+            }
+        }
         proFeedbackService.checkFeedbackCodeUnique(proFeedback);
         proFeedbackService.insertProFeedback(proFeedback);
         return success(proFeedback);

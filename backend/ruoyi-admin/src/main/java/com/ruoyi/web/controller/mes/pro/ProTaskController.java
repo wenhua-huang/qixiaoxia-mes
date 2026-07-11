@@ -114,53 +114,38 @@ public class ProTaskController extends BaseController
     }
 
     /**
-     * 下发排产任务：NORMAL → PRODUCING
+     * 下发排产任务：NORMAL/PREPARE → PRODUCING
      */
     @PreAuthorize("@ss.hasPermi('mes:pro:task:edit')")
     @Log(title = "生产任务下发", businessType = BusinessType.UPDATE)
     @PutMapping("/dispatch/{taskId}")
     public AjaxResult dispatch(@PathVariable Long taskId)
     {
-        ProTask task = proTaskService.selectProTaskByTaskId(taskId);
-        if (task == null) return error("任务不存在");
-        if (!"NORMAL".equals(task.getStatus()) && !"PREPARE".equals(task.getStatus()))
-            return error("只有待排产/正常状态的任务才能下发，当前状态：" + task.getStatus());
-        task.setStatus("PRODUCING");
-        proTaskService.updateProTask(task);
+        proTaskService.dispatchTask(taskId);
         return success();
     }
 
     /**
-     * 完成任务：PRODUCING → COMPLETED
+     * 完成任务：PRODUCING → COMPLETED（末工序完成时自动检查工单完工）
      */
     @PreAuthorize("@ss.hasPermi('mes:pro:task:edit')")
     @Log(title = "生产任务完成", businessType = BusinessType.UPDATE)
     @PutMapping("/complete/{taskId}")
     public AjaxResult complete(@PathVariable Long taskId)
     {
-        ProTask task = proTaskService.selectProTaskByTaskId(taskId);
-        if (task == null) return error("任务不存在");
-        if (!"PRODUCING".equals(task.getStatus()))
-            return error("只有生产中的任务才能完成，当前状态：" + task.getStatus());
-        task.setStatus("COMPLETED");
-        proTaskService.updateProTask(task);
+        proTaskService.completeTask(taskId);
         return success();
     }
 
     /**
-     * 取消任务
+     * 取消任务：非终态 → CANCEL
      */
     @PreAuthorize("@ss.hasPermi('mes:pro:task:edit')")
     @Log(title = "生产任务取消", businessType = BusinessType.UPDATE)
     @PutMapping("/cancel/{taskId}")
     public AjaxResult cancel(@PathVariable Long taskId)
     {
-        ProTask task = proTaskService.selectProTaskByTaskId(taskId);
-        if (task == null) return error("任务不存在");
-        if ("COMPLETED".equals(task.getStatus()))
-            return error("已完成的任务不能取消");
-        task.setStatus("CANCEL");
-        proTaskService.updateProTask(task);
+        proTaskService.cancelTask(taskId);
         return success();
     }
 

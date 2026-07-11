@@ -26,4 +26,30 @@ public interface IProTaskService
      * @return 每道工序的排产数量、已生产数量、合格/不合格数量
      */
     public List<Map<String, Object>> selectProcessProgressByWorkorder(Long workorderId);
+
+    /**
+     * 下发单个任务：NORMAL/PREPARE → PRODUCING
+     */
+    public void dispatchTask(Long taskId);
+
+    /**
+     * 完成单个任务：PRODUCING → COMPLETED。
+     * 若完成的是末工序任务，额外检查工单是否产够→自动完工。
+     */
+    public void completeTask(Long taskId);
+
+    /**
+     * 取消单个任务：非终态（非 COMPLETED/CANCEL）→ CANCEL
+     */
+    public void cancelTask(Long taskId);
+
+    /**
+     * 工单开工级联：把该工单下所有 NORMAL/PREPARE 任务自动下发为 PRODUCING
+     */
+    public void dispatchByWorkorder(Long workorderId);
+
+    /**
+     * 取消工单级联：把该工单下所有非终态任务自动置为 CANCEL
+     */
+    public void cancelByWorkorder(Long workorderId);
 }

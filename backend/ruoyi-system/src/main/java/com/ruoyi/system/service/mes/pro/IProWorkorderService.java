@@ -38,6 +38,11 @@ public interface IProWorkorderService
     public List<ProWorkorder> selectAll();
 
     /**
+     * 根据工单编码查询工单
+     */
+    public ProWorkorder selectProWorkorderByWorkorderCode(String workorderCode);
+
+    /**
      * 检查工单编码唯一性
      *
      * @param proWorkorder 生产工单

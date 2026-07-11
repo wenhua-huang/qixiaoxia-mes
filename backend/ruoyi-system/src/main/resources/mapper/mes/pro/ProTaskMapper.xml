@@ -279,4 +279,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           and end_time &gt; #{startTime}
           <if test="excludeTaskId != null"> and task_id != #{excludeTaskId}</if>
     </select>
+
+    <!-- 按工单 + 源状态批量更新任务状态（工单开工级联下发/取消级联取消）factory_id 由拦截器注入 -->
+    <update id="updateStatusByWorkorder">
+        update qxx_pro_task
+        set status = #{toStatus}, update_time = NOW()
+        where workorder_id = #{workorderId}
+          and status in
+          <foreach collection="fromStatuses" item="s" open="(" separator="," close=")">#{s}</foreach>
+    </update>
 </mapper>

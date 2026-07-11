@@ -17,6 +17,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="createTime"    column="create_time"    />
         <result property="updateBy"    column="update_by"    />
         <result property="updateTime"    column="update_time"    />
+        <result property="paramName"    column="param_name"    />
+        <result property="unit"    column="unit"    />
+        <result property="minValue"    column="min_value"    />
+        <result property="maxValue"    column="max_value"    />
     </resultMap>
 
     <sql id="selectProFeedbackParamVo">
@@ -39,9 +43,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </select>
 
     <select id="selectProFeedbackParamByFeedbackId" parameterType="Long" resultMap="ProFeedbackParamResult">
-        <include refid="selectProFeedbackParamVo"/>
-        where feedback_id = #{feedbackId}
-        order by record_id
+        select p.record_id, p.factory_id, p.feedback_id, p.workorder_param_id, p.template_id,
+               p.actual_value, p.is_deviation, p.remark, p.create_by, p.create_time, p.update_by, p.update_time,
+               t.param_name, t.unit, t.min_value, t.max_value
+        from qxx_pro_feedback_param p
+        left join qxx_pro_param_template t on p.template_id = t.template_id
+        where p.feedback_id = #{feedbackId}
+        order by p.record_id
     </select>
 
     <insert id="insertProFeedbackParam" parameterType="ProFeedbackParam" useGeneratedKeys="true" keyProperty="recordId">

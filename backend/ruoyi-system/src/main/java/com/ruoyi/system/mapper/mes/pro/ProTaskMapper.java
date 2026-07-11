@@ -28,4 +28,12 @@ public interface ProTaskMapper {
                       @Param("endTime") Date endTime,
                       @Param("factoryId") Long factoryId,
                       @Param("excludeTaskId") Long excludeTaskId);
+
+    /**
+     * 按工单 ID + 源状态批量更新任务状态（用于工单开工级联下发/取消级联取消）。
+     * factory_id 由 MyBatis 拦截器自动注入。
+     */
+    int updateStatusByWorkorder(@Param("workorderId") Long workorderId,
+                                @Param("fromStatuses") List<String> fromStatuses,
+                                @Param("toStatus") String toStatus);
 }

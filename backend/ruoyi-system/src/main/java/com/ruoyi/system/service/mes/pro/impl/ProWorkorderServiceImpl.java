@@ -373,6 +373,12 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         return qxxProWorkorderMapper.selectProWorkorderList(new ProWorkorder());
     }
 
+    @Override
+    public ProWorkorder selectProWorkorderByWorkorderCode(String workorderCode)
+    {
+        return qxxProWorkorderMapper.selectProWorkorderByWorkorderCode(workorderCode);
+    }
+
     /**
      * 检查工单编码唯一性
      *
@@ -514,7 +520,10 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         wo.setStatus("PRODUCING");
         wo.setUpdateTime(DateUtils.getNowDate());
         wo.setUpdateBy(SecurityUtils.getUsername());
-        return qxxProWorkorderMapper.updateProWorkorder(wo);
+        int rows = qxxProWorkorderMapper.updateProWorkorder(wo);
+        // 级联：工单开工 → 该工单下所有 NORMAL/PREPARE 任务自动下发为 PRODUCING
+        proTaskService.dispatchByWorkorder(workorderId);
+        return rows;
     }
 
     /**
@@ -524,6 +533,7 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
      * @return 结果
      */
     @Override
+    @Transactional
     public int cancelWorkorder(Long workorderId)
     {
         ProWorkorder wo = selectProWorkorderByWorkorderId(workorderId);
@@ -550,14 +560,17 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
                             wmIssueHeaderService.releaseAllocation(issue.getIssueId());
                         }
                         wmIssueHeaderService.cancel(issue.getIssueId(), "工单取消，关联领料单自动作废");
-                    } catch (Exception ex) {
-                        // 单张作废失败不阻断工单取消，忽略继续
+                    } catch (ServiceException ex) {
+                        // 并发场景下领料单可能已被其他请求作废，跳过不阻断工单取消
                     }
                 }
             }
         }
 
-        // Step 2: 全部释放成功后更新工单状态
+        // Step 2: 级联取消该工单下所有非终态排产任务
+        proTaskService.cancelByWorkorder(workorderId);
+
+        // Step 3: 更新工单状态
         wo.setStatus("CANCEL");
         wo.setUpdateTime(DateUtils.getNowDate());
         wo.setUpdateBy(SecurityUtils.getUsername());

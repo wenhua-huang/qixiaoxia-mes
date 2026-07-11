@@ -93,6 +93,11 @@
           <el-tag :type="statusTagMap[scope.row.status] || 'info'" size="small">{{ statusLabelMap[scope.row.status] || scope.row.status }}</el-tag>
         </template>
       </el-table-column>
+      <el-table-column label="报工人" align="center" prop="nickName" width="90" :show-overflow-tooltip="true">
+        <template #default="scope">
+          <span>{{ scope.row.nickName || scope.row.userName || '-' }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="报工时间" align="center" prop="feedbackTime" width="160">
         <template #default="scope">
           <span>{{ parseTime(scope.row.feedbackTime) }}</span>

@@ -225,6 +225,23 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
         }
     }
 
+    /**
+     * 报工审核后检查任务是否产够，产够则自动完成（PRODUCING → COMPLETED）。
+     * 避免任务永远停在 PRODUCING，需人工点"完成"按钮。
+     */
+    private void tryAutoCompleteTask(Long taskId) {
+        ProTask task = proTaskMapper.selectProTaskByTaskId(taskId);
+        if (task == null || !"PRODUCING".equals(task.getStatus())) return;
+        BigDecimal produced = task.getQuantityProduced() != null ? task.getQuantityProduced() : BigDecimal.ZERO;
+        BigDecimal planned = task.getQuantity() != null ? task.getQuantity() : BigDecimal.ZERO;
+        if (planned.compareTo(BigDecimal.ZERO) > 0 && produced.compareTo(planned) >= 0) {
+            task.setStatus("COMPLETED");
+            task.setUpdateTime(DateUtils.getNowDate());
+            task.setUpdateBy(SecurityUtils.getUsername());
+            proTaskMapper.updateProTask(task);
+        }
+    }
+
     /** 从工单BOM构建默认物料消耗列表 */
     private List<ProFeedbackConsume> buildConsumeFromBom(Long workorderId) {
         try {
@@ -347,6 +364,8 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
                 BigDecimal deltaQualified = nvl(fb.getQuantityQualified());
                 BigDecimal deltaUnqualified = nvl(fb.getQuantityUnqualified());
                 proTaskMapper.addQuantityProduced(fb.getTaskId(), deltaProduced, deltaQualified, deltaUnqualified);
+                // 任务已生产 ≥ 计划量 → 自动标记 COMPLETED（否则任务永远停在 PRODUCING）
+                tryAutoCompleteTask(fb.getTaskId());
             }
 
             // 增量更新生产工单已生产数量（末工序法：仅工艺路线最后一道工序报工才累加，避免多工序重复计数）

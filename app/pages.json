@@ -117,6 +117,17 @@
     "style": {
       "navigationBarTitleText": "扫码查库存"
     }
+  }, {
+    "path": "pages/mes/pro/report",
+    "style": {
+      "navigationBarTitleText": "生产报工"
+    }
+  }, {
+    "path": "pages/mes/pro/history",
+    "style": {
+      "navigationBarTitleText": "报工历史",
+      "enablePullDownRefresh": true
+    }
   }],
   "tabBar": {
     "color": "#000000",

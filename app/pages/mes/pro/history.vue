@@ -56,7 +56,7 @@
           </view>
         </view>
         <view class="item-footer">
-          <text class="text-grey">{{ item.feedbackTime || item.createTime }}</text>
+          <text class="text-grey">{{ item.nickName || item.userName || '-' }} · {{ formatTime(item.feedbackTime || item.createTime) }}</text>
         </view>
       </view>
 
@@ -91,6 +91,11 @@ const STATUS_MAP = {
   PREPARE: '待确认', CONFIRMED: '已确认', AUDITED: '已审核'
 }
 function fbStatusText(s) { return STATUS_MAP[s] || s || '' }
+/** 格式化时间：2026-07-11 14:52:17 → 07-11 14:52 */
+function formatTime(t) {
+  if (!t) return ''
+  return t.substring(5, 16)
+}
 function fbStatusTagType(s) {
   const m = { PREPARE: 'warning', CONFIRMED: 'primary', AUDITED: 'success' }
   return m[s] || 'default'

@@ -168,6 +168,13 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
         proFeedback.setCreateBy(SecurityUtils.getUsername());
         if (proFeedback.getStatus() == null) proFeedback.setStatus("PREPARE");
         if (proFeedback.getFeedbackTime() == null) proFeedback.setFeedbackTime(DateUtils.getNowDate());
+        // 自动填充报工人（当前登录用户），前端不传时由后端兜底
+        if (proFeedback.getUserName() == null || proFeedback.getUserName().isEmpty()) {
+            proFeedback.setUserName(SecurityUtils.getUsername());
+            try {
+                proFeedback.setNickName(SecurityUtils.getLoginUser().getUser().getNickName());
+            } catch (Exception ignored) {}
+        }
         autoFillCodes(proFeedback);
         // 物料消耗默认值：若未传 consumeList 但有工单ID，从工单BOM自动填充
         if ((proFeedback.getConsumeList() == null || proFeedback.getConsumeList().isEmpty())

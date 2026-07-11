@@ -167,6 +167,7 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
         proFeedback.setCreateTime(DateUtils.getNowDate());
         proFeedback.setCreateBy(SecurityUtils.getUsername());
         if (proFeedback.getStatus() == null) proFeedback.setStatus("PREPARE");
+        if (proFeedback.getFeedbackTime() == null) proFeedback.setFeedbackTime(DateUtils.getNowDate());
         autoFillCodes(proFeedback);
         // 物料消耗默认值：若未传 consumeList 但有工单ID，从工单BOM自动填充
         if ((proFeedback.getConsumeList() == null || proFeedback.getConsumeList().isEmpty())

@@ -12,14 +12,14 @@ description: Use to publish this project to the production server (115.29.234.20
 - **SSH 免密已配**：`~/.ssh/config` 含 `Host qxx` 别名 → `115.29.234.204`（root，密钥 `~/.ssh/id_ed25519`）。本 skill 所有 ssh/scp 均用 `qxx` 别名，无需密码
 - 服务器 Docker 容器正常运行（MySQL:3307, Redis:6380, MinIO:9010）
 - **服务器仅 1.8GB 内存，前端构建必须在本机完成，禁止在服务器跑 `vite build`**
-- 项目根路径：`/Users/huangwenhua/Company/qixiaoxiao/qixiaoxia-mes`（本机）与 `/var/www/qixiaoxia-mes`（服务器）
+- 项目根路径：`/Users/huangwenhua/company/self/qixiaoxia-mes`（本机，main 分支）与 `/var/www/qixiaoxia-mes`（服务器）
 
 ## 发布步骤
 
 ### 1. 本机构建前端
 
 ```bash
-cd /Users/huangwenhua/Company/qixiaoxiao/qixiaoxia-mes/frontend && npx vite build
+cd /Users/huangwenhua/company/self/qixiaoxia-mes/frontend && npx vite build
 ```
 
 ### 2. 服务器端：拉代码 → 编译 → 重启后端

@@ -533,7 +533,6 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
      * @return 结果
      */
     @Override
-    @Transactional
     public int cancelWorkorder(Long workorderId)
     {
         ProWorkorder wo = selectProWorkorderByWorkorderId(workorderId);

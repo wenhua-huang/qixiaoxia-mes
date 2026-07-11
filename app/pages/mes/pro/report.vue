@@ -232,7 +232,7 @@ function submitReport() {
     const w = workorder.value
     const body = {
       feedbackType: 'INTERNAL',
-      feedbackCode: 'FB' + Date.now(),
+      feedbackCode: '',  // 留空，后端自动生成
       taskId: t.taskId,
       taskCode: t.taskCode,
       workorderId: w.workorderId,
@@ -256,7 +256,7 @@ function submitReport() {
       quantityUncheck: 0,
       quantityOtherScrap: 0,
       feedbackChannel: 'PAD',
-      feedbackTime: null,  // 后端 autoFillCodes 不自动填，这里留 null 让后端处理
+      feedbackTime: null,  // 后端兜底设为当前时间
       userName: null,
       remark: form.remark || null,
       status: 'PREPARE'

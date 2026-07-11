@@ -30,6 +30,7 @@ import com.ruoyi.system.domain.mes.pro.ProFeedbackConsume;
 import com.ruoyi.system.domain.mes.pro.ProFeedbackParam;
 import com.ruoyi.system.domain.mes.pro.ProParamTemplate;
 import com.ruoyi.system.domain.mes.pro.ProTask;
+import com.ruoyi.system.domain.mes.pro.ProConstants;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderBom;
 import com.ruoyi.system.domain.mes.pro.ProProcess;
@@ -231,11 +232,11 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
      */
     private void tryAutoCompleteTask(Long taskId) {
         ProTask task = proTaskMapper.selectProTaskByTaskId(taskId);
-        if (task == null || !"PRODUCING".equals(task.getStatus())) return;
+        if (task == null || !ProConstants.TASK_STATUS_PRODUCING.equals(task.getStatus())) return;
         BigDecimal produced = task.getQuantityProduced() != null ? task.getQuantityProduced() : BigDecimal.ZERO;
         BigDecimal planned = task.getQuantity() != null ? task.getQuantity() : BigDecimal.ZERO;
         if (planned.compareTo(BigDecimal.ZERO) > 0 && produced.compareTo(planned) >= 0) {
-            task.setStatus("COMPLETED");
+            task.setStatus(ProConstants.TASK_STATUS_COMPLETED);
             task.setUpdateTime(DateUtils.getNowDate());
             task.setUpdateBy(SecurityUtils.getUsername());
             proTaskMapper.updateProTask(task);

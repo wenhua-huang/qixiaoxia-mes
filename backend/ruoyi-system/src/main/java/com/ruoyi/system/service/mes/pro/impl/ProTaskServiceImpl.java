@@ -21,6 +21,7 @@ import com.ruoyi.system.mapper.mes.pro.ProRouteMapper;
 import com.ruoyi.system.mapper.mes.pro.ProRouteProcessMapper;
 import com.ruoyi.system.mapper.mes.md.MdWorkstationMapper;
 import com.ruoyi.system.domain.mes.pro.ProTask;
+import com.ruoyi.system.domain.mes.pro.ProConstants;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
 import com.ruoyi.system.domain.mes.pro.ProProcess;
 import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
@@ -165,7 +166,7 @@ public class ProTaskServiceImpl implements IProTaskService
     {
         proTask.setCreateTime(DateUtils.getNowDate());
         proTask.setCreateBy(SecurityUtils.getUsername());
-        if (proTask.getStatus() == null) proTask.setStatus("NORMAL");
+        if (proTask.getStatus() == null) proTask.setStatus(ProConstants.TASK_STATUS_NORMAL);
 
         // 默认值
         if (proTask.getQuantity() == null) proTask.setQuantity(BigDecimal.ONE);
@@ -256,11 +257,11 @@ public class ProTaskServiceImpl implements IProTaskService
     // ==================== 任务状态流转（从 Controller 下沉到 Service）====================
 
     /** 终态集合：已结束不再占用工作站 */
-    private static final List<String> TASK_INACTIVE = Arrays.asList("COMPLETED", "CANCEL");
+    private static final List<String> TASK_INACTIVE = Arrays.asList(ProConstants.TASK_STATUS_COMPLETED, ProConstants.TASK_STATUS_CANCEL);
     /** 可下发的前置状态 */
-    private static final List<String> TASK_DISPATCHABLE = Arrays.asList("NORMAL", "PREPARE");
+    private static final List<String> TASK_DISPATCHABLE = Arrays.asList(ProConstants.TASK_STATUS_NORMAL, ProConstants.TASK_STATUS_PREPARE);
     /** 可取消的前置状态（所有非终态）*/
-    private static final List<String> TASK_CANCELLABLE = Arrays.asList("NORMAL", "PREPARE", "PRODUCING", "PAUSED");
+    private static final List<String> TASK_CANCELLABLE = Arrays.asList(ProConstants.TASK_STATUS_NORMAL, ProConstants.TASK_STATUS_PREPARE, ProConstants.TASK_STATUS_PRODUCING, ProConstants.TASK_STATUS_PAUSED);
 
     @Override
     public void dispatchTask(Long taskId)
@@ -269,7 +270,7 @@ public class ProTaskServiceImpl implements IProTaskService
         if (task == null) throw new ServiceException("任务不存在");
         if (!TASK_DISPATCHABLE.contains(task.getStatus()))
             throw new ServiceException("只有待排产/正常状态的任务才能下发，当前状态：" + task.getStatus());
-        task.setStatus("PRODUCING");
+        task.setStatus(ProConstants.TASK_STATUS_PRODUCING);
         task.setUpdateTime(DateUtils.getNowDate());
         task.setUpdateBy(SecurityUtils.getUsername());
         proTaskMapper.updateProTask(task);
@@ -280,9 +281,9 @@ public class ProTaskServiceImpl implements IProTaskService
     {
         ProTask task = proTaskMapper.selectProTaskByTaskId(taskId);
         if (task == null) throw new ServiceException("任务不存在");
-        if (!"PRODUCING".equals(task.getStatus()))
+        if (!ProConstants.TASK_STATUS_PRODUCING.equals(task.getStatus()))
             throw new ServiceException("只有生产中的任务才能完成，当前状态：" + task.getStatus());
-        task.setStatus("COMPLETED");
+        task.setStatus(ProConstants.TASK_STATUS_COMPLETED);
         task.setUpdateTime(DateUtils.getNowDate());
         task.setUpdateBy(SecurityUtils.getUsername());
         proTaskMapper.updateProTask(task);
@@ -298,7 +299,7 @@ public class ProTaskServiceImpl implements IProTaskService
         if (task == null) throw new ServiceException("任务不存在");
         if (TASK_INACTIVE.contains(task.getStatus()))
             throw new ServiceException("已完成/取消的任务不能操作，当前状态：" + task.getStatus());
-        task.setStatus("CANCEL");
+        task.setStatus(ProConstants.TASK_STATUS_CANCEL);
         task.setUpdateTime(DateUtils.getNowDate());
         task.setUpdateBy(SecurityUtils.getUsername());
         proTaskMapper.updateProTask(task);
@@ -309,13 +310,13 @@ public class ProTaskServiceImpl implements IProTaskService
     @Override
     public void dispatchByWorkorder(Long workorderId)
     {
-        proTaskMapper.updateStatusByWorkorder(workorderId, TASK_DISPATCHABLE, "PRODUCING");
+        proTaskMapper.updateStatusByWorkorder(workorderId, TASK_DISPATCHABLE, ProConstants.TASK_STATUS_PRODUCING);
     }
 
     @Override
     public void cancelByWorkorder(Long workorderId)
     {
-        proTaskMapper.updateStatusByWorkorder(workorderId, TASK_CANCELLABLE, "CANCEL");
+        proTaskMapper.updateStatusByWorkorder(workorderId, TASK_CANCELLABLE, ProConstants.TASK_STATUS_CANCEL);
     }
 
     /**
@@ -330,13 +331,13 @@ public class ProTaskServiceImpl implements IProTaskService
         if (lastProc == null || !lastProc.getProcessId().equals(task.getProcessId())) return;
 
         ProWorkorder wo = proWorkorderMapper.selectProWorkorderByWorkorderId(task.getWorkorderId());
-        if (wo == null || !"PRODUCING".equals(wo.getStatus())) return;
+        if (wo == null || !"PRODUCING".equals(wo.getStatus())) return;  // 工单状态暂无常量类，沿用字符串
 
         BigDecimal produced = wo.getQuantityProduced() != null ? wo.getQuantityProduced() : BigDecimal.ZERO;
         BigDecimal planned = wo.getQuantity() != null ? wo.getQuantity() : BigDecimal.ZERO;
         if (produced.compareTo(planned) >= 0)
         {
-            wo.setStatus("COMPLETED");
+            wo.setStatus("COMPLETED");  // 工单状态暂无常量类，沿用字符串
             wo.setFinishDate(new Date());
             wo.setUpdateTime(DateUtils.getNowDate());
             wo.setUpdateBy(SecurityUtils.getUsername());

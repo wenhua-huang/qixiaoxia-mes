@@ -58,14 +58,14 @@
     <!-- 宫格组件 — 生产管理 -->
     <uni-section title="生产管理" type="line"></uni-section>
     <view class="grid-body">
-      <uni-grid :column="4" :showBorder="false" @change="changeProGrid">
-        <uni-grid-item>
+      <uni-grid :column="4" :showBorder="false">
+        <uni-grid-item @click="goReport">
           <view class="grid-item-box">
             <uni-icons type="compose" size="30" color="#409eff"></uni-icons>
             <text class="text">生产报工</text>
           </view>
         </uni-grid-item>
-        <uni-grid-item>
+        <uni-grid-item @click="goFeedbackHistory">
           <view class="grid-item-box">
             <uni-icons type="list" size="30" color="#67c23a"></uni-icons>
             <text class="text">报工历史</text>
@@ -177,11 +177,12 @@
     else if (idx === 2) proxy.$tab.navigateTo('/pages/mes/wm/issue/scan-query')
   }
 
-  // 生产管理宫格：0=生产报工, 1=报工历史
-  function changeProGrid(e) {
-    const idx = e.detail.index
-    if (idx === 0) proxy.$tab.navigateTo('/pages/mes/pro/report')
-    else if (idx === 1) proxy.$tab.navigateTo('/pages/mes/pro/history')
+  // 生产管理入口
+  function goReport() {
+    proxy.$tab.navigateTo('/pages/mes/pro/report')
+  }
+  function goFeedbackHistory() {
+    proxy.$tab.navigateTo('/pages/mes/pro/history')
   }
 </script>
 

@@ -12,8 +12,6 @@ export function addFeedback(data: any) { return request({ url: '/mes/pro/feedbac
 export function updateFeedback(data: any) { return request({ url: '/mes/pro/feedback', method: 'put', data }) }
 // 删除
 export function delFeedback(ids: any) { return request({ url: '/mes/pro/feedback/' + ids, method: 'delete' }) }
-// 根据任务ID查询反馈列表
-export function listFeedbackByTaskId(taskId: number) { return request({ url: '/mes/pro/feedback/listByTaskId/' + taskId, method: 'get' }) }
 // 确认报工：PREPARE → CONFIRMED
 export function confirmFeedback(recordId: number) { return request({ url: '/mes/pro/feedback/confirm/' + recordId, method: 'put' }) }
 // 审核报工：CONFIRMED → AUDITED

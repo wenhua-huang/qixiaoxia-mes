@@ -22,9 +22,13 @@ import com.ruoyi.system.mapper.mes.pro.ProCardProcessMapper;
 import com.ruoyi.system.mapper.mes.pro.ProCardMapper;
 import com.ruoyi.system.mapper.mes.pro.ProMaterialTraceMapper;
 import com.ruoyi.system.mapper.mes.pro.ProFeedbackConsumeMapper;
+import com.ruoyi.system.mapper.mes.pro.ProFeedbackParamMapper;
+import com.ruoyi.system.mapper.mes.pro.ProParamTemplateMapper;
 import com.ruoyi.system.mapper.mes.md.MdItemMapper;
 import com.ruoyi.system.domain.mes.pro.ProFeedback;
 import com.ruoyi.system.domain.mes.pro.ProFeedbackConsume;
+import com.ruoyi.system.domain.mes.pro.ProFeedbackParam;
+import com.ruoyi.system.domain.mes.pro.ProParamTemplate;
 import com.ruoyi.system.domain.mes.pro.ProTask;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderBom;
@@ -49,6 +53,8 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
     @Autowired private RedisLockTemplate lockTemplate;
     @Autowired private ProFeedbackMapper qxxProFeedbackMapper;
     @Autowired private ProFeedbackConsumeMapper consumeMapper;
+    @Autowired private ProFeedbackParamMapper feedbackParamMapper;
+    @Autowired private ProParamTemplateMapper proParamTemplateMapper;
     @Autowired private ProTaskMapper proTaskMapper;
     @Autowired private ProWorkorderMapper proWorkorderMapper;
     @Autowired private ProWorkorderBomMapper proWorkorderBomMapper;
@@ -64,6 +70,7 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
         ProFeedback fb = qxxProFeedbackMapper.selectProFeedbackByRecordId(recordId);
         if (fb != null) {
             fb.setConsumeList(consumeMapper.selectByFeedbackId(recordId));
+            fb.setParamList(feedbackParamMapper.selectProFeedbackParamByFeedbackId(recordId));
         }
         return fb;
     }
@@ -175,8 +182,39 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
             }
             consumeMapper.insertBatch(proFeedback.getConsumeList());
         }
+        // 持久化报工参数（自动判定偏差）
+        if (proFeedback.getParamList() != null && !proFeedback.getParamList().isEmpty()) {
+            for (ProFeedbackParam p : proFeedback.getParamList()) {
+                p.setFeedbackId(proFeedback.getRecordId());
+                p.setIsDeviation(calcDeviation(p));
+                feedbackParamMapper.insertProFeedbackParam(p);
+            }
+        }
         writeMaterialTrace(proFeedback);
         return rows;
+    }
+
+    /**
+     * 计算参数偏差：actualValue 超出 template 的 minValue/maxValue 范围则返回 "Y"，范围内返回 "N"。
+     * 无 min/max 约束、actualValue 为空、或非数值型参数（无法解析为 BigDecimal）时返回 null（未判定）。
+     */
+    private String calcDeviation(ProFeedbackParam p) {
+        if (p.getActualValue() == null || p.getActualValue().isEmpty() || p.getTemplateId() == null) {
+            return null;
+        }
+        ProParamTemplate tpl = proParamTemplateMapper.selectProParamTemplateByTemplateId(p.getTemplateId());
+        if (tpl == null || (tpl.getMinValue() == null && tpl.getMaxValue() == null)) {
+            return null;
+        }
+        try {
+            BigDecimal val = new BigDecimal(p.getActualValue().trim());
+            if (tpl.getMinValue() != null && val.compareTo(tpl.getMinValue()) < 0) return "Y";
+            if (tpl.getMaxValue() != null && val.compareTo(tpl.getMaxValue()) > 0) return "Y";
+            return "N";
+        } catch (NumberFormatException e) {
+            // 非数值型参数（VARCHAR/ENUM/DATE 等），无法做范围比较
+            return null;
+        }
     }
 
     /** 从工单BOM构建默认物料消耗列表 */
@@ -208,7 +246,9 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
                 if (proc != null && "SLITTING".equals(proc.getProcessType())) {
                     traceType = "SLIT";
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                log.warn("物料追溯-工序类型判定失败, processId={}, 降级为 PRODUCE", fb.getProcessId(), e);
+            }
             Long cardId = null;
             Long cardProcessId = null;
             try {
@@ -227,7 +267,9 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
                         cardProcessId = cp.getRecordId();
                     }
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                log.warn("物料追溯-流转卡查找失败, workorderId={}, cardId/cardProcessId 将为 null", fb.getWorkorderId(), e);
+            }
             ProMaterialTrace trace = new ProMaterialTrace();
             trace.setTraceType(traceType);
             trace.setParentType("CARD");
@@ -245,7 +287,10 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
             trace.setCreateTime(DateUtils.getNowDate());
             trace.setCreateBy(SecurityUtils.getUsername());
             proMaterialTraceMapper.insertProMaterialTrace(trace);
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            // 物料追溯失败不阻断主报工流程（报工主记录已提交），但必须留痕便于排查追溯断链
+            log.error("写入物料追溯失败, feedbackId={}", fb.getRecordId(), e);
+        }
     }
 
     @Override

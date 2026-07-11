@@ -76,6 +76,10 @@ public class ProFeedback extends BaseEntity
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private List<ProFeedbackConsume> consumeList;
 
+    /** 报工参数列表（transient，由Service层手动填充，含偏差判定结果） */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private List<ProFeedbackParam> paramList;
+
     public Long getRecordId() { return recordId; }
     public void setRecordId(Long v) { this.recordId = v; }
     public Long getFactoryId() { return factoryId; }
@@ -172,6 +176,8 @@ public class ProFeedback extends BaseEntity
     public void setStatus(String v) { this.status = v; }
     public List<ProFeedbackConsume> getConsumeList() { return consumeList; }
     public void setConsumeList(List<ProFeedbackConsume> v) { this.consumeList = v; }
+    public List<ProFeedbackParam> getParamList() { return paramList; }
+    public void setParamList(List<ProFeedbackParam> v) { this.paramList = v; }
 
     @Override
     public String toString() {

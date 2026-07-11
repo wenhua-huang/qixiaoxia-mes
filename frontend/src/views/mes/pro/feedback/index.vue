@@ -319,6 +319,37 @@
           </el-table>
           <div v-if="consumeList.length === 0" style="text-align: center; padding: 20px; color: #909399;">暂无物料消耗数据</div>
         </el-tab-pane>
+
+        <!-- Tab3: 工序参数 -->
+        <el-tab-pane label="工序参数" name="param">
+          <el-table :data="paramList" border size="small" max-height="320">
+            <el-table-column label="参数名称" align="center" prop="paramName" min-width="130" />
+            <el-table-column label="单位" align="center" prop="unit" width="80" />
+            <el-table-column label="标准范围" align="center" min-width="140">
+              <template #default="scope">
+                <span>{{ formatRange(scope.row) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="实际值" align="center" prop="actualValue" min-width="150">
+              <template #default="scope">
+                <el-input v-model="scope.row.actualValue" size="small" placeholder="请输入" :disabled="optType === 'view'" />
+              </template>
+            </el-table-column>
+            <el-table-column label="偏差" align="center" width="80">
+              <template #default="scope">
+                <el-tag v-if="scope.row.isDeviation === 'Y'" type="danger" size="small">偏差</el-tag>
+                <el-tag v-else-if="scope.row.isDeviation === 'N'" type="success" size="small">正常</el-tag>
+                <span v-else style="color: #909399">-</span>
+              </template>
+            </el-table-column>
+          </el-table>
+          <div v-if="paramList.length === 0" style="text-align: center; padding: 20px; color: #909399;">
+            暂无工序参数{{ form.processId ? '' : '（请先选择工序）' }}
+          </div>
+          <div v-if="paramList.some(p => p.isDeviation === 'Y')" style="margin-top: 10px; color: #f56c6c; font-size: 12px;">
+            <el-icon><Warning /></el-icon> 存在偏差参数，请核对实际值是否符合工艺要求
+          </div>
+        </el-tab-pane>
       </el-tabs>
 
       <!-- 工作站选择弹窗 -->
@@ -338,8 +369,10 @@
 
 <script setup lang="ts">
 import { ref, reactive, getCurrentInstance } from 'vue'
+import { Warning } from '@element-plus/icons-vue'
 import { listFeedback, getFeedback, addFeedback, updateFeedback, delFeedback, confirmFeedback, auditFeedback, getConsumeDefaults } from '@/api/mes/pro/feedback'
 import { getTask } from '@/api/mes/pro/task'
+import { listParamTemplateByProcessId } from '@/api/mes/pro/paramtemplate'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import WorkstationSelect from '@/components/workstationSelect/single.vue'
 import taskSelect from '@/components/taskSelect/single.vue'
@@ -393,6 +426,29 @@ interface ConsumeItem {
   batchCode: string
 }
 const consumeList = ref<ConsumeItem[]>([])
+
+// 工序参数列表（Tab3，新增时从参数模板加载，提交时回传后端做偏差判定）
+interface ParamItem {
+  templateId: number | null
+  workorderParamId: number | null
+  paramName: string
+  unit: string
+  minValue: number | null
+  maxValue: number | null
+  actualValue: string
+  isDeviation: string | null
+}
+const paramList = ref<ParamItem[]>([])
+
+/** 格式化参数标准范围显示 */
+function formatRange(row: ParamItem): string {
+  const hasMin = row.minValue != null
+  const hasMax = row.maxValue != null
+  if (hasMin && hasMax) return `${row.minValue} ~ ${row.maxValue}`
+  if (hasMin) return `≥ ${row.minValue}`
+  if (hasMax) return `≤ ${row.maxValue}`
+  return '-'
+}
 
 const queryParams = reactive<any>({
   pageNum: 1,
@@ -530,7 +586,25 @@ function onTaskSelected(row: any) {
     form.itemName = row.itemName
     form.routeId = row.routeId
     fetchConsumeDefaults(row.workorderId)
+    if (row.processId) loadParamTemplates(row.processId)
   }
+}
+
+/** 加载工序参数模板（只加载报工可见 isReportVisible=Y 的），填充到 paramList 供操作工填报 */
+function loadParamTemplates(processId: number) {
+  listParamTemplateByProcessId(processId).then((res: any) => {
+    const templates = (res.data || []).filter((t: any) => t.isReportVisible === 'Y' && t.enableFlag === '1')
+    paramList.value = templates.map((t: any) => ({
+      templateId: t.templateId,
+      workorderParamId: null,
+      paramName: t.paramName,
+      unit: t.unit || '',
+      minValue: t.minValue,
+      maxValue: t.maxValue,
+      actualValue: '',
+      isDeviation: null,
+    }))
+  })
 }
 
 // ==================== 工单选择 ====================
@@ -630,6 +704,7 @@ function reset() {
   form.feedbackTime = null
   form.remark = null
   consumeList.value = []
+  paramList.value = []
   activeTab.value = 'feedback'
   proxy.resetForm('formRef')
 }
@@ -652,6 +727,19 @@ function handleView(row: any) {
     if (response.data.consumeList) {
       consumeList.value = response.data.consumeList
     }
+    // 回填工序参数列表（如果后端返回了 paramList）
+    if (response.data.paramList) {
+      paramList.value = response.data.paramList.map((p: any) => ({
+        templateId: p.templateId,
+        workorderParamId: p.workorderParamId,
+        paramName: p.paramName || '',
+        unit: p.unit || '',
+        minValue: p.minValue,
+        maxValue: p.maxValue,
+        actualValue: p.actualValue || '',
+        isDeviation: p.isDeviation,
+      }))
+    }
     open.value = true
     title.value = '查看报工'
     optType.value = 'view'
@@ -667,6 +755,19 @@ function handleUpdate(row?: any) {
     if (response.data.consumeList) {
       consumeList.value = response.data.consumeList
     }
+    // 回填工序参数列表（如果后端返回了 paramList）
+    if (response.data.paramList) {
+      paramList.value = response.data.paramList.map((p: any) => ({
+        templateId: p.templateId,
+        workorderParamId: p.workorderParamId,
+        paramName: p.paramName || '',
+        unit: p.unit || '',
+        minValue: p.minValue,
+        maxValue: p.maxValue,
+        actualValue: p.actualValue || '',
+        isDeviation: p.isDeviation,
+      }))
+    }
     open.value = true
     title.value = '修改报工'
     optType.value = 'edit'
@@ -676,8 +777,8 @@ function handleUpdate(row?: any) {
 function submitForm() {
   formRef.value?.validate((valid: boolean) => {
     if (valid) {
-      // 将物料消耗列表合并到表单数据
-      const submitData = { ...form, consumeList: consumeList.value }
+      // 将物料消耗列表和工序参数列表合并到表单数据
+      const submitData = { ...form, consumeList: consumeList.value, paramList: paramList.value }
       if (form.recordId != null) {
         updateFeedback(submitData).then(() => {
           proxy.$modal.msgSuccess('修改成功')

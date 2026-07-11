@@ -10,13 +10,14 @@ description: Use to start the local development environment for this project. Tr
 ## 架构
 
 ```
-浏览器 → Vite Dev Server → /dev-api 代理 → localhost:8081 (Spring Boot)
-                                                 ↓
-                                          MySQL :3307 (qxx-mysql)
-                                          Redis :6380 (qxx-redis)
+浏览器 → Vite Dev Server (:5173) → /dev-api 代理 → localhost:8081 (Spring Boot)
+                                                       ↓
+                                                MySQL :3307 (qxx-mysql)
+                                                Redis :6380 (qxx-redis)
 ```
 
-> 项目根路径：`/Users/huangwenhua/Company/qixiaoxiao/qixiaoxia-mes`
+> ⚠️ 端口以 `frontend/vite.config.ts`（server.port=**5173**）和 `application.yml`（server.port=**8081**）为准，勿用默认 :80。  
+> 项目根路径：当前 git 仓库根（含 `backend/`、`frontend/`、`app/`）。
 
 ## 前置条件
 
@@ -38,7 +39,7 @@ docker ps --filter name=qxx-mysql --filter name=qxx-redis --format "{{.Names}} {
 ### 2. 构建并启动后端
 
 ```bash
-cd /Users/huangwenhua/Company/qixiaoxiao/qixiaoxia-mes/backend
+cd <repo-root>/backend    # 例：cd backend（相对 git 仓库根）
 
 # 若已有旧后端运行，先停掉
 lsof -ti :8081 | xargs kill 2>/dev/null
@@ -59,26 +60,28 @@ done
 ### 3. 启动前端
 
 ```bash
-cd /Users/huangwenhua/Company/qixiaoxiao/qixiaoxia-mes/frontend
+cd <repo-root>/frontend   # 例：cd frontend（相对 git 仓库根）
 
-# 若已有旧前端运行，先停掉（Vite dev 端口见 vite.config.ts，默认 :80）
-lsof -ti :80 | xargs kill 2>/dev/null
+# 若已有旧前端运行，先停掉（⚠️ 端口是 5173，不是 80）
+lsof -ti :5173 | xargs kill 2>/dev/null
 
-# 启动 Vite 开发服务器（代理 /dev-api → localhost:8081）
+# 启动 Vite 开发服务器（:5173，代理 /dev-api → localhost:8081）
 npm run dev &
 
 # 等待就绪
 for i in $(seq 1 15); do
   sleep 1
-  curl -s -o /dev/null -w "%{http_code}" http://localhost:80/ | grep -q 200 && echo "✅ 前端就绪" && break
+  curl -s -o /dev/null -w "%{http_code}" http://localhost:5173/ | grep -q 200 && echo "✅ 前端就绪" && break
 done
 ```
+
+> 首次运行若 `vite: command not found`，先 `npm install`。
 
 ### 4. 验证全链路
 
 ```bash
 # 验证前端代理 → 后端 API 链路
-curl -s http://localhost:80/dev-api/login \
+curl -s http://localhost:5173/dev-api/login \
   -X POST -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin123"}' \
   | python3 -c "import sys,json; d=json.load(sys.stdin); print('登录API:', d.get('code'), d.get('msg',''))"
@@ -93,19 +96,19 @@ curl -s http://localhost:80/dev-api/login \
 ```bash
 # 后端：仅重启 JAR（不重新构建）
 lsof -ti :8081 | xargs kill 2>/dev/null
-cd /Users/huangwenhua/Company/qixiaoxiao/qixiaoxia-mes/backend && \
+cd <repo-root>/backend && \
   nohup java -jar ruoyi-admin/target/ruoyi-admin.jar > /tmp/qxx-backend.log 2>&1 &
 
 # 前端：仅重启 Vite
-lsof -ti :80 | xargs kill 2>/dev/null
-cd /Users/huangwenhua/Company/qixiaoxiao/qixiaoxia-mes/frontend && npm run dev &
+lsof -ti :5173 | xargs kill 2>/dev/null
+cd <repo-root>/frontend && npm run dev &
 ```
 
 ## 停止服务
 
 ```bash
 lsof -ti :8081 | xargs kill  # 停止后端
-lsof -ti :80 | xargs kill    # 停止前端
+lsof -ti :5173 | xargs kill  # 停止前端
 ```
 
 ## 故障排查
@@ -113,10 +116,11 @@ lsof -ti :80 | xargs kill    # 停止前端
 | 现象 | 原因 | 解决 |
 |------|------|------|
 | 后端启动后立即退出 | Docker 容器未启动 | `docker start qxx-mysql qxx-redis` |
+| 前端 `vite: command not found` | node_modules 未安装 | `cd frontend && npm install` |
 | 前端 404 | Vite 路由未命中 | 确认访问路径正确，刷新页面 |
-| 登录接口 500 | 数据库连接失败 | 检查 `docker ps`，确认 `qxx-mysql` 状态 healthy |
+| 登录接口 500 | 数据库连接失败 | 检查 `docker ps`，确认 `qxx-mysql` 运行中 |
 | 端口 8081 被占 | 旧后端未完全退出 | `lsof -ti :8081 \| xargs kill -9` |
-| 端口 80 被占 | 旧前端未完全退出 | `lsof -ti :80 \| xargs kill -9` |
+| **前端端口漂移到 5174/5175** | 5173 被旧 Vite 进程占用（kill 80 杀不到） | `lsof -ti :5173 \| xargs kill -9` 后重启 |
 | 构建失败 | 代码编译错误 | 先 `mvn compile -pl ruoyi-admin -am` 排查 |
 | 前端 API 跨域 | Vite 代理未配置 | 检查 `frontend/vite.config.ts` 中 proxy 配置 |
 

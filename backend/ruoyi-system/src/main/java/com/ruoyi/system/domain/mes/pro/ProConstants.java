@@ -34,6 +34,10 @@ public class ProConstants
     public static final String DEFAULT_UNIT = "个";
     public static final String SYSTEM_USER = "system";
 
+    /** 上下工会话状态 */
+    public static final String WORKRECORD_ACTIVE = "ACTIVE";   // 在岗
+    public static final String WORKRECORD_CLOSED = "CLOSED";   // 已下工
+
     /** 日历安全阀 */
     public static final int CALENDAR_MAX_LOOPS = 1000;
     public static final int CALENDAR_PROBE_DAYS = 7;

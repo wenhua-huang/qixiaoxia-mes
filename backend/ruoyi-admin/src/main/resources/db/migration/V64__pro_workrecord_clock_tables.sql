@@ -1,26 +1,24 @@
 -- ============================================================
--- V63: 上下工打卡建表 DDL + clock 按钮权限补全
+-- V64: 上下工打卡建表 DDL + clock 按钮权限补全
 --
--- 说明：qxx_pro_workrecord / qxx_pro_user_workstation 两表此前仅存在于
---      docs 设计文档，无 Flyway 版本化迁移。部分环境存在手动建的旧表
---      （operation_flag/operation_time 扁平流水结构，无数据），本迁移
---      DROP 后重建为"工位会话"模式。两表此前从未经 Flyway 版本化，
---      且无业务数据，可安全重建。
+-- 说明：原 V63 与 origin/main 的 V63__ensure_product_recpt_menu.sql(PR #8)
+--      版本号冲突，故重命名为 V64。
+--      两表此前仅在部分开发环境手动建过（无业务数据），本迁移用
+--      CREATE TABLE IF NOT EXISTS 保护已有环境数据。
 --      菜单(2308/2309)及 CRUD 按钮权限已由 V18 创建。
 --
 -- 会话模式：上工 INSERT 一条 ACTIVE，下工 UPDATE 同一条 →
 --          CLOSED + clock_out_time + work_duration，工时直接读字段。
 --
--- 幂等：DROP IF EXISTS + CREATE；DML WHERE NOT EXISTS。
--- 日期：2026-07-12
+-- 幂等：CREATE IF NOT EXISTS；DML WHERE NOT EXISTS。
+-- 日期：2026-07-13
 -- ============================================================
 
 -- ════════════════════════════════════════════
 -- 1. 上下工会话记录表（工位打卡）
 --    会话模式：上工建一条(status=ACTIVE)，下工结算同一条(status=CLOSED)
 -- ════════════════════════════════════════════
-DROP TABLE IF EXISTS qxx_pro_workrecord;
-CREATE TABLE qxx_pro_workrecord (
+CREATE TABLE IF NOT EXISTS qxx_pro_workrecord (
   record_id                   bigint(20)      not null auto_increment    comment '记录ID',
   factory_id                  bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
   -- 操作人员
@@ -57,8 +55,7 @@ CREATE TABLE qxx_pro_workrecord (
 -- 2. 用户工作站绑定表
 --    用于"绑定优先不强制"的工位推荐（操作工快捷选择自己绑定的工位）
 -- ════════════════════════════════════════════
-DROP TABLE IF EXISTS qxx_pro_user_workstation;
-CREATE TABLE qxx_pro_user_workstation (
+CREATE TABLE IF NOT EXISTS qxx_pro_user_workstation (
   record_id                   bigint(20)      not null auto_increment    comment '记录ID',
   factory_id                  bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
   user_id                     bigint(20)      not null                   comment '用户ID',

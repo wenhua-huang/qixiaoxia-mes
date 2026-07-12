@@ -50,8 +50,8 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
     @Autowired private IWmIssueLineService wmIssueLineService;
     @Autowired private IWmRtIssueService wmRtIssueService;
     @Autowired private IWmRtIssueLineService wmRtIssueLineService;
-    @Autowired private IWmItemRecptService wmItemRecptService;
-    @Autowired private IWmItemRecptLineService wmItemRecptLineService;
+    @Autowired private IWmProductRecptService wmProductRecptService;
+    @Autowired private IWmProductRecptLineService wmProductRecptLineService;
     @Autowired private IWmMaterialStockService wmMaterialStockService;
     @Autowired private IWmWarehouseService wmWarehouseService;
 
@@ -238,9 +238,9 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
         vo.setQualifiedQty(totalQualified);
 
         // 检查是否已有入库单
-        WmItemRecpt recptQuery = new WmItemRecpt();
+        WmProductRecpt recptQuery = new WmProductRecpt();
         recptQuery.setWorkorderId(workorderId);
-        List<WmItemRecpt> existing = wmItemRecptService.selectWmItemRecptList(recptQuery);
+        List<WmProductRecpt> existing = wmProductRecptService.selectWmProductRecptList(recptQuery);
         boolean hasRecpt = existing != null && !existing.isEmpty();
         vo.setAlreadyHasReceipt(hasRecpt);
         if (hasRecpt) {
@@ -611,22 +611,24 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
 
         Long defaultWarehouseId = findDefaultWarehouse(wo.getFactoryId());
 
-        // 创建入库单
-        String recptCode = genCode("RK");
-        WmItemRecpt recpt = new WmItemRecpt();
+        // 创建产品入库单
+        String recptCode = genCode("PR");
+        WmProductRecpt recpt = new WmProductRecpt();
         recpt.setRecptCode(recptCode);
         recpt.setRecptName(wo.getWorkorderName() + "-生产入库");
-        recpt.setRecptType("PRODUCE");
+        recpt.setProduceId(wo.getProductId());
+        recpt.setProduceCode(wo.getProductCode());
         recpt.setWorkorderId(workorderId);
         recpt.setWorkorderCode(wo.getWorkorderCode());
         recpt.setWarehouseId(defaultWarehouseId);
         recpt.setRecptDate(new Date());
         recpt.setTotalQuantity(totalQualified);
+        recpt.setTotalBox(0);
         recpt.setStatus("DRAFT");
-        wmItemRecptService.insertWmItemRecpt(recpt);
+        wmProductRecptService.insertWmProductRecpt(recpt);
 
         // 创建入库单行
-        WmItemRecptLine recptLine = new WmItemRecptLine();
+        WmProductRecptLine recptLine = new WmProductRecptLine();
         recptLine.setRecptId(recpt.getRecptId());
         recptLine.setItemId(wo.getProductId());
         recptLine.setItemCode(wo.getProductCode());
@@ -635,7 +637,7 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
         recptLine.setUnitName(wo.getUnitName());
         recptLine.setQuantityRecpt(totalQualified);
         recptLine.setWarehouseId(defaultWarehouseId);
-        wmItemRecptLineService.insertWmItemRecptLine(recptLine);
+        wmProductRecptLineService.insertWmProductRecptLine(recptLine);
 
         insertLog(workorderId, DOC_RECPT, recpt.getRecptId(), recptCode, batch);
 
@@ -818,23 +820,36 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
     }
 
     @Override
-    @Transactional
-    public WmItemRecpt generateProductReceipt(Long workorderId) {
-        String batch = UUID.randomUUID().toString();
-        List<Map<String, Object>> recpts = generateReceiptDocuments(workorderId, batch);
-        if (recpts.isEmpty()) return null;
-        Long recptId = (Long) recpts.get(0).get("recptId");
-        return wmItemRecptService.selectWmItemRecptByRecptId(recptId);
+    public WmProductRecpt generateProductReceipt(Long workorderId) {
+        // 先锁后事务：Redis 锁在事务外获取（防重复入库单 + 编码碰撞 TOCTOU）
+        // 事务由内层 TransactionTemplate 管理，确保锁释放前事务已提交
+        return lockTemplate.execute("pro:workorder:receipt:" + workorderId, () -> {
+            TransactionTemplate tt = new TransactionTemplate(txManager);
+            tt.setTimeout(30);
+            return tt.execute(status -> {
+                String batch = UUID.randomUUID().toString();
+                List<Map<String, Object>> recpts = generateReceiptDocuments(workorderId, batch);
+                if (recpts.isEmpty()) return null;
+                Long recptId = (Long) recpts.get(0).get("recptId");
+                return wmProductRecptService.selectWmProductRecptByRecptId(recptId);
+            });
+        });
     }
 
     @Override
-    @Transactional
     public WmRtIssue generateMaterialReturn(Long workorderId) {
-        String batch = UUID.randomUUID().toString();
-        List<Map<String, Object>> returns = generateReturnDocuments(workorderId, batch);
-        if (returns.isEmpty()) return null;
-        Long rtId = (Long) returns.get(0).get("rtId");
-        return wmRtIssueService.selectWmRtIssueByRtId(rtId);
+        // 先锁后事务：与 generateProductReceipt 对齐，防并发重复生成退料单
+        return lockTemplate.execute("pro:workorder:return:" + workorderId, () -> {
+            TransactionTemplate tt = new TransactionTemplate(txManager);
+            tt.setTimeout(30);
+            return tt.execute(status -> {
+                String batch = UUID.randomUUID().toString();
+                List<Map<String, Object>> returns = generateReturnDocuments(workorderId, batch);
+                if (returns.isEmpty()) return null;
+                Long rtId = (Long) returns.get(0).get("rtId");
+                return wmRtIssueService.selectWmRtIssueByRtId(rtId);
+            });
+        });
     }
 
     // ---- 报工审核后自动触发 ----

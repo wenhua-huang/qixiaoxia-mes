@@ -61,8 +61,8 @@ class ProWorkorderDocServiceUnitTest {
     @Mock private IWmIssueLineService wmIssueLineService;
     @Mock private IWmRtIssueService wmRtIssueService;
     @Mock private IWmRtIssueLineService wmRtIssueLineService;
-    @Mock private IWmItemRecptService wmItemRecptService;
-    @Mock private IWmItemRecptLineService wmItemRecptLineService;
+    @Mock private IWmProductRecptService wmProductRecptService;
+    @Mock private IWmProductRecptLineService wmProductRecptLineService;
     @Mock private IWmMaterialStockService wmMaterialStockService;
     @Mock private IWmWarehouseService wmWarehouseService;
 
@@ -147,7 +147,7 @@ class ProWorkorderDocServiceUnitTest {
         when(wmIssueHeaderService.selectWmIssueHeaderList(any())).thenReturn(Collections.emptyList());
         when(wmRtIssueService.selectWmRtIssueList(any())).thenReturn(Collections.emptyList());
         when(proFeedbackMapper.selectProFeedbackList(any())).thenReturn(Collections.emptyList());
-        when(wmItemRecptService.selectWmItemRecptList(any())).thenReturn(Collections.emptyList());
+        when(wmProductRecptService.selectWmProductRecptList(any())).thenReturn(Collections.emptyList());
 
         ProWorkorderKitDashboardVO vo = docService.loadKitDashboard(1L);
 
@@ -181,7 +181,7 @@ class ProWorkorderDocServiceUnitTest {
         when(wmIssueHeaderService.selectWmIssueHeaderList(any())).thenReturn(Collections.emptyList());
         when(wmRtIssueService.selectWmRtIssueList(any())).thenReturn(Collections.emptyList());
         when(proFeedbackMapper.selectProFeedbackList(any())).thenReturn(Collections.emptyList());
-        when(wmItemRecptService.selectWmItemRecptList(any())).thenReturn(Collections.emptyList());
+        when(wmProductRecptService.selectWmProductRecptList(any())).thenReturn(Collections.emptyList());
 
         ProWorkorderKitDashboardVO vo = docService.loadKitDashboard(1L);
 
@@ -203,7 +203,7 @@ class ProWorkorderDocServiceUnitTest {
         when(proWorkorderService.checkMaterialReadiness(1L)).thenReturn(Collections.emptyList());
         when(wmIssueHeaderService.selectWmIssueHeaderList(any())).thenReturn(Collections.emptyList());
         when(wmRtIssueService.selectWmRtIssueList(any())).thenReturn(Collections.emptyList());
-        when(wmItemRecptService.selectWmItemRecptList(any())).thenReturn(Collections.emptyList());
+        when(wmProductRecptService.selectWmProductRecptList(any())).thenReturn(Collections.emptyList());
         // 有已审核的报工，合格 95 个
         ProFeedback fb = new ProFeedback();
         fb.setRecordId(1L); fb.setWorkorderId(1L); fb.setStatus("AUDITED");
@@ -339,12 +339,12 @@ class ProWorkorderDocServiceUnitTest {
         // 再次查询工单用于 auto-complete
         when(proWorkorderMapper.selectProWorkorderByWorkorderId(1L)).thenReturn(testWorkorder);
         // 入库单
-        when(wmItemRecptService.selectWmItemRecptList(any())).thenReturn(Collections.emptyList());
+        when(wmProductRecptService.selectWmProductRecptList(any())).thenReturn(Collections.emptyList());
         when(wmWarehouseService.selectWmWarehouseList(any())).thenReturn(Collections.emptyList());
         when(wmWarehouseService.selectWmWarehouseAll()).thenReturn(Collections.emptyList());
-        doAnswer(inv -> { WmItemRecpt r = inv.getArgument(0); r.setRecptId(300L); return 1; })
-                .when(wmItemRecptService).insertWmItemRecpt(any());
-        when(wmItemRecptLineService.insertWmItemRecptLine(any())).thenReturn(1);
+        doAnswer(inv -> { WmProductRecpt r = inv.getArgument(0); r.setRecptId(300L); return 1; })
+                .when(wmProductRecptService).insertWmProductRecpt(any());
+        when(wmProductRecptLineService.insertWmProductRecptLine(any())).thenReturn(1);
         // 退料单 — 无已过账领料单，不生成
         when(wmIssueHeaderService.selectWmIssueHeaderList(any())).thenReturn(Collections.emptyList());
         // docLog
@@ -381,7 +381,7 @@ class ProWorkorderDocServiceUnitTest {
 
         assertThat(result).isEmpty();
         // 不应生成任何单据
-        verify(wmItemRecptService, never()).insertWmItemRecpt(any());
+        verify(wmProductRecptService, never()).insertWmProductRecpt(any());
         verify(wmRtIssueService, never()).insertWmRtIssue(any());
     }
 
@@ -400,12 +400,12 @@ class ProWorkorderDocServiceUnitTest {
         when(proRouteProcessMapper.selectLastProcessByRouteId(10L)).thenReturn(lastProcess);
         when(proWorkorderMapper.selectProWorkorderByWorkorderId(1L)).thenReturn(testWorkorder);
         // 入库单
-        when(wmItemRecptService.selectWmItemRecptList(any())).thenReturn(Collections.emptyList());
+        when(wmProductRecptService.selectWmProductRecptList(any())).thenReturn(Collections.emptyList());
         when(wmWarehouseService.selectWmWarehouseList(any())).thenReturn(Collections.emptyList());
         when(wmWarehouseService.selectWmWarehouseAll()).thenReturn(Collections.emptyList());
-        doAnswer(inv -> { WmItemRecpt r = inv.getArgument(0); r.setRecptId(300L); return 1; })
-                .when(wmItemRecptService).insertWmItemRecpt(any());
-        when(wmItemRecptLineService.insertWmItemRecptLine(any())).thenReturn(1);
+        doAnswer(inv -> { WmProductRecpt r = inv.getArgument(0); r.setRecptId(300L); return 1; })
+                .when(wmProductRecptService).insertWmProductRecpt(any());
+        when(wmProductRecptLineService.insertWmProductRecptLine(any())).thenReturn(1);
         when(wmIssueHeaderService.selectWmIssueHeaderList(any())).thenReturn(Collections.emptyList());
         when(docLogMapper.selectList(any())).thenReturn(Collections.emptyList());
         when(docLogMapper.insert(any())).thenReturn(1);
@@ -414,7 +414,7 @@ class ProWorkorderDocServiceUnitTest {
         docService.onFeedbackAudited(1L);
 
         // 入库单已生成
-        verify(wmItemRecptService).insertWmItemRecpt(any());
+        verify(wmProductRecptService).insertWmProductRecpt(any());
         // 但工单状态不应更新（因为 50 < 100）
         verify(proWorkorderMapper, never()).updateProWorkorder(any());
     }
@@ -429,7 +429,7 @@ class ProWorkorderDocServiceUnitTest {
         lastProcess.setRouteId(10L); lastProcess.setProcessId(30L);
         when(proRouteProcessMapper.selectLastProcessByRouteId(10L)).thenReturn(lastProcess);
         when(proWorkorderMapper.selectProWorkorderByWorkorderId(1L)).thenReturn(testWorkorder);
-        when(wmItemRecptService.selectWmItemRecptList(any())).thenReturn(Collections.emptyList());
+        when(wmProductRecptService.selectWmProductRecptList(any())).thenReturn(Collections.emptyList());
         when(wmIssueHeaderService.selectWmIssueHeaderList(any())).thenReturn(Collections.emptyList());
         when(docLogMapper.selectList(any())).thenReturn(Collections.emptyList());
         when(proFeedbackMapper.selectProFeedbackList(any())).thenReturn(Collections.emptyList());
@@ -449,23 +449,23 @@ class ProWorkorderDocServiceUnitTest {
     void should_createReceipt_when_qualifiedExists() {
         testWorkorder.setStatus("COMPLETED");
         when(proWorkorderMapper.selectProWorkorderByWorkorderId(1L)).thenReturn(testWorkorder);
-        when(wmItemRecptService.selectWmItemRecptList(any())).thenReturn(Collections.emptyList());
+        when(wmProductRecptService.selectWmProductRecptList(any())).thenReturn(Collections.emptyList());
         ProFeedback fb = new ProFeedback();
         fb.setRecordId(1L); fb.setWorkorderId(1L); fb.setStatus("AUDITED");
         fb.setQuantityQualified(new BigDecimal("95"));
         when(proFeedbackMapper.selectProFeedbackList(any())).thenReturn(Collections.singletonList(fb));
         when(wmWarehouseService.selectWmWarehouseList(any())).thenReturn(Collections.emptyList());
         when(wmWarehouseService.selectWmWarehouseAll()).thenReturn(Collections.emptyList());
-        doAnswer(inv -> { WmItemRecpt r = inv.getArgument(0); r.setRecptId(300L); return 1; })
-                .when(wmItemRecptService).insertWmItemRecpt(any());
-        when(wmItemRecptLineService.insertWmItemRecptLine(any())).thenReturn(1);
+        doAnswer(inv -> { WmProductRecpt r = inv.getArgument(0); r.setRecptId(300L); return 1; })
+                .when(wmProductRecptService).insertWmProductRecpt(any());
+        when(wmProductRecptLineService.insertWmProductRecptLine(any())).thenReturn(1);
         when(docLogMapper.selectList(any())).thenReturn(Collections.emptyList());
         when(docLogMapper.insert(any())).thenReturn(1);
-        when(wmItemRecptService.selectWmItemRecptByRecptId(300L)).thenAnswer(inv -> {
-            WmItemRecpt r = new WmItemRecpt(); r.setRecptId(300L); r.setRecptCode("RK001"); return r;
+        when(wmProductRecptService.selectWmProductRecptByRecptId(300L)).thenAnswer(inv -> {
+            WmProductRecpt r = new WmProductRecpt(); r.setRecptId(300L); r.setRecptCode("RK001"); return r;
         });
 
-        WmItemRecpt result = docService.generateProductReceipt(1L);
+        WmProductRecpt result = docService.generateProductReceipt(1L);
 
         assertThat(result).isNotNull();
         assertThat(result.getRecptCode()).isEqualTo("RK001");
@@ -480,15 +480,15 @@ class ProWorkorderDocServiceUnitTest {
         existingLog.setDocId(300L); existingLog.setDocCode("RK001");
         existingLog.setDocType("RECPT");
         when(docLogMapper.selectList(any())).thenReturn(Collections.singletonList(existingLog));
-        when(wmItemRecptService.selectWmItemRecptByRecptId(300L)).thenAnswer(inv -> {
-            WmItemRecpt r = new WmItemRecpt(); r.setRecptId(300L); r.setRecptCode("RK001"); return r;
+        when(wmProductRecptService.selectWmProductRecptByRecptId(300L)).thenAnswer(inv -> {
+            WmProductRecpt r = new WmProductRecpt(); r.setRecptId(300L); r.setRecptCode("RK001"); return r;
         });
 
-        WmItemRecpt result = docService.generateProductReceipt(1L);
+        WmProductRecpt result = docService.generateProductReceipt(1L);
 
         // 返回已有单据，不应插入新单据
         assertThat(result.getRecptCode()).isEqualTo("RK001");
-        verify(wmItemRecptService, never()).insertWmItemRecpt(any());
+        verify(wmProductRecptService, never()).insertWmProductRecpt(any());
     }
 
     // ═══════════════════════════════════════

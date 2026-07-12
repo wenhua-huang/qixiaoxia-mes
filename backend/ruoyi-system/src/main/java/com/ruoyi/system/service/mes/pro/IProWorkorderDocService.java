@@ -7,7 +7,7 @@ import com.ruoyi.system.domain.mes.pro.ProDocGenerationRequestVO;
 import com.ruoyi.system.domain.mes.pro.ProDocGenerationResultVO;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderKitDashboardVO;
 import com.ruoyi.system.domain.mes.pro.PurOrderWizardLineVO;
-import com.ruoyi.system.domain.mes.wm.WmItemRecpt;
+import com.ruoyi.system.domain.mes.wm.WmProductRecpt;
 import com.ruoyi.system.domain.mes.wm.WmRtIssue;
 
 /**
@@ -37,7 +37,7 @@ public interface IProWorkorderDocService
     /**
      * 单独生成产品入库单
      */
-    WmItemRecpt generateProductReceipt(Long workorderId);
+    WmProductRecpt generateProductReceipt(Long workorderId);
 
     /**
      * 采购单快捷创建向导 — 返回推荐数据（按供应商分组），不写库

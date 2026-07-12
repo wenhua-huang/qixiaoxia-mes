@@ -2,9 +2,10 @@ import { PageDomain, BaseEntity } from '@/types/api/common'
 
 export interface WorkrecordQueryParams extends PageDomain {
   userName?: string
+  nickName?: string
   workstationId?: number
   taskId?: number
-  operationFlag?: string
+  status?: string
 }
 
 export interface Workrecord extends BaseEntity {
@@ -13,10 +14,16 @@ export interface Workrecord extends BaseEntity {
   userName?: string
   nickName?: string
   workstationId?: number
+  workstationCode?: string
   workstationName?: string
+  workorderId?: number
+  workorderCode?: string
   taskId?: number
   taskCode?: string
-  operationFlag?: string
-  operationTime?: string
+  processName?: string
+  clockInTime?: string
+  clockOutTime?: string
+  workDuration?: number
+  status?: string  // ACTIVE-在岗 / CLOSED-已下工
   remark?: string
 }

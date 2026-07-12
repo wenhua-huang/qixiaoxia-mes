@@ -5,42 +5,79 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 <mapper namespace="com.ruoyi.system.mapper.mes.pro.ProWorkrecordMapper">
 
     <resultMap type="ProWorkrecord" id="ProWorkrecordResult">
-        <result property="recordId"    column="record_id"    />
-        <result property="factoryId"    column="factory_id"    />
-        <result property="userId"    column="user_id"    />
-        <result property="userName"    column="user_name"    />
-        <result property="nickName"    column="nick_name"    />
-        <result property="workstationId"    column="workstation_id"    />
-        <result property="workstationCode"    column="workstation_code"    />
-        <result property="workstationName"    column="workstation_name"    />
-        <result property="taskId"    column="task_id"    />
-        <result property="taskCode"    column="task_code"    />
-        <result property="operationFlag"    column="operation_flag"    />
-        <result property="operationTime"    column="operation_time"    />
-        <result property="remark"    column="remark"    />
-        <result property="createBy"    column="create_by"    />
-        <result property="createTime"    column="create_time"    />
-        <result property="updateBy"    column="update_by"    />
-        <result property="updateTime"    column="update_time"    />
+        <result property="recordId"         column="record_id"        />
+        <result property="factoryId"        column="factory_id"       />
+        <result property="userId"           column="user_id"          />
+        <result property="userName"         column="user_name"        />
+        <result property="nickName"         column="nick_name"        />
+        <result property="workstationId"    column="workstation_id"   />
+        <result property="workstationCode"  column="workstation_code" />
+        <result property="workstationName"  column="workstation_name" />
+        <result property="workorderId"      column="workorder_id"     />
+        <result property="workorderCode"    column="workorder_code"   />
+        <result property="taskId"           column="task_id"          />
+        <result property="taskCode"         column="task_code"        />
+        <result property="processName"      column="process_name"     />
+        <result property="clockInTime"      column="clock_in_time"    />
+        <result property="clockOutTime"     column="clock_out_time"   />
+        <result property="workDuration"     column="work_duration"    />
+        <result property="status"           column="status"           />
+        <result property="remark"           column="remark"           />
+        <result property="createBy"         column="create_by"        />
+        <result property="createTime"       column="create_time"      />
+        <result property="updateBy"         column="update_by"        />
+        <result property="updateTime"       column="update_time"      />
     </resultMap>
 
     <sql id="selectProWorkrecordVo">
-        select record_id, factory_id, user_id, user_name, nick_name, workstation_id, workstation_code, workstation_name, task_id, task_code, operation_flag, operation_time, remark, create_by, create_time, update_by, update_time from qxx_pro_workrecord
+        select record_id, factory_id, user_id, user_name, nick_name,
+               workstation_id, workstation_code, workstation_name,
+               workorder_id, workorder_code, task_id, task_code, process_name,
+               clock_in_time, clock_out_time, work_duration, status,
+               remark, create_by, create_time, update_by, update_time
+        from qxx_pro_workrecord
     </sql>
 
     <select id="selectProWorkrecordList" parameterType="ProWorkrecord" resultMap="ProWorkrecordResult">
         <include refid="selectProWorkrecordVo"/>
         <where>
-            <if test="userName != null  and userName != ''"> and user_name like concat('%', #{userName}, '%')</if>
+            <if test="userId != null"> and user_id = #{userId}</if>
+            <if test="userName != null and userName != ''"> and user_name like concat('%', #{userName}, '%')</if>
+            <if test="nickName != null and nickName != ''"> and nick_name like concat('%', #{nickName}, '%')</if>
             <if test="workstationId != null"> and workstation_id = #{workstationId}</if>
+            <if test="workstationName != null and workstationName != ''"> and workstation_name like concat('%', #{workstationName}, '%')</if>
             <if test="taskId != null"> and task_id = #{taskId}</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+            <if test="params.beginTime != null and params.beginTime != ''"><!-- 日期范围 -->
+                and clock_in_time &gt;= #{params.beginTime}
+            </if>
+            <if test="params.endTime != null and params.endTime != ''">
+                and clock_in_time &lt;= #{params.endTime}
+            </if>
         </where>
-        order by record_id desc
+        order by clock_in_time desc
     </select>
 
     <select id="selectProWorkrecordByRecordId" parameterType="Long" resultMap="ProWorkrecordResult">
         <include refid="selectProWorkrecordVo"/>
         where record_id = #{recordId}
+    </select>
+
+    <!-- 查某用户当前在岗会话（上工防重 / 移动端进页面判状态）
+         factory_id 由 FactoryIdInterceptor 自动注入，SQL 无需显式写 -->
+    <select id="selectActiveByUser" parameterType="ProWorkrecord" resultMap="ProWorkrecordResult">
+        <include refid="selectProWorkrecordVo"/>
+        where user_id = #{userId}
+          and status = 'ACTIVE'
+        limit 1
+    </select>
+
+    <!-- 查某工作站当前在岗会话（展示/校验） -->
+    <select id="selectActiveByWorkstation" parameterType="ProWorkrecord" resultMap="ProWorkrecordResult">
+        <include refid="selectProWorkrecordVo"/>
+        where workstation_id = #{workstationId}
+          and status = 'ACTIVE'
+        limit 1
     </select>
 
     <insert id="insertProWorkrecord" parameterType="ProWorkrecord" useGeneratedKeys="true" keyProperty="recordId">
@@ -52,10 +89,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="workstationId != null">workstation_id,</if>
             <if test="workstationCode != null and workstationCode != ''">workstation_code,</if>
             <if test="workstationName != null and workstationName != ''">workstation_name,</if>
+            <if test="workorderId != null">workorder_id,</if>
+            <if test="workorderCode != null and workorderCode != ''">workorder_code,</if>
             <if test="taskId != null">task_id,</if>
             <if test="taskCode != null and taskCode != ''">task_code,</if>
-            <if test="operationFlag != null and operationFlag != ''">operation_flag,</if>
-            <if test="operationTime != null">operation_time,</if>
+            <if test="processName != null and processName != ''">process_name,</if>
+            <if test="clockInTime != null">clock_in_time,</if>
+            <if test="clockOutTime != null">clock_out_time,</if>
+            <if test="workDuration != null">work_duration,</if>
+            <if test="status != null and status != ''">status,</if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
@@ -67,15 +109,31 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="workstationId != null">#{workstationId},</if>
             <if test="workstationCode != null and workstationCode != ''">#{workstationCode},</if>
             <if test="workstationName != null and workstationName != ''">#{workstationName},</if>
+            <if test="workorderId != null">#{workorderId},</if>
+            <if test="workorderCode != null and workorderCode != ''">#{workorderCode},</if>
             <if test="taskId != null">#{taskId},</if>
             <if test="taskCode != null and taskCode != ''">#{taskCode},</if>
-            <if test="operationFlag != null and operationFlag != ''">#{operationFlag},</if>
-            <if test="operationTime != null">#{operationTime},</if>
+            <if test="processName != null and processName != ''">#{processName},</if>
+            <if test="clockInTime != null">#{clockInTime},</if>
+            <if test="clockOutTime != null">#{clockOutTime},</if>
+            <if test="workDuration != null">#{workDuration},</if>
+            <if test="status != null and status != ''">#{status},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
          </trim>
     </insert>
+
+    <!-- 下工结算：只更 clock_out_time / work_duration / status -->
+    <update id="closeSession" parameterType="ProWorkrecord">
+        update qxx_pro_workrecord
+        set clock_out_time = #{clockOutTime},
+            work_duration  = #{workDuration},
+            status         = #{status},
+            update_by      = #{updateBy},
+            update_time    = #{updateTime}
+        where record_id = #{recordId} and status = 'ACTIVE'
+    </update>
 
     <update id="updateProWorkrecord" parameterType="ProWorkrecord">
         update qxx_pro_workrecord
@@ -86,10 +144,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="workstationId != null">workstation_id = #{workstationId},</if>
             <if test="workstationCode != null and workstationCode != ''">workstation_code = #{workstationCode},</if>
             <if test="workstationName != null and workstationName != ''">workstation_name = #{workstationName},</if>
+            <if test="workorderId != null">workorder_id = #{workorderId},</if>
+            <if test="workorderCode != null and workorderCode != ''">workorder_code = #{workorderCode},</if>
             <if test="taskId != null">task_id = #{taskId},</if>
             <if test="taskCode != null and taskCode != ''">task_code = #{taskCode},</if>
-            <if test="operationFlag != null and operationFlag != ''">operation_flag = #{operationFlag},</if>
-            <if test="operationTime != null">operation_time = #{operationTime},</if>
+            <if test="processName != null and processName != ''">process_name = #{processName},</if>
+            <if test="clockInTime != null">clock_in_time = #{clockInTime},</if>
+            <if test="clockOutTime != null">clock_out_time = #{clockOutTime},</if>
+            <if test="workDuration != null">work_duration = #{workDuration},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
             <if test="remark != null">remark = #{remark},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="updateTime != null">update_time = #{updateTime},</if>

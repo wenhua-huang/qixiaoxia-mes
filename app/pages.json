@@ -128,6 +128,17 @@
       "navigationBarTitleText": "报工历史",
       "enablePullDownRefresh": true
     }
+  }, {
+    "path": "pages/mes/pro/clock",
+    "style": {
+      "navigationBarTitleText": "工位打卡"
+    }
+  }, {
+    "path": "pages/mes/pro/clock-history",
+    "style": {
+      "navigationBarTitleText": "打卡历史",
+      "enablePullDownRefresh": true
+    }
   }],
   "tabBar": {
     "color": "#000000",

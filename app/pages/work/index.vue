@@ -71,6 +71,18 @@
             <text class="text">报工历史</text>
           </view>
         </uni-grid-item>
+        <uni-grid-item @click="goClock">
+          <view class="grid-item-box">
+            <uni-icons type="staff-filled" size="30" color="#e6a23c"></uni-icons>
+            <text class="text">工位打卡</text>
+          </view>
+        </uni-grid-item>
+        <uni-grid-item @click="goClockHistory">
+          <view class="grid-item-box">
+            <uni-icons type="list" size="30" color="#f56c6c"></uni-icons>
+            <text class="text">打卡历史</text>
+          </view>
+        </uni-grid-item>
       </uni-grid>
     </view>
 
@@ -183,6 +195,12 @@
   }
   function goFeedbackHistory() {
     proxy.$tab.navigateTo('/pages/mes/pro/history')
+  }
+  function goClock() {
+    proxy.$tab.navigateTo('/pages/mes/pro/clock')
+  }
+  function goClockHistory() {
+    proxy.$tab.navigateTo('/pages/mes/pro/clock-history')
   }
 </script>
 

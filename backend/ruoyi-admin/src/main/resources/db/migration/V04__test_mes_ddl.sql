@@ -1,7 +1,7 @@
 -- test MES DDL for integration tests
 
 -- from mes-md.sql
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS qxx_md_factory (
+CREATE TABLE IF NOT EXISTS qxx_md_factory (
   factory_id        bigint(20)      not null auto_increment    comment '工厂ID',
   factory_code      varchar(64)     not null                   comment '工厂编码(如SX-圣享,WL-万隆)',
   factory_name      varchar(255)    not null                   comment '工厂全称',
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS qxx_md_factory (
 ) engine=innodb auto_increment=100 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '工厂定义表';
 
 -- from mes-md.sql
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS qxx_md_item (
+CREATE TABLE IF NOT EXISTS qxx_md_item (
   item_id           bigint(20)      not null auto_increment    comment '产品物料ID',
   factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
   item_code         varchar(64)     not null                   comment '产品物料编码(唯一)',
@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS qxx_md_item (
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '物料产品表';
 
 -- from mes-md.sql
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS qxx_md_item_type (
+CREATE TABLE IF NOT EXISTS qxx_md_item_type (
   item_type_id      bigint(20)      not null auto_increment    comment '产品物料类型ID',
 
   factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
@@ -82,7 +82,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS qxx_md_item_type (
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '物料产品分类表';
 
 -- from mes-md.sql
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS qxx_md_workshop (
+CREATE TABLE IF NOT EXISTS qxx_md_workshop (
   workshop_id       bigint(20)      not null auto_increment    comment '车间ID',
   factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
   workshop_code     varchar(64)     not null                   comment '车间编码(如PRINT-印刷车间,BAG-制袋车间)',
@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS qxx_md_workshop (
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '车间管理表';
 
 -- from mes-md.sql
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS qxx_md_workstation (
+CREATE TABLE IF NOT EXISTS qxx_md_workstation (
   workstation_id    bigint(20)      not null auto_increment    comment '工作站ID',
   factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
   workstation_code  varchar(64)     not null                   comment '工作站编码(如PRINT-01/BAG-01)',
@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS qxx_md_workstation (
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '工作站管理表';
 
 -- from mes-wm.sql
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS qxx_wm_warehouse (
+CREATE TABLE IF NOT EXISTS qxx_wm_warehouse (
   warehouse_id      bigint(20)      not null auto_increment    comment '仓库ID',
   factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
   warehouse_code    varchar(64)     not null                   comment '仓库编码(唯一)',
@@ -144,7 +144,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS qxx_wm_warehouse (
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '仓库表';
 
 -- from mes-wm.sql
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS qxx_wm_storage_location (
+CREATE TABLE IF NOT EXISTS qxx_wm_storage_location (
   location_id       bigint(20)      not null auto_increment    comment '库区ID',
   factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
   location_code     varchar(64)     not null                   comment '库区编码(唯一)',
@@ -165,7 +165,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS qxx_wm_storage_location (
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '库区表';
 
 -- from mes-pro.sql
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS qxx_pro_process (
+CREATE TABLE IF NOT EXISTS qxx_pro_process (
   process_id                  bigint(20)      not null auto_increment    comment '工序ID',
   factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
   process_code                varchar(64)     not null                   comment '工序编码(唯一)',
@@ -184,7 +184,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS qxx_pro_process (
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '生产工序表';
 
 -- from mes-pro.sql
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS qxx_pro_route (
+CREATE TABLE IF NOT EXISTS qxx_pro_route (
   route_id                    bigint(20)      not null auto_increment    comment '工艺路线ID',
   factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
   route_code                  varchar(64)     not null                   comment '工艺路线编码(唯一)',
@@ -202,7 +202,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS qxx_pro_route (
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '工艺路线表';
 
 -- from mes-tm.sql
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS qxx_tm_tool (
+CREATE TABLE IF NOT EXISTS qxx_tm_tool (
   tool_id             bigint(20)      not null auto_increment    comment '工装夹具ID',
   factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
   tool_code           varchar(64)     not null                   comment '工装夹具编码(唯一)',
@@ -229,7 +229,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS qxx_tm_tool (
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '工装夹具清单表';
 
 -- from mes-tm.sql
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS qxx_tm_tool_type (
+CREATE TABLE IF NOT EXISTS qxx_tm_tool_type (
   tool_type_id        bigint(20)      not null auto_increment    comment '工装夹具类型ID',
   factory_id        bigint(20)      not null                   comment '工厂ID(关联qxx_md_factory)',
   tool_type_code      varchar(64)     not null                   comment '类型编码(唯一)',

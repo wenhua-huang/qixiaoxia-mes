@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.wm.WmProductRecptMapper">
+
+    <resultMap type="WmProductRecpt" id="WmProductRecptResult">
+        <id property="recptId" column="recpt_id" />
+        <result property="factoryId" column="factory_id" />
+        <result property="recptCode" column="recpt_code" />
+        <result property="recptName" column="recpt_name" />
+        <result property="produceId" column="produce_id" />
+        <result property="produceCode" column="produce_code" />
+        <result property="workorderId" column="workorder_id" />
+        <result property="workorderCode" column="workorder_code" />
+        <result property="sourceWarehouseId" column="source_warehouse_id" />
+        <result property="warehouseId" column="warehouse_id" />
+        <result property="warehouseCode" column="warehouse_code" />
+        <result property="warehouseName" column="warehouse_name" />
+        <result property="recptDate" column="recpt_date" />
+        <result property="totalQuantity" column="total_quantity" />
+        <result property="totalBox" column="total_box" />
+        <result property="ipqcId" column="ipqc_id" />
+        <result property="ipqcCode" column="ipqc_code" />
+        <result property="status" column="status" />
+        <result property="remark" column="remark" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <sql id="selectWmProductRecptVo">
+        select recpt_id, factory_id, recpt_code, recpt_name, produce_id, produce_code, workorder_id, workorder_code, source_warehouse_id, warehouse_id, warehouse_code, warehouse_name, recpt_date, total_quantity, total_box, ipqc_id, ipqc_code, status, remark, create_by, create_time, update_by, update_time from qxx_wm_product_recpt
+    </sql>
+
+    <select id="selectWmProductRecptList" parameterType="WmProductRecpt" resultMap="WmProductRecptResult">
+        <include refid="selectWmProductRecptVo"/>
+        <where>
+            <if test="recptCode != null and recptCode != ''"> and recpt_code like concat('%', #{recptCode}, '%')</if>
+            <if test="recptName != null and recptName != ''"> and recpt_name like concat('%', #{recptName}, '%')</if>
+            <if test="produceId != null"> and produce_id = #{produceId}</if>
+            <if test="produceCode != null and produceCode != ''"> and produce_code like concat('%', #{produceCode}, '%')</if>
+            <if test="workorderId != null"> and workorder_id = #{workorderId}</if>
+            <if test="workorderCode != null and workorderCode != ''"> and workorder_code like concat('%', #{workorderCode}, '%')</if>
+            <if test="sourceWarehouseId != null"> and source_warehouse_id = #{sourceWarehouseId}</if>
+            <if test="warehouseId != null"> and warehouse_id = #{warehouseId}</if>
+            <if test="warehouseCode != null and warehouseCode != ''"> and warehouse_code like concat('%', #{warehouseCode}, '%')</if>
+            <if test="warehouseName != null and warehouseName != ''"> and warehouse_name like concat('%', #{warehouseName}, '%')</if>
+            <if test="ipqcId != null"> and ipqc_id = #{ipqcId}</if>
+            <if test="ipqcCode != null and ipqcCode != ''"> and ipqc_code like concat('%', #{ipqcCode}, '%')</if>
+            <if test="status != null and status != ''"> and status like concat('%', #{status}, '%')</if>
+            <if test="createBy != null and createBy != ''"> and create_by like concat('%', #{createBy}, '%')</if>
+            <if test="updateBy != null and updateBy != ''"> and update_by like concat('%', #{updateBy}, '%')</if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <select id="selectWmProductRecptAll" resultMap="WmProductRecptResult">
+        <include refid="selectWmProductRecptVo"/>
+    </select>
+
+    <select id="selectWmProductRecptByRecptId" parameterType="Long" resultMap="WmProductRecptResult">
+        <include refid="selectWmProductRecptVo"/>
+        where recpt_id = #{recptId}
+    </select>
+
+    <insert id="insertWmProductRecpt" parameterType="WmProductRecpt" useGeneratedKeys="true" keyProperty="recptId">
+        insert into qxx_wm_product_recpt
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="recptCode != null">recpt_code,</if>
+            <if test="recptName != null">recpt_name,</if>
+            <if test="produceId != null">produce_id,</if>
+            <if test="produceCode != null">produce_code,</if>
+            <if test="workorderId != null">workorder_id,</if>
+            <if test="workorderCode != null">workorder_code,</if>
+            <if test="sourceWarehouseId != null">source_warehouse_id,</if>
+            <if test="warehouseId != null">warehouse_id,</if>
+            <if test="warehouseCode != null">warehouse_code,</if>
+            <if test="warehouseName != null">warehouse_name,</if>
+            <if test="recptDate != null">recpt_date,</if>
+            <if test="totalQuantity != null">total_quantity,</if>
+            <if test="totalBox != null">total_box,</if>
+            <if test="ipqcId != null">ipqc_id,</if>
+            <if test="ipqcCode != null">ipqc_code,</if>
+            <if test="status != null">status,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="recptCode != null">#{recptCode},</if>
+            <if test="recptName != null">#{recptName},</if>
+            <if test="produceId != null">#{produceId},</if>
+            <if test="produceCode != null">#{produceCode},</if>
+            <if test="workorderId != null">#{workorderId},</if>
+            <if test="workorderCode != null">#{workorderCode},</if>
+            <if test="sourceWarehouseId != null">#{sourceWarehouseId},</if>
+            <if test="warehouseId != null">#{warehouseId},</if>
+            <if test="warehouseCode != null">#{warehouseCode},</if>
+            <if test="warehouseName != null">#{warehouseName},</if>
+            <if test="recptDate != null">#{recptDate},</if>
+            <if test="totalQuantity != null">#{totalQuantity},</if>
+            <if test="totalBox != null">#{totalBox},</if>
+            <if test="ipqcId != null">#{ipqcId},</if>
+            <if test="ipqcCode != null">#{ipqcCode},</if>
+            <if test="status != null">#{status},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateWmProductRecpt" parameterType="WmProductRecpt">
+        update qxx_wm_product_recpt
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="recptCode != null">recpt_code = #{recptCode},</if>
+            <if test="recptName != null">recpt_name = #{recptName},</if>
+            <if test="produceId != null">produce_id = #{produceId},</if>
+            <if test="produceCode != null">produce_code = #{produceCode},</if>
+            <if test="workorderId != null">workorder_id = #{workorderId},</if>
+            <if test="workorderCode != null">workorder_code = #{workorderCode},</if>
+            <if test="sourceWarehouseId != null">source_warehouse_id = #{sourceWarehouseId},</if>
+            <if test="warehouseId != null">warehouse_id = #{warehouseId},</if>
+            <if test="warehouseCode != null">warehouse_code = #{warehouseCode},</if>
+            <if test="warehouseName != null">warehouse_name = #{warehouseName},</if>
+            <if test="recptDate != null">recpt_date = #{recptDate},</if>
+            <if test="totalQuantity != null">total_quantity = #{totalQuantity},</if>
+            <if test="totalBox != null">total_box = #{totalBox},</if>
+            <if test="ipqcId != null">ipqc_id = #{ipqcId},</if>
+            <if test="ipqcCode != null">ipqc_code = #{ipqcCode},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where recpt_id = #{recptId}
+    </update>
+
+    <delete id="deleteWmProductRecptByRecptId" parameterType="Long">
+        delete from qxx_wm_product_recpt where recpt_id = #{recptId}
+    </delete>
+
+    <delete id="deleteWmProductRecptByRecptIds" parameterType="String">
+        delete from qxx_wm_product_recpt where recpt_id in
+        <foreach item="recptId" collection="array" open="(" separator="," close=")">
+            #{recptId}
+        </foreach>
+    </delete>
+
+</mapper>

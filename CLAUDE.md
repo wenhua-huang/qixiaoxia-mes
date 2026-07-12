@@ -190,7 +190,7 @@ yarn install && yarn dev   # :80，代理 /dev-api → localhost:8081
 
 ## 命名规范
 
-- 后端包名: `com.qixiaoxia.mes.{domain}`，模块: `qixiaoxia-{domain}`
+- 后端包名: `com.ruoyi`（若依原生包名，按分层+domain 组织：Controller 在 `com.ruoyi.web.controller.mes.{domain}`，Service/Mapper/Domain 在 `com.ruoyi.system.{layer}.mes.{domain}`）。模块按若依分层: `ruoyi-admin` / `ruoyi-system` / `ruoyi-common`，不按 domain 分模块。⚠️ **是 `com.ruoyi` 不是 `com.qixiaoxia`**（IDE 配置若期望 `com.qixiaoxia` 会误挪文件）
 - 数据库表: `qxx_{domain}_{entity}`（如 `qxx_wm_item_recpt`）
 - 前端路由权限: `mes:{domain}:{entity}:{action}`（如 `mes:wm:itemrecpt:list`）
 - 前端页面: `src/views/mes/{domain}/{entity}/`

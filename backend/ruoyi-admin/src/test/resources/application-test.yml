@@ -16,6 +16,12 @@ server:
 
 # Redis — 连接本地 Docker (docker compose up -d redis)
 spring:
+  flyway:
+    # Testcontainers DB 非空（SQL init + manual_tables 建所有表）+ baselineVersion=60 跳过 V1-V60
+    # 只跑 V61/V62（DML 菜单/字典，不 ALTER 表，避免与 manual_tables 现状字段重复）
+    baseline-on-migrate: true
+    baseline-version: 60
+    repair-before-migrate: true
   datasource:
     druid:
       # 借出连接前验证，防止 Spring SQL init 后连接被标记为 disabled

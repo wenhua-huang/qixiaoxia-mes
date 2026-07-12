@@ -15,6 +15,9 @@ public interface IWmStorageCoreService {
     /** 物料入库 → 库存+1 */
     void processItemRecpt(List<ItemRecptTxBean> lines);
 
+    /** 产品入库（工单完工） -> 库存+1 */
+    void processProductRecpt(List<ProductRecptTxBean> lines);
+
     /** 杂项入库 → 库存+1 */
     void processMiscRecpt(List<MiscRecptTxBean> lines);
 

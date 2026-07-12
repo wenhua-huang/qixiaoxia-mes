@@ -36,6 +36,9 @@ public class FlywayConfig
     @Value("${spring.flyway.baseline-version:1}")
     private String baselineVersion;
 
+    @Value("${spring.flyway.repair-before-migrate:false}")
+    private boolean repairBeforeMigrate;
+
     @Value("${spring.datasource.druid.master.url}")
     private String masterUrl;
 
@@ -72,6 +75,15 @@ public class FlywayConfig
                 .baselineVersion(org.flywaydb.core.api.MigrationVersion.fromVersion(baselineVersion))
                 .validateOnMigrate(true)  // history 已对齐，开启校验
                 .load();
+        if (repairBeforeMigrate) {
+            // 测试环境:Testcontainers 容器 reuse 残留 history（V01-V08 成功 + V09 failed），
+            // repair 只删 failed 不删成功，导致 Flyway 不 baseline 而跑 V09（Duplicate column）。
+            // 解法:DROP history + baseline(V60) + 跑 V61/V62（DML，不 ALTER，不与 manual_tables 现状字段冲突）
+            try (java.sql.Connection conn = flywayDs.getConnection(); java.sql.Statement st = conn.createStatement()) {
+                st.execute("DROP TABLE IF EXISTS flyway_schema_history");
+            } catch (Exception e) { log.warn("DROP flyway_schema_history failed: {}", e.getMessage()); }
+            flyway.baseline();
+        }
         int count = flyway.migrate().migrationsExecuted;
         log.info("Flyway 迁移完成，执行了 {} 个 migration", count);
         return flyway;

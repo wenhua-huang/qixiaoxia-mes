@@ -140,8 +140,8 @@ INSERT IGNORE INTO sys_role values('2', 1, '普通角色',    'common', 2, 2, 1,
 -- ----------------------------
 -- 5、菜单权限表
 -- ----------------------------
--- drop table if exists sys_menu; -- ⚠️ 已禁用：每次部署执行会清空所有菜单数据，改为依赖 CREATE TABLE IF NOT EXISTS IF NOT EXISTS（见下方）
-CREATE TABLE IF NOT EXISTS if not exists sys_menu (
+-- drop table if exists sys_menu; -- ⚠️ 已禁用：每次部署执行会清空所有菜单数据，改为依赖 CREATE TABLE IF NOT EXISTS（见下方）
+CREATE TABLE IF NOT EXISTS sys_menu (
   menu_id           bigint(20)      not null auto_increment    comment '菜单ID',
   menu_name         varchar(50)     not null                   comment '菜单名称',
   parent_id         bigint(20)      default 0                  comment '父菜单ID',

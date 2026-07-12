@@ -87,10 +87,10 @@ public abstract class BaseIntegrationTest {
         registry.add("spring.datasource.druid.master.password", mysql::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
 
-        // SQL init 通过 classpath 资源（由 maven-resources-plugin 复制到 test-classes/sql/）
+        // SQL init 建基础表（sys_config 等），供 sysConfigServiceImpl @PostConstruct 在 Flyway 前查询
         registry.add("spring.sql.init.mode", () -> "always");
         registry.add("spring.sql.init.schema-locations", () ->
-            "classpath:sql/ry_20260417.sql,classpath:sql/test_mes_ddl.sql");
+            "classpath:sql/ry_20260417.sql,classpath:sql/test_mes_ddl.sql,classpath:sql/manual_tables.sql");
         registry.add("spring.sql.init.continue-on-error", () -> "true");
     }
 

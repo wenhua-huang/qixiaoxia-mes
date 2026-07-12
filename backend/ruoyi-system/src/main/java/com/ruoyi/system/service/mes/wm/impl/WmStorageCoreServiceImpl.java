@@ -44,6 +44,14 @@ public class WmStorageCoreServiceImpl implements IWmStorageCoreService {
     }
 
     @Override
+    public void processProductRecpt(List<ProductRecptTxBean> lines) {
+        checkNotEmpty(lines, "入库单行");
+        for (ProductRecptTxBean line : lines) {
+            wmTransactionService.processTransaction(buildTx(line, TransactionTypeEnum.PRODUCT_RECPT.getCode(), 1));
+        }
+    }
+
+    @Override
     public void processMiscRecpt(List<MiscRecptTxBean> lines) {
         checkNotEmpty(lines, "入库单行");
         for (MiscRecptTxBean line : lines) {

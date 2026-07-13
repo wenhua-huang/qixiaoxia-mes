@@ -127,7 +127,7 @@
 
 <script setup>
 import { ref, reactive, computed, onUnmounted, getCurrentInstance } from 'vue'
-import { clockIn, clockOut, getActiveSession, getMyWorkstations } from '@/api/mes/pro/workrecord'
+import { clockIn, clockOut, getActiveSession, getMyWorkstations, resolveWorkstation } from '@/api/mes/pro/workrecord'
 import { getFeedbackEntry } from '@/api/mes/pro/feedback'
 
 const { proxy } = getCurrentInstance()
@@ -201,23 +201,34 @@ function selectWorkstation(ws) {
   form.workstationName = ws.workstationName
 }
 
-// 按编码查工位（简化：从绑定列表匹配，或提示扫码）
+// 按编码查工位（调后端解析真实 workstationId，绑定优先不强制）
 function searchWorkstation() {
-  if (!wsCodeInput.value.trim()) {
+  const code = wsCodeInput.value.trim()
+  if (!code) {
     proxy.$modal.msgError('请输入工位编码')
     return
   }
-  // 优先从已加载的绑定工位匹配
-  const matched = myWorkstations.value.find(w => w.workstationCode === wsCodeInput.value.trim())
-  if (matched) {
-    selectWorkstation(matched)
-  } else {
-    // 未在绑定列表中，软提示但允许手动填入（绑定优先不强制）
-    proxy.$modal.showToast('该工位不在您的绑定列表，仍可使用')
-    form.workstationId = null
-    form.workstationCode = wsCodeInput.value.trim()
-    form.workstationName = wsCodeInput.value.trim()
-  }
+  proxy.$modal.loading('查询工位...')
+  resolveWorkstation(code).then(res => {
+    proxy.$modal.closeLoading()
+    const ws = res.data
+    if (!ws || !ws.workstationId) {
+      proxy.$modal.msgError('未找到该工位编码，请检查或扫码')
+      form.workstationId = null
+      form.workstationCode = ''
+      form.workstationName = ''
+      return
+    }
+    selectWorkstation(ws)
+    // 绑定优先不强制：若不在绑定列表，仅提示不阻断
+    const bound = myWorkstations.value.some(w => w.workstationId === ws.workstationId)
+    if (!bound) {
+      proxy.$modal.showToast('该工位不在您的绑定列表，仍可使用')
+    }
+  }).catch(() => {
+    proxy.$modal.closeLoading()
+    proxy.$modal.msgError('查询工位失败')
+  })
 }
 
 // 扫码选工位

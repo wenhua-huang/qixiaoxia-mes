@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.controller.BaseController;
@@ -70,6 +71,13 @@ public class ProWorkrecordController extends BaseController
     @GetMapping("/myWorkstations")
     public AjaxResult myWorkstations() {
         return success(proWorkrecordService.selectMyWorkstations());
+    }
+
+    /** 按编码查工作站（移动端扫码/手输编码后解析真实工位） */
+    @PreAuthorize("@ss.hasPermi('mes:pro:workrecord:clock')")
+    @GetMapping("/resolveWorkstation")
+    public AjaxResult resolveWorkstation(@RequestParam String workstationCode) {
+        return success(proWorkrecordService.resolveWorkstationByCode(workstationCode));
     }
 
     /** 查当前登录用户的打卡历史（分页，移动端） */

@@ -154,4 +154,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </foreach>
     </delete>
 
+    <!--
+      汇总某工单已生成的入库单总量。
+      语义：仅统计 DRAFT/CONFIRMED/POSTED 三种业务状态；status IS NULL 视为脏数据不计入。
+      状态机：DRAFT → CONFIRMED (库存已扣) → POSTED (已过账)。
+      factory_id 由 FactoryIdInterceptor 自动注入。
+      用途：手动补录 (generateProductReceipt) 计算未入库差额。
+      注意：DRAFT/CONFIRMED 已产生 doc log 记录，必须计入差额基数，否则会被重复"补录"。
+    -->
+    <select id="sumQuantityByWorkorderId" resultType="java.math.BigDecimal">
+        select COALESCE(SUM(total_quantity), 0)
+        from qxx_wm_product_recpt
+        where workorder_id = #{workorderId}
+          and status in ('DRAFT', 'CONFIRMED', 'POSTED')
+    </select>
+
 </mapper>

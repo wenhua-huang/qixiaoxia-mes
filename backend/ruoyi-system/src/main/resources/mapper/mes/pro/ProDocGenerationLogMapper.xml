@@ -11,13 +11,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="docType" column="doc_type" />
         <result property="docId" column="doc_id" />
         <result property="docCode" column="doc_code" />
+        <result property="sourceFeedbackId" column="source_feedback_id" />
         <result property="generationBatch" column="generation_batch" />
         <result property="status" column="status" />
         <result property="createTime" column="create_time" />
     </resultMap>
 
     <sql id="selectVo">
-        select log_id, factory_id, workorder_id, doc_type, doc_id, doc_code, generation_batch, status, create_time
+        select log_id, factory_id, workorder_id, doc_type, doc_id, doc_code, source_feedback_id, generation_batch, status, create_time
         from qxx_pro_doc_generation_log
     </sql>
 
@@ -32,6 +33,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="workorderId != null"> and workorder_id = #{workorderId}</if>
             <if test="docType != null and docType != ''"> and doc_type = #{docType}</if>
             <if test="docId != null"> and doc_id = #{docId}</if>
+            <if test="sourceFeedbackId != null"> and source_feedback_id = #{sourceFeedbackId}</if>
             <if test="generationBatch != null and generationBatch != ''"> and generation_batch = #{generationBatch}</if>
             <if test="status != null and status != ''"> and status = #{status}</if>
         </where>
@@ -44,6 +46,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="docType != null">doc_type,</if>
             <if test="docId != null">doc_id,</if>
             <if test="docCode != null">doc_code,</if>
+            <if test="sourceFeedbackId != null">source_feedback_id,</if>
             <if test="generationBatch != null">generation_batch,</if>
             <if test="status != null">status,</if>
             create_time,
@@ -53,6 +56,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="docType != null">#{docType},</if>
             <if test="docId != null">#{docId},</if>
             <if test="docCode != null">#{docCode},</if>
+            <if test="sourceFeedbackId != null">#{sourceFeedbackId},</if>
             <if test="generationBatch != null">#{generationBatch},</if>
             <if test="status != null">#{status},</if>
             sysdate(),
@@ -67,5 +71,28 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <delete id="deleteByWorkorderId" parameterType="Long">
         delete from qxx_pro_doc_generation_log where workorder_id = #{workorderId}
     </delete>
+
+    <!--
+      精准查询 source_feedback_id IS NULL 的 log (手动补录场景专用, Fix Finding #11)。
+      selectList 在 sourceFeedbackId=null 时 <if> 忽略过滤 → 拉全量 → Java 端过滤，浪费往返。
+    -->
+    <select id="selectManualReceiptLogs" resultMap="ProDocGenerationLogResult">
+        <include refid="selectVo"/>
+        where workorder_id = #{workorderId}
+          and doc_type = #{docType}
+          and source_feedback_id is null
+    </select>
+
+    <!--
+      撤销旧 ACTIVE log：CANCEL 入库单再生场景下，旧 log 仍 ACTIVE → 阻塞新 log 插入 (unique key)。
+      仅置 REVOKED 不物理删除，保留审计轨迹。
+    -->
+    <update id="revokeBySourceFeedbackId">
+        update qxx_pro_doc_generation_log set status = 'REVOKED'
+        where workorder_id = #{workorderId}
+          and doc_type = #{docType}
+          and source_feedback_id = #{sourceFeedbackId}
+          and status = 'ACTIVE'
+    </update>
 
 </mapper>

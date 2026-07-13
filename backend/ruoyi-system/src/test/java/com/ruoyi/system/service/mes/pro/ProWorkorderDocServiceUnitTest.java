@@ -63,6 +63,7 @@ class ProWorkorderDocServiceUnitTest {
     @Mock private IWmRtIssueLineService wmRtIssueLineService;
     @Mock private IWmProductRecptService wmProductRecptService;
     @Mock private IWmProductRecptLineService wmProductRecptLineService;
+    @Mock private com.ruoyi.system.mapper.mes.wm.WmProductRecptMapper wmProductRecptMapper;
     @Mock private IWmMaterialStockService wmMaterialStockService;
     @Mock private IWmWarehouseService wmWarehouseService;
 
@@ -351,7 +352,7 @@ class ProWorkorderDocServiceUnitTest {
         when(docLogMapper.selectList(any())).thenReturn(Collections.emptyList());
         when(docLogMapper.insert(any())).thenReturn(1);
         // 更新工单状态
-        when(proWorkorderMapper.updateProWorkorder(any())).thenReturn(1);
+        when(proWorkorderMapper.completeWorkorderIfProducing(anyLong(), any(), any(), any())).thenReturn(1);
         // 已审核报工
         when(proFeedbackMapper.selectProFeedbackList(any())).thenReturn(
                 Collections.singletonList(fb));
@@ -362,8 +363,8 @@ class ProWorkorderDocServiceUnitTest {
         // 应生成 1 张入库单
         boolean hasReceipt = result.stream().anyMatch(m -> m.containsKey("recptId"));
         assertThat(hasReceipt).isTrue();
-        // 工单应被标记为 COMPLETED（因为 quantityProduced=100 >= quantity=100）
-        verify(proWorkorderMapper).updateProWorkorder(any());
+        // 完工判定已移交 autoCompleteWorkorderIfQualified (由 auditFeedback 外层事务调用)，
+        // onFeedbackAudited 只负责入库单/退料单生成，不再调 completeWorkorderIfProducing。
     }
 
     @Test
@@ -436,8 +437,8 @@ class ProWorkorderDocServiceUnitTest {
 
         docService.onFeedbackAudited(1L);
 
-        // 验证使用了正确的锁 key
-        verify(lockTemplate).execute(eq("feedback:audit:lastProcess:1"), any(java.util.function.Supplier.class));
+        // 验证使用了统一锁 key（Fix Finding #3/#4/#10：五入口共用同一 key）
+        verify(lockTemplate).execute(eq("pro:workorder:doc-gen:1"), any(java.util.function.Supplier.class));
     }
 
     // ═══════════════════════════════════════
@@ -445,15 +446,14 @@ class ProWorkorderDocServiceUnitTest {
     // ═══════════════════════════════════════
 
     @Test
-    @DisplayName("generateProductReceipt：有合格品 → 生成入库单")
+    @DisplayName("generateProductReceipt：produced - alreadyRecpt > 0 → 生成差额入库单")
     void should_createReceipt_when_qualifiedExists() {
         testWorkorder.setStatus("COMPLETED");
+        testWorkorder.setQuantity(new BigDecimal("100"));           // 计划 100
+        testWorkorder.setQuantityProduced(new BigDecimal("95"));    // 已生产 95
         when(proWorkorderMapper.selectProWorkorderByWorkorderId(1L)).thenReturn(testWorkorder);
-        when(wmProductRecptService.selectWmProductRecptList(any())).thenReturn(Collections.emptyList());
-        ProFeedback fb = new ProFeedback();
-        fb.setRecordId(1L); fb.setWorkorderId(1L); fb.setStatus("AUDITED");
-        fb.setQuantityQualified(new BigDecimal("95"));
-        when(proFeedbackMapper.selectProFeedbackList(any())).thenReturn(Collections.singletonList(fb));
+        // 手动路径：alreadyRecpt=40 → 差额 = 95 - 40 = 55
+        when(wmProductRecptMapper.sumQuantityByWorkorderId(1L)).thenReturn(new BigDecimal("40"));
         when(wmWarehouseService.selectWmWarehouseList(any())).thenReturn(Collections.emptyList());
         when(wmWarehouseService.selectWmWarehouseAll()).thenReturn(Collections.emptyList());
         doAnswer(inv -> { WmProductRecpt r = inv.getArgument(0); r.setRecptId(300L); return 1; })
@@ -469,19 +469,26 @@ class ProWorkorderDocServiceUnitTest {
 
         assertThat(result).isNotNull();
         assertThat(result.getRecptCode()).isEqualTo("RK001");
+        // 验证入库单量 = 生产差额 55 (produced 95 - alreadyRecpt 40)
+        verify(wmProductRecptService).insertWmProductRecpt(argThat(r ->
+            r.getTotalQuantity() != null && r.getTotalQuantity().compareTo(new BigDecimal("55")) == 0));
     }
 
     @Test
-    @DisplayName("generateProductReceipt：幂等 — 已有入库单则跳过")
+    @DisplayName("generateProductReceipt：手动入口已生成过 (sourceFeedbackId=null) → 走既有单据分支")
     void should_skipReceipt_when_alreadyExists() {
-        when(proWorkorderMapper.selectProWorkorderByWorkorderId(1L)).thenReturn(testWorkorder);
-        // 已有日志记录
+        // 已有 sourceFeedbackId=null 的 RECPT log (对应手动补录)
         ProDocGenerationLog existingLog = new ProDocGenerationLog();
         existingLog.setDocId(300L); existingLog.setDocCode("RK001");
         existingLog.setDocType("RECPT");
-        when(docLogMapper.selectList(any())).thenReturn(Collections.singletonList(existingLog));
+        existingLog.setSourceFeedbackId(null);
+        // Fix #11: 新增专用 mapper 方法查 manual (source_feedback_id IS NULL) log
+        when(docLogMapper.selectManualReceiptLogs(1L, "RECPT")).thenReturn(Collections.singletonList(existingLog));
+        // Fix #5: buildExistingRecptInfo 现在需要 recpt 有效 (status IN DRAFT/CONFIRMED/POSTED) 才算「已存在」
         when(wmProductRecptService.selectWmProductRecptByRecptId(300L)).thenAnswer(inv -> {
-            WmProductRecpt r = new WmProductRecpt(); r.setRecptId(300L); r.setRecptCode("RK001"); return r;
+            WmProductRecpt r = new WmProductRecpt();
+            r.setRecptId(300L); r.setRecptCode("RK001"); r.setStatus("DRAFT");
+            return r;
         });
 
         WmProductRecpt result = docService.generateProductReceipt(1L);

@@ -375,12 +375,18 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
                 if (fb.getRouteId() != null && fb.getProcessId() != null) {
                     // 有工艺路线信息：仅末工序报工才更新工单已生产数
                     if (isLastProcessOfRoute(fb.getRouteId(), fb.getProcessId())) {
+                        // 【Fix #1/#2/#4】末工序场景：quantity_produced 更新 + 完工判定 都在外层本事务完成，
+                        // 与单据生成 (REQUIRES_NEW) 解耦 —— 单据失败回滚不影响 quantity_produced / 审核提交。
                         proWorkorderMapper.addQuantityProduced(fb.getWorkorderId(), deltaProduced);
-                        // 末工序报工审核后：自动生成入库单 + 退料单
+                        // 完工判定先于单据生成：若 autoComplete 失败，外层事务整体回滚，避免
+                        // REQUIRES_NEW 已提交的入库单成孤儿 (autoComplete 失败时 onFeedbackAudited 未执行)。
+                        proWorkorderDocService.autoCompleteWorkorderIfQualified(fb.getWorkorderId());
+                        // 末工序报工审核后：自动生成入库单 + 退料单 (独立事务, 失败不影响审核)
                         try {
                             proWorkorderDocService.onFeedbackAudited(recordId);
                         } catch (Exception e) {
-                            log.error("自动生成入库单/退料单失败, feedbackId={}, workorderId={}, err={}",
+                            // 单据生成失败：审核仍提交，用户需手动补录入库单
+                            log.warn("自动生成入库单/退料单失败, 需手动补录. feedbackId={}, workorderId={}, err={}",
                                     recordId, fb.getWorkorderId(), e.getMessage());
                         }
                     }

@@ -30,9 +30,17 @@ public interface IProWorkorderDocService
     ProDocGenerationResultVO generateDocuments(ProDocGenerationRequestVO request);
 
     /**
-     * 报工审核后的自动触发：末工序报工 → 生成入库单 + 退料单
+     * 报工审核后的自动触发：末工序报工 → 生成入库单 + 退料单。
+     * <p>职责边界：仅生成单据，**不更新 workorder** (quantity_produced 更新 / 完工判定
+     * 由调用方 auditFeedback 在外层事务完成, 见 {@link #autoCompleteWorkorderIfQualified})。
      */
     List<Map<String, Object>> onFeedbackAudited(Long feedbackId);
+
+    /**
+     * 自动完工判定：quantity_produced >= 计划量时，精准条件 UPDATE 置 COMPLETED。
+     * 由 auditFeedback 在 addQuantityProduced 之后、同一事务内调用。
+     */
+    void autoCompleteWorkorderIfQualified(Long workorderId);
 
     /**
      * 单独生成产品入库单

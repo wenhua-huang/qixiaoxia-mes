@@ -11,7 +11,7 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.core.redis.RedisLockTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.stereotype.Service;
 
@@ -35,6 +35,7 @@ import com.ruoyi.system.service.mes.pur.*;
 @Service
 public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
 {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ProWorkorderDocServiceImpl.class);
     @Autowired private RedisLockTemplate lockTemplate;
     @Autowired private PlatformTransactionManager txManager;
     @Autowired private ProWorkorderMapper proWorkorderMapper;
@@ -52,6 +53,7 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
     @Autowired private IWmRtIssueLineService wmRtIssueLineService;
     @Autowired private IWmProductRecptService wmProductRecptService;
     @Autowired private IWmProductRecptLineService wmProductRecptLineService;
+    @Autowired private WmProductRecptMapper wmProductRecptMapper;
     @Autowired private IWmMaterialStockService wmMaterialStockService;
     @Autowired private IWmWarehouseService wmWarehouseService;
 
@@ -274,8 +276,11 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
     public ProDocGenerationResultVO generateDocuments(ProDocGenerationRequestVO request)
     {
         Long workorderId = request.getWorkorderId();
-        // 【Fix #2】先锁后事务：防止两个用户同时点击"一键全部生成"产生重复单据
-        return lockTemplate.execute("kit:generate:" + workorderId, () -> {
+        // 【Fix Finding #3/#4/#10】锁 key 统一为 "pro:workorder:doc-gen:" + wid，五个生成入口
+        //   (generateDocuments / generateProductReceipt / generateMaterialReturn /
+        //    generatePurchaseOrder / onFeedbackAudited) 全部共用同一 key，
+        //   杜绝跨入口并发穿透造成的重复单据。
+        return lockTemplate.execute("pro:workorder:doc-gen:" + workorderId, () -> {
             TransactionTemplate tt = new TransactionTemplate(txManager);
             tt.setTimeout(30);
             return tt.execute(status -> {
@@ -293,7 +298,8 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
                     result.setReturns(generateReturnDocuments(workorderId, batch));
                 }
                 if (request.isGenerateReceipt()) {
-                    result.setReceipts(generateReceiptDocuments(workorderId, batch));
+                    // 批量入口无 feedbackId → 走手动补录语义 (未入库差额)
+                    result.setReceipts(generateReceiptDocuments(workorderId, null, batch));
                 }
 
                 StringBuilder msg = new StringBuilder();
@@ -563,6 +569,7 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
                 wmRtIssueLineService.insertWmRtIssueLine(rl);
             }
 
+            // 写幂等日志 (DuplicateKeyException 已由 insertLog 统一兜底)
             insertLog(workorderId, DOC_RETURN, rt.getRtId(), rtCode, batch);
 
             Map<String, Object> info = new HashMap<>();
@@ -576,38 +583,57 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
     }
 
     // ---- 生成产品入库单 ----
-    private List<Map<String, Object>> generateReceiptDocuments(Long workorderId, String batch)
+    /**
+     * 生成产品入库单。幂等键为 feedback 级 (source_feedback_id)：
+     * <ul>
+     *   <li>feedbackId != null (末工序报工审核自动触发)：
+     *       数量 = min(fb.quantityQualified, planned - alreadyRecpt)，即封顶到计划量差额，
+     *       避免与手动补录混用时超量入库 (Fix Finding #2)。
+     *       同一 feedback 已生成过 <b>且未被取消</b> 则返回既有信息 (走 buildExistingRecptInfo)；
+     *       若已取消则允许重新生成 (Fix Finding #5)。
+     *       Index A (uk_doc_log_wo_type_feedback) 兜底并发。
+     *   <li>feedbackId == null (手动补录入口，前端"生成入库单"按钮)：
+     *       数量 = produced - alreadyRecpt (已生产未入库差额，含 DRAFT/CONFIRMED/POSTED)；
+     *       靠应用层 + Redis 锁串行；Index A 对 NULL 值不去重，DB 不兜底 (锁保证串行)。
+     * </ul>
+     */
+    private List<Map<String, Object>> generateReceiptDocuments(Long workorderId, Long feedbackId, String batch)
     {
+        // 先做幂等检查 (Fix Finding #10：命中时避免无用工单/仓库查询)。
+        // 【Fix #5】用 buildExistingRecptInfo 结果非空判定 (已过滤 CANCEL)，允许对已取消单据重新生成。
+        List<Map<String, Object>> existing = buildExistingRecptInfo(workorderId, feedbackId);
+        if (!existing.isEmpty()) return existing;
+
         ProWorkorder wo = proWorkorderMapper.selectProWorkorderByWorkorderId(workorderId);
-
-        // 幂等检查
-        if (hasLog(workorderId, DOC_RECPT, 0L)) {
-            List<ProDocGenerationLog> existingLogs = getLogs(workorderId, DOC_RECPT);
-            List<Map<String, Object>> result = new ArrayList<>();
-            if (existingLogs != null) {
-                for (ProDocGenerationLog log : existingLogs) {
-                    Map<String, Object> info = new HashMap<>();
-                    info.put("recptId", log.getDocId());
-                    info.put("recptCode", log.getDocCode());
-                    info.put("message", "已存在入库单");
-                    result.add(info);
-                }
-            }
-            return result;
+        if (wo == null) {
+            // 【Fix Finding #9】feedback 已 audit 但工单查不到 → 数据异常，需要告警
+            log.warn("生成入库单时工单不存在, workorderId={}, feedbackId={}", workorderId, feedbackId);
+            return new ArrayList<>();
         }
 
-        // 汇总合格数量
-        ProFeedback fbQuery = new ProFeedback();
-        fbQuery.setWorkorderId(workorderId);
-        fbQuery.setStatus("AUDITED");
-        List<ProFeedback> fbs = proFeedbackMapper.selectProFeedbackList(fbQuery);
-        BigDecimal totalQualified = BigDecimal.ZERO;
-        if (fbs != null) {
-            for (ProFeedback fb : fbs) {
-                if (fb.getQuantityQualified() != null) totalQualified = totalQualified.add(fb.getQuantityQualified());
-            }
+        BigDecimal planned = wo.getQuantity() != null ? wo.getQuantity() : BigDecimal.ZERO;
+        BigDecimal produced = wo.getQuantityProduced() != null ? wo.getQuantityProduced() : BigDecimal.ZERO;
+        BigDecimal alreadyRecpt = sumReceiptedQty(workorderId);
+
+        BigDecimal qtyToRecpt;
+        if (feedbackId != null) {
+            // 自动路径：cap = min(本次合格数, 计划量-已入库)，用 planned 做上限 (required_by REQUIRES_NEW
+            // 下 produced 可能读脏, 而 produced ≤ planned 在正常流程恒成立, planned 更宽松也更安全)。
+            ProFeedback fb = proFeedbackMapper.selectProFeedbackByRecordId(feedbackId);
+            if (fb == null || fb.getQuantityQualified() == null) return new ArrayList<>();
+            BigDecimal qualified = fb.getQuantityQualified();
+            qtyToRecpt = qualified.min(planned.subtract(alreadyRecpt));
+        } else {
+            // 手动路径：入库「已生产但未入库」的差额 (保持原始语义, produced 为已提交值)
+            qtyToRecpt = produced.subtract(alreadyRecpt);
         }
-        if (totalQualified.compareTo(BigDecimal.ZERO) <= 0) return new ArrayList<>();
+
+        if (qtyToRecpt.compareTo(BigDecimal.ZERO) <= 0) {
+            // 【Fix Finding #8】自动路径合格数被封顶到 0 / 手动路径无差额: 记录审计日志便于运维排查
+            log.info("跳过生成入库单 (差额为 0), workorderId={}, feedbackId={}, planned={}, produced={}, alreadyRecpt={}",
+                    workorderId, feedbackId, planned, produced, alreadyRecpt);
+            return new ArrayList<>();
+        }
 
         Long defaultWarehouseId = findDefaultWarehouse(wo.getFactoryId());
 
@@ -622,7 +648,7 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
         recpt.setWorkorderCode(wo.getWorkorderCode());
         recpt.setWarehouseId(defaultWarehouseId);
         recpt.setRecptDate(new Date());
-        recpt.setTotalQuantity(totalQualified);
+        recpt.setTotalQuantity(qtyToRecpt);
         recpt.setTotalBox(0);
         recpt.setStatus("DRAFT");
         wmProductRecptService.insertWmProductRecpt(recpt);
@@ -635,17 +661,22 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
         recptLine.setItemName(wo.getProductName());
         recptLine.setUnitOfMeasure(wo.getUnitOfMeasure());
         recptLine.setUnitName(wo.getUnitName());
-        recptLine.setQuantityRecpt(totalQualified);
+        recptLine.setQuantityRecpt(qtyToRecpt);
         recptLine.setWarehouseId(defaultWarehouseId);
         wmProductRecptLineService.insertWmProductRecptLine(recptLine);
 
-        insertLog(workorderId, DOC_RECPT, recpt.getRecptId(), recptCode, batch);
+        // CANCEL 再生：撤销同一 feedbackId 下的旧 ACTIVE log，避免唯一索引冲突
+        if (feedbackId != null) {
+            docLogMapper.revokeBySourceFeedbackId(workorderId, DOC_RECPT, feedbackId);
+        }
+        // 写幂等日志 (DuplicateKeyException 已由 insertLog 统一兜底转 ServiceException)
+        insertLog(workorderId, DOC_RECPT, recpt.getRecptId(), recptCode, feedbackId, batch);
 
         List<Map<String, Object>> result = new ArrayList<>();
         Map<String, Object> info = new HashMap<>();
         info.put("recptId", recpt.getRecptId());
         info.put("recptCode", recptCode);
-        info.put("totalQuantity", totalQualified);
+        info.put("totalQuantity", qtyToRecpt);
         result.add(info);
         return result;
     }
@@ -733,8 +764,16 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
     }
 
     @Override
-    @Transactional
     public Map<String, Object> submitPurOrderWizard(Long workorderId, java.util.List<PurOrderWizardLineVO> lines) {
+        // 【Fix Finding #3 + CLAUDE.md】移除方法级 @Transactional，先锁后事务（与其它四入口共用 pro:workorder:doc-gen: 锁）。
+        return lockTemplate.execute("pro:workorder:doc-gen:" + workorderId, () -> {
+            TransactionTemplate tt = new TransactionTemplate(txManager);
+            tt.setTimeout(30);
+            return tt.execute(status -> doSubmitPurOrderWizard(workorderId, lines));
+        });
+    }
+
+    private Map<String, Object> doSubmitPurOrderWizard(Long workorderId, java.util.List<PurOrderWizardLineVO> lines) {
         ProWorkorder wo = proWorkorderMapper.selectProWorkorderByWorkorderId(workorderId);
         if (lines == null || lines.isEmpty()) {
             Map<String, Object> empty = new HashMap<>();
@@ -802,10 +841,10 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
     }
 
     @Override
-    @Transactional
     public Map<String, Object> generatePurchaseOrder(Long workorderId) {
-        // Fix #1: 分布式锁防止并发生成重复采购单
-        return lockTemplate.execute("kit:generate:" + workorderId, () -> {
+        // 【Fix Finding #3】统一锁 key 为 pro:workorder:doc-gen: (五入口互斥)。
+        // 【Fix Finding + CLAUDE.md】移除方法级 @Transactional，先锁后事务（避免事务先于锁开启）。
+        return lockTemplate.execute("pro:workorder:doc-gen:" + workorderId, () -> {
             TransactionTemplate tt = new TransactionTemplate(txManager);
             tt.setTimeout(30);
             return tt.execute(status -> {
@@ -821,14 +860,14 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
 
     @Override
     public WmProductRecpt generateProductReceipt(Long workorderId) {
-        // 先锁后事务：Redis 锁在事务外获取（防重复入库单 + 编码碰撞 TOCTOU）
-        // 事务由内层 TransactionTemplate 管理，确保锁释放前事务已提交
-        return lockTemplate.execute("pro:workorder:receipt:" + workorderId, () -> {
+        // 【Fix Finding #3】统一锁 key 为 pro:workorder:doc-gen: (五入口互斥)。
+        return lockTemplate.execute("pro:workorder:doc-gen:" + workorderId, () -> {
             TransactionTemplate tt = new TransactionTemplate(txManager);
             tt.setTimeout(30);
             return tt.execute(status -> {
                 String batch = UUID.randomUUID().toString();
-                List<Map<String, Object>> recpts = generateReceiptDocuments(workorderId, batch);
+                // Controller 手动入口 (前端"生成入库单"按钮) 无 feedbackId → 手动补录语义
+                List<Map<String, Object>> recpts = generateReceiptDocuments(workorderId, null, batch);
                 if (recpts.isEmpty()) return null;
                 Long recptId = (Long) recpts.get(0).get("recptId");
                 return wmProductRecptService.selectWmProductRecptByRecptId(recptId);
@@ -838,8 +877,8 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
 
     @Override
     public WmRtIssue generateMaterialReturn(Long workorderId) {
-        // 先锁后事务：与 generateProductReceipt 对齐，防并发重复生成退料单
-        return lockTemplate.execute("pro:workorder:return:" + workorderId, () -> {
+        // 【Fix Finding #4】统一锁 key 为 pro:workorder:doc-gen: (五入口互斥, 与其它 4 入口的退料生成路径互斥)。
+        return lockTemplate.execute("pro:workorder:doc-gen:" + workorderId, () -> {
             TransactionTemplate tt = new TransactionTemplate(txManager);
             tt.setTimeout(30);
             return tt.execute(status -> {
@@ -866,29 +905,48 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
         if (lastProcess == null || !lastProcess.getProcessId().equals(fb.getProcessId()))
             return new ArrayList<>();
 
-        // 【Fix #3】Redis 分布式锁：防止两个末工序报工并发生成重复单据
+        // 职责边界 (Fix #1/#2/#4)：本方法只负责生成入库单/退料单，**不更新 workorder**。
+        //  - addQuantityProduced / 完工判定 由外层 auditFeedback 同一事务负责 (autoCompleteWorkorderIfQualified)，
+        //    避免外层 addQuantityProduced 与本内层 updateProWorkorder 争 workorder 行锁 (InnoDB 死锁)。
+        //  - 本方法用 REQUIRES_NEW 独立事务：单据生成失败时只回滚单据，不影响外层审核提交。
+        //  - 内层完全不写 workorder，故无死锁；单据生成全程幂等 (feedback 级 + Index A)。
         final Long wid = fb.getWorkorderId();
-        return lockTemplate.execute("feedback:audit:lastProcess:" + wid, () -> {
-            String batch = UUID.randomUUID().toString();
-            List<Map<String, Object>> result = new ArrayList<>();
-            result.addAll(generateReceiptDocuments(wid, batch));
-            result.addAll(generateReturnDocuments(wid, batch));
-
-            // 【Fix #2】自动完成工单 — 必须检查已生产数量 >= 计划数量
-            ProWorkorder wo = proWorkorderMapper.selectProWorkorderByWorkorderId(wid);
-            if (wo != null && "PRODUCING".equals(wo.getStatus())) {
-                BigDecimal produced = wo.getQuantityProduced() != null ? wo.getQuantityProduced() : BigDecimal.ZERO;
-                BigDecimal planned = wo.getQuantity() != null ? wo.getQuantity() : BigDecimal.ZERO;
-                if (produced.compareTo(planned) >= 0) {
-                    wo.setStatus("COMPLETED");
-                    wo.setFinishDate(new Date());
-                    wo.setUpdateTime(DateUtils.getNowDate());
-                    wo.setUpdateBy(SecurityUtils.getUsername());
-                    proWorkorderMapper.updateProWorkorder(wo);
-                }
-            }
-            return result;
+        return lockTemplate.execute("pro:workorder:doc-gen:" + wid, () -> {
+            TransactionTemplate tt = new TransactionTemplate(txManager);
+            tt.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            tt.setTimeout(30);
+            return tt.execute(status -> {
+                String batch = UUID.randomUUID().toString();
+                List<Map<String, Object>> result = new ArrayList<>();
+                result.addAll(generateReceiptDocuments(wid, feedbackId, batch));
+                result.addAll(generateReturnDocuments(wid, batch));
+                return result;
+            });
         });
+    }
+
+    /**
+     * 自动完工判定：仅当 quantity_produced >= 计划量时，精准条件 UPDATE 置 COMPLETED。
+     * <p>由 auditFeedback 在 addQuantityProduced 之后、同一外层事务内调用 (Fix Finding #1/#2)：
+     * <ul>
+     *   <li>同事务读 quantity_produced 可见 addQuantityProduced 未提交值，无读脏；
+     *   <li>精准条件 UPDATE (WHERE status='PRODUCING')，无 full-entity 覆盖 (TOCTOU)；
+     *   <li>幂等：并发多 feedback 同时达标时，仅一个 UPDATE 命中，返回 0 即跳过。
+     * </ul>
+     */
+    @Override
+    public void autoCompleteWorkorderIfQualified(Long workorderId)
+    {
+        ProWorkorder wo = proWorkorderMapper.selectProWorkorderByWorkorderId(workorderId);
+        if (wo == null) return;
+        BigDecimal produced = wo.getQuantityProduced() != null ? wo.getQuantityProduced() : BigDecimal.ZERO;
+        BigDecimal planned = wo.getQuantity() != null ? wo.getQuantity() : BigDecimal.ZERO;
+        if (produced.compareTo(planned) < 0) return;
+        proWorkorderMapper.completeWorkorderIfProducing(
+                workorderId,
+                new Date(),
+                SecurityUtils.getUsername(),
+                DateUtils.getNowDate());
     }
 
     // ======================== 工具方法 ========================
@@ -925,24 +983,89 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
         return !logs.isEmpty();
     }
 
-    private List<ProDocGenerationLog> getLogs(Long workorderId, String docType)
+    private void insertLog(Long workorderId, String docType, Long docId, String docCode, String batch)
     {
-        ProDocGenerationLog query = new ProDocGenerationLog();
-        query.setWorkorderId(workorderId);
-        query.setDocType(docType);
-        List<ProDocGenerationLog> logs = docLogMapper.selectList(query);
-        return logs != null ? logs : Collections.emptyList();
+        insertLog(workorderId, docType, docId, docCode, null, batch);
     }
 
-    private void insertLog(Long workorderId, String docType, Long docId, String docCode, String batch)
+    /**
+     * 写幂等日志。统一兜底 DuplicateKeyException (Fix Finding #4/#6)：
+     * 五入口共用 pro:workorder:doc-gen: 锁串行执行，正常不冲突；锁失效等异常并发穿透时，
+     * 转 ServiceException 让 GlobalExceptionHandler 返回友好提示，而非 HTTP 500。
+     */
+    private void insertLog(Long workorderId, String docType, Long docId, String docCode, Long sourceFeedbackId, String batch)
     {
         ProDocGenerationLog log = new ProDocGenerationLog();
         log.setWorkorderId(workorderId);
         log.setDocType(docType);
         log.setDocId(docId);
         log.setDocCode(docCode);
+        log.setSourceFeedbackId(sourceFeedbackId);
         log.setGenerationBatch(batch);
         log.setStatus("ACTIVE");
-        docLogMapper.insert(log);
+        try {
+            docLogMapper.insert(log);
+        } catch (org.springframework.dao.DuplicateKeyException dup) {
+            throw new ServiceException("单据正在生成中，请稍后重试");
+        }
+    }
+
+    // ---- feedback 级入库单幂等辅助 ----
+
+    /**
+     * 查该 (workorder, feedback) 已生成过的 RECPT 类型 log 列表。
+     * feedbackId == null 时用专用 mapper 精确匹配 source_feedback_id IS NULL，避免 Java 端过滤 (Fix Finding #11)。
+     * 供 buildExistingRecptInfo 复用，避免重复查询 (Fix Finding #9)。
+     */
+    private List<ProDocGenerationLog> findReceiptLogsForFeedback(Long workorderId, Long feedbackId)
+    {
+        if (feedbackId == null) {
+            // 手动补录：SQL 直接 source_feedback_id IS NULL，不拉全量再 Java 过滤
+            List<ProDocGenerationLog> logs = docLogMapper.selectManualReceiptLogs(workorderId, DOC_RECPT);
+            return logs != null ? logs : Collections.emptyList();
+        }
+        // 自动路径：selectList 会拼 source_feedback_id = ? 精确匹配
+        ProDocGenerationLog query = new ProDocGenerationLog();
+        query.setWorkorderId(workorderId);
+        query.setDocType(DOC_RECPT);
+        query.setSourceFeedbackId(feedbackId);
+        List<ProDocGenerationLog> logs = docLogMapper.selectList(query);
+        return logs != null ? logs : Collections.emptyList();
+    }
+
+    /**
+     * 返回已存在入库单的信息 (幂等命中场景)。
+     * 【Fix Finding #6】过滤 log 关联的入库单已被物理删除的脏 log。
+     * 【Fix Finding #5】过滤 status='CANCEL' 的已取消入库单，允许用户对已取消的单据重新生成。
+     * 只把 DRAFT/CONFIRMED/POSTED (与 sumQuantityByWorkorderId 语义一致) 视为「有效已存在单据」。
+     */
+    private List<Map<String, Object>> buildExistingRecptInfo(Long workorderId, Long feedbackId)
+    {
+        List<ProDocGenerationLog> logs = findReceiptLogsForFeedback(workorderId, feedbackId);
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (ProDocGenerationLog log : logs) {
+            // 确认入库单行仍存在且未取消 (数据完整性检查)
+            WmProductRecpt recpt = wmProductRecptService.selectWmProductRecptByRecptId(log.getDocId());
+            if (recpt == null) continue;                      // log 指向已删单据 → 跳过
+            String st = recpt.getStatus();
+            if (!"DRAFT".equals(st) && !"CONFIRMED".equals(st) && !"POSTED".equals(st)) continue;  // 排除 CANCEL 等
+            Map<String, Object> info = new HashMap<>();
+            info.put("recptId", log.getDocId());
+            info.put("recptCode", log.getDocCode());
+            info.put("message", "已存在入库单");
+            result.add(info);
+        }
+        return result;
+    }
+
+    /**
+     * 汇总某工单已生成的入库单总量。
+     * 语义：仅统计 status IN ('DRAFT','CONFIRMED','POSTED')；NULL 及其它状态 (含 CANCEL) 均排除。
+     * 详见 WmProductRecptMapper.sumQuantityByWorkorderId XML 注释。
+     */
+    private BigDecimal sumReceiptedQty(Long workorderId)
+    {
+        BigDecimal sum = wmProductRecptMapper.sumQuantityByWorkorderId(workorderId);
+        return sum != null ? sum : BigDecimal.ZERO;
     }
 }

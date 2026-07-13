@@ -20,6 +20,8 @@ public class ProDocGenerationLog extends BaseEntity
     private String docType;
     private Long docId;
     private String docCode;
+    /** 触发本次生成的报工 record_id（RECPT 类型必填, 其它类型为 null 表示工单级幂等） */
+    private Long sourceFeedbackId;
     private String generationBatch;
     private String status;
 
@@ -40,6 +42,9 @@ public class ProDocGenerationLog extends BaseEntity
 
     public String getDocCode() { return docCode; }
     public void setDocCode(String v) { this.docCode = v; }
+
+    public Long getSourceFeedbackId() { return sourceFeedbackId; }
+    public void setSourceFeedbackId(Long v) { this.sourceFeedbackId = v; }
 
     public String getGenerationBatch() { return generationBatch; }
     public void setGenerationBatch(String v) { this.generationBatch = v; }

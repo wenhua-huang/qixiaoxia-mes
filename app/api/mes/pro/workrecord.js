@@ -20,6 +20,11 @@ export function getMyWorkstations() {
   return request({ url: '/mes/pro/workrecord/myWorkstations', method: 'get' })
 }
 
+// 按编码查工作站（扫码/手输编码后解析真实工位）
+export function resolveWorkstation(workstationCode) {
+  return request({ url: '/mes/pro/workrecord/resolveWorkstation', method: 'get', params: { workstationCode } })
+}
+
 // 打卡历史列表（分页）
 export function listWorkrecord(query) {
   return request({ url: '/mes/pro/workrecord/list', method: 'get', params: query })

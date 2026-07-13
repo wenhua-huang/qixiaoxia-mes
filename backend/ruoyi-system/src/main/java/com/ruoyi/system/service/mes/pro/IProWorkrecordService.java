@@ -1,6 +1,7 @@
 package com.ruoyi.system.service.mes.pro;
 
 import java.util.List;
+import com.ruoyi.system.domain.mes.md.MdWorkstation;
 import com.ruoyi.system.domain.mes.pro.ProUserWorkstation;
 import com.ruoyi.system.domain.mes.pro.ProWorkrecord;
 
@@ -28,6 +29,9 @@ public interface IProWorkrecordService
 
     /** 查当前登录用户的打卡历史（移动端，固定按 userId 过滤，支持 status/时间范围） */
     public List<ProWorkrecord> selectMyHistory(ProWorkrecord e);
+
+    /** 按编码查工作站（移动端扫码/手输编码后解析真实工位，绑定优先不强制） */
+    public MdWorkstation resolveWorkstationByCode(String workstationCode);
 
     /** 标准 CRUD（PC 端管理用） */
     public ProWorkrecord selectProWorkrecordByRecordId(Long recordId);

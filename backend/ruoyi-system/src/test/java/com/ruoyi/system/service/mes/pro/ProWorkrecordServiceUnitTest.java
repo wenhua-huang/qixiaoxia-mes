@@ -153,4 +153,27 @@ class ProWorkrecordServiceUnitTest {
         when(workrecordMapper.selectActiveByUser(any(ProWorkrecord.class))).thenReturn(null);
         assertThat(workrecordService.selectActiveSession()).isNull();
     }
+
+    @Test
+    @DisplayName("按编码查工位：命中返回工位对象")
+    void testResolveWorkstationByCodeFound() {
+        MdWorkstation ws = new MdWorkstation();
+        ws.setWorkstationId(200L);
+        ws.setWorkstationCode("WS-200");
+        ws.setWorkstationName("装配工位");
+        when(mdWorkstationMapper.selectMdWorkstationList(any(MdWorkstation.class))).thenReturn(java.util.Collections.singletonList(ws));
+
+        MdWorkstation result = workrecordService.resolveWorkstationByCode("WS-200");
+        assertThat(result).isNotNull();
+        assertThat(result.getWorkstationId()).isEqualTo(200L);
+        assertThat(result.getWorkstationName()).isEqualTo("装配工位");
+    }
+
+    @Test
+    @DisplayName("按编码查工位：空编码返回 null")
+    void testResolveWorkstationByCodeEmpty() {
+        assertThat(workrecordService.resolveWorkstationByCode("")).isNull();
+        assertThat(workrecordService.resolveWorkstationByCode(null)).isNull();
+        verify(mdWorkstationMapper, never()).selectMdWorkstationList(any());
+    }
 }

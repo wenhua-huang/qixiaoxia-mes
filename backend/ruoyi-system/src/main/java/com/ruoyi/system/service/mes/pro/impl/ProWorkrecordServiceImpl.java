@@ -98,6 +98,18 @@ public class ProWorkrecordServiceImpl implements IProWorkrecordService
         return proWorkrecordMapper.selectProWorkrecordList(e);
     }
 
+    /** 按编码查工作站（移动端扫码/手输编码后解析真实工位） */
+    @Override
+    public MdWorkstation resolveWorkstationByCode(String workstationCode) {
+        if (workstationCode == null || workstationCode.trim().isEmpty()) {
+            return null;
+        }
+        MdWorkstation q = new MdWorkstation();
+        q.setWorkstationCode(workstationCode.trim());
+        List<MdWorkstation> list = mdWorkstationMapper.selectMdWorkstationList(q);
+        return list.isEmpty() ? null : list.get(0);
+    }
+
     // ════════════════════════════════════════════
     // 锁内业务（私有）
     // ════════════════════════════════════════════

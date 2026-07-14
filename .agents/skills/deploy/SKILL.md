@@ -33,11 +33,12 @@ export JAVA_HOME=/usr/lib/jvm/java-17-alibaba-dragonwell-17.0.9.0.10.9-1.al8.x86
 export PATH=$JAVA_HOME/bin:$PATH
 cd backend && mvn clean package -pl ruoyi-admin -am -DskipTests -Dcheckstyle.skip=true -q
 
-# 重启（⚠️ 服务器仅 1.8GB 内存，必须限制堆内存，否则 OOM Killer 会杀进程）
+# 重启（⚠️ 服务器仅 1.8GB 内存，必须限制全部 JVM 内存区，否则 OOM Killer 会杀进程）
+# ⚠️ 关键：仅 -Xmx 不够！Metaspace + DirectMemory + 线程栈会让总虚拟内存飙到 3.8GB，仍触发全局 OOM
 pkill -f 'org.codehaus.plexus.classworlds.launcher.Launcher' 2>/dev/null  # 清 Maven 残留进程
 sleep 2
 kill $(lsof -ti :8081) 2>/dev/null; sleep 2
-nohup java -Xms256m -Xmx768m -XX:+UseG1GC \
+nohup java -Xms256m -Xmx512m -XX:MaxMetaspaceSize=256m -XX:MaxDirectMemorySize=128m -XX:+UseG1GC \
   -jar /var/www/qixiaoxia-mes/backend/ruoyi-admin/target/ruoyi-admin.jar \
   --server.port=8081 --ruoyi.profile=/var/www/qixiaoxia-mes/uploadPath \
   > /tmp/qxx-backend.log 2>&1 &
@@ -84,7 +85,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost/
 | 现象 | 原因 | 解决 |
 |------|------|------|
 | 后端启动后立即退出 | Docker 容器未启动 | `docker start qxx-mysql qxx-redis qxx-minio` |
-| 后端进程被 Killed（OOM） | 编译后内存不足，java 进程被 OOM Killer 杀 | 启动前 `pkill -f classworlds` 清 Maven 残留；启动命令必须带 `-Xmx768m`（见步骤 2）；等 `free -m` available > 800MB 再启 |
+| 后端进程被 Killed（OOM） | JVM 总虚拟内存超物理内存被 OOM Killer 杀（**仅 `-Xmx` 不够**，Metaspace/DirectMemory 会让总内存飙到 ~3.8GB） | 启动前 `pkill -f classworlds` 清 Maven 残留；启动命令必须同时限制 `-Xmx512m -XX:MaxMetaspaceSize=256m -XX:MaxDirectMemorySize=128m`（见步骤 2）；等 `free -m` available > 800MB 再启；查 `dmesg -T \| grep -i oom` 确认是否 OOM |
 | Nginx 502 | 后端未就绪 | 等 `curl :8081` 返回 200 后再重载 |
 | 前端 404 | dist/ 未上传或路径错误 | 确认 scp 目标路径 `/var/www/qixiaoxia-mes/frontend/dist/` |
 | 登录验证码报错 | 服务器已关闭验证码 | `"uuid":""` 传空字符串 |

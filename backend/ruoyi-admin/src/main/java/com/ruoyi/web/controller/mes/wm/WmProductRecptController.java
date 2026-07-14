@@ -10,6 +10,7 @@ import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.system.domain.mes.wm.WmProductRecpt;
+import com.ruoyi.system.domain.mes.wm.WmProductRecptMobileBody;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -110,6 +111,22 @@ public class WmProductRecptController extends BaseController
     public AjaxResult post(@PathVariable("recptId") Long recptId) {
         try {
             wmProductRecptService.postProductRecpt(recptId);
+            return AjaxResult.success();
+        } catch (RuntimeException e) {
+            return AjaxResult.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 移动端确认入库 — 更新行数量 + 确认 + 更新库存，单接口原子完成。
+     */
+    @PreAuthorize("@ss.hasPermi('mes:wm:product_recpt:edit')")
+    @Log(title = "产品入库单移动端确认", businessType = BusinessType.UPDATE)
+    @PutMapping("/mobile/confirm/{recptId}")
+    public AjaxResult mobileConfirm(@PathVariable("recptId") Long recptId,
+                                    @RequestBody WmProductRecptMobileBody body) {
+        try {
+            wmProductRecptService.mobileConfirmProductRecpt(recptId, body);
             return AjaxResult.success();
         } catch (RuntimeException e) {
             return AjaxResult.error(e.getMessage());

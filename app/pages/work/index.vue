@@ -33,6 +33,18 @@
             <text class="text">扫码查库存</text>
           </view>
         </uni-grid-item>
+        <uni-grid-item @click="goProductRecpt">
+          <view class="grid-item-box">
+            <uni-icons type="checkbox-filled" size="30" color="#67c23a"></uni-icons>
+            <text class="text">产品入库</text>
+          </view>
+        </uni-grid-item>
+        <uni-grid-item @click="goProductRecptHistory">
+          <view class="grid-item-box">
+            <uni-icons type="list" size="30" color="#409eff"></uni-icons>
+            <text class="text">入库记录</text>
+          </view>
+        </uni-grid-item>
       </uni-grid>
     </view>
 
@@ -201,6 +213,12 @@
   }
   function goClockHistory() {
     proxy.$tab.navigateTo('/pages/mes/pro/clock-history')
+  }
+  function goProductRecpt() {
+    proxy.$tab.navigateTo('/pages/mes/wm/productrecpt/list')
+  }
+  function goProductRecptHistory() {
+    proxy.$tab.navigateTo('/pages/mes/wm/productrecpt/list')
   }
 </script>
 

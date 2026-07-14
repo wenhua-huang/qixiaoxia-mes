@@ -2,6 +2,7 @@ package com.ruoyi.system.service.mes.wm;
 
 import java.util.List;
 import com.ruoyi.system.domain.mes.wm.WmProductRecpt;
+import com.ruoyi.system.domain.mes.wm.WmProductRecptMobileBody;
 
 public interface IWmProductRecptService
 {
@@ -29,4 +30,10 @@ public interface IWmProductRecptService
      * 库存数据已在 confirmProductRecpt 阶段更新，此处仅做状态变更。
      */
     public void postProductRecpt(Long recptId);
+
+    /**
+     * 移动端确认入库 — 更新行数量 + 确认 + 更新库存，单接口原子完成。
+     * 仅支持 DRAFT 状态的入库单。
+     */
+    public void mobileConfirmProductRecpt(Long recptId, WmProductRecptMobileBody body);
 }

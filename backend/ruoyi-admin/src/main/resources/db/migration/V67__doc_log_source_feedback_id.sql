@@ -1,5 +1,5 @@
 -- ============================================================
--- V65: qxx_pro_doc_generation_log 增加 source_feedback_id + 唯一索引 (仅 A)
+-- V67: qxx_pro_doc_generation_log 增加 source_feedback_id + 唯一索引 (仅 A)
 --
 -- 背景：产品入库单幂等原本按 workorder_id 级判重，导致：
 --   1) 中间工序报工先审核 → 汇总所有 AUDITED 合格数被污染 (bug)
@@ -18,8 +18,8 @@
 -- ⚠️ 生产运维注意事项：
 --   本次迁移只加字段/索引，不回填历史 log 的 source_feedback_id (保持为 NULL)。
 --   ---
---   过渡期风险：V65 之前已生成过入库单的进行中 (status != COMPLETED) 工单，
---   V65 后新审核的末工序 feedback 会被视为"新的分批"再生成一张入库单 → 可能造成超量入库。
+--   过渡期风险：V67 之前已生成过入库单的进行中 (status != COMPLETED) 工单，
+--   V67 后新审核的末工序 feedback 会被视为"新的分批"再生成一张入库单 → 可能造成超量入库。
 --   ---
 --   缓解：
 --   1. 部署前先让 PRODUCING 工单尽量完成 (末工序全部审核 → 工单自动 COMPLETED)

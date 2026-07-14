@@ -118,6 +118,17 @@
       "navigationBarTitleText": "扫码查库存"
     }
   }, {
+    "path": "pages/mes/wm/productrecpt/list",
+    "style": {
+      "navigationBarTitleText": "产品入库",
+      "enablePullDownRefresh": true
+    }
+  }, {
+    "path": "pages/mes/wm/productrecpt/detail",
+    "style": {
+      "navigationBarTitleText": "入库详情"
+    }
+  }, {
     "path": "pages/mes/pro/report",
     "style": {
       "navigationBarTitleText": "生产报工"

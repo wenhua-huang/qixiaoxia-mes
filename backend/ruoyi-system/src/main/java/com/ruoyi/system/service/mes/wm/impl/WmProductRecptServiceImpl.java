@@ -1,7 +1,10 @@
 package com.ruoyi.system.service.mes.wm.impl;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -9,6 +12,8 @@ import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.system.domain.mes.wm.WmProductRecpt;
 import com.ruoyi.system.domain.mes.wm.WmProductRecptLine;
+import com.ruoyi.system.domain.mes.wm.WmProductRecptMobileBody;
+import com.ruoyi.system.domain.mes.wm.WmProductRecptMobileBody.MobileLineItem;
 import com.ruoyi.system.domain.mes.wm.tx.ProductRecptTxBean;
 import com.ruoyi.system.mapper.mes.wm.WmProductRecptMapper;
 import com.ruoyi.system.service.mes.wm.IWmProductRecptLineService;
@@ -154,6 +159,89 @@ public class WmProductRecptServiceImpl implements IWmProductRecptService
         header.setUpdateBy(SecurityUtils.getUsername());
         header.setUpdateTime(DateUtils.getNowDate());
         wmProductRecptMapper.updateWmProductRecpt(header);
+    }
+
+    /**
+     * 移动端确认入库 — 更新行数量 + 确认 + 更新库存，单接口原子完成。
+     * 仅支持 DRAFT 状态。使用 @Transactional 保证行更新和确认在同一事务中。
+     */
+    @Override
+    @Transactional
+    public void mobileConfirmProductRecpt(Long recptId, WmProductRecptMobileBody body) {
+        WmProductRecpt header = selectWmProductRecptByRecptId(recptId);
+        if (header == null) {
+            throw new RuntimeException("入库单不存在");
+        }
+        if (!"DRAFT".equals(header.getStatus())) {
+            throw new RuntimeException("仅草稿状态可确认收货");
+        }
+        List<MobileLineItem> bodyLines = body.getLines();
+        if (bodyLines == null || bodyLines.isEmpty()) {
+            throw new RuntimeException("请至少填写一条入库数量");
+        }
+
+        // 加载数据库中的行，按 lineId 建立索引
+        List<WmProductRecptLine> dbLines = loadRecptLines(recptId);
+        if (dbLines == null || dbLines.isEmpty()) {
+            throw new RuntimeException("入库单没有行数据");
+        }
+        // 校验：用户必须提交所有行（移动端不能跳过行）
+        if (bodyLines.size() != dbLines.size()) {
+            throw new RuntimeException("请提交所有入库行的实收数量（当前" + bodyLines.size() + "行，共" + dbLines.size() + "行）");
+        }
+        Map<Long, WmProductRecptLine> lineMap = dbLines.stream()
+                .collect(Collectors.toMap(WmProductRecptLine::getLineId, l -> l, (a, b) -> a));
+
+        BigDecimal totalQty = BigDecimal.ZERO;
+        int totalBox = 0;
+        List<WmProductRecptLine> updatedLines = new ArrayList<>();
+        for (MobileLineItem item : bodyLines) {
+            WmProductRecptLine line = lineMap.get(item.getLineId());
+            if (line == null) {
+                throw new RuntimeException("行ID " + item.getLineId() + " 不属于该入库单");
+            }
+            BigDecimal qty = item.getQuantityRecpt();
+            if (qty == null || qty.compareTo(BigDecimal.ZERO) < 0) {
+                throw new RuntimeException("行ID " + item.getLineId() + " 实收数量不能为负数");
+            }
+            line.setQuantityRecpt(qty);
+            // 数量为 0 的行跳过库存更新（仅更新行记录，不产生 stock transaction）
+            if (qty.compareTo(BigDecimal.ZERO) == 0) {
+                line.setQuantityBox(0);
+                wmProductRecptLineService.updateWmProductRecptLine(line);
+                continue;
+            }
+            line.setQuantityBox(item.getQuantityBox() != null ? item.getQuantityBox() : 0);
+            if (item.getWarehouseId() != null) {
+                line.setWarehouseId(item.getWarehouseId());
+            }
+            if (item.getBatchCode() != null) {
+                line.setBatchCode(item.getBatchCode());
+            }
+            wmProductRecptLineService.updateWmProductRecptLine(line);
+            totalQty = totalQty.add(qty);
+            totalBox += (item.getQuantityBox() != null ? item.getQuantityBox() : 0);
+            updatedLines.add(line);
+        }
+
+        // 更新 header
+        if (body.getWarehouseId() != null) {
+            header.setWarehouseId(body.getWarehouseId());
+            // 清除旧的 warehouseCode/Name，防止 tx bean 中 warehouseId 与 code/name 不一致
+            header.setWarehouseCode(null);
+            header.setWarehouseName(null);
+        }
+        if (body.getRemark() != null) {
+            header.setRemark(body.getRemark());
+        }
+        header.setTotalQuantity(totalQty);
+        header.setTotalBox(totalBox);
+        header.setUpdateBy(SecurityUtils.getUsername());
+        header.setUpdateTime(DateUtils.getNowDate());
+        wmProductRecptMapper.updateWmProductRecpt(header);
+
+        // 确认收货 — 更新库存（仅处理用户提交的行，避免未提交行产生零数量库存事务）
+        doConfirmProductRecpt(header, updatedLines);
     }
 
     /** 加载入库单下所有行 */

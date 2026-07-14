@@ -77,6 +77,22 @@ class FactoryIdInterceptorTest {
             String sql = "SELECT * FROM sys_config c WHERE c.config_id = ?";
             assertThat(interceptor.getTableAlias(sql)).isEmpty();
         }
+
+        @Test
+        @DisplayName("PageHelper 分页 count 子查询 → 回退到子查询内别名")
+        void shouldFallbackToSubqueryAliasForCountWrapper() {
+            // 模拟 PageHelper 分页 count：SELECT count(0) FROM (原始SQL) table_count
+            String sql = "SELECT count(0) FROM (SELECT DISTINCT r.role_id, r.role_name FROM sys_role r LEFT JOIN sys_user_role ur ON ur.role_id = r.role_id LEFT JOIN sys_user u ON u.user_id = ur.user_id LEFT JOIN sys_dept d ON u.dept_id = d.dept_id WHERE r.del_flag = '0') table_count";
+            assertThat(interceptor.getTableAlias(sql)).isEqualTo("r");
+        }
+
+        @Test
+        @DisplayName("主查询有匹配表 → 不取子查询回退")
+        void shouldPreferMainQueryOverSubquery() {
+            // 主查询 sys_user u → 应返回 u，不返回子查询内的 sys_role r
+            String sql = "SELECT u.*, (SELECT r.role_name FROM sys_role r WHERE r.role_id = u.role_id) AS rn FROM sys_user u";
+            assertThat(interceptor.getTableAlias(sql)).isEqualTo("u");
+        }
     }
 
     // ==================== 括号深度计算 ====================

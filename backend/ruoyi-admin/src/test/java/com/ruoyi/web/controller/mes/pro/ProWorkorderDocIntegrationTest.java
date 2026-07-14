@@ -202,14 +202,17 @@ class ProWorkorderDocIntegrationTest extends BaseIntegrationTest {
                 + "update_by varchar(64) DEFAULT '', update_time datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"
                 + "PRIMARY KEY (record_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-        // 日志表
+        // 日志表 (含 source_feedback_id + 唯一索引 A，对齐 V65)
         exec("CREATE TABLE IF NOT EXISTS qxx_pro_doc_generation_log ("
                 + "log_id bigint(20) NOT NULL AUTO_INCREMENT, factory_id bigint(20) NOT NULL DEFAULT 1,"
                 + "workorder_id bigint(20) NOT NULL, doc_type varchar(20) NOT NULL,"
                 + "doc_id bigint(20) NOT NULL, doc_code varchar(64) DEFAULT NULL,"
+                + "source_feedback_id bigint(20) DEFAULT NULL,"
                 + "generation_batch varchar(64) NOT NULL, status varchar(20) DEFAULT 'ACTIVE',"
                 + "create_time datetime DEFAULT CURRENT_TIMESTAMP,"
-                + "PRIMARY KEY (log_id), UNIQUE KEY uk_wo_doc (workorder_id, doc_type, doc_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                + "PRIMARY KEY (log_id),"
+                + "UNIQUE KEY uk_doc_log_wo_type_feedback (workorder_id, doc_type, source_feedback_id)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
         // 采购单表
         exec("CREATE TABLE IF NOT EXISTS qxx_pur_order ("

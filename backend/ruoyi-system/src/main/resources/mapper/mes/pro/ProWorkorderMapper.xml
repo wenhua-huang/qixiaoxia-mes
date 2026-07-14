@@ -221,4 +221,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         set quantity_produced = quantity_produced + #{deltaProduced}
         where workorder_id = #{workorderId}
     </update>
+
+    <!--
+      精准完工 UPDATE：仅当 status='PRODUCING' 时置 COMPLETED + finish_date + audit 字段。
+      避免 full-entity 覆盖并发写入的其它列 (Fix Finding #2)；避免与 addQuantityProduced 死锁。
+    -->
+    <update id="completeWorkorderIfProducing">
+        update qxx_pro_workorder
+        set status = 'COMPLETED',
+            finish_date = #{finishDate},
+            update_by = #{updateBy},
+            update_time = #{updateTime}
+        where workorder_id = #{workorderId}
+          and status = 'PRODUCING'
+    </update>
 </mapper>

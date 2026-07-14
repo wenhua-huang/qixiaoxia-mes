@@ -64,6 +64,11 @@
           </el-tag>
         </template>
       </el-table-column>
+      <el-table-column label="更新时间" align="center" prop="updateTime" width="160">
+        <template #default="scope">
+          <span>{{ scope.row.updateTime || '-' }}</span>
+        </template>
+      </el-table-column>
     </el-table>
 
     <pagination v-show="total>0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />

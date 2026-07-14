@@ -180,8 +180,8 @@
           </el-form>
         </el-tab-pane>
 
-        <!-- 纸张属性 tab (条件显示) -->
-        <el-tab-pane label="纸张属性" name="paper" v-if="showPaperTab">
+        <!-- 纸张属性 tab -->
+        <el-tab-pane label="纸张属性" name="paper">
           <el-form :model="form.attrPaper" label-width="100px">
             <el-row>
               <el-col :span="12"><el-form-item label="门幅"><el-input v-model="form.attrPaper!.paperWidth" placeholder="如925mm" /></el-form-item></el-col>
@@ -195,7 +195,7 @@
         </el-tab-pane>
 
         <!-- 纸袋属性 tab -->
-        <el-tab-pane label="纸袋属性" name="paperBag" v-if="showPaperBagTab">
+        <el-tab-pane label="纸袋属性" name="paperBag">
           <el-form :model="form.attrPaperBag" label-width="100px">
             <el-row>
               <el-col :span="12"><el-form-item label="绳料规格"><el-input v-model="form.attrPaperBag!.ropeSpec" placeholder="如7.5cm黄牛皮纸绳" /></el-form-item></el-col>
@@ -274,17 +274,9 @@ const data = reactive({
 
 const { queryParams, form, rules } = toRefs(data)
 
-const showPaperTab = computed(() => {
-  const c = form.value.itemTypeCode?.toUpperCase() || ''
-  return c.includes('PAPER') || c.includes('纸')
-})
 const parentItemDisplay = computed(() => {
   if (!form.value.parentId || form.value.parentId === 0) return ''
   return `${form.value.parentItemCode || '(父产品#' + form.value.parentId + ')'} — ${form.value.parentItemName || ''}`
-})
-const showPaperBagTab = computed(() => {
-  const c = form.value.itemTypeCode?.toUpperCase() || ''
-  return c.includes('BAG') || c.includes('纸袋')
 })
 
 watch(filterText, (val) => { treeRef.value?.filter(val) })

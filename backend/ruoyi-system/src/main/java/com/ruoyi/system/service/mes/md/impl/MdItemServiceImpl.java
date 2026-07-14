@@ -196,7 +196,9 @@ public class MdItemServiceImpl implements IMdItemService
             box.setCreateTime(DateUtils.getNowDate());
             attrGiftBoxMapper.insert(box);
         }
-    }    @Override
+    }
+
+    @Override
     @Transactional
     public int updateMdItem(MdItem mdItem)
     {

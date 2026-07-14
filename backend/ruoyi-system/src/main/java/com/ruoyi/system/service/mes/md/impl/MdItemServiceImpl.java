@@ -170,34 +170,29 @@ public class MdItemServiceImpl implements IMdItemService
         }
     }
 
-    /** 根据 item 信息判断并插入对应的行业子表（按 itemOrProduct 精确匹配） */
+    /** 根据前端传入的属性对象，插入对应的行业子表（所有分类均开放，用户自行填写） */
     private void handleSubTableInsert(MdItem item)
     {
-        if (item.getItemTypeCode() == null) return;
-        String code = item.getItemTypeCode().toUpperCase();
-        // 用 itemOrProduct 精确路由，不再依赖 itemTypeCode 的子串匹配
-        String iop = item.getItemTypeCode(); // 保留原始大小写给后续检查用
-        if (code.contains("PAPER_BAG") || code.equals("BAG") || code.contains("纸袋"))
-        {
-            MdItemAttrPaperBag bag = item.getAttrPaperBag();
-            if (bag == null) bag = new MdItemAttrPaperBag();
-            bag.setItemId(item.getItemId());
-            bag.setCreateTime(DateUtils.getNowDate());
-            attrPaperBagMapper.insert(bag);
-        }
-        else if (code.equals("PAPER") || code.equals("RAW-PAPER") || code.contains("纸张"))
+        Long itemId = item.getItemId();
+
+        if (item.getAttrPaper() != null)
         {
             MdItemAttrPaper paper = item.getAttrPaper();
-            if (paper == null) paper = new MdItemAttrPaper();
-            paper.setItemId(item.getItemId());
+            paper.setItemId(itemId);
             paper.setCreateTime(DateUtils.getNowDate());
             attrPaperMapper.insert(paper);
         }
-        else if (code.contains("GIFT") || code.equals("BOX") || code.contains("盒"))
+        if (item.getAttrPaperBag() != null)
+        {
+            MdItemAttrPaperBag bag = item.getAttrPaperBag();
+            bag.setItemId(itemId);
+            bag.setCreateTime(DateUtils.getNowDate());
+            attrPaperBagMapper.insert(bag);
+        }
+        if (item.getAttrGiftBox() != null)
         {
             MdItemAttrGiftBox box = item.getAttrGiftBox();
-            if (box == null) box = new MdItemAttrGiftBox();
-            box.setItemId(item.getItemId());
+            box.setItemId(itemId);
             box.setCreateTime(DateUtils.getNowDate());
             attrGiftBoxMapper.insert(box);
         }
@@ -217,49 +212,34 @@ public class MdItemServiceImpl implements IMdItemService
 
     private void handleSubTableUpsert(MdItem item)
     {
-        if (item.getItemTypeCode() == null)
-        {
-            // 不确定类型则不操作子表
-            return;
-        }
-        String code = item.getItemTypeCode().toUpperCase();
         Long itemId = item.getItemId();
 
-        if (code.contains("PAPER_BAG") || code.equals("BAG") || code.contains("纸袋"))
-        {
-            MdItemAttrPaperBag bag = item.getAttrPaperBag();
-            if (bag != null)
-            {
-                bag.setItemId(itemId);
-                bag.setUpdateTime(DateUtils.getNowDate());
-                MdItemAttrPaperBag exist = attrPaperBagMapper.selectByItemId(itemId);
-                if (exist != null) attrPaperBagMapper.updateByItemId(bag);
-                else { bag.setCreateTime(DateUtils.getNowDate()); attrPaperBagMapper.insert(bag); }
-            }
-        }
-        else if (code.equals("PAPER") || code.equals("RAW-PAPER") || code.contains("纸张"))
+        if (item.getAttrPaper() != null)
         {
             MdItemAttrPaper paper = item.getAttrPaper();
-            if (paper != null)
-            {
-                paper.setItemId(itemId);
-                paper.setUpdateTime(DateUtils.getNowDate());
-                MdItemAttrPaper exist = attrPaperMapper.selectByItemId(itemId);
-                if (exist != null) attrPaperMapper.updateByItemId(paper);
-                else { paper.setCreateTime(DateUtils.getNowDate()); attrPaperMapper.insert(paper); }
-            }
+            paper.setItemId(itemId);
+            paper.setUpdateTime(DateUtils.getNowDate());
+            MdItemAttrPaper exist = attrPaperMapper.selectByItemId(itemId);
+            if (exist != null) attrPaperMapper.updateByItemId(paper);
+            else { paper.setCreateTime(DateUtils.getNowDate()); attrPaperMapper.insert(paper); }
         }
-        else if (code.contains("GIFT") || code.equals("BOX") || code.contains("盒"))
+        if (item.getAttrPaperBag() != null)
+        {
+            MdItemAttrPaperBag bag = item.getAttrPaperBag();
+            bag.setItemId(itemId);
+            bag.setUpdateTime(DateUtils.getNowDate());
+            MdItemAttrPaperBag exist = attrPaperBagMapper.selectByItemId(itemId);
+            if (exist != null) attrPaperBagMapper.updateByItemId(bag);
+            else { bag.setCreateTime(DateUtils.getNowDate()); attrPaperBagMapper.insert(bag); }
+        }
+        if (item.getAttrGiftBox() != null)
         {
             MdItemAttrGiftBox box = item.getAttrGiftBox();
-            if (box != null)
-            {
-                box.setItemId(itemId);
-                box.setUpdateTime(DateUtils.getNowDate());
-                MdItemAttrGiftBox exist = attrGiftBoxMapper.selectByItemId(itemId);
-                if (exist != null) attrGiftBoxMapper.updateByItemId(box);
-                else { box.setCreateTime(DateUtils.getNowDate()); attrGiftBoxMapper.insert(box); }
-            }
+            box.setItemId(itemId);
+            box.setUpdateTime(DateUtils.getNowDate());
+            MdItemAttrGiftBox exist = attrGiftBoxMapper.selectByItemId(itemId);
+            if (exist != null) attrGiftBoxMapper.updateByItemId(box);
+            else { box.setCreateTime(DateUtils.getNowDate()); attrGiftBoxMapper.insert(box); }
         }
     }
 

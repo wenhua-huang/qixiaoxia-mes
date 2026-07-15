@@ -117,7 +117,12 @@ public class FactoryIdInterceptor implements Interceptor
 
     // ---- 别名提取 ----
 
-    /** 从 FROM/JOIN 子句中找第一个有 factory_id 列的表的限定名（别名或表名）。visible for testing */
+    /**
+     * 从 FROM/JOIN 子句中找第一个有 factory_id 列的表的限定名（别名或表名）。
+     *
+     * 优先匹配主查询（深度 0）中的表；若主查询找不到（如 PageHelper 分页 count 将原始 SQL
+     * 包在子查询中），则回退到子查询内的第一个匹配表。visible for testing
+     */
     String getTableAlias(String sql)
     {
         String s = sql.replaceAll("\\s+", " ");
@@ -126,24 +131,46 @@ public class FactoryIdInterceptor implements Interceptor
         // 计算每个位置的括号深度，跳过子查询内的 FROM/JOIN
         int[] depthAt = parenDepth(s);
 
-        String fallbackTable = null;
+        String fallbackTable = null;       // 深度 0 关键字别名回退
+        String subAlias = null;            // 子查询内有效别名回退
+        String subTable = null;            // 子查询内无别名回退
         while (m.find())
         {
-            // 跳过子查询内的 FROM/JOIN（括号深度 > 0）
-            if (depthAt[m.start()] > 0) continue;
-
             String table = m.group(1);
-            if (FACTORY_ID_TABLE.matcher(table).matches())
+            if (!FACTORY_ID_TABLE.matcher(table).matches()) continue;
+
+            String alias = m.group(2);
+            boolean validAlias = alias != null && !alias.isEmpty() && !isSqlKeyword(alias);
+            boolean noAlias = alias == null || alias.isEmpty();
+
+            if (depthAt[m.start()] > 0)
             {
-                String alias = m.group(2);
-                if (alias != null && !alias.isEmpty() && !isSqlKeyword(alias))
-                    return alias;                  // 有效别名 → alias.factory_id
-                if (alias == null || alias.isEmpty())
-                    return table;                  // 无别名 → table_name.factory_id
-                fallbackTable = table;             // 关键字别名 → 记下，继续找
+                // 子查询内：记录下来作为回退，继续找主查询的
+                if (subAlias == null && subTable == null)
+                {
+                    if (validAlias)
+                        subAlias = alias;
+                    else if (noAlias)
+                        subTable = table;
+                    else
+                        subTable = table;      // 关键字别名 → 用表名
+                }
+                continue;
             }
+
+            // 主查询（深度 0）
+            if (validAlias)
+                return alias;                  // 有效别名 → alias.factory_id
+            if (noAlias)
+                return table;                  // 无别名 → table_name.factory_id
+            fallbackTable = table;             // 关键字别名 → 记下，继续找
         }
-        return fallbackTable != null ? fallbackTable : "";  // 全部是关键字别名 → 用最后一个表名
+
+        // 优先主查询回退，其次子查询回退
+        if (fallbackTable != null) return fallbackTable;
+        if (subAlias != null) return subAlias;
+        if (subTable != null) return subTable;
+        return "";                             // 全部找不到
     }
 
     /** 计算每个字符位置的括号嵌套深度（( ) 未匹配数），下标 i 表示 s.charAt(i) 之前的深度。visible for testing */

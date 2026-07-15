@@ -22,6 +22,7 @@
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="工单编码" align="center" prop="workorderCode" width="130" />
       <el-table-column label="工单名称" align="center" prop="workorderName" :show-overflow-tooltip="true"><template #default="scope"><el-button link @click="handleView(scope.row)" v-hasPermi="['mes:pro:workorder:query']">{{ scope.row.workorderName }}</el-button></template></el-table-column>
+      <el-table-column label="来源销售订单" align="center" prop="sourceCode" width="140" :show-overflow-tooltip="true" />
       <el-table-column label="产品" align="center" prop="productName" :show-overflow-tooltip="true" />
       <el-table-column label="计划数量" align="center" prop="quantity" width="90" />
       <el-table-column label="已生产" align="center" prop="quantityProduced" width="80" />
@@ -60,6 +61,13 @@
             <el-form-item label-width="80">
               <el-switch v-model="autoGenFlag" @change="handleAutoGenChange" v-if="optType==='add'" />
               <span style="margin-left:6px;font-size:12px;color:#909399">自动生成</span>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row v-if="form.sourceCode">
+          <el-col :span="16">
+            <el-form-item label="来源销售订单">
+              <el-input v-model="form.sourceCode" disabled />
             </el-form-item>
           </el-col>
         </el-row>

@@ -13,6 +13,10 @@ export interface UserQueryParams extends PageDomain {
   status?: '0' | '1';
   /** 部门编号 */
   deptId?: number;
+  /** 员工类型 */
+  employeeType?: string;
+  /** 工资类型 */
+  wageType?: string;
   /** 创建时间 */
   params?: {
     beginTime?: string;
@@ -48,6 +52,14 @@ export interface SysUser extends BaseEntity {
   password?: string;
   /** 账号状态（0正常 1停用） */
   status?: '0' | '1';
+  /** 微信openid(小程序登录绑定) */
+  openid?: string;
+  /** 工资类型:MONTHLY-月工资,PIECE-计件,HOURLY-计时 */
+  wageType?: string;
+  /** 员工类型:REGULAR-正式工,TEMPORARY-临时工 */
+  employeeType?: string;
+  /** 入职日期 */
+  hireDate?: string;
   /** 部门对象 */
   dept?: SysDept;
   /** 角色对象 */

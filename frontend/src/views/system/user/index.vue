@@ -15,6 +15,16 @@
               <el-option v-for="dict in sys_normal_disable" :key="dict.value" :label="dict.label" :value="dict.value" />
             </el-select>
           </el-form-item>
+          <el-form-item label="员工类型" prop="employeeType">
+            <el-select v-model="queryParams.employeeType" placeholder="员工类型" clearable style="width: 240px">
+              <el-option v-for="dict in mes_employee_type" :key="dict.value" :label="dict.label" :value="dict.value" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="工资类型" prop="wageType">
+            <el-select v-model="queryParams.wageType" placeholder="工资类型" clearable style="width: 240px">
+              <el-option v-for="dict in mes_wage_type" :key="dict.value" :label="dict.label" :value="dict.value" />
+            </el-select>
+          </el-form-item>
           <el-form-item label="创建时间" style="width: 308px">
             <el-date-picker v-model="dateRange" value-format="YYYY-MM-DD" type="daterange" range-separator="-" start-placeholder="开始日期" end-placeholder="结束日期"></el-date-picker>
           </el-form-item>
@@ -64,6 +74,16 @@
               ></el-switch>
             </template>
           </el-table-column>
+          <el-table-column label="员工类型" align="center" key="employeeType" prop="employeeType" v-if="columns.employeeType.visible">
+            <template #default="scope">
+              <dict-tag :options="mes_employee_type" :value="scope.row.employeeType" />
+            </template>
+          </el-table-column>
+          <el-table-column label="工资类型" align="center" key="wageType" prop="wageType" v-if="columns.wageType.visible">
+            <template #default="scope">
+              <dict-tag :options="mes_wage_type" :value="scope.row.wageType" />
+            </template>
+          </el-table-column>
           <el-table-column label="创建时间" align="center" prop="createTime" v-if="columns.createTime.visible" width="160">
             <template #default="scope">
               <span>{{ parseTime(scope.row.createTime) }}</span>
@@ -90,7 +110,7 @@
       </div>
     </div>
     <!-- 添加或修改用户配置对话框 -->
-    <el-dialog :title="title" v-model="open" width="600px" append-to-body>
+    <el-dialog :title="title" v-model="open" width="750px" append-to-body>
       <el-form :model="form" :rules="rules" ref="userRef" label-width="80px">
         <el-row>
           <el-col :span="12">
@@ -161,6 +181,61 @@
           </el-col>
         </el-row>
         <el-row>
+          <el-col :span="12">
+            <el-form-item label="员工类型">
+              <el-select v-model="form.employeeType" placeholder="请选择" clearable>
+                <el-option v-for="dict in mes_employee_type" :key="dict.value" :label="dict.label" :value="dict.value" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="工资类型">
+              <el-select v-model="form.wageType" placeholder="请选择" clearable>
+                <el-option v-for="dict in mes_wage_type" :key="dict.value" :label="dict.label" :value="dict.value" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row>
+          <el-col :span="12">
+            <el-form-item label="入职日期">
+              <el-date-picker v-model="form.hireDate" type="date" placeholder="请选择入职日期" value-format="YYYY-MM-DD" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="微信openid">
+              <el-input v-model="form.openid" placeholder="请输入微信openid" maxlength="100" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <!-- 技能管理 -->
+        <el-row v-if="form.userId != undefined">
+          <el-col :span="24">
+            <el-form-item label="技能">
+              <el-table :data="skillList" border size="small" style="width: 100%">
+                <el-table-column label="技能名称" align="center">
+                  <template #default="scope">
+                    <el-input v-model="scope.row.skillName" placeholder="请输入技能名称" size="small" />
+                  </template>
+                </el-table-column>
+                <el-table-column label="技能等级" align="center" width="140">
+                  <template #default="scope">
+                    <el-select v-model="scope.row.skillLevel" placeholder="请选择" size="small" clearable style="width: 100%">
+                      <el-option v-for="dict in mes_skill_level" :key="dict.value" :label="dict.label" :value="dict.value" />
+                    </el-select>
+                  </template>
+                </el-table-column>
+                <el-table-column label="操作" align="center" width="80">
+                  <template #default="scope">
+                    <el-button link type="danger" icon="Delete" @click="handleRemoveSkill(scope.$index)"></el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+              <el-button type="primary" link icon="Plus" @click="handleAddSkill" style="margin-top: 5px">新增技能</el-button>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row>
           <el-col :span="24">
             <el-form-item label="备注">
               <el-input v-model="form.remark" type="textarea" placeholder="请输入内容"></el-input>
@@ -189,7 +264,9 @@ import ExcelImportDialog from "@/components/ExcelImportDialog/index.vue"
 import UserViewDrawer from "./view.vue"
 import { usePasswordRule } from "@/utils/passwordRule"
 import { changeUserStatus, listUser, resetUserPwd, delUser, getUser, updateUser, addUser, deptTreeSelect } from "@/api/system/user"
+import { listEmployeeSkill, addEmployeeSkill, delEmployeeSkill } from "@/api/mes/md/employeeSkill"
 import type { SysUser, UserQueryParams, UserFormDataResult } from '@/types/api/system/user'
+import type { MdEmployeeSkill } from '@/api/mes/md/employeeSkill'
 import type { SysRole } from '@/types/api/system/role'
 import type { SysPost } from '@/types/api/system/post'
 import type { TreeSelect, TableShowColumns, AjaxResult } from '@/types/api/common'
@@ -198,6 +275,7 @@ const router = useRouter()
 const { proxy } = getCurrentInstance()
 const { pwdValidator, pwdPromptValidator } = usePasswordRule()
 const { sys_normal_disable, sys_user_sex } = useDict("sys_normal_disable", "sys_user_sex")
+const { mes_wage_type, mes_employee_type, mes_skill_level } = useDict("mes_wage_type", "mes_employee_type", "mes_skill_level")
 
 const userList = ref<SysUser[]>([])
 const open = ref<boolean>(false)
@@ -214,6 +292,8 @@ const enabledDeptOptions = ref<TreeSelect[] | undefined>(undefined)
 const initPassword = ref<string | undefined>(undefined)
 const postOptions = ref<SysPost[]>([])
 const roleOptions = ref<SysRole[]>([])
+// 技能列表（当前编辑用户的技能）
+const skillList = ref<MdEmployeeSkill[]>([])
 // 列显隐信息
 const columns = ref<Record<string, TableShowColumns>>({
   userId: { label: '用户编号', visible: true },
@@ -222,7 +302,9 @@ const columns = ref<Record<string, TableShowColumns>>({
   deptName: { label: '部门', visible: true },
   phonenumber: { label: '手机号码', visible: true },
   status: { label: '状态', visible: true },
-  createTime: { label: '创建时间', visible: true }
+  createTime: { label: '创建时间', visible: true },
+  employeeType: { label: '员工类型', visible: false },
+  wageType: { label: '工资类型', visible: false }
 })
 
 const data = reactive({
@@ -233,7 +315,9 @@ const data = reactive({
     userName: undefined,
     phonenumber: undefined,
     status: undefined,
-    deptId: undefined
+    deptId: undefined,
+    employeeType: undefined,
+    wageType: undefined
   } as UserQueryParams,
   rules: {
     userName: [{ required: true, message: "用户名称不能为空", trigger: "blur" }, { min: 2, max: 20, message: "用户名称长度必须介于 2 和 20 之间", trigger: "blur" }],
@@ -380,22 +464,27 @@ function handleImport() {
 
 /** 重置操作表单 */
 function reset() {
-  form.value = {
-    userId: undefined,
-    deptId: undefined,
-    userName: undefined,
-    nickName: undefined,
-    password: undefined,
-    phonenumber: undefined,
-    email: undefined,
-    sex: undefined,
-    status: "0",
-    remark: undefined,
-    postIds: [],
-    roleIds: []
+    form.value = {
+      userId: undefined,
+      deptId: undefined,
+      userName: undefined,
+      nickName: undefined,
+      password: undefined,
+      phonenumber: undefined,
+      email: undefined,
+      sex: undefined,
+      status: "0",
+      remark: undefined,
+      postIds: [],
+      roleIds: [],
+      openid: undefined,
+      wageType: undefined,
+      employeeType: undefined,
+      hireDate: undefined
+    }
+    skillList.value = []
+    proxy.resetForm("userRef")
   }
-  proxy.resetForm("userRef")
-}
 
 /** 取消按钮 */
 function cancel() {
@@ -428,7 +517,51 @@ function handleUpdate(row?: SysUser) {
     open.value = true
     title.value = "修改用户"
     form.value.password = ""
+    // 加载该用户的技能列表
+    loadSkills(userId)
   })
+}
+
+/** 加载用户技能列表 */
+function loadSkills(userId: number) {
+  listEmployeeSkill({ userId }).then(res => {
+    skillList.value = res.rows || []
+  })
+}
+
+/** 新增技能行 */
+function handleAddSkill() {
+  skillList.value.push({ userId: form.value.userId, userName: form.value.userName, skillName: '', skillLevel: '' })
+}
+
+/** 删除技能行 */
+function handleRemoveSkill(index: number) {
+  const skill = skillList.value[index]
+  if (skill.skillId) {
+    // 已持久化的技能，调后端删除
+    delEmployeeSkill(skill.skillId).then(() => {
+      skillList.value.splice(index, 1)
+      proxy.$modal.msgSuccess("技能已删除")
+    })
+  } else {
+    // 新增未保存的技能，直接移除
+    skillList.value.splice(index, 1)
+  }
+}
+
+/** 保存技能（新增未持久化的技能） */
+function saveSkills(userId: number, userName: string) {
+  const newSkills = skillList.value.filter((s: MdEmployeeSkill) => !s.skillId)
+  if (newSkills.length === 0) return Promise.resolve()
+  const promises = newSkills.map((s: MdEmployeeSkill) => {
+    return addEmployeeSkill({
+      userId,
+      userName,
+      skillName: s.skillName,
+      skillLevel: s.skillLevel
+    })
+  })
+  return Promise.all(promises)
 }
 
 /** 提交按钮 */
@@ -437,15 +570,28 @@ function submitForm() {
     if (valid) {
       if (form.value.userId != undefined) {
         updateUser(form.value).then(() => {
-          proxy.$modal.msgSuccess("修改成功")
-          open.value = false
-          getList()
+          // 保存技能
+          saveSkills(form.value.userId!, form.value.userName!).then(() => {
+            proxy.$modal.msgSuccess("修改成功")
+            open.value = false
+            getList()
+          })
         })
       } else {
-        addUser(form.value).then(() => {
-          proxy.$modal.msgSuccess("新增成功")
-          open.value = false
-          getList()
+        addUser(form.value).then((res) => {
+          // 新增用户返回的 data 中包含 userId
+          const newUserId = res.data?.userId
+          if (newUserId) {
+            saveSkills(newUserId, form.value.nickName!).then(() => {
+              proxy.$modal.msgSuccess("新增成功")
+              open.value = false
+              getList()
+            })
+          } else {
+            proxy.$modal.msgSuccess("新增成功")
+            open.value = false
+            getList()
+          }
         })
       }
     }

@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.md.MdEmployeeSkillMapper">
+    
+    <resultMap type="MdEmployeeSkill" id="MdEmployeeSkillResult">
+        <result property="skillId"      column="skill_id"      />
+        <result property="factoryId"    column="factory_id"    />
+        <result property="userId"       column="user_id"       />
+        <result property="userName"     column="user_name"     />
+        <result property="skillName"    column="skill_name"    />
+        <result property="skillLevel"   column="skill_level"   />
+        <result property="remark"       column="remark"        />
+        <result property="createBy"     column="create_by"     />
+        <result property="createTime"   column="create_time"   />
+        <result property="updateBy"     column="update_by"     />
+        <result property="updateTime"   column="update_time"   />
+    </resultMap>
+
+    <sql id="selectMdEmployeeSkillVo">
+        select skill_id, factory_id, user_id, user_name, skill_name, skill_level, remark, create_by, create_time, update_by, update_time from qxx_md_employee_skill
+    </sql>
+
+    <select id="selectMdEmployeeSkillList" parameterType="MdEmployeeSkill" resultMap="MdEmployeeSkillResult">
+        <include refid="selectMdEmployeeSkillVo"/>
+        <where>
+            <if test="userId != null "> and user_id = #{userId}</if>
+            <if test="userName != null  and userName != ''"> and user_name like concat('%', #{userName}, '%')</if>
+            <if test="skillName != null  and skillName != ''"> and skill_name like concat('%', #{skillName}, '%')</if>
+            <if test="skillLevel != null  and skillLevel != ''"> and skill_level = #{skillLevel}</if>
+        </where>
+    </select>
+    
+    <select id="selectMdEmployeeSkillBySkillId" parameterType="Long" resultMap="MdEmployeeSkillResult">
+        <include refid="selectMdEmployeeSkillVo"/>
+        where skill_id = #{skillId}
+    </select>
+
+    <insert id="insertMdEmployeeSkill" parameterType="MdEmployeeSkill" useGeneratedKeys="true" keyProperty="skillId">
+        insert into qxx_md_employee_skill
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="userId != null">user_id,</if>
+            <if test="userName != null and userName != ''">user_name,</if>
+            <if test="skillName != null and skillName != ''">skill_name,</if>
+            <if test="skillLevel != null">skill_level,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="userId != null">#{userId},</if>
+            <if test="userName != null and userName != ''">#{userName},</if>
+            <if test="skillName != null and skillName != ''">#{skillName},</if>
+            <if test="skillLevel != null">#{skillLevel},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateMdEmployeeSkill" parameterType="MdEmployeeSkill">
+        update qxx_md_employee_skill
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="userId != null">user_id = #{userId},</if>
+            <if test="userName != null and userName != ''">user_name = #{userName},</if>
+            <if test="skillName != null and skillName != ''">skill_name = #{skillName},</if>
+            <if test="skillLevel != null">skill_level = #{skillLevel},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where skill_id = #{skillId}
+    </update>
+
+    <delete id="deleteMdEmployeeSkillBySkillId" parameterType="Long">
+        delete from qxx_md_employee_skill where skill_id = #{skillId}
+    </delete>
+
+    <delete id="deleteMdEmployeeSkillBySkillIds" >
+        delete from qxx_md_employee_skill where skill_id in 
+        <foreach item="skillId" collection="array" open="(" separator="," close=")">
+            #{skillId}
+        </foreach>
+    </delete>
+
+    <delete id="deleteMdEmployeeSkillByUserId" parameterType="Long">
+        delete from qxx_md_employee_skill where user_id = #{userId}
+    </delete>
+</mapper>

@@ -69,6 +69,44 @@
           </div>
         </el-col>
       </el-row>
+      <!-- 员工信息 -->
+      <h4 class="section-header">员工信息</h4>
+      <el-row :gutter="20" class="mb8">
+        <el-col :span="12">
+          <div class="info-item">
+            <label class="info-label">员工类型：</label>
+            <span class="info-value plaintext">{{ employeeTypeLabel }}</span>
+          </div>
+        </el-col>
+        <el-col :span="12">
+          <div class="info-item">
+            <label class="info-label">工资类型：</label>
+            <span class="info-value plaintext">{{ wageTypeLabel }}</span>
+          </div>
+        </el-col>
+      </el-row>
+      <el-row :gutter="20" class="mb8">
+        <el-col :span="12">
+          <div class="info-item">
+            <label class="info-label">入职日期：</label>
+            <span class="info-value plaintext">{{ info.hireDate || '-' }}</span>
+          </div>
+        </el-col>
+        <el-col :span="12">
+          <div class="info-item">
+            <label class="info-label">微信openid：</label>
+            <span class="info-value plaintext">{{ info.openid || '-' }}</span>
+          </div>
+        </el-col>
+      </el-row>
+      <el-row :gutter="20" class="mb8">
+        <el-col :span="24">
+          <div class="info-item full-width">
+            <label class="info-label">技能：</label>
+            <span class="info-value plaintext">{{ skillNames || '无技能' }}</span>
+          </div>
+        </el-col>
+      </el-row>
       <!-- 其他信息 -->
       <h4 class="section-header">其他信息</h4>
       <el-row :gutter="20" class="mb8">
@@ -127,7 +165,9 @@
 
 <script setup lang="ts">
 import { getUser } from '@/api/system/user'
+import { listEmployeeSkill } from '@/api/mes/md/employeeSkill'
 import type { SysUser } from '@/types/api/system/user'
+import type { MdEmployeeSkill } from '@/api/mes/md/employeeSkill'
 import type { SysRole } from '@/types/api/system/role'
 import type { SysPost } from '@/types/api/system/post'
 
@@ -136,10 +176,23 @@ const loading = ref<boolean>(false)
 const info = reactive<SysUser>({})
 const postOptions = ref<SysPost[]>([])
 const roleOptions = ref<SysRole[]>([])
+const skillList = ref<MdEmployeeSkill[]>([])
 
 const { sys_user_sex } = useDict("sys_user_sex")
+const { mes_wage_type, mes_employee_type, mes_skill_level } = useDict("mes_wage_type", "mes_employee_type", "mes_skill_level")
 
 const sexLabel = computed(() => selectDictLabel(sys_user_sex.value, info.sex) || '-')
+
+const employeeTypeLabel = computed(() => selectDictLabel(mes_employee_type.value, info.employeeType) || '-')
+const wageTypeLabel = computed(() => selectDictLabel(mes_wage_type.value, info.wageType) || '-')
+
+const skillNames = computed<string>(() => {
+  if (!skillList.value.length) return ''
+  return skillList.value.map((s: MdEmployeeSkill) => {
+    const levelLabel = selectDictLabel(mes_skill_level.value, s.skillLevel)
+    return s.skillName + (levelLabel ? '(' + levelLabel + ')' : '')
+  }).join('、')
+})
 
 const postNames = computed<string>(() => {
   if (!postOptions.value.length || !info.postIds) return ''
@@ -161,6 +214,9 @@ const open = async (userId: number): Promise<void> => {
     roleOptions.value = res.roles || []
     info.postIds = res.postIds || []
     info.roleIds = res.roleIds || []
+    // 加载技能列表
+    const skillRes = await listEmployeeSkill({ userId })
+    skillList.value = skillRes.rows || []
   } catch (error) {
     console.error('获取用户信息失败:', error)
   } finally {

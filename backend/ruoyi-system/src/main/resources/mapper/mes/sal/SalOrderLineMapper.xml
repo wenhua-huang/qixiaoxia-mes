@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.sal.SalOrderLineMapper">
+
+    <resultMap type="SalOrderLine" id="SalOrderLineResult">
+        <result property="lineId"          column="line_id"          />
+        <result property="factoryId"       column="factory_id"       />
+        <result property="orderId"         column="order_id"         />
+        <result property="lineNo"          column="line_no"          />
+        <result property="productId"       column="product_id"       />
+        <result property="productCode"     column="product_code"     />
+        <result property="productName"     column="product_name"     />
+        <result property="productSpc"      column="product_spc"      />
+        <result property="unitOfMeasure"   column="unit_of_measure"  />
+        <result property="unitName"        column="unit_name"        />
+        <result property="quantity"        column="quantity"         />
+        <result property="unitPrice"       column="unit_price"       />
+        <result property="lineAmount"      column="line_amount"      />
+        <result property="spacing"         column="spacing"          />
+        <result property="productSize"     column="product_size"     />
+        <result property="printingReq"     column="printing_req"     />
+        <result property="ropeSpec"        column="rope_spec"        />
+        <result property="packageReq"      column="package_req"      />
+        <result property="shippingReq"     column="shipping_req"     />
+        <result property="requestDate"     column="request_date"     />
+        <result property="remark"          column="remark"           />
+        <result property="createBy"        column="create_by"        />
+        <result property="createTime"      column="create_time"      />
+        <result property="updateBy"        column="update_by"        />
+        <result property="updateTime"      column="update_time"      />
+    </resultMap>
+
+    <sql id="selectSalOrderLineVo">
+        select line_id, factory_id, order_id, line_no, product_id, product_code, product_name, product_spc, unit_of_measure, unit_name, quantity, unit_price, line_amount, spacing, product_size, printing_req, rope_spec, package_req, shipping_req, request_date, remark, create_by, create_time, update_by, update_time from qxx_sal_order_line
+    </sql>
+
+    <select id="selectSalOrderLineByLineId" parameterType="Long" resultMap="SalOrderLineResult">
+        <include refid="selectSalOrderLineVo"/>
+        where line_id = #{lineId}
+    </select>
+
+    <select id="selectSalOrderLineByOrderId" parameterType="Long" resultMap="SalOrderLineResult">
+        <include refid="selectSalOrderLineVo"/>
+        where order_id = #{orderId}
+        order by line_no
+    </select>
+
+    <insert id="insertSalOrderLine" parameterType="SalOrderLine" useGeneratedKeys="true" keyProperty="lineId">
+        insert into qxx_sal_order_line
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="orderId != null">order_id,</if>
+            <if test="lineNo != null">line_no,</if>
+            <if test="productId != null">product_id,</if>
+            <if test="productCode != null">product_code,</if>
+            <if test="productName != null">product_name,</if>
+            <if test="productSpc != null">product_spc,</if>
+            <if test="unitOfMeasure != null">unit_of_measure,</if>
+            <if test="unitName != null">unit_name,</if>
+            <if test="quantity != null">quantity,</if>
+            <if test="unitPrice != null">unit_price,</if>
+            <if test="lineAmount != null">line_amount,</if>
+            <if test="spacing != null">spacing,</if>
+            <if test="productSize != null">product_size,</if>
+            <if test="printingReq != null">printing_req,</if>
+            <if test="ropeSpec != null">rope_spec,</if>
+            <if test="packageReq != null">package_req,</if>
+            <if test="shippingReq != null">shipping_req,</if>
+            <if test="requestDate != null">request_date,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="orderId != null">#{orderId},</if>
+            <if test="lineNo != null">#{lineNo},</if>
+            <if test="productId != null">#{productId},</if>
+            <if test="productCode != null">#{productCode},</if>
+            <if test="productName != null">#{productName},</if>
+            <if test="productSpc != null">#{productSpc},</if>
+            <if test="unitOfMeasure != null">#{unitOfMeasure},</if>
+            <if test="unitName != null">#{unitName},</if>
+            <if test="quantity != null">#{quantity},</if>
+            <if test="unitPrice != null">#{unitPrice},</if>
+            <if test="lineAmount != null">#{lineAmount},</if>
+            <if test="spacing != null">#{spacing},</if>
+            <if test="productSize != null">#{productSize},</if>
+            <if test="printingReq != null">#{printingReq},</if>
+            <if test="ropeSpec != null">#{ropeSpec},</if>
+            <if test="packageReq != null">#{packageReq},</if>
+            <if test="shippingReq != null">#{shippingReq},</if>
+            <if test="requestDate != null">#{requestDate},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateSalOrderLine" parameterType="SalOrderLine">
+        update qxx_sal_order_line
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="orderId != null">order_id = #{orderId},</if>
+            <if test="lineNo != null">line_no = #{lineNo},</if>
+            <if test="productId != null">product_id = #{productId},</if>
+            <if test="productCode != null">product_code = #{productCode},</if>
+            <if test="productName != null">product_name = #{productName},</if>
+            <if test="productSpc != null">product_spc = #{productSpc},</if>
+            <if test="unitOfMeasure != null">unit_of_measure = #{unitOfMeasure},</if>
+            <if test="unitName != null">unit_name = #{unitName},</if>
+            <if test="quantity != null">quantity = #{quantity},</if>
+            <if test="unitPrice != null">unit_price = #{unitPrice},</if>
+            <if test="lineAmount != null">line_amount = #{lineAmount},</if>
+            <if test="spacing != null">spacing = #{spacing},</if>
+            <if test="productSize != null">product_size = #{productSize},</if>
+            <if test="printingReq != null">printing_req = #{printingReq},</if>
+            <if test="ropeSpec != null">rope_spec = #{ropeSpec},</if>
+            <if test="packageReq != null">package_req = #{packageReq},</if>
+            <if test="shippingReq != null">shipping_req = #{shippingReq},</if>
+            <if test="requestDate != null">request_date = #{requestDate},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where line_id = #{lineId}
+    </update>
+
+    <delete id="deleteSalOrderLineByOrderId" parameterType="Long">
+        delete from qxx_sal_order_line where order_id = #{orderId}
+    </delete>
+
+    <delete id="deleteSalOrderLineByLineIds">
+        delete from qxx_sal_order_line where line_id in
+        <foreach item="lineId" collection="array" open="(" separator="," close=")">
+            #{lineId}
+        </foreach>
+    </delete>
+
+    <!-- 已转工单数量:聚合 qxx_pro_workorder(排除已取消)。factory_id 由拦截器注入 -->
+    <select id="sumProducedQtyByLineId" parameterType="Long" resultType="java.math.BigDecimal">
+        select COALESCE(sum(quantity), 0) from qxx_pro_workorder
+        where sales_order_line_id = #{lineId} and status != 'CANCEL'
+    </select>
+
+</mapper>

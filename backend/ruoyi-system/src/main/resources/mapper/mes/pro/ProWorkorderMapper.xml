@@ -12,6 +12,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="workorderType"    column="workorder_type"    />
         <result property="orderSource"    column="order_source"    />
         <result property="sourceCode"    column="source_code"    />
+        <result property="salesOrderLineId"    column="sales_order_line_id"    />
         <result property="productId"    column="product_id"    />
         <result property="productCode"    column="product_code"    />
         <result property="productName"    column="product_name"    />
@@ -50,7 +51,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectProWorkorderVo">
-        select workorder_id, factory_id, workorder_code, workorder_name, workorder_type, order_source, source_code, product_id, product_code, product_name, product_spc, route_product_id, unit_of_measure, unit_name, quantity, quantity_produced, quantity_changed, quantity_scheduled, client_id, client_code, client_name, client_order_code, product_size, printing_req, rope_spec, package_req, shipping_req, order_type, vendor_id, vendor_code, vendor_name, outsource_factory_id, batch_code, request_date, cancel_date, finish_date, status, remark, create_by, create_time, update_by, update_time from qxx_pro_workorder
+        select workorder_id, factory_id, workorder_code, workorder_name, workorder_type, order_source, source_code, sales_order_line_id, product_id, product_code, product_name, product_spc, route_product_id, unit_of_measure, unit_name, quantity, quantity_produced, quantity_changed, quantity_scheduled, client_id, client_code, client_name, client_order_code, product_size, printing_req, rope_spec, package_req, shipping_req, order_type, vendor_id, vendor_code, vendor_name, outsource_factory_id, batch_code, request_date, cancel_date, finish_date, status, remark, create_by, create_time, update_by, update_time from qxx_pro_workorder
     </sql>
 
     <select id="selectProWorkorderList" parameterType="ProWorkorder" resultMap="ProWorkorderResult">
@@ -84,6 +85,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="workorderType != null and workorderType != ''">workorder_type,</if>
             <if test="orderSource != null">order_source,</if>
             <if test="sourceCode != null">source_code,</if>
+            <if test="salesOrderLineId != null">sales_order_line_id,</if>
             <if test="productId != null">product_id,</if>
             <if test="productCode != null">product_code,</if>
             <if test="productName != null">product_name,</if>
@@ -124,6 +126,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="workorderType != null and workorderType != ''">#{workorderType},</if>
             <if test="orderSource != null">#{orderSource},</if>
             <if test="sourceCode != null">#{sourceCode},</if>
+            <if test="salesOrderLineId != null">#{salesOrderLineId},</if>
             <if test="productId != null">#{productId},</if>
             <if test="productCode != null">#{productCode},</if>
             <if test="productName != null">#{productName},</if>
@@ -168,6 +171,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="workorderType != null and workorderType != ''">workorder_type = #{workorderType},</if>
             <if test="orderSource != null">order_source = #{orderSource},</if>
             <if test="sourceCode != null">source_code = #{sourceCode},</if>
+            <if test="salesOrderLineId != null">sales_order_line_id = #{salesOrderLineId},</if>
             <if test="productId != null">product_id = #{productId},</if>
             <if test="productCode != null">product_code = #{productCode},</if>
             <if test="productName != null">product_name = #{productName},</if>

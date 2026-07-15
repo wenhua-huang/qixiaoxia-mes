@@ -36,6 +36,9 @@ export * from "./mes/dv/machinery";
 // MES PUR 模块
 export * from "./mes/pur/order";
 
+// MES SAL 模块(销售订单)
+export * from "./mes/sal/order";
+
 // MES WM 模块 (wm-core)
 export * from "./mes/wm/barcode";
 export * from "./mes/wm/batch";

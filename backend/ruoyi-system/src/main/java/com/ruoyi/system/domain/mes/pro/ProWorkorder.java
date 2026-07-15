@@ -25,6 +25,7 @@ public class ProWorkorder extends BaseEntity
     @Excel(name = "工单类型") private String workorderType;
     @Excel(name = "来源类型") private String orderSource;
     @Excel(name = "来源单据编码") private String sourceCode;
+    @Excel(name = "销售订单行ID") private Long salesOrderLineId;
     @Excel(name = "产品ID") private Long productId;
     @Excel(name = "产品编码") private String productCode;
     @Excel(name = "产品名称") private String productName;
@@ -81,6 +82,8 @@ public class ProWorkorder extends BaseEntity
     public void setOrderSource(String v) { this.orderSource = v; }
     public String getSourceCode() { return sourceCode; }
     public void setSourceCode(String v) { this.sourceCode = v; }
+    public Long getSalesOrderLineId() { return salesOrderLineId; }
+    public void setSalesOrderLineId(Long v) { this.salesOrderLineId = v; }
     public Long getProductId() { return productId; }
     public void setProductId(Long v) { this.productId = v; }
     public String getProductCode() { return productCode; }

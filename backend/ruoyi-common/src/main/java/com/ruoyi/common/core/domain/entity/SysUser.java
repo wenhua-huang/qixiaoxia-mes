@@ -80,6 +80,21 @@ public class SysUser extends BaseEntity
     /** 密码最后更新时间 */
     private Date pwdUpdateDate;
 
+    /** 微信openid(小程序登录绑定) */
+    private String openid;
+
+    /** 工资类型:MONTHLY-月工资,PIECE-计件,HOURLY-计时 */
+    @Excel(name = "工资类型", readConverterExp = "MONTHLY=月工资,PIECE=计件,HOURLY=计时")
+    private String wageType;
+
+    /** 员工类型:REGULAR-正式工,TEMPORARY-临时工 */
+    @Excel(name = "员工类型", readConverterExp = "REGULAR=正式工,TEMPORARY=临时工")
+    private String employeeType;
+
+    /** 入职日期 */
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private Date hireDate;
+
     /** 部门对象 */
     @Excels({
         @Excel(name = "部门名称", targetAttr = "deptName", type = Type.EXPORT),
@@ -273,6 +288,46 @@ public class SysUser extends BaseEntity
         this.pwdUpdateDate = pwdUpdateDate;
     }
 
+    public String getOpenid()
+    {
+        return openid;
+    }
+
+    public void setOpenid(String openid)
+    {
+        this.openid = openid;
+    }
+
+    public String getWageType()
+    {
+        return wageType;
+    }
+
+    public void setWageType(String wageType)
+    {
+        this.wageType = wageType;
+    }
+
+    public String getEmployeeType()
+    {
+        return employeeType;
+    }
+
+    public void setEmployeeType(String employeeType)
+    {
+        this.employeeType = employeeType;
+    }
+
+    public Date getHireDate()
+    {
+        return hireDate;
+    }
+
+    public void setHireDate(Date hireDate)
+    {
+        this.hireDate = hireDate;
+    }
+
     public SysDept getDept()
     {
         return dept;
@@ -340,6 +395,10 @@ public class SysUser extends BaseEntity
             .append("loginIp", getLoginIp())
             .append("loginDate", getLoginDate())
             .append("pwdUpdateDate", getPwdUpdateDate())
+            .append("openid", getOpenid())
+            .append("wageType", getWageType())
+            .append("employeeType", getEmployeeType())
+            .append("hireDate", getHireDate())
             .append("createBy", getCreateBy())
             .append("createTime", getCreateTime())
             .append("updateBy", getUpdateBy())

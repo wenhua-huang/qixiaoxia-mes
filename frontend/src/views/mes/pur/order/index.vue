@@ -1,7 +1,7 @@
 <template>
   <div class="app-container">
     <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="68px">
-      <el-form-item label="订单编码" prop="orderCode">
+      <el-form-item label="单据编号" prop="orderCode">
         <el-input
           v-model="queryParams.orderCode"
           placeholder="请输入采购订单编码(唯一)"
@@ -9,7 +9,7 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="订单名称" prop="orderName">
+      <el-form-item label="单据名称" prop="orderName">
         <el-input
           v-model="queryParams.orderName"
           placeholder="请输入采购订单名称"
@@ -128,8 +128,8 @@
 
     <el-table v-loading="loading" :data="orderList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="50" align="center" />
-      <el-table-column label="ID" align="center" prop="orderId" />      <el-table-column label="订单编码" align="center" prop="orderCode" />
-      <el-table-column label="订单名称" align="center" prop="orderName" />
+<el-table-column label="ID" align="center" prop="orderId" />      <el-table-column label="单据编号" align="center" prop="orderCode" />
+	      <el-table-column label="单据名称" align="center" prop="orderName" />
       
       
       <el-table-column label="供应商名称" align="center" prop="vendorName" />
@@ -188,8 +188,8 @@
       <el-form ref="form" :model="form" :rules="rules" label-width="100px">
         <el-row>
           <el-col :span="8">
-            <el-form-item label="订单编码" prop="orderCode">
-              <el-input v-model="form.orderCode" placeholder="PO20260614001" :disabled="optType === 'edit' || optType === 'view' || autoGenFlag" />
+<el-form-item label="单据编号" prop="orderCode">
+	              <el-input v-model="form.orderCode" placeholder="PO20260614001" :disabled="optType === 'edit' || optType === 'view' || autoGenFlag" />
             </el-form-item>
           </el-col>
           <el-col :span="6" v-if="optType === 'add'">
@@ -199,8 +199,8 @@
             </el-form-item>
           </el-col>
           <el-col :span="10">
-            <el-form-item label="订单名称" prop="orderName">
-              <el-input v-model="form.orderName" placeholder="订单名称" />
+<el-form-item label="单据名称" prop="orderName">
+	              <el-input v-model="form.orderName" placeholder="单据名称" />
             </el-form-item>
           </el-col>
         </el-row>

@@ -1,6 +1,7 @@
 package com.ruoyi.system.mapper.mes.pur;
 
 import java.util.List;
+import com.ruoyi.common.annotation.SkipFactoryId;
 import com.ruoyi.system.domain.mes.pur.PurOrder;
 import com.ruoyi.system.domain.mes.pur.vo.PurOrderVO;
 
@@ -54,9 +55,19 @@ public interface PurOrderMapper
 
     /**
      * 批量删除采购订单头
-     * 
+     *
      * @param orderIds 需要删除的数据主键集合
      * @return 结果
      */
     public int deletePurOrderByOrderIds(Long[] orderIds);
+
+    /**
+     * 重算订单头总数量/总金额（订单行增删改后调用）
+     * SkipFactoryId: 子查询自带 order_id 过滤，避免拦截器注入破坏 SQL
+     *
+     * @param orderId 采购订单头主键
+     * @return 结果
+     */
+    @SkipFactoryId
+    public int recalcOrderTotals(Long orderId);
 }

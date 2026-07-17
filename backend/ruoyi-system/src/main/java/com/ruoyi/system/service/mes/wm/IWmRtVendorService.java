@@ -12,4 +12,10 @@ public interface IWmRtVendorService
     public int updateWmRtVendor(WmRtVendor entity);
     public int deleteWmRtVendorByRtId(Long rtId);
     public int deleteWmRtVendorByRtIds(Long[] rtIds);
+
+    /** 确认退货单（DRAFT -> CONFIRMED），执行库存扣减 */
+    void confirmRtVendor(Long rtId);
+
+    /** 过账退货单（CONFIRMED -> POSTED），回写采购订单已退货数量 */
+    void postRtVendor(Long rtId);
 }

@@ -84,4 +84,36 @@ public class WmRtVendorController extends BaseController
     {
         return toAjax(wmRtVendorService.deleteWmRtVendorByRtIds(rtIds));
     }
+
+    /**
+     * 确认退货单（DRAFT -> CONFIRMED），执行库存扣减
+     */
+    @PreAuthorize("@ss.hasPermi('mes:wm:rt_vendor:confirm')")
+    @Log(title = "退货单确认", businessType = BusinessType.UPDATE)
+    @PutMapping("/confirm/{rtId}")
+    public AjaxResult confirm(@PathVariable("rtId") Long rtId)
+    {
+        try {
+            wmRtVendorService.confirmRtVendor(rtId);
+            return AjaxResult.success();
+        } catch (RuntimeException e) {
+            return AjaxResult.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 过账退货单（CONFIRMED -> POSTED），回写采购订单已退货数量
+     */
+    @PreAuthorize("@ss.hasPermi('mes:wm:rt_vendor:post')")
+    @Log(title = "退货单过账", businessType = BusinessType.UPDATE)
+    @PutMapping("/post/{rtId}")
+    public AjaxResult post(@PathVariable("rtId") Long rtId)
+    {
+        try {
+            wmRtVendorService.postRtVendor(rtId);
+            return AjaxResult.success();
+        } catch (RuntimeException e) {
+            return AjaxResult.error(e.getMessage());
+        }
+    }
 }

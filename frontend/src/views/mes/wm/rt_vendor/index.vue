@@ -10,6 +10,11 @@
       <el-form-item label="原入库单编码" prop="recptCode">
         <el-input v-model="queryParams.recptCode" placeholder="请输入" clearable style="width:180px" @keyup.enter="handleQuery" />
       </el-form-item>
+      <el-form-item label="状态" prop="status">
+        <el-select v-model="queryParams.status" placeholder="请选择" clearable style="width:140px">
+          <el-option v-for="d in mes_rt_status" :key="d.value" :label="d.label" :value="d.value" />
+        </el-select>
+      </el-form-item>
       <el-form-item>
         <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
         <el-button icon="Refresh" @click="resetQuery">重置</el-button>
@@ -32,10 +37,19 @@
       <el-table-column label="原入库单编码" align="center" prop="recptCode" width="180" :show-overflow-tooltip="true" />
       <el-table-column label="供应商编码" align="center" prop="vendorCode" width="180" :show-overflow-tooltip="true" />
       <el-table-column label="供应商名称" align="center" prop="vendorName" width="180" :show-overflow-tooltip="true" />
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="160">
+      <el-table-column label="退货日期" align="center" prop="rtDate" width="120" />
+      <el-table-column label="退货数量" align="center" prop="totalQuantity" width="100" />
+      <el-table-column label="状态" align="center" prop="status" width="100">
+        <template #default="scope">
+          <dict-tag :options="mes_rt_status" :value="scope.row.status" />
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="240">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:rt_vendor:edit']">修改</el-button>
           <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:wm:rt_vendor:remove']">删除</el-button>
+          <el-button v-if="scope.row.status === 'DRAFT'" link type="warning" @click="handleConfirm(scope.row)" v-hasPermi="['mes:wm:rt_vendor:confirm']">确认</el-button>
+          <el-button v-if="scope.row.status === 'CONFIRMED'" link type="success" @click="handlePost(scope.row)" v-hasPermi="['mes:wm:rt_vendor:post']">过账</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -98,8 +112,13 @@
         <el-form-item label="退料质检单编码" prop="rqcCode">
           <el-input v-model="form.rqcCode" placeholder="请输入" clearable />
         </el-form-item>
-        <el-form-item label="状态:DRAFT-草稿,CONFIRMED-已确认,POSTED-已过账" prop="status">
-          <el-input v-model="form.status" placeholder="请输入" clearable />
+        <el-form-item label="采购订单ID" prop="purOrderId">
+          <el-input v-model="form.purOrderId" placeholder="请输入(用于回写退货数量)" clearable />
+        </el-form-item>
+        <el-form-item label="状态" prop="status">
+          <el-select v-model="form.status" placeholder="请选择" style="width:100%">
+            <el-option v-for="d in mes_rt_status" :key="d.value" :label="d.label" :value="d.value" />
+          </el-select>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -115,11 +134,11 @@
 <script setup lang="ts" name="WmRtVendor">
 import { ref, reactive, toRefs, getCurrentInstance } from 'vue'
 import type { WmRtVendorQueryParams, WmRtVendor } from '@/types/api/mes/wm/rt_vendor'
-import { listWmRtVendor, getWmRtVendor, delWmRtVendor, addWmRtVendor, updateWmRtVendor } from '@/api/mes/wm/rt_vendor'
+import { listWmRtVendor, getWmRtVendor, delWmRtVendor, addWmRtVendor, updateWmRtVendor, confirmRtVendor, postRtVendor } from '@/api/mes/wm/rt_vendor'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
 
 const { proxy } = getCurrentInstance() as any
-const dicts = proxy.useDict('sys_yes_no')
+const { mes_rt_status } = proxy.useDict('mes_rt_status')
 
 const rtvendorList = ref<WmRtVendor[]>([])
 const open = ref(false)
@@ -153,7 +172,11 @@ function handleAutoGenChange(flag: boolean) {
   if (flag) genSerialCode('RT_VENDOR_NO').then((r: any) => { form.value.rtCode = r.data })
   else form.value.rtCode = ''
 }
-function reset() { autoGenFlag.value = false; form.value = {} as WmRtVendor; proxy.resetForm('formRef') }
+function reset() {
+  autoGenFlag.value = false
+  form.value = { status: 'DRAFT' } as WmRtVendor
+  proxy.resetForm('formRef')
+}
 function handleQuery() { queryParams.value.pageNum = 1; getList() }
 function resetQuery() { proxy.resetForm('queryRef'); handleQuery() }
 function handleSelectionChange(s: any[]) { ids.value = s.map(i => i.rtId); single.value = s.length !== 1; multiple.value = !s.length }
@@ -174,6 +197,16 @@ function submitForm() {
 function handleDelete(row?: WmRtVendor) {
   const _ids = row?.rtId ? [row.rtId] : ids.value
   proxy.$modal.confirm('是否确认删除？').then(() => delWmRtVendor(_ids)).then(() => { getList(); proxy.$modal.msgSuccess('删除成功') })
+}
+function handleConfirm(row: WmRtVendor) {
+  proxy.$modal.confirm('确认退货单 "' + row.rtCode + '" 吗？确认后将扣减库存且不可修改。').then(() => {
+    return confirmRtVendor(row.rtId)
+  }).then(() => { getList(); proxy.$modal.msgSuccess('确认成功') }).catch(() => {})
+}
+function handlePost(row: WmRtVendor) {
+  proxy.$modal.confirm('过账退货单 "' + row.rtCode + '" 吗？过账后将回写采购订单已退货数量。').then(() => {
+    return postRtVendor(row.rtId)
+  }).then(() => { getList(); proxy.$modal.msgSuccess('过账成功') }).catch(() => {})
 }
 function handleExport() { proxy.download('/mes/wm/rt_vendor/export', { ...queryParams.value }, `rtvendor_${Date.now()}.xlsx`) }
 

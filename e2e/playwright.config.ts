@@ -37,6 +37,7 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
+        channel: 'chrome',  // 使用系统 Chrome，避免下载 Playwright 自带浏览器
         // 复用登录态（仅在项目级别设置，未认证的 describe 块须显式 override 为 undefined）
         storageState: 'setup/storageState.json'
       }

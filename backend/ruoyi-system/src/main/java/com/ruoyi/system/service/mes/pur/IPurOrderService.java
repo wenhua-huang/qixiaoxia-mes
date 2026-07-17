@@ -77,10 +77,41 @@ public interface IPurOrderService
     public int orderPurOrder(Long orderId);
 
     /**
-     * 关闭采购订单（RECEIVED → CLOSED）
+     * 关闭采购订单（RECEIVED -> CLOSED 或 RECEIVING -> CLOSED 强制关闭）
      *
      * @param orderId 采购订单ID
+     * @param closeReason 关闭原因（强制关闭时必填）
      * @return 结果
      */
-    public int closePurOrder(Long orderId);
+    public int closePurOrder(Long orderId, String closeReason);
+
+    /**
+     * 取消采购订单（DRAFT/APPROVED/ORDERED -> CANCEL）
+     * 校验：所有行已收货数量为0
+     *
+     * @param orderId 采购订单ID
+     * @param cancelReason 取消原因
+     * @return 结果
+     */
+    public int cancelPurOrder(Long orderId, String cancelReason);
+
+    /**
+     * 取消采购订单行（ORDERED/RECEIVING -> CANCEL）
+     * 校验：已收货数量为0
+     *
+     * @param lineId 采购订单行ID
+     * @param cancelReason 取消原因
+     * @return 结果
+     */
+    public int cancelPurOrderLine(Long lineId, String cancelReason);
+
+    /**
+     * 终止收货采购订单行（RECEIVING -> CLOSED）
+     * 校验：已收货数量 > 0 且 < 订购数量
+     *
+     * @param lineId 采购订单行ID
+     * @param closeReason 终止原因
+     * @return 结果
+     */
+    public int terminatePurOrderLine(Long lineId, String closeReason);
 }

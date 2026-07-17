@@ -51,13 +51,10 @@
           start-placeholder="开始" end-placeholder="结束" value-format="YYYY-MM-DD" style="width:100%"
           @change="onExpectedDateRangeChange" />
       </el-form-item>
-      <el-form-item label="采购员" prop="purchaser">
-        <el-input
-          v-model="queryParams.purchaser"
-          placeholder="请输入采购员(申购人)"
-          clearable
-          @keyup.enter="handleQuery"
-        />
+      <el-form-item label="采购人" prop="purchaser">
+        <el-select v-model="queryParams.purchaser" placeholder="采购人" clearable filterable style="width:140px">
+          <el-option v-for="u in userOptions" :key="u.userName" :label="u.nickName || u.userName" :value="u.userName" />
+        </el-select>
       </el-form-item>
       <el-form-item label="审批人" prop="approver">
         <el-input
@@ -148,7 +145,7 @@
           <span>{{ parseTime(scope.row.expectedDate, '{y}-{m}-{d}') }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="采购员" align="center" prop="purchaser" />
+      <el-table-column label="采购人" align="center" prop="purchaser" />
       <el-table-column label="审批人" align="center" prop="approver" />
       <el-table-column label="采购数量" align="center" prop="totalQuantity" />
       <el-table-column label="到货数量" align="center" prop="receivedQuantity" />
@@ -170,7 +167,8 @@
           <el-tooltip content="删除" placement="top"><el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:pur:order:remove']"></el-button></el-tooltip>
           <el-button v-if="scope.row.status === 'DRAFT'" link type="success" size="small" @click="handleApprove(scope.row)" v-hasPermi="['mes:pur:order:approve']">审批</el-button>
           <el-button v-if="scope.row.status === 'APPROVED'" link type="warning" size="small" @click="handleOrder(scope.row)" v-hasPermi="['mes:pur:order:order']">下单</el-button>
-          <el-button v-if="scope.row.status === 'RECEIVED'" link type="info" size="small" @click="handleClose(scope.row)" v-hasPermi="['mes:pur:order:close']">关闭</el-button>
+          <el-button v-if="['DRAFT','APPROVED','ORDERED'].includes(scope.row.status)" link type="danger" size="small" @click="handleCancel(scope.row)" v-hasPermi="['mes:pur:order:cancel']">取消</el-button>
+          <el-button v-if="['RECEIVED','RECEIVING'].includes(scope.row.status)" link type="info" size="small" @click="handleClose(scope.row)" v-hasPermi="['mes:pur:order:close']">关闭</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -216,10 +214,7 @@
           <el-col :span="8">
             <el-form-item label="采购类型" prop="purchaseType">
               <el-select v-model="form.purchaseType" placeholder="请选择" style="width:100%">
-                <el-option label="纸张" value="PAPER" />
-                <el-option label="辅料" value="AUX" />
-                <el-option label="包材" value="PACK" />
-                <el-option label="其他" value="OTHER" />
+                <el-option v-for="d in mes_purchase_type" :key="d.value" :label="d.label" :value="d.value" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -235,7 +230,11 @@
               <el-input v-model="form.expectedDate" type="date" placeholder="yyyy-MM-dd" style="width:100%" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">          </el-col>
+          <el-col :span="8">
+            <el-form-item label="采购金额">
+              <el-input v-model="form.totalAmount" readonly placeholder="自动统计" />
+            </el-form-item>
+          </el-col>
           <el-col :span="8">
             <el-form-item label="状态" prop="status">
               <el-select v-model="form.status" placeholder="请选择" style="width:100%">
@@ -248,18 +247,17 @@
         </el-row>
         <el-row>
           <el-col :span="8">
-            <el-form-item label="采购员" prop="purchaser">
-              <el-input v-model="form.purchaser" placeholder="采购员" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="审批人" prop="approver">
-              <el-input v-model="form.approver" placeholder="审批人" />
+            <el-form-item label="采购人" prop="purchaser">
+              <el-select v-model="form.purchaser" placeholder="请选择采购人" clearable filterable style="width:100%">
+                <el-option v-for="u in userOptions" :key="u.userName" :label="u.nickName || u.userName" :value="u.userName" />
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="8">
             <el-form-item label="关联客户订单" prop="sourceOrderCode">
-              <el-input v-model="form.sourceOrderCode" placeholder="如PO#ORD66003MT" />
+              <el-select v-model="form.sourceOrderCode" placeholder="请选择销售订单" clearable filterable style="width:100%">
+                <el-option v-for="so in salOrderOptions" :key="so.orderId" :label="so.orderCode + (so.orderName ? ' / ' + so.orderName : '')" :value="so.orderCode" />
+              </el-select>
             </el-form-item>
           </el-col>
         </el-row>
@@ -273,7 +271,7 @@
       </el-form>
       <template v-if="form.orderId">
         <el-divider content-position="center">采购订单行</el-divider>
-        <PurOrderLine :orderId="form.orderId" :initLines="orderLines" ref="orderLineRef" />
+        <PurOrderLine :orderId="form.orderId" :initLines="orderLines" ref="orderLineRef" @change="refreshOrderTotals" />
       </template>
       <template #footer>
         <div class="dialog-footer">
@@ -282,20 +280,54 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 取消采购订单弹窗 -->
+    <el-dialog title="取消采购订单" v-model="cancelOpen" width="450px" append-to-body>
+      <el-form label-width="80px">
+        <el-form-item label="取消原因">
+          <el-select v-model="cancelReason" placeholder="请选择取消原因" style="width:100%">
+            <el-option v-for="d in mes_cancel_reason" :key="d.value" :label="d.label" :value="d.value" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button type="danger" @click="confirmCancel">确认取消</el-button>
+        <el-button @click="cancelOpen = false">取 消</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 强制关闭采购订单弹窗 -->
+    <el-dialog title="强制关闭采购订单" v-model="forceCloseOpen" width="500px" append-to-body>
+      <el-alert title="该订单存在未完全收货的行，强制关闭后将放弃未收部分，且不可恢复。" type="warning" show-icon :closable="false" style="margin-bottom:12px" />
+      <el-form label-width="80px">
+        <el-form-item label="关闭原因">
+          <el-select v-model="forceCloseReason" placeholder="请选择关闭原因" style="width:100%">
+            <el-option v-for="d in mes_cancel_reason" :key="d.value" :label="d.label" :value="d.value" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button type="danger" @click="confirmForceClose">确认关闭</el-button>
+        <el-button @click="forceCloseOpen = false">取 消</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-import { listOrder, getOrder, delOrder, addOrder, updateOrder, approveOrder, orderOrder, closeOrder } from "@/api/mes/pur/order"
+import { listOrder, getOrder, delOrder, addOrder, updateOrder, approveOrder, orderOrder, closeOrder, cancelOrder } from "@/api/mes/pur/order"
+import { listAllOrder } from "@/api/mes/sal/order"
 import { genSerialCode } from "@/api/mes/sys/autocoderule"
+import { listUser } from "@/api/system/user"
+import useUserStore from '@/store/modules/user'
 import VendorSelect from "@/components/vendorSelect/single.vue"
 import PurOrderLine from "./line.vue"
 
 export default {
   name: "Order",
   setup() {
-    const { mes_order_status, mes_purchase_type } = useDict("mes_order_status", "mes_purchase_type")
-    return { mes_order_status, mes_purchase_type }
+    const { mes_order_status, mes_purchase_type, mes_cancel_reason } = useDict("mes_order_status", "mes_purchase_type", "mes_cancel_reason")
+    return { mes_order_status, mes_purchase_type, mes_cancel_reason }
   },
   components: { VendorSelect, PurOrderLine },
   data() {
@@ -314,6 +346,10 @@ export default {
       total: 0,
       // 采购订单头表格数据
       orderList: [],
+      // 人员选项列表
+      userOptions: [],
+      // 销售订单下拉选项
+      salOrderOptions: [],
       // 弹出层标题
       title: "",
       // 是否显示弹出层
@@ -343,6 +379,14 @@ export default {
       expectedDateRange: null,
       optType: undefined,
       orderLines: [],
+      // 取消弹窗
+      cancelOpen: false,
+      cancelTargetId: null,
+      cancelReason: null,
+      // 强制关闭弹窗
+      forceCloseOpen: false,
+      forceCloseTargetId: null,
+      forceCloseReason: null,
       // 表单校验
       rules: {        orderCode: [
         ],
@@ -353,9 +397,23 @@ export default {
     }
   },
   created() {
+    this.loadUserOptions()
+    this.loadSalOrderOptions()
     this.getList()
   },
   methods: {
+    /** 加载人员选项列表 */
+    loadUserOptions() {
+      listUser({ pageSize: 999 }).then(response => {
+        this.userOptions = response.rows || []
+      })
+    },
+    /** 加载销售订单下拉选项（已确认的销售订单） */
+    loadSalOrderOptions() {
+      listAllOrder().then(response => {
+        this.salOrderOptions = response.data || []
+      })
+    },
     /** 查询采购订单头列表 */
     getList() {
       this.loading = true
@@ -452,6 +510,8 @@ export default {
       const m = String(today.getMonth() + 1).padStart(2, '0')
       const d = String(today.getDate()).padStart(2, '0')
       this.form.orderDate = y + '-' + m + '-' + d
+      // 采购人默认当前登录用户
+      this.form.purchaser = useUserStore().name
       // 触发编码预览
       this.handleAutoGenChange(true)
       this.open = true
@@ -468,6 +528,15 @@ export default {
         this.open = true
         this.title = "修改采购订单头"
       })
+    },
+    /** 订单行变动后刷新订单头汇总（总金额/总数量） */
+    refreshOrderTotals() {
+      if (this.form.orderId) {
+        getOrder(this.form.orderId).then(response => {
+          this.form.totalAmount = response.data.order.totalAmount
+          this.form.totalQuantity = response.data.order.totalQuantity
+        })
+      }
     },
     /** 提交按钮 */
     submitForm() {
@@ -519,12 +588,46 @@ export default {
     },
     /** 关闭操作 */
     handleClose(row) {
-      this.$modal.confirm('确认关闭采购订单 "' + row.orderCode + '" 吗？关闭后不可恢复。').then(() => {
-        return closeOrder(row.orderId)
-      }).then(() => {
+      if (row.status === 'RECEIVING') {
+        // 强制关闭：需要填写关闭原因
+        this.forceCloseTargetId = row.orderId
+        this.forceCloseReason = null
+        this.forceCloseOpen = true
+      } else {
+        // 正常关闭：简单确认
+        this.$modal.confirm('确认关闭采购订单 "' + row.orderCode + '" 吗？关闭后不可恢复。').then(() => {
+          return closeOrder(row.orderId, null)
+        }).then(() => {
+          this.getList()
+          this.$modal.msgSuccess("关闭成功")
+        }).catch(() => {})
+      }
+    },
+    /** 确认强制关闭 */
+    confirmForceClose() {
+      if (!this.forceCloseReason) {
+        this.$modal.msgWarning("请选择关闭原因")
+        return
+      }
+      closeOrder(this.forceCloseTargetId, this.forceCloseReason).then(() => {
+        this.forceCloseOpen = false
         this.getList()
         this.$modal.msgSuccess("关闭成功")
-      }).catch(() => {})
+      })
+    },
+    /** 取消操作 */
+    handleCancel(row) {
+      this.cancelTargetId = row.orderId
+      this.cancelReason = null
+      this.cancelOpen = true
+    },
+    /** 确认取消 */
+    confirmCancel() {
+      cancelOrder(this.cancelTargetId, this.cancelReason).then(() => {
+        this.cancelOpen = false
+        this.getList()
+        this.$modal.msgSuccess("取消成功")
+      })
     },
     /** 判断是否超期未到货 */
     isOverdue(row) {

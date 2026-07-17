@@ -24,3 +24,13 @@ export function updateWmRtVendor(d: WmRtVendor): Promise<AjaxResult> {
 export function delWmRtVendor(rtId: number | number[]): Promise<AjaxResult> {
   return request({ url: '/mes/wm/rt_vendor/' + rtId, method: 'delete' })
 }
+
+// 确认退货单（DRAFT -> CONFIRMED），执行库存扣减
+export function confirmRtVendor(rtId: number): Promise<AjaxResult> {
+  return request({ url: '/mes/wm/rt_vendor/confirm/' + rtId, method: 'put' })
+}
+
+// 过账退货单（CONFIRMED -> POSTED），回写采购订单已退货数量
+export function postRtVendor(rtId: number): Promise<AjaxResult> {
+  return request({ url: '/mes/wm/rt_vendor/post/' + rtId, method: 'put' })
+}

@@ -14,20 +14,20 @@
     <!-- 宫格组件 — 仓储管理 -->
     <uni-section title="仓储管理" type="line"></uni-section>
     <view class="grid-body">
-      <uni-grid :column="4" :showBorder="false" @change="changeWmGrid">
-        <uni-grid-item>
+      <uni-grid :column="4" :showBorder="false">
+        <uni-grid-item @click="goIssueList">
           <view class="grid-item-box">
             <uni-icons type="paperplane-filled" size="30" color="#409eff"></uni-icons>
             <text class="text">领料单</text>
           </view>
         </uni-grid-item>
-        <uni-grid-item>
+        <uni-grid-item @click="goIssueScan">
           <view class="grid-item-box">
             <uni-icons type="scan" size="30" color="#67c23a"></uni-icons>
             <text class="text">扫码发料</text>
           </view>
         </uni-grid-item>
-        <uni-grid-item>
+        <uni-grid-item @click="goIssueScanQuery">
           <view class="grid-item-box">
             <uni-icons type="search" size="30" color="#e6a23c"></uni-icons>
             <text class="text">扫码查库存</text>
@@ -51,14 +51,14 @@
     <!-- 宫格组件 — 采购管理 -->
     <uni-section title="采购管理" type="line"></uni-section>
     <view class="grid-body">
-      <uni-grid :column="4" :showBorder="false" @change="changePurGrid">
-        <uni-grid-item>
+      <uni-grid :column="4" :showBorder="false">
+        <uni-grid-item @click="goReceipt">
           <view class="grid-item-box">
             <uni-icons type="checkbox-filled" size="30"></uni-icons>
             <text class="text">采购收货</text>
           </view>
         </uni-grid-item>
-        <uni-grid-item>
+        <uni-grid-item @click="goHistory">
           <view class="grid-item-box">
             <uni-icons type="list" size="30"></uni-icons>
             <text class="text">收货历史</text>
@@ -189,22 +189,19 @@
   function goHistory() {
     proxy.$tab.navigateTo('/pages/mes/pur/history')
   }
-  // 采购管理宫格：0=采购收货, 1=收货历史
-  function changePurGrid(e) {
-    const idx = e.detail.index
-    if (idx === 0) goReceipt()
-    else if (idx === 1) goHistory()
-  }
   function changeGrid(e) {
     proxy.$modal.showToast('模块建设中~')
   }
 
-  // 仓储管理宫格：0=领料单列表, 1=扫码发料(先选领料单), 2=扫码查库存
-  function changeWmGrid(e) {
-    const idx = e.detail.index
-    if (idx === 0) proxy.$tab.navigateTo('/pages/mes/wm/issue/list')
-    else if (idx === 1) proxy.$tab.navigateTo('/pages/mes/wm/issue/list?from=scan')
-    else if (idx === 2) proxy.$tab.navigateTo('/pages/mes/wm/issue/scan-query')
+  // 仓储管理宫格
+  function goIssueList() {
+    proxy.$tab.navigateTo('/pages/mes/wm/issue/list')
+  }
+  function goIssueScan() {
+    proxy.$tab.navigateTo('/pages/mes/wm/issue/list?from=scan')
+  }
+  function goIssueScanQuery() {
+    proxy.$tab.navigateTo('/pages/mes/wm/issue/scan-query')
   }
 
   // 生产管理入口

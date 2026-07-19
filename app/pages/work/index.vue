@@ -51,14 +51,14 @@
     <!-- 宫格组件 — 采购管理 -->
     <uni-section title="采购管理" type="line"></uni-section>
     <view class="grid-body">
-      <uni-grid :column="4" :showBorder="false" @change="changeGrid">
-        <uni-grid-item @click="goReceipt">
+      <uni-grid :column="4" :showBorder="false" @change="changePurGrid">
+        <uni-grid-item>
           <view class="grid-item-box">
             <uni-icons type="checkbox-filled" size="30"></uni-icons>
             <text class="text">采购收货</text>
           </view>
         </uni-grid-item>
-        <uni-grid-item @click="goHistory">
+        <uni-grid-item>
           <view class="grid-item-box">
             <uni-icons type="list" size="30"></uni-icons>
             <text class="text">收货历史</text>
@@ -188,6 +188,12 @@
   }
   function goHistory() {
     proxy.$tab.navigateTo('/pages/mes/pur/history')
+  }
+  // 采购管理宫格：0=采购收货, 1=收货历史
+  function changePurGrid(e) {
+    const idx = e.detail.index
+    if (idx === 0) goReceipt()
+    else if (idx === 1) goHistory()
   }
   function changeGrid(e) {
     proxy.$modal.showToast('模块建设中~')

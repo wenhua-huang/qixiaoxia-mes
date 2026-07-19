@@ -1,6 +1,6 @@
 <template>
   <div>
-    <el-row :gutter="10" class="mb8">
+    <el-row v-if="!readOnly" :gutter="10" class="mb8">
       <el-col :span="1.5">
         <el-button type="primary" plain size="small" @click="handleAdd" v-hasPermi="['mes:pur:order-line:add']">新增行</el-button>
       </el-col>
@@ -10,7 +10,7 @@
     </el-row>
 
     <el-table v-loading="loading" :data="lineList" @selection-change="handleSelectionChange" border>
-      <el-table-column type="selection" width="45" align="center" />
+      <el-table-column v-if="!readOnly" type="selection" width="45" align="center" />
       <el-table-column label="物料编码" align="center" prop="itemCode" width="120" />
       <el-table-column label="物料名称" align="center" prop="itemName" :show-overflow-tooltip="true" width="150" />
       <el-table-column label="规格" align="center" prop="specification" width="100" />
@@ -22,7 +22,7 @@
       <el-table-column label="状态" align="center" prop="status" width="80">
         <template #default="scope"><dict-tag :options="mes_order_status" :value="scope.row.status" /></template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="200">
+      <el-table-column v-if="!readOnly" label="操作" align="center" width="200">
         <template #default="scope">
           <el-button link type="primary" size="small" @click="handleUpdate(scope.row)">修改</el-button>
           <el-button link type="primary" size="small" @click="handleDelete(scope.row)">删除</el-button>
@@ -208,7 +208,7 @@ export default {
     const { mes_order_status, mes_cancel_reason } = useDict("mes_order_status", "mes_cancel_reason")
     return { mes_order_status, mes_cancel_reason }
   },
-  props: { orderId: { type: Number, default: null }, initLines: { type: Array, default: null } },
+  props: { orderId: { type: Number, default: null }, initLines: { type: Array, default: null }, readOnly: { type: Boolean, default: false } },
   emits: ['change'],
   data() {
     return {
@@ -253,7 +253,7 @@ export default {
         itemId: null, itemCode: null, itemName: null, specification: null,
         unitOfMeasure: null, unitName: null,
         quantityOrdered: 0, unitPrice: 0, amount: 0, taxRate: 0,
-        status: "ORDERED",
+        // 行状态不前端硬编码，由后端按订单头状态自动设置（行跟随头）
         lineAttrs: { paper: {}, paperBag: {}, product: {} }
       }
     },

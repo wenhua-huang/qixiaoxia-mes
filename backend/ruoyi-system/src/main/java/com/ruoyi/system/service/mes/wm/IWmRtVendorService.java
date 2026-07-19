@@ -1,7 +1,9 @@
 package com.ruoyi.system.service.mes.wm;
 
 import java.util.List;
+import com.ruoyi.system.domain.mes.wm.RtVendorFromPurOrderRequest;
 import com.ruoyi.system.domain.mes.wm.WmRtVendor;
+import com.ruoyi.system.domain.mes.wm.vo.ReturnableBatchVO;
 
 public interface IWmRtVendorService
 {
@@ -18,4 +20,10 @@ public interface IWmRtVendorService
 
     /** 过账退货单（CONFIRMED -> POSTED），回写采购订单已退货数量 */
     void postRtVendor(Long rtId);
+
+    /** 从采购订单生成退货单(DRAFT):校验可退量 → 构建头+行写库,不回写 PO(回写在过账时统一做) */
+    WmRtVendor createRtVendorFromPurOrder(RtVendorFromPurOrderRequest req);
+
+    /** 查询某采购订单的可退入库批次(按 item+warehouse+batch 聚合) */
+    List<ReturnableBatchVO> selectReturnableBatches(Long purOrderId);
 }

@@ -9,6 +9,7 @@ import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.system.domain.mes.wm.RtVendorFromPurOrderRequest;
 import com.ruoyi.system.domain.mes.wm.WmRtVendor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -115,5 +116,26 @@ public class WmRtVendorController extends BaseController
         } catch (RuntimeException e) {
             return AjaxResult.error(e.getMessage());
         }
+    }
+
+    /**
+     * 从采购订单生成退货单(DRAFT):选 PO + 勾可退批次 + 填退货数量,一次性提交
+     */
+    @PreAuthorize("@ss.hasPermi('mes:wm:rt_vendor:fromPurOrder')")
+    @Log(title = "从采购订单生成退货单", businessType = BusinessType.INSERT)
+    @PostMapping("/fromPurOrder")
+    public AjaxResult fromPurOrder(@RequestBody RtVendorFromPurOrderRequest req)
+    {
+        return AjaxResult.success(wmRtVendorService.createRtVendorFromPurOrder(req));
+    }
+
+    /**
+     * 查询某采购订单的可退入库批次(向导数据源)
+     */
+    @PreAuthorize("@ss.hasPermi('mes:wm:rt_vendor:query')")
+    @GetMapping("/returnableBatches/{purOrderId}")
+    public AjaxResult returnableBatches(@PathVariable("purOrderId") Long purOrderId)
+    {
+        return AjaxResult.success(wmRtVendorService.selectReturnableBatches(purOrderId));
     }
 }

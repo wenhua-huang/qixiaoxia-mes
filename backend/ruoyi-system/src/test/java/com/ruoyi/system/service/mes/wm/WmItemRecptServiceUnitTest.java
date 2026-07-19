@@ -22,6 +22,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
@@ -203,15 +204,14 @@ class WmItemRecptServiceUnitTest {
         when(purOrderLineService.selectPurOrderLineList(any()))
             .thenReturn(Collections.singletonList(poLine))
             .thenReturn(Collections.singletonList(poLine));
-        when(purOrderService.selectPurOrderByOrderId(100L)).thenReturn(purOrder);
         // 模拟原子 SQL increment
         when(purOrderLineMapper.addQuantityReceived(eq(1L), any()))
             .thenAnswer(inv -> { poLine.setQuantityReceived(poLine.getQuantityReceived().add(inv.getArgument(1))); return 1; });
 
         service.postItemRecpt(1L);
 
-        verify(purOrderService).updatePurOrder(purOrder);
-        assertThat(purOrder.getStatus()).isEqualTo("RECEIVED");
+        // 全部收完时,writebackPoOnPost 会调用 checkAndAutoCloseOrder 推进 PO 头状态
+        verify(purOrderService).checkAndAutoCloseOrder(eq(100L), isNull());
     }
 
     @Test
@@ -415,6 +415,72 @@ class WmItemRecptServiceUnitTest {
             assertThatThrownBy(() -> service.receiveWithLines(body))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("行不能为空");
+        }
+
+        @Test
+        @DisplayName("14. 采购入库 → 行的 purOrderLineId 按 itemId 匹配回填")
+        void shouldBackfillPurOrderLineIdByItemId() {
+            WmItemRecpt header = draftRecpt();
+            header.setWarehouseId(1L);
+            header.setPurOrderId(100L);
+
+            WmItemRecptLine line = new WmItemRecptLine();
+            line.setItemId(208L);
+            line.setItemCode("AUX-GLUE-001");
+            line.setQuantityRecpt(new BigDecimal("10.0000"));
+            line.setWarehouseId(1L);
+            // 故意不设 purOrderLineId,验证会按 itemId 回填
+
+            PurOrderLine poLine = new PurOrderLine();
+            poLine.setLineId(555L);
+            poLine.setOrderId(100L);
+            poLine.setItemId(208L);
+
+            ItemRecptReceiveBody body = new ItemRecptReceiveBody();
+            body.setHeader(header);
+            body.setLines(Collections.singletonList(line));
+
+            when(wmItemRecptMapper.insertWmItemRecpt(any())).thenReturn(1);
+            when(wmItemRecptMapper.updateWmItemRecpt(any())).thenReturn(1);
+            when(wmItemRecptLineService.insertWmItemRecptLine(any())).thenReturn(1);
+            when(purOrderLineMapper.selectPurOrderLineList(any())).thenReturn(Collections.singletonList(poLine));
+            stubConfirmMocks(header);
+
+            service.receiveWithLines(body);
+
+            // 验证 insert 行时 purOrderLineId 已被回填为 PO 行 ID
+            ArgumentCaptor<WmItemRecptLine> captor = ArgumentCaptor.forClass(WmItemRecptLine.class);
+            verify(wmItemRecptLineService).insertWmItemRecptLine(captor.capture());
+            assertThat(captor.getValue().getPurOrderLineId()).isEqualTo(555L);
+        }
+
+        @Test
+        @DisplayName("15. 非 PO 入库(purOrderId=null) → 不查 PO 行,不回填 purOrderLineId")
+        void shouldSkipBackfillWhenNoPurOrder() {
+            WmItemRecpt header = draftRecpt();
+            header.setWarehouseId(1L);
+            header.setPurOrderId(null);  // 非采购入库
+
+            WmItemRecptLine line = new WmItemRecptLine();
+            line.setItemId(208L);
+            line.setQuantityRecpt(new BigDecimal("10.0000"));
+            line.setWarehouseId(1L);
+
+            ItemRecptReceiveBody body = new ItemRecptReceiveBody();
+            body.setHeader(header);
+            body.setLines(Collections.singletonList(line));
+
+            when(wmItemRecptMapper.insertWmItemRecpt(any())).thenReturn(1);
+            when(wmItemRecptMapper.updateWmItemRecpt(any())).thenReturn(1);
+            when(wmItemRecptLineService.insertWmItemRecptLine(any())).thenReturn(1);
+            stubConfirmMocks(header);
+
+            service.receiveWithLines(body);
+
+            verify(purOrderLineMapper, never()).selectPurOrderLineList(any());
+            ArgumentCaptor<WmItemRecptLine> captor = ArgumentCaptor.forClass(WmItemRecptLine.class);
+            verify(wmItemRecptLineService).insertWmItemRecptLine(captor.capture());
+            assertThat(captor.getValue().getPurOrderLineId()).isNull();
         }
     }
 

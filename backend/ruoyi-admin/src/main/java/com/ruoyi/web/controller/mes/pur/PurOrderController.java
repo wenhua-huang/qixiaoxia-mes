@@ -85,6 +85,20 @@ public class PurOrderController extends BaseController
     }
 
     /**
+     * 按订单编码查询采购订单头+行（一次拿全，移动端扫码/搜索收货用）
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pur:order:query')")
+    @GetMapping("/byCode")
+    public AjaxResult getInfoByCode(@RequestParam("orderCode") String orderCode)
+    {
+        PurOrderDetailVO detail = purOrderService.selectPurOrderDetailByOrderCode(orderCode);
+        if (detail == null) {
+            return error("采购订单不存在");
+        }
+        return success(detail);
+    }
+
+    /**
      * 新增采购订单头
      */
     @PreAuthorize("@ss.hasPermi('mes:pur:order:add')")

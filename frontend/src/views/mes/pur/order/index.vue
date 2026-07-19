@@ -112,6 +112,16 @@
       </el-col>
       <el-col :span="1.5">
         <el-button
+          type="info"
+          plain
+          size="small"
+          :disabled="single"
+          @click="handleView()"
+          v-hasPermi="['mes:pur:order:query']"
+        >查询</el-button>
+      </el-col>
+      <el-col :span="1.5">
+        <el-button
           type="warning"
           plain
           
@@ -145,11 +155,27 @@
           <span>{{ parseTime(scope.row.expectedDate, '{y}-{m}-{d}') }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="采购人" align="center" prop="purchaser" />
-      <el-table-column label="审批人" align="center" prop="approver" />
-      <el-table-column label="采购数量" align="center" prop="totalQuantity" />
-      <el-table-column label="到货数量" align="center" prop="receivedQuantity" />
-      <el-table-column label="采购金额" align="center" prop="totalAmount" />
+      <el-table-column label="采购人" align="center" prop="purchaser">
+        <template #default="scope">{{ nickOf(scope.row.purchaser) }}</template>
+      </el-table-column>
+      <el-table-column label="审批人" align="center" prop="approver">
+        <template #default="scope">{{ nickOf(scope.row.approver) }}</template>
+      </el-table-column>
+      <el-table-column label="采购数量" align="center" width="120">
+        <template #default="scope">
+          <div>{{ num(scope.row.receivedQuantity) }} / {{ num(scope.row.totalQuantity) }}</div>
+          <div v-if="gt0(scope.row.cancelledQuantity)" class="amt-sub cancel-text">已取消 {{ num(scope.row.cancelledQuantity) }}</div>
+        </template>
+      </el-table-column>
+      <el-table-column label="采购金额" align="center" width="130">
+        <template #default="scope">
+          <div>{{ money(scope.row.totalAmount) }}</div>
+          <div v-if="gt0(scope.row.receivedAmount) || gt0(scope.row.cancelledAmount)" class="amt-sub">
+            <span>已收 {{ money(scope.row.receivedAmount) }}</span>
+            <span v-if="gt0(scope.row.cancelledAmount)" class="cancel-text"> · 已取消 {{ money(scope.row.cancelledAmount) }}</span>
+          </div>
+        </template>
+      </el-table-column>
       <el-table-column label="币种" align="center" prop="currency" />
       <el-table-column label="关联客户订单" align="center" prop="sourceOrderCode" />
       <el-table-column label="状态" align="center" prop="status" width="110">
@@ -161,14 +187,16 @@
           </template>
         </el-table-column>
       <el-table-column label="备注" align="center" prop="remark" />
-      <el-table-column label="操作" align="center" width="260" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="320" class-name="small-padding fixed-width">
         <template #default="scope">
+          <el-tooltip content="查看" placement="top"><el-button link type="primary" icon="View" @click="handleView(scope.row)" v-hasPermi="['mes:pur:order:query']"></el-button></el-tooltip>
           <el-tooltip content="修改" placement="top"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:pur:order:edit']"></el-button></el-tooltip>
           <el-tooltip content="删除" placement="top"><el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:pur:order:remove']"></el-button></el-tooltip>
           <el-button v-if="scope.row.status === 'DRAFT'" link type="success" size="small" @click="handleApprove(scope.row)" v-hasPermi="['mes:pur:order:approve']">审批</el-button>
           <el-button v-if="scope.row.status === 'APPROVED'" link type="warning" size="small" @click="handleOrder(scope.row)" v-hasPermi="['mes:pur:order:order']">下单</el-button>
           <el-button v-if="['DRAFT','APPROVED','ORDERED'].includes(scope.row.status)" link type="danger" size="small" @click="handleCancel(scope.row)" v-hasPermi="['mes:pur:order:cancel']">取消</el-button>
           <el-button v-if="['RECEIVED','RECEIVING'].includes(scope.row.status)" link type="info" size="small" @click="handleClose(scope.row)" v-hasPermi="['mes:pur:order:close']">关闭</el-button>
+          <el-button v-if="['RECEIVED','RECEIVING'].includes(scope.row.status)" link type="danger" size="small" @click="handleReturn(scope.row)" v-hasPermi="['mes:pur:order:return']">退货</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -198,7 +226,7 @@
           </el-col>
           <el-col :span="10">
 <el-form-item label="单据名称" prop="orderName">
-	              <el-input v-model="form.orderName" placeholder="单据名称" />
+	              <el-input v-model="form.orderName" placeholder="单据名称" :disabled="optType === 'view'" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -206,76 +234,86 @@
           <el-col :span="8">
             <el-form-item label="供应商" prop="vendorName">
               <el-input v-model="form.vendorName" readonly placeholder="请选择供应商">
-                <template #append><el-button icon="Search" @click="handleSelectVendor" /></template>
+                <template #append><el-button icon="Search" :disabled="optType === 'view'" @click="handleSelectVendor" /></template>
               </el-input>
             </el-form-item>
             <VendorSelect ref="vendorSelectRef" @onSelected="onVendorSelected" />
           </el-col>
           <el-col :span="8">
             <el-form-item label="采购类型" prop="purchaseType">
-              <el-select v-model="form.purchaseType" placeholder="请选择" style="width:100%">
+              <el-select v-model="form.purchaseType" placeholder="请选择" style="width:100%" :disabled="optType === 'view'">
                 <el-option v-for="d in mes_purchase_type" :key="d.value" :label="d.label" :value="d.value" />
               </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="8">
             <el-form-item label="下单日期" prop="orderDate">
-              <el-input v-model="form.orderDate" type="date" placeholder="yyyy-MM-dd" style="width:100%" />
+              <el-input v-model="form.orderDate" type="date" placeholder="yyyy-MM-dd" style="width:100%" :disabled="optType === 'view'" />
             </el-form-item>
           </el-col>
         </el-row>
         <el-row>
           <el-col :span="8">
             <el-form-item label="预计到货" prop="expectedDate">
-              <el-input v-model="form.expectedDate" type="date" placeholder="yyyy-MM-dd" style="width:100%" />
+              <el-input v-model="form.expectedDate" type="date" placeholder="yyyy-MM-dd" style="width:100%" :disabled="optType === 'view'" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
             <el-form-item label="采购金额">
               <el-input v-model="form.totalAmount" readonly placeholder="自动统计" />
+              <div v-if="form.orderId && (gt0(form.receivedAmount) || gt0(form.cancelledAmount))" class="amt-sub" style="margin-top:4px">
+                <span>已收 {{ money(form.receivedAmount) }} 元</span>
+                <span v-if="gt0(form.cancelledAmount)" class="cancel-text"> · 已取消 {{ money(form.cancelledAmount) }} 元</span>
+              </div>
             </el-form-item>
           </el-col>
           <el-col :span="8">
             <el-form-item label="状态" prop="status">
-              <el-select v-model="form.status" placeholder="请选择" style="width:100%">
+              <el-select v-model="form.status" placeholder="请选择" style="width:100%" disabled>
                 <el-option label="草稿" value="DRAFT" />
                 <el-option label="已审批" value="APPROVED" />
                 <el-option label="已下单" value="ORDERED" />
               </el-select>
+              <div style="font-size:11px;color:#909399;line-height:1.4;margin-top:2px">状态通过列表「审批/下单/取消/关闭」按钮推进</div>
             </el-form-item>
           </el-col>
         </el-row>
         <el-row>
           <el-col :span="8">
             <el-form-item label="采购人" prop="purchaser">
-              <el-select v-model="form.purchaser" placeholder="请选择采购人" clearable filterable style="width:100%">
+              <el-select v-model="form.purchaser" placeholder="请选择采购人" clearable filterable style="width:100%" :disabled="optType === 'view'">
                 <el-option v-for="u in userOptions" :key="u.userName" :label="u.nickName || u.userName" :value="u.userName" />
               </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="8">
             <el-form-item label="关联客户订单" prop="sourceOrderCode">
-              <el-select v-model="form.sourceOrderCode" placeholder="请选择销售订单" clearable filterable style="width:100%">
+              <el-select v-model="form.sourceOrderCode" placeholder="请选择销售订单" clearable filterable style="width:100%" :disabled="optType === 'view'">
                 <el-option v-for="so in salOrderOptions" :key="so.orderId" :label="so.orderCode + (so.orderName ? ' / ' + so.orderName : '')" :value="so.orderCode" />
               </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="8" v-if="optType !== 'add'">
+            <el-form-item label="审核人">
+              <el-input :model-value="nickOf(form.approver)" readonly :placeholder="form.approver ? '' : '尚未审批'" />
             </el-form-item>
           </el-col>
         </el-row>
         <el-row>
           <el-col :span="16">
             <el-form-item label="备注" prop="remark">
-              <el-input v-model="form.remark" type="textarea" placeholder="备注" />
+              <el-input v-model="form.remark" type="textarea" placeholder="备注" :disabled="optType === 'view'" />
             </el-form-item>
           </el-col>
         </el-row>
       </el-form>
       <template v-if="form.orderId">
         <el-divider content-position="center">采购订单行</el-divider>
-        <PurOrderLine :orderId="form.orderId" :initLines="orderLines" ref="orderLineRef" @change="refreshOrderTotals" />
+        <PurOrderLine :orderId="form.orderId" :initLines="orderLines" ref="orderLineRef" :readOnly="optType === 'view'" @change="refreshOrderTotals" />
       </template>
       <template #footer>
         <div class="dialog-footer">
-          <el-button type="primary" @click="submitForm">保存单据</el-button>
+          <el-button v-if="optType !== 'view'" type="primary" @click="submitForm">保存单据</el-button>
           <el-button @click="cancel">关 闭</el-button>
         </div>
       </template>
@@ -311,6 +349,8 @@
         <el-button @click="forceCloseOpen = false">取 消</el-button>
       </template>
     </el-dialog>
+
+    <rt-vendor-wizard v-model="returnWizardOpen" :purOrder="returnWizardOrder" @success="onReturnWizardSuccess" />
   </div>
 </template>
 
@@ -322,6 +362,7 @@ import { listUser } from "@/api/system/user"
 import useUserStore from '@/store/modules/user'
 import VendorSelect from "@/components/vendorSelect/single.vue"
 import PurOrderLine from "./line.vue"
+import RtVendorWizard from "@/components/rtVendorWizard/index.vue"
 
 export default {
   name: "Order",
@@ -329,7 +370,7 @@ export default {
     const { mes_order_status, mes_purchase_type, mes_cancel_reason } = useDict("mes_order_status", "mes_purchase_type", "mes_cancel_reason")
     return { mes_order_status, mes_purchase_type, mes_cancel_reason }
   },
-  components: { VendorSelect, PurOrderLine },
+  components: { VendorSelect, PurOrderLine, RtVendorWizard },
   data() {
     return {
       // 遮罩层
@@ -387,6 +428,9 @@ export default {
       forceCloseOpen: false,
       forceCloseTargetId: null,
       forceCloseReason: null,
+      // 退货向导
+      returnWizardOpen: false,
+      returnWizardOrder: null,
       // 表单校验
       rules: {        orderCode: [
         ],
@@ -529,6 +573,25 @@ export default {
         this.title = "修改采购订单头"
       })
     },
+    /** 查看按钮操作（只读） */
+    handleView(row) {
+      this.reset()
+      this.optType = 'view'
+      // row 可能是 undefined（工具栏勾选调用）；这时用 ids[0]
+      const orderId = (row && row.orderId) || (Array.isArray(this.ids) ? this.ids[0] : this.ids)
+      getOrder(orderId).then(response => {
+        this.form = response.data.order
+        this.orderLines = response.data.lines || []
+        this.open = true
+        this.title = "查看采购订单头"
+      })
+    },
+    /** 根据 userName 返回 nickName（找不到则回落 userName） */
+    nickOf(userName) {
+      if (!userName) return ''
+      const u = this.userOptions.find(x => x.userName === userName)
+      return (u && u.nickName) || userName
+    },
     /** 订单行变动后刷新订单头汇总（总金额/总数量） */
     refreshOrderTotals() {
       if (this.form.orderId) {
@@ -615,6 +678,15 @@ export default {
         this.$modal.msgSuccess("关闭成功")
       })
     },
+    /** 退货操作：打开退货向导并预填当前 PO */
+    handleReturn(row) {
+      this.returnWizardOrder = { orderId: row.orderId, orderCode: row.orderCode, vendorName: row.vendorName }
+      this.returnWizardOpen = true
+    },
+    /** 退货向导成功回调 */
+    onReturnWizardSuccess() {
+      this.getList()
+    },
     /** 取消操作 */
     handleCancel(row) {
       this.cancelTargetId = row.orderId
@@ -642,7 +714,33 @@ export default {
       this.download('mes/pur/order/export', {
         ...this.queryParams
       }, `order_${new Date().getTime()}.xlsx`)
+    },
+    /** 数值格式化：空值显示 0，保留 4 位小数（去尾 0） */
+    num(v) {
+      const n = Number(v) || 0
+      return n
+    },
+    /** 金额格式化：2 位小数 */
+    money(v) {
+      const n = Number(v) || 0
+      return n.toFixed(2)
+    },
+    /** 是否 > 0（用于决定是否显示次要信息行） */
+    gt0(v) {
+      return (Number(v) || 0) > 0
     }
   }
 }
 </script>
+
+<style scoped>
+.amt-sub {
+  font-size: 11px;
+  color: #909399;
+  line-height: 1.4;
+  margin-top: 2px;
+}
+.cancel-text {
+  color: #f56c6c;
+}
+</style>

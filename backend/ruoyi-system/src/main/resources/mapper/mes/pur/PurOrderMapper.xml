@@ -39,10 +39,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <resultMap type="com.ruoyi.system.domain.mes.pur.vo.PurOrderVO" id="PurOrderVOResult" extends="PurOrderResult">
         <result property="receivedQuantity" column="received_quantity"/>
+        <result property="receivedAmount" column="received_amount"/>
+        <result property="cancelledQuantity" column="cancelled_quantity"/>
+        <result property="cancelledAmount" column="cancelled_amount"/>
     </resultMap>
 
     <sql id="selectPurOrderVo">
-        select o.order_id, o.factory_id, o.order_code, o.order_name, o.vendor_id, o.vendor_code, o.vendor_name, o.purchase_type, o.order_date, o.expected_date, o.purchaser, o.approver, o.total_quantity, (SELECT COALESCE(SUM(l.quantity_received), 0) FROM qxx_pur_order_line l WHERE l.order_id = o.order_id) AS received_quantity, o.total_amount, o.currency, o.source_order_code, o.workorder_id, o.workorder_code, o.status, o.cancel_reason, o.cancel_time, o.cancel_by, o.close_reason, o.close_time, o.close_by, o.remark, o.create_by, o.create_time, o.update_by, o.update_time from qxx_pur_order o
+        select o.order_id, o.factory_id, o.order_code, o.order_name, o.vendor_id, o.vendor_code, o.vendor_name, o.purchase_type, o.order_date, o.expected_date, o.purchaser, o.approver, o.total_quantity,
+            (SELECT COALESCE(SUM(l.quantity_received), 0) FROM qxx_pur_order_line l WHERE l.order_id = o.order_id) AS received_quantity,
+            (SELECT COALESCE(SUM(l.quantity_received * l.unit_price), 0) FROM qxx_pur_order_line l WHERE l.order_id = o.order_id) AS received_amount,
+            (SELECT COALESCE(SUM(l.quantity_ordered), 0) FROM qxx_pur_order_line l WHERE l.order_id = o.order_id AND l.status = 'CANCEL') AS cancelled_quantity,
+            (SELECT COALESCE(SUM(l.amount), 0) FROM qxx_pur_order_line l WHERE l.order_id = o.order_id AND l.status = 'CANCEL') AS cancelled_amount,
+            o.total_amount, o.currency, o.source_order_code, o.workorder_id, o.workorder_code, o.status, o.cancel_reason, o.cancel_time, o.cancel_by, o.close_reason, o.close_time, o.close_by, o.remark, o.create_by, o.create_time, o.update_by, o.update_time from qxx_pur_order o
     </sql>
 
     <select id="selectPurOrderList" parameterType="PurOrder" resultMap="PurOrderVOResult">

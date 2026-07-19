@@ -30,6 +30,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="expireDate" column="expire_date" />
         <result property="lotNumber" column="lot_number" />
         <result property="noticeLineId" column="notice_line_id" />
+        <result property="purOrderLineId" column="pur_order_line_id" />
         <result property="remark" column="remark" />
         <result property="createBy" column="create_by" />
         <result property="createTime" column="create_time" />
@@ -38,7 +39,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectWmItemRecptLineVo">
-        select line_id, factory_id, recpt_id, item_id, item_code, item_name, specification, unit_of_measure, unit_name, unit2, unit2_name, conversion_rate, quantity_recpt, quantity_recpt2, batch_id, batch_code, warehouse_id, warehouse_code, warehouse_name, location_id, area_id, produce_date, expire_date, lot_number, notice_line_id, remark, create_by, create_time, update_by, update_time from qxx_wm_item_recpt_line
+        select line_id, factory_id, recpt_id, item_id, item_code, item_name, specification, unit_of_measure, unit_name, unit2, unit2_name, conversion_rate, quantity_recpt, quantity_recpt2, batch_id, batch_code, warehouse_id, warehouse_code, warehouse_name, location_id, area_id, produce_date, expire_date, lot_number, notice_line_id, pur_order_line_id, remark, create_by, create_time, update_by, update_time from qxx_wm_item_recpt_line
     </sql>
 
     <select id="selectWmItemRecptLineList" parameterType="WmItemRecptLine" resultMap="WmItemRecptLineResult">
@@ -100,6 +101,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="expireDate != null">expire_date,</if>
             <if test="lotNumber != null and lotNumber != ''">lot_number,</if>
             <if test="noticeLineId != null">notice_line_id,</if>
+            <if test="purOrderLineId != null">pur_order_line_id,</if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
@@ -129,6 +131,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="expireDate != null">#{expireDate},</if>
             <if test="lotNumber != null and lotNumber != ''">#{lotNumber},</if>
             <if test="noticeLineId != null">#{noticeLineId},</if>
+            <if test="purOrderLineId != null">#{purOrderLineId},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
@@ -162,6 +165,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="expireDate != null">expire_date = #{expireDate},</if>
             <if test="lotNumber != null and lotNumber != ''">lot_number = #{lotNumber},</if>
             <if test="noticeLineId != null">notice_line_id = #{noticeLineId},</if>
+            <if test="purOrderLineId != null">pur_order_line_id = #{purOrderLineId},</if>
             <if test="remark != null">remark = #{remark},</if>
             <if test="createBy != null">create_by = #{createBy},</if>
             <if test="createTime != null">create_time = #{createTime},</if>
@@ -170,6 +174,79 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </trim>
         where line_id = #{lineId}
     </update>
+
+    <!-- 可退批次聚合查询:按 (item, warehouse, batch) 聚合该 PO 的已收货入库,
+         已退量从 wm_transaction(ITEM_RTV) 按同维度反查, batch_id null 归一化为 0 -->
+    <select id="selectReturnableBatchesByPurOrderId" parameterType="Long" resultType="com.ruoyi.system.domain.mes.wm.vo.ReturnableBatchVO">
+        SELECT
+            agg.item_id              AS itemId,
+            agg.item_code            AS itemCode,
+            agg.item_name            AS itemName,
+            agg.specification        AS specification,
+            agg.unit_of_measure      AS unitOfMeasure,
+            agg.unit_name            AS unitName,
+            agg.warehouse_id         AS warehouseId,
+            agg.warehouse_code       AS warehouseCode,
+            agg.warehouse_name       AS warehouseName,
+            agg.batch_id             AS batchId,
+            agg.batch_code           AS batchCode,
+            agg.expire_date          AS expireDate,
+            agg.recpt_id             AS recptId,
+            agg.recpt_code           AS recptCode,
+            agg.pur_order_line_id    AS purOrderLineId,
+            agg.total_quantity       AS quantityRecptTotal,
+            (COALESCE(rt.returned_qty, 0) + COALESCE(dr.draft_qty, 0)) AS quantityReturned,
+            (agg.total_quantity - COALESCE(rt.returned_qty, 0) - COALESCE(dr.draft_qty, 0)) AS quantityReturnable
+        FROM (
+            -- 严格按 (item, warehouse, batch) 聚合入库量,跨多张入库单合并;
+            -- 同批次可能来自多张入库单: recpt_code 用 GROUP_CONCAT 合并展示来源,
+            -- recpt_id/pur_order_line_id/expire_date 用聚合函数取(V49 保证同 PO 同物料唯一)
+            SELECT irl.item_id, MAX(irl.item_code) AS item_code, MAX(irl.item_name) AS item_name,
+                   MAX(irl.specification) AS specification,
+                   MAX(irl.unit_of_measure) AS unit_of_measure, MAX(irl.unit_name) AS unit_name,
+                   irl.warehouse_id, MAX(irl.warehouse_code) AS warehouse_code,
+                   MAX(irl.warehouse_name) AS warehouse_name,
+                   irl.batch_id, MAX(irl.batch_code) AS batch_code, MAX(irl.expire_date) AS expire_date,
+                   MAX(ir.recpt_id) AS recpt_id,
+                   -- 仅展示用:GROUP_CONCAT 受 group_concat_max_len(默认1024)限制可能截断,不做业务判断;
+                   -- 同批次多值时 expire_date/pur_order_line_id 取 MAX(同批次理论一致)
+                   GROUP_CONCAT(DISTINCT ir.recpt_code ORDER BY ir.recpt_code SEPARATOR ',') AS recpt_code,
+                   MAX(irl.pur_order_line_id) AS pur_order_line_id,
+                   SUM(irl.quantity_recpt) AS total_quantity
+            FROM qxx_wm_item_recpt_line irl
+            JOIN qxx_wm_item_recpt ir ON ir.recpt_id = irl.recpt_id
+            WHERE ir.pur_order_id = #{purOrderId}
+              AND ir.status = 'POSTED'
+              AND irl.quantity_recpt > 0
+            GROUP BY irl.item_id, irl.warehouse_id, irl.batch_id
+        ) agg
+        LEFT JOIN (
+            -- 已确认退货量: wm_transaction(ITEM_RTV) 按 (item, warehouse, batch) 反查
+            -- (覆盖 CONFIRMED + POSTED 退货单,这两类在 confirm 时已写事务)
+            SELECT t.item_id, t.warehouse_id, COALESCE(t.batch_id, 0) AS batch_key,
+                   SUM(ABS(t.quantity)) AS returned_qty
+            FROM qxx_wm_transaction t
+            WHERE t.transaction_type = 'ITEM_RTV'
+            GROUP BY t.item_id, t.warehouse_id, COALESCE(t.batch_id, 0)
+        ) rt ON rt.item_id = agg.item_id
+            AND rt.warehouse_id = agg.warehouse_id
+            AND rt.batch_key = COALESCE(agg.batch_id, 0)
+        LEFT JOIN (
+            -- 草稿退货单占用量: DRAFT 状态退货单未扣库存(不在 transaction 里),
+            -- 但业务上已声明要退,必须占用可退量防止重复生成超退
+            SELECT rtl.item_id, rtl.warehouse_id, COALESCE(rtl.batch_id, 0) AS batch_key,
+                   SUM(rtl.quantity_rt) AS draft_qty
+            FROM qxx_wm_rt_vendor_line rtl
+            JOIN qxx_wm_rt_vendor rth ON rth.rt_id = rtl.rt_id
+            WHERE rth.status = 'DRAFT'
+              AND rth.pur_order_id = #{purOrderId}
+            GROUP BY rtl.item_id, rtl.warehouse_id, COALESCE(rtl.batch_id, 0)
+        ) dr ON dr.item_id = agg.item_id
+            AND dr.warehouse_id = agg.warehouse_id
+            AND dr.batch_key = COALESCE(agg.batch_id, 0)
+        WHERE (agg.total_quantity - COALESCE(rt.returned_qty, 0) - COALESCE(dr.draft_qty, 0)) > 0
+        ORDER BY agg.item_code
+    </select>
 
     <delete id="deleteWmItemRecptLineByLineId" parameterType="Long">
         delete from qxx_wm_item_recpt_line where line_id = #{lineId}

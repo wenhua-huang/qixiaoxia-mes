@@ -2,6 +2,7 @@ package com.ruoyi.system.domain.mes.wm;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import com.ruoyi.common.annotation.Excel;
@@ -65,8 +66,28 @@ public class WmRtVendor extends BaseEntity
     @Excel(name = "退料质检单编码")
     private String rqcCode;
 
-    @Excel(name = "状态:DRAFT-草稿")
+    @Excel(name = "状态:DRAFT-草稿,CONFIRMED-已确认,POSTED-已过账")
     private String status;
+
+    @Excel(name = "采购订单ID")
+    private Long purOrderId;
+
+    @Excel(name = "采购订单编码")
+    private String purOrderCode;
+
+    /** 确认时间 */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date confirmTime;
+
+    /** 确认人 */
+    private String confirmBy;
+
+    /** 过账时间 */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date postTime;
+
+    /** 过账人 */
+    private String postBy;
 
     public Long getRtId() { return rtId; }
     public void setRtId(Long v) { this.rtId = v; }
@@ -118,6 +139,24 @@ public class WmRtVendor extends BaseEntity
 
     public String getStatus() { return status; }
     public void setStatus(String v) { this.status = v; }
+
+    public Long getPurOrderId() { return purOrderId; }
+    public void setPurOrderId(Long v) { this.purOrderId = v; }
+
+    public String getPurOrderCode() { return purOrderCode; }
+    public void setPurOrderCode(String v) { this.purOrderCode = v; }
+
+    public Date getConfirmTime() { return confirmTime; }
+    public void setConfirmTime(Date v) { this.confirmTime = v; }
+
+    public String getConfirmBy() { return confirmBy; }
+    public void setConfirmBy(String v) { this.confirmBy = v; }
+
+    public Date getPostTime() { return postTime; }
+    public void setPostTime(Date v) { this.postTime = v; }
+
+    public String getPostBy() { return postBy; }
+    public void setPostBy(String v) { this.postBy = v; }
 
     @Override
     public String toString() {

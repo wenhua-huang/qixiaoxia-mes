@@ -9,6 +9,7 @@ import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.system.domain.mes.wm.RtVendorFromPurOrderRequest;
 import com.ruoyi.system.domain.mes.wm.WmRtVendor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -83,5 +84,58 @@ public class WmRtVendorController extends BaseController
     public AjaxResult remove(@PathVariable Long[] rtIds)
     {
         return toAjax(wmRtVendorService.deleteWmRtVendorByRtIds(rtIds));
+    }
+
+    /**
+     * 确认退货单（DRAFT -> CONFIRMED），执行库存扣减
+     */
+    @PreAuthorize("@ss.hasPermi('mes:wm:rt_vendor:confirm')")
+    @Log(title = "退货单确认", businessType = BusinessType.UPDATE)
+    @PutMapping("/confirm/{rtId}")
+    public AjaxResult confirm(@PathVariable("rtId") Long rtId)
+    {
+        try {
+            wmRtVendorService.confirmRtVendor(rtId);
+            return AjaxResult.success();
+        } catch (RuntimeException e) {
+            return AjaxResult.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 过账退货单（CONFIRMED -> POSTED），回写采购订单已退货数量
+     */
+    @PreAuthorize("@ss.hasPermi('mes:wm:rt_vendor:post')")
+    @Log(title = "退货单过账", businessType = BusinessType.UPDATE)
+    @PutMapping("/post/{rtId}")
+    public AjaxResult post(@PathVariable("rtId") Long rtId)
+    {
+        try {
+            wmRtVendorService.postRtVendor(rtId);
+            return AjaxResult.success();
+        } catch (RuntimeException e) {
+            return AjaxResult.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 从采购订单生成退货单(DRAFT):选 PO + 勾可退批次 + 填退货数量,一次性提交
+     */
+    @PreAuthorize("@ss.hasPermi('mes:wm:rt_vendor:fromPurOrder')")
+    @Log(title = "从采购订单生成退货单", businessType = BusinessType.INSERT)
+    @PostMapping("/fromPurOrder")
+    public AjaxResult fromPurOrder(@RequestBody RtVendorFromPurOrderRequest req)
+    {
+        return AjaxResult.success(wmRtVendorService.createRtVendorFromPurOrder(req));
+    }
+
+    /**
+     * 查询某采购订单的可退入库批次(向导数据源)
+     */
+    @PreAuthorize("@ss.hasPermi('mes:wm:rt_vendor:query')")
+    @GetMapping("/returnableBatches/{purOrderId}")
+    public AjaxResult returnableBatches(@PathVariable("purOrderId") Long purOrderId)
+    {
+        return AjaxResult.success(wmRtVendorService.selectReturnableBatches(purOrderId));
     }
 }

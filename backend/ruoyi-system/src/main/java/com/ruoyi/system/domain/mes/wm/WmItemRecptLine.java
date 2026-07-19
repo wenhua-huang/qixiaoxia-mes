@@ -95,6 +95,9 @@ public class WmItemRecptLine extends BaseEntity
     @Excel(name = "到货通知行ID")
     private Long noticeLineId;
 
+    /** 采购订单行ID(回写退货量精确匹配) */
+    private Long purOrderLineId;
+
     public Long getLineId() { return lineId; }
     public void setLineId(Long v) { this.lineId = v; }
 
@@ -169,6 +172,9 @@ public class WmItemRecptLine extends BaseEntity
 
     public Long getNoticeLineId() { return noticeLineId; }
     public void setNoticeLineId(Long v) { this.noticeLineId = v; }
+
+    public Long getPurOrderLineId() { return purOrderLineId; }
+    public void setPurOrderLineId(Long v) { this.purOrderLineId = v; }
 
     @Override
     public String toString() {

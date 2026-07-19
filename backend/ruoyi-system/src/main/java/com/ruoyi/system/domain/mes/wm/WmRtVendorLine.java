@@ -68,6 +68,15 @@ public class WmRtVendorLine extends BaseEntity
     @Excel(name = "库位ID")
     private Long areaId;
 
+    /** 采购订单行ID(精确回写退货量) */
+    private Long purOrderLineId;
+
+    /** 采购订单行号(展示用) */
+    private String purOrderLineNo;
+
+    /** 原采购数量(展示可退上限) */
+    private BigDecimal quantityOrdered;
+
     public Long getLineId() { return lineId; }
     public void setLineId(Long v) { this.lineId = v; }
 
@@ -119,6 +128,15 @@ public class WmRtVendorLine extends BaseEntity
     public Long getAreaId() { return areaId; }
     public void setAreaId(Long v) { this.areaId = v; }
 
+    public Long getPurOrderLineId() { return purOrderLineId; }
+    public void setPurOrderLineId(Long v) { this.purOrderLineId = v; }
+
+    public String getPurOrderLineNo() { return purOrderLineNo; }
+    public void setPurOrderLineNo(String v) { this.purOrderLineNo = v; }
+
+    public BigDecimal getQuantityOrdered() { return quantityOrdered; }
+    public void setQuantityOrdered(BigDecimal v) { this.quantityOrdered = v; }
+
     @Override
     public String toString() {
         return new ToStringBuilder(this, ToStringStyle.MULTI_LINE_STYLE)
@@ -126,6 +144,8 @@ public class WmRtVendorLine extends BaseEntity
             .append("itemCode", getItemCode())
             .append("itemName", getItemName())
             .append("unitName", getUnitName())
+            .append("purOrderLineId", getPurOrderLineId())
+            .append("quantityOrdered", getQuantityOrdered())
             .toString();
     }
 }

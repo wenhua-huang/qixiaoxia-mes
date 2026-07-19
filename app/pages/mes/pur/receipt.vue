@@ -162,7 +162,7 @@ import UniFormsItem from '@/uni_modules/uni-forms/components/uni-forms-item/uni-
 import UniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue'
 import UniSection from '@/components/uni-section/uni-section.vue'
 import UniTag from '@/uni_modules/uni-tag/components/uni-tag/uni-tag.vue'
-import { listOrder, listOrderLine, receiveItemRecpt, listWarehouseAll } from '@/api/mes/pur/order'
+import { getOrderDetailByCode, receiveItemRecpt, listWarehouseAll } from '@/api/mes/pur/order'
 import { isValidReceiptQty, genRecptCode, purchaseTypeText, orderStatusTagType, orderStatusText, canReceive } from '@/utils/pur.js'
 
 const { proxy } = getCurrentInstance()
@@ -207,39 +207,33 @@ function handleScan() {
   // #endif
 }
 
-// 搜索PO（通过列表API按编码搜索）
+// 搜索PO（一次请求拿到头+行，避免二次调用 order-line/list）
 function searchOrder() {
   if (!orderCode.value.trim()) {
     proxy.$modal.msgError('请输入PO单号')
     return
   }
   proxy.$modal.loading('查询中...')
-  // 使用列表API按订单编码搜索（getOrder 需要数字ID）
-  listOrder({ orderCode: orderCode.value.trim() }).then(res => {
+  getOrderDetailByCode(orderCode.value.trim()).then(res => {
     proxy.$modal.closeLoading()
-    const rows = res.rows || []
-    if (rows.length === 0) {
-      proxy.$modal.msgError('未找到该采购订单')
+    const detail = res.data
+    if (!detail || !detail.order) {
+      // H5 下 hideLoading + 立即 showToast/showModal 有时序冲突，用 setTimeout 错开
+      setTimeout(() => proxy.$modal.msgError('未找到该采购订单'), 60)
       return
     }
-    const found = rows[0]
+    const found = detail.order
     if (!canReceive(found.status)) {
-      proxy.$modal.msgError('该订单状态为"' + orderStatusText(found.status) + '"，仅已下单/收货中的订单可收货')
+      // 用 alert 弹框而不是 toast：toast 在 H5/小程序都有宽度限制，长文本会被截断
+      // 延迟一帧，避免被 hideLoading 遗留的 mask 挡住
+      setTimeout(() => {
+        proxy.$modal.alert('该订单状态为"' + orderStatusText(found.status) + '"，仅"已下单/收货中"的订单可执行收货操作', '无法收货')
+      }, 60)
       return
     }
     // 存储原始数据，模板中用 purchaseTypeText() 显示中文
     order.value = found
-    loadLines(order.value.orderId)
-  }).catch(() => {
-    proxy.$modal.closeLoading()
-    proxy.$modal.msgError('查询失败，请检查单号')
-  })
-}
-
-// 加载物料行
-function loadLines(orderId) {
-  listOrderLine({ orderId }).then(res => {
-    lines.value = (res.rows || []).map(l => ({
+    lines.value = (detail.lines || []).map(l => ({
       ...l,
       receiptQty: '',
       warehouseId: null,
@@ -248,6 +242,9 @@ function loadLines(orderId) {
       lotNumber: l.lotNumber || '',
       quantityReceived: l.quantityReceived || 0
     }))
+  }).catch(() => {
+    proxy.$modal.closeLoading()
+    proxy.$modal.msgError('查询失败，请检查单号')
   })
 }
 

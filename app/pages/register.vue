@@ -101,6 +101,8 @@
         }
       })
     }).catch(() => {
+      // 失败必须关 loading，否则"注册中，请耐心等待..."会全局残留遮住后续提示
+      proxy.$modal.closeLoading()
       if (captchaEnabled.value) {
         getCode()
       }

@@ -79,7 +79,11 @@
           <text class="label">入库仓库</text>
           <picker :value="warehouseList.findIndex(w => w.warehouseId === line.warehouseId)"
             :range="warehouseList" range-key="warehouseName"
-            @change="(e) => line.warehouseId = warehouseList[e.detail.value].warehouseId">
+            @change="(e) => {
+              // 守卫：列表空/索引越界时不赋值，避免 warehouseList[undefined] 异常
+              const w = warehouseList[e.detail.value]
+              if (w) line.warehouseId = w.warehouseId
+            }">
             <view class="picker-value-sm">
               {{ warehouseNameOf(line.warehouseId) || '请选择' }}
               <uni-icons type="right" size="12" color="#999" />
@@ -332,7 +336,16 @@ function submitReceipt() {
 }
 
 onMounted(() => {
-  listWarehouseAll().then(res => { warehouseList.value = res.data || [] })
+  // 必须有 catch：token 过期时后端返回 401，request.js 拦截器会弹"登录状态已过期"modal，
+  // 这里再不兜住会让 Promise 成为 unhandledrejection；且 warehouseList 永远为空，picker 无选项可选
+  listWarehouseAll()
+    .then(res => { warehouseList.value = res.data || [] })
+    .catch(err => {
+      // 401 已被 request.js 拦截器处理（弹登录 modal），其余失败提示加载失败
+      if (err !== 401 && err !== '无效的会话，或者会话已过期，请重新登录。') {
+        proxy.$modal.msgError('仓库列表加载失败，请重试')
+      }
+    })
 })
 </script>
 

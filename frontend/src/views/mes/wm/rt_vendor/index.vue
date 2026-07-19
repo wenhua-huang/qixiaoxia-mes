@@ -22,7 +22,6 @@
     </el-form>
 
     <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5"><el-button type="primary" plain icon="Plus" @click="handleAdd" v-hasPermi="['mes:wm:rt_vendor:add']">新增</el-button></el-col>
       <el-col :span="1.5"><el-button type="success" plain icon="Connection" @click="handleFromPo" v-hasPermi="['mes:wm:rt_vendor:fromPurOrder']">从采购订单生成</el-button></el-col>
       <el-col :span="1.5"><el-button type="warning" plain icon="Download" @click="handleExport" v-hasPermi="['mes:wm:rt_vendor:export']">导出</el-button></el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList" />
@@ -191,7 +190,6 @@ function reset() {
 function handleQuery() { queryParams.value.pageNum = 1; getList() }
 function resetQuery() { proxy.resetForm('queryRef'); handleQuery() }
 function handleSelectionChange(s: any[]) { ids.value = s.map(i => i.rtId); single.value = s.length !== 1; multiple.value = !s.length }
-function handleAdd() { reset(); open.value = true; title.value = '新增采购退货单' }
 function handleFromPo() { poWizardOpen.value = true }
 function onPoWizardSuccess() { getList() }
 function handleUpdate(row?: WmRtVendor) {

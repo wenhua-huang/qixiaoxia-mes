@@ -134,8 +134,14 @@
       </template>
     </el-dialog>
 
-    <!-- 工单选择器（从工单生成入库单） -->
-    <WorkorderSelect ref="woSelectRef" @onSelected="onWorkorderSelected" />
+    <!-- 工单选择器（从工单生成入库单）：只显示生产中/已完成且已产出>0 的工单，并展示待入库量 -->
+    <WorkorderSelect
+      ref="woSelectRef"
+      :status-list="['PRODUCING', 'COMPLETED']"
+      :require-produced="true"
+      :show-quantity-recpt="true"
+      @onSelected="onWorkorderSelected"
+    />
   </div>
 </template>
 

@@ -29,6 +29,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatcher;
 
 /**
@@ -365,6 +366,41 @@ class ProWorkorderDocServiceUnitTest {
         assertThat(hasReceipt).isTrue();
         // 完工判定已移交 autoCompleteWorkorderIfQualified (由 auditFeedback 外层事务调用)，
         // onFeedbackAudited 只负责入库单/退料单生成，不再调 completeWorkorderIfProducing。
+    }
+
+    @Test
+    @DisplayName("onFeedbackAudited：超产场景 → 仍按 produced 封顶生成入库单（放开 planned 限制）")
+    void should_createReceipt_when_overProduced() {
+        // 场景：planned=100，已生产 110（超产），本次合格 10，已入库 100（计划量已入满）
+        // 旧逻辑 min(10, 100-100)=0 → 不生成（账外物料）
+        // 新逻辑 min(10, 110-100)=10 → 生成入库单 (10)
+        testWorkorder.setStatus("COMPLETED");
+        testWorkorder.setQuantityProduced(new BigDecimal("110"));
+        ProFeedback fb = new ProFeedback();
+        fb.setRecordId(1L); fb.setWorkorderId(1L); fb.setRouteId(10L); fb.setProcessId(30L);
+        fb.setQuantityQualified(new BigDecimal("10"));
+        when(proFeedbackMapper.selectProFeedbackByRecordId(1L)).thenReturn(fb);
+        ProRouteProcess lastProcess = new ProRouteProcess();
+        lastProcess.setRouteId(10L); lastProcess.setProcessId(30L);
+        when(proRouteProcessMapper.selectLastProcessByRouteId(10L)).thenReturn(lastProcess);
+        when(proWorkorderMapper.selectProWorkorderByWorkorderId(1L)).thenReturn(testWorkorder);
+        // 已入库 100（计划量）
+        when(wmProductRecptMapper.sumQuantityByWorkorderId(1L)).thenReturn(new BigDecimal("100"));
+        // 入库单 insert：捕获参数以校验数量
+        doAnswer(inv -> { WmProductRecpt r = inv.getArgument(0); r.setRecptId(301L); return 1; })
+                .when(wmProductRecptService).insertWmProductRecpt(any());
+        when(wmProductRecptLineService.insertWmProductRecptLine(any())).thenReturn(1);
+        when(docLogMapper.selectList(any())).thenReturn(Collections.emptyList());
+        when(docLogMapper.insert(any())).thenReturn(1);
+        when(proFeedbackMapper.selectProFeedbackList(any())).thenReturn(Collections.singletonList(fb));
+
+        List<Map<String, Object>> result = docService.onFeedbackAudited(1L);
+
+        assertThat(result).isNotEmpty();
+        ArgumentCaptor<WmProductRecpt> captor = ArgumentCaptor.forClass(WmProductRecpt.class);
+        verify(wmProductRecptService).insertWmProductRecpt(captor.capture());
+        // 超产 10 应正常入库（而非被计划量封顶到 0）
+        assertThat(captor.getValue().getTotalQuantity()).isEqualByComparingTo("10");
     }
 
     @Test

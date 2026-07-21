@@ -43,6 +43,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="cancelDate"    column="cancel_date"    />
         <result property="finishDate"    column="finish_date"    />
         <result property="status"    column="status"    />
+        <result property="quantityRecpt"    column="quantity_recpt"    />
         <result property="remark"    column="remark"    />
         <result property="createBy"    column="create_by"    />
         <result property="createTime"    column="create_time"    />
@@ -51,7 +52,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectProWorkorderVo">
-        select workorder_id, factory_id, workorder_code, workorder_name, workorder_type, order_source, source_code, sales_order_line_id, product_id, product_code, product_name, product_spc, route_product_id, unit_of_measure, unit_name, quantity, quantity_produced, quantity_changed, quantity_scheduled, client_id, client_code, client_name, client_order_code, product_size, printing_req, rope_spec, package_req, shipping_req, order_type, vendor_id, vendor_code, vendor_name, outsource_factory_id, batch_code, request_date, cancel_date, finish_date, status, remark, create_by, create_time, update_by, update_time from qxx_pro_workorder
+        select workorder_id, factory_id, workorder_code, workorder_name, workorder_type, order_source, source_code, sales_order_line_id, product_id, product_code, product_name, product_spc, route_product_id, unit_of_measure, unit_name, quantity, quantity_produced, quantity_changed, quantity_scheduled, client_id, client_code, client_name, client_order_code, product_size, printing_req, rope_spec, package_req, shipping_req, order_type, vendor_id, vendor_code, vendor_name, outsource_factory_id, batch_code, request_date, cancel_date, finish_date, status, remark, create_by, create_time, update_by, update_time
+        <!-- 已入库量子查询：JOIN ON 关联 + CASE WHEN 过滤状态，刻意不写 WHERE，避开 FactoryIdInterceptor 误判 -->
+        ,(SELECT IFNULL(SUM(CASE WHEN r.status IN ('DRAFT','CONFIRMED','POSTED') THEN r.total_quantity ELSE 0 END),0)
+          FROM qxx_wm_product_recpt r
+          JOIN qxx_pro_workorder w ON r.workorder_id = w.workorder_id
+          AND w.workorder_id = qxx_pro_workorder.workorder_id) as quantity_recpt
+        from qxx_pro_workorder
     </sql>
 
     <select id="selectProWorkorderList" parameterType="ProWorkorder" resultMap="ProWorkorderResult">
@@ -63,6 +70,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="productCode != null  and productCode != ''"> and product_code = #{productCode}</if>
             <if test="productName != null  and productName != ''"> and product_name like concat('%', #{productName}, '%')</if>
             <if test="status != null  and status != ''"> and status = #{status}</if>
+            <if test="statusList != null and statusList.size() > 0">
+                and status in
+                <foreach collection="statusList" item="item" open="(" separator="," close=")">#{item}</foreach>
+            </if>
+            <if test="quantityProducedMin != null"> and quantity_produced &gt;= #{quantityProducedMin}</if>
         </where>
         order by workorder_id desc
     </select>

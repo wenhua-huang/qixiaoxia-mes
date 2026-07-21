@@ -2,6 +2,7 @@ package com.ruoyi.system.domain.mes.pro;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.List;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
@@ -67,6 +68,13 @@ public class ProWorkorder extends BaseEntity
     private String skuCode;
     /** SKU变体名称（createSkuVariant=true时必填） */
     private String skuName;
+
+    /** 状态多值查询（非DB字段，status IN 过滤用） */
+    private List<String> statusList;
+    /** 已生产量下限（非DB字段，quantity_produced >= 过滤用） */
+    private BigDecimal quantityProducedMin;
+    /** 已入库量（非DB字段，由 Mapper 子查询填充，前端可读） */
+    private BigDecimal quantityRecpt;
 
     public Long getWorkorderId() { return workorderId; }
     public void setWorkorderId(Long v) { this.workorderId = v; }
@@ -151,6 +159,12 @@ public class ProWorkorder extends BaseEntity
     public void setSkuCode(String v) { this.skuCode = v; }
     public String getSkuName() { return skuName; }
     public void setSkuName(String v) { this.skuName = v; }
+    public List<String> getStatusList() { return statusList; }
+    public void setStatusList(List<String> v) { this.statusList = v; }
+    public BigDecimal getQuantityProducedMin() { return quantityProducedMin; }
+    public void setQuantityProducedMin(BigDecimal v) { this.quantityProducedMin = v; }
+    public BigDecimal getQuantityRecpt() { return quantityRecpt; }
+    public void setQuantityRecpt(BigDecimal v) { this.quantityRecpt = v; }
 
     @Override
     public String toString() {

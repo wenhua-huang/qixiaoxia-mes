@@ -19,7 +19,7 @@
     </el-form>
 
     <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5"><el-button type="primary" plain icon="Plus" size="small" @click="handleAdd" v-hasPermi="['mes:wm:product_recpt:add']">新增</el-button></el-col>
+      <el-col :span="1.5"><el-button type="primary" plain icon="Connection" size="small" @click="handleFromWorkorder" v-hasPermi="['mes:wm:product_recpt:add']">从工单生成</el-button></el-col>
       <el-col :span="1.5"><el-button type="success" plain icon="Edit" size="small" :disabled="single" @click="handleUpdate()" v-hasPermi="['mes:wm:product_recpt:edit']">修改</el-button></el-col>
       <el-col :span="1.5"><el-button type="danger" plain icon="Delete" size="small" :disabled="multiple" @click="handleDelete()" v-hasPermi="['mes:wm:product_recpt:remove']">删除</el-button></el-col>
       <el-col :span="1.5"><el-button type="warning" plain icon="Download" size="small" @click="handleExport" v-hasPermi="['mes:wm:product_recpt:export']">导出</el-button></el-col>
@@ -133,6 +133,9 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 工单选择器（从工单生成入库单） -->
+    <WorkorderSelect ref="woSelectRef" @onSelected="onWorkorderSelected" />
   </div>
 </template>
 
@@ -142,10 +145,12 @@ import type { WmProductRecptQueryParams, WmProductRecpt } from '@/api/mes/wm/pro
 import { listWmProductRecpt, getWmProductRecpt, delWmProductRecpt, addWmProductRecpt, updateWmProductRecpt } from '@/api/mes/wm/product_recpt'
 import request from '@/utils/request'
 import WarehouseSelect from '@/components/warehouseSelect/single.vue'
+import WorkorderSelect from '@/components/workorderSelect/single.vue'
 
 const { proxy } = getCurrentInstance() as any
 const { mes_itemrecpt_status } = useDict('mes_itemrecpt_status')
 const warehouseSelectRef = ref()
+const woSelectRef = ref()
 
 const recptList = ref<WmProductRecpt[]>([])
 const open = ref(false)
@@ -182,6 +187,27 @@ function handleAdd() {
   reset()
   open.value = true
   title.value = '新增产品入库单'
+}
+// 从工单生成：弹工单选择器 → 选中后调后端 generateReceipt（自动算数量/仓库/单号）
+function handleFromWorkorder() {
+  woSelectRef.value?.open()
+}
+function onWorkorderSelected(row: any) {
+  if (!row?.workorderId) return
+  if (!['PRODUCING', 'COMPLETED'].includes(row.status)) {
+    proxy.$modal.msgWarning('仅"生产中/已完成"的工单可生成入库单')
+    return
+  }
+  if (!(Number(row.quantityProduced) > 0)) {
+    proxy.$modal.msgWarning('该工单暂无已生产数量，无法生成入库单')
+    return
+  }
+  proxy.$modal.confirm(`是否根据工单 "${row.workorderCode}" 生成产品入库单？`).then(() => {
+    request({ url: `/mes/pro/workorder/generateReceipt/${row.workorderId}`, method: 'post' }).then((res: any) => {
+      proxy.$modal.msgSuccess('入库单已生成：' + (res?.data?.recptCode || ''))
+      getList()
+    })
+  }).catch(() => {})
 }
 function handleView(row: WmProductRecpt) {
   reset()

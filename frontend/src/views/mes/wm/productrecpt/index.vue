@@ -203,7 +203,7 @@ function onWorkorderSelected(row: any) {
     return
   }
   proxy.$modal.confirm(`是否根据工单 "${row.workorderCode}" 生成产品入库单？`).then(() => {
-    request({ url: `/mes/pro/workorder/generateReceipt/${row.workorderId}`, method: 'post' }).then((res: any) => {
+    request({ url: `/mes/wm/product_recpt/fromWorkorder/${row.workorderId}`, method: 'post' }).then((res: any) => {
       proxy.$modal.msgSuccess('入库单已生成：' + (res?.data?.recptCode || ''))
       getList()
     })

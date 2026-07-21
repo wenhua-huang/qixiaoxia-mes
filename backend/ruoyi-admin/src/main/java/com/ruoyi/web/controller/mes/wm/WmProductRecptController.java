@@ -2,6 +2,7 @@ package com.ruoyi.web.controller.mes.wm;
 
 import java.util.List;
 import jakarta.servlet.http.HttpServletResponse;
+import com.ruoyi.system.service.mes.pro.IProWorkorderDocService;
 import com.ruoyi.system.service.mes.wm.IWmProductRecptService;
 import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.controller.BaseController;
@@ -27,6 +28,9 @@ public class WmProductRecptController extends BaseController
 {
     @Autowired
     private IWmProductRecptService wmProductRecptService;
+
+    @Autowired
+    private IProWorkorderDocService proWorkorderDocService;
 
     @PreAuthorize("@ss.hasPermi('mes:wm:product_recpt:list')")
     @GetMapping("/list")
@@ -69,6 +73,18 @@ public class WmProductRecptController extends BaseController
     {
         wmProductRecptService.insertWmProductRecpt(entity);
         return AjaxResult.success(entity);
+    }
+
+    /**
+     * 从工单生成产品入库单（薄包装：权限归 wm 域，复用 pro 域既有生成逻辑）
+     * 后端自动完成：算数量(produced-已入库)、生成 PR 单号、找默认仓库、插头+插行、写幂等日志。
+     */
+    @PreAuthorize("@ss.hasPermi('mes:wm:product_recpt:add')")
+    @Log(title = "从工单生成产品入库单", businessType = BusinessType.INSERT)
+    @PostMapping("/fromWorkorder/{workorderId}")
+    public AjaxResult fromWorkorder(@PathVariable("workorderId") Long workorderId)
+    {
+        return AjaxResult.success(proWorkorderDocService.generateProductReceipt(workorderId));
     }
 
     @PreAuthorize("@ss.hasPermi('mes:wm:product_recpt:edit')")

@@ -189,6 +189,7 @@ function resetQuery() { proxy.resetForm('queryRef'); handleQuery() }
 function handleSelectionChange(s: any[]) { ids.value = s.map(i => i.recptId); single.value = s.length !== 1; multiple.value = !s.length }
 function isEditable(row: WmProductRecpt) { return row.status === 'DRAFT' }
 
+// 入口已改为「从工单生成」，handleAdd 暂保留以支持未来手动新增入口恢复（dialog 复用）
 function handleAdd() {
   reset()
   open.value = true

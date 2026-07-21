@@ -88,14 +88,17 @@ const data = reactive({
 })
 const { queryParams } = toRefs(data)
 
+// quantity_produced > 0 用极小正数表达（后端用 >= 比较，避免改 SQL 写专用 >0 分支）。
+// 取 1e-6：小于任何实际生产数量（最小 1 件），又大于 BigDecimal.ZERO 的序列化值 0。
+const PRODUCED_MIN_EPSILON = 0.000001
+
 // 把 props 固定过滤条件合并进 queryParams（每次查询前调用，保证 resetQuery 后也不丢）
 function applyFixedFilters() {
   if (props.statusList && props.statusList.length > 0) {
     queryParams.value.statusList = [...props.statusList]
   }
   if (props.requireProduced) {
-    // 用极小正数表达 "> 0"，避免改 SQL 写专用分支
-    queryParams.value.quantityProducedMin = 0.000001
+    queryParams.value.quantityProducedMin = PRODUCED_MIN_EPSILON
   }
 }
 
@@ -111,11 +114,15 @@ function resetQuery() {
   getList()
 }
 // 待入库量 = 已生产 - 已入库（quantityRecpt 由后端子查询返回）
+// 用 toFixed 规整避免浮点精度（如 0.1+0.2=0.30000000000000004），最多 4 位小数对齐后端 decimal(14,4)
 function formatPending(row: any): string {
   const produced = Number(row.quantityProduced) || 0
   const recpt = Number(row.quantityRecpt) || 0
   const pending = produced - recpt
-  return pending > 0 ? String(pending) : '0'
+  if (pending <= 0) return '0'
+  // 去掉多余小数位：整数显示整数，小数最多 4 位且去尾零
+  const rounded = Number(pending.toFixed(4))
+  return String(rounded)
 }
 function handleRowChange(row: any) { selectedRow.value = row }
 function handleRowDbClick(row: any) {

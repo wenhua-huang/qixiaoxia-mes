@@ -617,14 +617,17 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
 
         BigDecimal qtyToRecpt;
         if (feedbackId != null) {
-            // 自动路径：cap = min(本次合格数, 计划量-已入库)，用 planned 做上限 (required_by REQUIRES_NEW
-            // 下 produced 可能读脏, 而 produced ≤ planned 在正常流程恒成立, planned 更宽松也更安全)。
+            // 自动路径：cap = min(本次合格数, 已生产量-已入库)
+            // 用 produced 替代 planned 做上限：允许超产成品（produced > planned）正常入库，
+            // 避免"账外物料"（产出存在但系统无入库凭证）；同时防止入库量超过实际产出（防重复计数）。
+            // produced 在外层事务已由 addQuantityProduced 累加提交，REQUIRES_NEW 下可读到最新值。
             ProFeedback fb = proFeedbackMapper.selectProFeedbackByRecordId(feedbackId);
             if (fb == null || fb.getQuantityQualified() == null) return new ArrayList<>();
             BigDecimal qualified = fb.getQuantityQualified();
-            qtyToRecpt = qualified.min(planned.subtract(alreadyRecpt));
+            BigDecimal remaining = produced.subtract(alreadyRecpt);
+            qtyToRecpt = qualified.min(remaining);
         } else {
-            // 手动路径：入库「已生产但未入库」的差额 (保持原始语义, produced 为已提交值)
+            // 手动路径：入库「已生产但未入库」的差额 (与自动路径语义对齐，均以 produced 为上限)
             qtyToRecpt = produced.subtract(alreadyRecpt);
         }
 

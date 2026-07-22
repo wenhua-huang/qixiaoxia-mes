@@ -1,6 +1,7 @@
 import { PageDomain, BaseEntity } from "@/types/api/common"
 
 export interface WmProductSalesLineQueryParams extends PageDomain {
+  salesId?: number
   itemCode?: string
   itemName?: string
   specification?: string
@@ -12,6 +13,7 @@ export interface WmProductSalesLine extends BaseEntity {
   lineId: number
   factoryId?: number
   salesId?: number
+  salesOrderLineId?: number
   itemId?: number
   itemCode?: string
   itemName?: string
@@ -19,6 +21,7 @@ export interface WmProductSalesLine extends BaseEntity {
   unitOfMeasure?: string
   unitName?: string
   quantitySales?: number
+  quantityPosted?: number
   quantityBox?: number
   boxSpec?: string
   boxLength?: number

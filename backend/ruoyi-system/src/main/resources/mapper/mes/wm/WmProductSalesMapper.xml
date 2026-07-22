@@ -19,6 +19,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="warehouseName" column="warehouse_name" />
         <result property="salesDate" column="sales_date" />
         <result property="totalQuantity" column="total_quantity" />
+        <result property="postedQuantity" column="posted_quantity" />
         <result property="totalBox" column="total_box" />
         <result property="totalVolume" column="total_volume" />
         <result property="totalWeight" column="total_weight" />
@@ -33,6 +34,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="salesType" column="sales_type" />
         <result property="oqcId" column="oqc_id" />
         <result property="oqcCode" column="oqc_code" />
+        <result property="salesOrderId" column="sales_order_id" />
+        <result property="salesOrderCode" column="sales_order_code" />
         <result property="status" column="status" />
         <result property="remark" column="remark" />
         <result property="createBy" column="create_by" />
@@ -42,7 +45,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectWmProductSalesVo">
-        select sales_id, factory_id, sales_code, sales_name, client_id, client_code, client_name, client_order_code, salesperson, warehouse_id, warehouse_code, warehouse_name, sales_date, total_quantity, total_box, total_volume, total_weight, logistics_company, tracking_no, logistics_fee, shipping_address, receiver_name, receiver_tel, pallet_flag, box_label, sales_type, oqc_id, oqc_code, status, remark, create_by, create_time, update_by, update_time from qxx_wm_product_sales
+        select sales_id, factory_id, sales_code, sales_name, client_id, client_code, client_name, client_order_code, salesperson, warehouse_id, warehouse_code, warehouse_name, sales_date, total_quantity, posted_quantity, total_box, total_volume, total_weight, logistics_company, tracking_no, logistics_fee, shipping_address, receiver_name, receiver_tel, pallet_flag, box_label, sales_type, oqc_id, oqc_code, sales_order_id, sales_order_code, status, remark, create_by, create_time, update_by, update_time from qxx_wm_product_sales
     </sql>
 
     <select id="selectWmProductSalesList" parameterType="WmProductSales" resultMap="WmProductSalesResult">
@@ -98,6 +101,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="warehouseName != null">warehouse_name,</if>
             <if test="salesDate != null">sales_date,</if>
             <if test="totalQuantity != null">total_quantity,</if>
+            <if test="postedQuantity != null">posted_quantity,</if>
             <if test="totalBox != null">total_box,</if>
             <if test="totalVolume != null">total_volume,</if>
             <if test="totalWeight != null">total_weight,</if>
@@ -112,6 +116,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="salesType != null">sales_type,</if>
             <if test="oqcId != null">oqc_id,</if>
             <if test="oqcCode != null">oqc_code,</if>
+            <if test="salesOrderId != null">sales_order_id,</if>
+            <if test="salesOrderCode != null">sales_order_code,</if>
             <if test="status != null">status,</if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null">create_by,</if>
@@ -131,6 +137,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="warehouseName != null">#{warehouseName},</if>
             <if test="salesDate != null">#{salesDate},</if>
             <if test="totalQuantity != null">#{totalQuantity},</if>
+            <if test="postedQuantity != null">#{postedQuantity},</if>
             <if test="totalBox != null">#{totalBox},</if>
             <if test="totalVolume != null">#{totalVolume},</if>
             <if test="totalWeight != null">#{totalWeight},</if>
@@ -145,6 +152,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="salesType != null">#{salesType},</if>
             <if test="oqcId != null">#{oqcId},</if>
             <if test="oqcCode != null">#{oqcCode},</if>
+            <if test="salesOrderId != null">#{salesOrderId},</if>
+            <if test="salesOrderCode != null">#{salesOrderCode},</if>
             <if test="status != null">#{status},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
@@ -168,6 +177,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="warehouseName != null">warehouse_name = #{warehouseName},</if>
             <if test="salesDate != null">sales_date = #{salesDate},</if>
             <if test="totalQuantity != null">total_quantity = #{totalQuantity},</if>
+            <if test="postedQuantity != null">posted_quantity = #{postedQuantity},</if>
             <if test="totalBox != null">total_box = #{totalBox},</if>
             <if test="totalVolume != null">total_volume = #{totalVolume},</if>
             <if test="totalWeight != null">total_weight = #{totalWeight},</if>
@@ -182,6 +192,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="salesType != null">sales_type = #{salesType},</if>
             <if test="oqcId != null">oqc_id = #{oqcId},</if>
             <if test="oqcCode != null">oqc_code = #{oqcCode},</if>
+            <if test="salesOrderId != null">sales_order_id = #{salesOrderId},</if>
+            <if test="salesOrderCode != null">sales_order_code = #{salesOrderCode},</if>
             <if test="status != null">status = #{status},</if>
             <if test="remark != null">remark = #{remark},</if>
             <if test="createBy != null">create_by = #{createBy},</if>

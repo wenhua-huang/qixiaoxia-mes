@@ -2,10 +2,10 @@
   <div>
     <el-row :gutter="10" class="mb8">
       <el-col :span="1.5">
-        <el-button type="primary" plain icon="Plus" size="small" @click="handleAdd" v-hasPermi="['mes:wm:productsales:add']">新增行</el-button>
+        <el-button type="primary" plain icon="Plus" size="small" @click="handleAdd" v-hasPermi="['mes:wm:sales:edit']">新增行</el-button>
       </el-col>
       <el-col :span="1.5">
-        <el-button type="danger" plain icon="Delete" size="small" :disabled="multiple" @click="handleDelete" v-hasPermi="['mes:wm:productsales:remove']">删除</el-button>
+        <el-button type="danger" plain icon="Delete" size="small" :disabled="multiple" @click="handleDelete" v-hasPermi="['mes:wm:sales:edit']">删除</el-button>
       </el-col>
     </el-row>
 
@@ -127,7 +127,7 @@ const data = reactive({
 })
 const { queryParams, form, rules } = toRefs(data)
 
-watch(() => props.salesId, (val) => {
+watch(() => props.salesId, (val: number | undefined) => {
   if (val) { queryParams.value.salesId = val; getList() }
 }, { immediate: true })
 

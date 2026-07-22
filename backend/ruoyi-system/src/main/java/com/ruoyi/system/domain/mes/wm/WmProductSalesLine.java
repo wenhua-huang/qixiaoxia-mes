@@ -26,6 +26,9 @@ public class WmProductSalesLine extends BaseEntity
     @Excel(name = "出库单ID")
     private Long salesId;
 
+    @Excel(name = "销售订单行ID")
+    private Long salesOrderLineId;
+
     @Excel(name = "物料ID")
     private Long itemId;
 
@@ -46,6 +49,9 @@ public class WmProductSalesLine extends BaseEntity
 
     @Excel(name = "出库数量")
     private BigDecimal quantitySales;
+
+    @Excel(name = "已过账出库量")
+    private BigDecimal quantityPosted;
 
     @Excel(name = "出库箱数")
     private Long quantityBox;
@@ -92,6 +98,9 @@ public class WmProductSalesLine extends BaseEntity
     public Long getSalesId() { return salesId; }
     public void setSalesId(Long v) { this.salesId = v; }
 
+    public Long getSalesOrderLineId() { return salesOrderLineId; }
+    public void setSalesOrderLineId(Long v) { this.salesOrderLineId = v; }
+
     public Long getItemId() { return itemId; }
     public void setItemId(Long v) { this.itemId = v; }
 
@@ -112,6 +121,9 @@ public class WmProductSalesLine extends BaseEntity
 
     public BigDecimal getQuantitySales() { return quantitySales; }
     public void setQuantitySales(BigDecimal v) { this.quantitySales = v; }
+
+    public BigDecimal getQuantityPosted() { return quantityPosted; }
+    public void setQuantityPosted(BigDecimal v) { this.quantityPosted = v; }
 
     public Long getQuantityBox() { return quantityBox; }
     public void setQuantityBox(Long v) { this.quantityBox = v; }

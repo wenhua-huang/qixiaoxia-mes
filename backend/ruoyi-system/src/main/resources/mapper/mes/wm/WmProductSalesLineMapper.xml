@@ -8,6 +8,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <id property="lineId" column="line_id" />
         <result property="factoryId" column="factory_id" />
         <result property="salesId" column="sales_id" />
+        <result property="salesOrderLineId" column="sales_order_line_id" />
         <result property="itemId" column="item_id" />
         <result property="itemCode" column="item_code" />
         <result property="itemName" column="item_name" />
@@ -15,6 +16,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="unitOfMeasure" column="unit_of_measure" />
         <result property="unitName" column="unit_name" />
         <result property="quantitySales" column="quantity_sales" />
+        <result property="quantityPosted" column="quantity_posted" />
         <result property="quantityBox" column="quantity_box" />
         <result property="boxSpec" column="box_spec" />
         <result property="boxLength" column="box_length" />
@@ -35,7 +37,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectWmProductSalesLineVo">
-        select line_id, factory_id, sales_id, item_id, item_code, item_name, specification, unit_of_measure, unit_name, quantity_sales, quantity_box, box_spec, box_length, box_width, box_height, volume, weight, batch_id, batch_code, warehouse_id, location_id, area_id, remark, create_by, create_time, update_by, update_time from qxx_wm_product_sales_line
+        select line_id, factory_id, sales_id, sales_order_line_id, item_id, item_code, item_name, specification, unit_of_measure, unit_name, quantity_sales, quantity_posted, quantity_box, box_spec, box_length, box_width, box_height, volume, weight, batch_id, batch_code, warehouse_id, location_id, area_id, remark, create_by, create_time, update_by, update_time from qxx_wm_product_sales_line
     </sql>
 
     <select id="selectWmProductSalesLineList" parameterType="WmProductSalesLine" resultMap="WmProductSalesLineResult">
@@ -69,9 +71,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where line_id = #{lineId}
     </select>
 
+    <select id="selectLinesBySalesId" parameterType="Long" resultMap="WmProductSalesLineResult">
+        <include refid="selectWmProductSalesLineVo"/>
+        where sales_id = #{salesId}
+        order by line_id asc
+    </select>
+
     <insert id="insertWmProductSalesLine" parameterType="WmProductSalesLine" useGeneratedKeys="true" keyProperty="lineId">
         insert into qxx_wm_product_sales_line
         <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="salesId != null">sales_id,</if>
+            <if test="salesOrderLineId != null">sales_order_line_id,</if>
             <if test="itemId != null">item_id,</if>
             <if test="itemCode != null">item_code,</if>
             <if test="itemName != null">item_name,</if>
@@ -79,6 +88,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="unitOfMeasure != null">unit_of_measure,</if>
             <if test="unitName != null">unit_name,</if>
             <if test="quantitySales != null">quantity_sales,</if>
+            <if test="quantityPosted != null">quantity_posted,</if>
             <if test="quantityBox != null">quantity_box,</if>
             <if test="boxSpec != null">box_spec,</if>
             <if test="boxLength != null">box_length,</if>
@@ -98,6 +108,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateTime != null">update_time,</if>
         </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="salesId != null">#{salesId},</if>
+            <if test="salesOrderLineId != null">#{salesOrderLineId},</if>
             <if test="itemId != null">#{itemId},</if>
             <if test="itemCode != null">#{itemCode},</if>
             <if test="itemName != null">#{itemName},</if>
@@ -105,6 +116,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="unitOfMeasure != null">#{unitOfMeasure},</if>
             <if test="unitName != null">#{unitName},</if>
             <if test="quantitySales != null">#{quantitySales},</if>
+            <if test="quantityPosted != null">#{quantityPosted},</if>
             <if test="quantityBox != null">#{quantityBox},</if>
             <if test="boxSpec != null">#{boxSpec},</if>
             <if test="boxLength != null">#{boxLength},</if>
@@ -128,6 +140,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <update id="updateWmProductSalesLine" parameterType="WmProductSalesLine">
         update qxx_wm_product_sales_line
         <trim prefix="SET" suffixOverrides=",">            <if test="salesId != null">sales_id = #{salesId},</if>
+            <if test="salesOrderLineId != null">sales_order_line_id = #{salesOrderLineId},</if>
             <if test="itemId != null">item_id = #{itemId},</if>
             <if test="itemCode != null">item_code = #{itemCode},</if>
             <if test="itemName != null">item_name = #{itemName},</if>
@@ -135,6 +148,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="unitOfMeasure != null">unit_of_measure = #{unitOfMeasure},</if>
             <if test="unitName != null">unit_name = #{unitName},</if>
             <if test="quantitySales != null">quantity_sales = #{quantitySales},</if>
+            <if test="quantityPosted != null">quantity_posted = #{quantityPosted},</if>
             <if test="quantityBox != null">quantity_box = #{quantityBox},</if>
             <if test="boxSpec != null">box_spec = #{boxSpec},</if>
             <if test="boxLength != null">box_length = #{boxLength},</if>
@@ -165,6 +179,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <foreach item="lineId" collection="array" open="(" separator="," close=")">
             #{lineId}
         </foreach>
+    </delete>
+
+    <delete id="deleteWmProductSalesLineBySalesId" parameterType="Long">
+        delete from qxx_wm_product_sales_line where sales_id = #{salesId}
     </delete>
 
 </mapper>

@@ -1,4 +1,6 @@
 import { PageDomain, BaseEntity } from "@/types/api/common"
+import type { WmProductSalesLine } from './product_sales_line'
+import type { WmProductSalesDetail } from './product_sales_detail'
 
 export interface WmProductSalesQueryParams extends PageDomain {
   salesCode?: string
@@ -6,6 +8,10 @@ export interface WmProductSalesQueryParams extends PageDomain {
   clientCode?: string
   clientName?: string
   clientOrderCode?: string
+  status?: string
+  salesType?: string
+  beginSalesDate?: string
+  endSalesDate?: string
 }
 
 export interface WmProductSales extends BaseEntity {
@@ -23,6 +29,7 @@ export interface WmProductSales extends BaseEntity {
   warehouseName?: string
   salesDate?: string
   totalQuantity?: number
+  postedQuantity?: number
   totalBox?: number
   totalVolume?: number
   totalWeight?: number
@@ -37,5 +44,9 @@ export interface WmProductSales extends BaseEntity {
   salesType?: string
   oqcId?: number
   oqcCode?: string
+  salesOrderId?: number
+  salesOrderCode?: string
   status?: string
+  lines?: WmProductSalesLine[]
+  details?: WmProductSalesDetail[]
 }

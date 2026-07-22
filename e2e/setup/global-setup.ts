@@ -52,7 +52,7 @@ async function globalSetup(config: FullConfig) {
   }
 
   // Step 2: 用 token 构造 storageState（写入 localStorage + cookie）
-  const browser = await chromium.launch()
+  const browser = await chromium.launch({ channel: 'chrome' })
   const page = await browser.newPage()
   try {
     // 访问任意页面以建立 origin
@@ -71,7 +71,7 @@ async function globalSetup(config: FullConfig) {
 
 /** 降级方案：浏览器 UI 登录 */
 async function browserLogin(baseURL: string, stateFile: string) {
-  const browser = await chromium.launch()
+  const browser = await chromium.launch({ channel: 'chrome' })
   const page = await browser.newPage()
   try {
     await page.goto(baseURL + '/login')

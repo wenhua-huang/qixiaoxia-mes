@@ -93,6 +93,26 @@ public class PurOrder extends BaseEntity
     @Excel(name = "状态:DRAFT-草稿,APPROVED-已审批,ORDERED-已下单,RECEIVING-收货中,RECEIVED-已收货,CLOSED-已关闭,CANCEL-已取消")
     private String status;
 
+    /** 取消原因 */
+    private String cancelReason;
+
+    /** 取消时间 */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date cancelTime;
+
+    /** 取消人 */
+    private String cancelBy;
+
+    /** 关闭原因(强制关闭时填写) */
+    private String closeReason;
+
+    /** 关闭时间 */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date closeTime;
+
+    /** 关闭人 */
+    private String closeBy;
+
     public void setOrderId(Long orderId) 
     {
         this.orderId = orderId;
@@ -278,9 +298,69 @@ public class PurOrder extends BaseEntity
         this.status = status;
     }
 
-    public String getStatus() 
+    public String getStatus()
     {
         return status;
+    }
+
+    public void setCancelReason(String cancelReason)
+    {
+        this.cancelReason = cancelReason;
+    }
+
+    public String getCancelReason()
+    {
+        return cancelReason;
+    }
+
+    public void setCancelTime(Date cancelTime)
+    {
+        this.cancelTime = cancelTime;
+    }
+
+    public Date getCancelTime()
+    {
+        return cancelTime;
+    }
+
+    public void setCancelBy(String cancelBy)
+    {
+        this.cancelBy = cancelBy;
+    }
+
+    public String getCancelBy()
+    {
+        return cancelBy;
+    }
+
+    public void setCloseReason(String closeReason)
+    {
+        this.closeReason = closeReason;
+    }
+
+    public String getCloseReason()
+    {
+        return closeReason;
+    }
+
+    public void setCloseTime(Date closeTime)
+    {
+        this.closeTime = closeTime;
+    }
+
+    public Date getCloseTime()
+    {
+        return closeTime;
+    }
+
+    public void setCloseBy(String closeBy)
+    {
+        this.closeBy = closeBy;
+    }
+
+    public String getCloseBy()
+    {
+        return closeBy;
     }
 
     @Override
@@ -305,6 +385,12 @@ public class PurOrder extends BaseEntity
             .append("workorderId", getWorkorderId())
             .append("workorderCode", getWorkorderCode())
             .append("status", getStatus())
+            .append("cancelReason", getCancelReason())
+            .append("cancelTime", getCancelTime())
+            .append("cancelBy", getCancelBy())
+            .append("closeReason", getCloseReason())
+            .append("closeTime", getCloseTime())
+            .append("closeBy", getCloseBy())
             .append("remark", getRemark())
             .append("createBy", getCreateBy())
             .append("createTime", getCreateTime())

@@ -13,8 +13,13 @@ PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
         <setting name="defaultExecutorType"      value="SIMPLE" />
 		<!-- 指定 MyBatis 所用日志的具体实现 -->
         <setting name="logImpl"                  value="SLF4J"  />
-        <!-- 使用驼峰命名法转换字段 -->
+		<!-- 使用驼峰命名法转换字段 -->
 		<!-- <setting name="mapUnderscoreToCamelCase" value="true"/> -->
 	</settings>
-	
+
+	<!-- JSON TypeHandler 注册（用于 line_attrs 等 JSON 列的 Map 互转） -->
+	<typeHandlers>
+		<typeHandler handler="com.ruoyi.common.core.handler.JsonMapTypeHandler"/>
+	</typeHandlers>
+
 </configuration>

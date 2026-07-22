@@ -82,6 +82,26 @@ pages/mes/
 - 小程序主包 ≤2MB、总包 ≤20MB，MES 各领域（wm/pro/qc/md）独立分包
 - 测试：核心流程（登录/报工/质检）手动覆盖，后续引入 uni-app 自动化测试框架
 
+## 常见坑（避免重犯）
+
+### vite.config 不要改成 `.mjs`
+`@dcloudio/vite-plugin-uni@3.x-alpha` 的 package.json 没配 `exports` 字段。Node 严格 ESM 解析（`.mjs` 或 `"type":"module"`）会 `ERR_MODULE_NOT_FOUND`。保持 `.js` + CJS（Vite 自己会用 esbuild 处理 ESM 语法）。
+
+### app/node_modules 可软链主 worktree 复用
+新起 git worktree 时，如果 `app/package.json` 与主 worktree 一致（或差异只在未装的 dep），跑 `npm install` 会重下几百 MB。直接软链更快：
+
+```bash
+cd <新worktree>/app && ln -s /Users/huangwenhua/company/self/qixiaoxia-mes/app/node_modules node_modules
+```
+
+主 worktree 实际装的是 vite@4.0.4（不是 package.json 里写的 5.2.8，历史 install 冻结），别单独升 vite@5——HBuilderX CLI 自带 Vite 5.2.8 是 ESM-only，会跟本地 `.js` CJS config 冲突。
+
+### uni.showToast 长文本会被截成 7 字方框
+`uni.showToast` 当 `icon: 'error'|'success'` 时，标题限制约 7 个汉字，超出被截。`plugins/modal.js` 里 `msgError`/`msgSuccess` 已做长度自适应（>7 字自动 fallback 到 `icon:'none'`）。**业务规则拦截类**提示（如"订单状态不允许操作"）优先用 `$modal.alert()` 弹框，不用 toast——弹框无宽度限制，也强制用户 ack。
+
+### H5 下 hideLoading + showModal 时序冲突
+`uni.hideLoading()` 关 loading mask 是异步的，紧接着调 `uni.showModal()` 有概率被残留 mask 挡住导致看不见。在 `closeLoading()` 之后弹 modal / toast 时加 `setTimeout(..., 60)` 错开一帧。
+
 ## Key References
 
 - uni-app https://uniapp.dcloud.net.cn/

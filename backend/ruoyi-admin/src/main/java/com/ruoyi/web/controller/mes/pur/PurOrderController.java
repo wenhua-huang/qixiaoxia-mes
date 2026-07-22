@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.controller.BaseController;
@@ -84,6 +85,20 @@ public class PurOrderController extends BaseController
     }
 
     /**
+     * 按订单编码查询采购订单头+行（一次拿全，移动端扫码/搜索收货用）
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pur:order:query')")
+    @GetMapping("/byCode")
+    public AjaxResult getInfoByCode(@RequestParam("orderCode") String orderCode)
+    {
+        PurOrderDetailVO detail = purOrderService.selectPurOrderDetailByOrderCode(orderCode);
+        if (detail == null) {
+            return error("采购订单不存在");
+        }
+        return success(detail);
+    }
+
+    /**
      * 新增采购订单头
      */
     @PreAuthorize("@ss.hasPermi('mes:pur:order:add')")
@@ -150,15 +165,67 @@ public class PurOrderController extends BaseController
     }
 
     /**
-     * 关闭采购订单（RECEIVED → CLOSED）
+     * 关闭采购订单（RECEIVED -> CLOSED 正常关闭，RECEIVING -> CLOSED 强制关闭）
      */
     @PreAuthorize("@ss.hasPermi('mes:pur:order:close')")
     @Log(title = "采购订单关闭", businessType = BusinessType.UPDATE)
     @PostMapping("/{orderId}/close")
-    public AjaxResult close(@PathVariable Long orderId)
+    public AjaxResult close(@PathVariable Long orderId,
+                            @RequestParam(value = "closeReason", required = false) String closeReason)
     {
         try {
-            purOrderService.closePurOrder(orderId);
+            purOrderService.closePurOrder(orderId, closeReason);
+            return success();
+        } catch (RuntimeException e) {
+            return error(e.getMessage());
+        }
+    }
+
+    /**
+     * 取消采购订单（DRAFT/APPROVED/ORDERED -> CANCEL）
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pur:order:cancel')")
+    @Log(title = "采购订单取消", businessType = BusinessType.UPDATE)
+    @PostMapping("/{orderId}/cancel")
+    public AjaxResult cancel(@PathVariable Long orderId,
+                             @RequestParam(value = "cancelReason", required = false) String cancelReason)
+    {
+        try {
+            purOrderService.cancelPurOrder(orderId, cancelReason);
+            return success();
+        } catch (RuntimeException e) {
+            return error(e.getMessage());
+        }
+    }
+
+    /**
+     * 取消采购订单行（ORDERED/RECEIVING -> CANCEL）
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pur:order:cancel')")
+    @Log(title = "采购订单行取消", businessType = BusinessType.UPDATE)
+    @PostMapping("/line/{lineId}/cancel")
+    public AjaxResult cancelLine(@PathVariable Long lineId,
+                                 @RequestParam(value = "cancelReason", required = false) String cancelReason)
+    {
+        try {
+            purOrderService.cancelPurOrderLine(lineId, cancelReason);
+            return success();
+        } catch (RuntimeException e) {
+            return error(e.getMessage());
+        }
+    }
+
+    /**
+     * 终止收货采购订单行（RECEIVING -> CLOSED）
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pur:order:close')")
+    @Log(title = "采购订单行终止收货", businessType = BusinessType.UPDATE)
+    @PostMapping("/line/{lineId}/terminate")
+    public AjaxResult terminateLine(@PathVariable Long lineId,
+                                    @RequestParam(value = "closeReason", required = false) String closeReason)
+    {
+        try {
+            purOrderService.terminatePurOrderLine(lineId, closeReason);
             return success();
         } catch (RuntimeException e) {
             return error(e.getMessage());

@@ -1,6 +1,7 @@
 package com.ruoyi.system.service.mes.pur.impl;
 
 import java.math.BigDecimal;
+import java.util.Date;
 import java.util.List;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 import com.ruoyi.system.mapper.mes.pur.PurOrderMapper;
 import com.ruoyi.system.domain.mes.pur.PurOrder;
 import com.ruoyi.system.domain.mes.pur.PurOrderLine;
+import com.ruoyi.system.domain.mes.pur.vo.PurOrderDetailVO;
 import com.ruoyi.system.domain.mes.pur.vo.PurOrderVO;
 import com.ruoyi.system.service.mes.pur.IPurOrderService;
 import com.ruoyi.system.service.mes.pur.IPurOrderLineService;
@@ -48,6 +50,32 @@ public class PurOrderServiceImpl implements IPurOrderService
     }
 
     /**
+     * 按订单编码查询采购订单头+行
+     * 复用 selectPurOrderList 的 orderCode 精确匹配，factory_id 由拦截器注入。
+     *
+     * @param orderCode 采购订单编码
+     * @return 头+行封装；未命中返回 null
+     */
+    @Override
+    public PurOrderDetailVO selectPurOrderDetailByOrderCode(String orderCode)
+    {
+        if (StringUtils.isEmpty(orderCode)) {
+            return null;
+        }
+        PurOrder query = new PurOrder();
+        query.setOrderCode(orderCode.trim());
+        List<PurOrderVO> heads = purOrderMapper.selectPurOrderList(query);
+        if (heads == null || heads.isEmpty()) {
+            return null;
+        }
+        PurOrderVO head = heads.get(0);
+        PurOrderLine lineQuery = new PurOrderLine();
+        lineQuery.setOrderId(head.getOrderId());
+        List<PurOrderLine> lines = purOrderLineService.selectPurOrderLineList(lineQuery);
+        return new PurOrderDetailVO(head, lines);
+    }
+
+    /**
      * 查询采购订单头列表
      * 
      * @param purOrder 采购订单头
@@ -75,6 +103,10 @@ public class PurOrderServiceImpl implements IPurOrderService
         }
         purOrder.setCreateTime(DateUtils.getNowDate());
         purOrder.setCreateBy(SecurityUtils.getUsername());
+        // 采购人默认当前登录用户
+        if (StringUtils.isEmpty(purOrder.getPurchaser())) {
+            purOrder.setPurchaser(SecurityUtils.getUsername());
+        }
         return purOrderMapper.insertPurOrder(purOrder);
     }
 
@@ -124,7 +156,7 @@ public class PurOrderServiceImpl implements IPurOrderService
 
     /**
      * 审批采购订单（DRAFT → APPROVED）
-     * 校验：status == DRAFT，自动写入审批人
+     * 校验：status == DRAFT，自动写入审批人，所有行状态同步 → APPROVED
      */
     @Override
     @Transactional
@@ -141,7 +173,18 @@ public class PurOrderServiceImpl implements IPurOrderService
         order.setApprover(SecurityUtils.getUsername());
         order.setUpdateTime(DateUtils.getNowDate());
         order.setUpdateBy(SecurityUtils.getUsername());
-        return purOrderMapper.updatePurOrder(order);
+        int result = purOrderMapper.updatePurOrder(order);
+        // 批量更新所有行状态 → APPROVED（与头同步，修复历史「头审批行未同步」缺陷）
+        PurOrderLine queryLine = new PurOrderLine();
+        queryLine.setOrderId(orderId);
+        List<PurOrderLine> lines = purOrderLineService.selectPurOrderLineList(queryLine);
+        for (PurOrderLine line : lines) {
+            line.setStatus(PurOrderStatus.APPROVED.getCode());
+            line.setUpdateTime(DateUtils.getNowDate());
+            line.setUpdateBy(SecurityUtils.getUsername());
+            purOrderLineService.updatePurOrderLine(line);
+        }
+        return result;
     }
 
     /**
@@ -179,43 +222,241 @@ public class PurOrderServiceImpl implements IPurOrderService
     }
 
     /**
-     * 关闭采购订单（RECEIVED → CLOSED）
-     * 校验：status == RECEIVED，全部行已收完
+     * 关闭采购订单（RECEIVED -> CLOSED 正常关闭，RECEIVING -> CLOSED 强制关闭）
+     * 校验：status ∈ {RECEIVED, RECEIVING}，所有行到达终态(RECEIVED/CLOSED/CANCEL)
+     * 强制关闭(有CLOSED/CANCEL行)时需填 closeReason
      */
     @Override
     @Transactional
-    public int closePurOrder(Long orderId)
+    public int closePurOrder(Long orderId, String closeReason)
     {
         PurOrder order = purOrderMapper.selectPurOrderByOrderId(orderId);
         if (order == null) {
             throw new RuntimeException("采购订单不存在");
         }
-        if (!PurOrderStatus.RECEIVED.is(order.getStatus())) {
-            throw new RuntimeException("只有已收货的采购订单才能关闭，当前状态：" + order.getStatus());
+        if (!PurOrderStatus.RECEIVED.is(order.getStatus())
+                && !PurOrderStatus.RECEIVING.is(order.getStatus())) {
+            throw new RuntimeException("只有已收货或收货中的采购订单才能关闭，当前状态：" + order.getStatus());
         }
-        // 校验全部行已收完
+        // 校验所有行到达终态
+        PurOrderLine queryLine = new PurOrderLine();
+        queryLine.setOrderId(orderId);
+        List<PurOrderLine> lines = purOrderLineService.selectPurOrderLineList(queryLine);
+        if (lines.isEmpty()) {
+            throw new RuntimeException("采购订单没有订单行，无法关闭");
+        }
+        boolean hasForceClose = false;
+        for (PurOrderLine line : lines) {
+            if (!PurOrderStatus.RECEIVED.is(line.getStatus())
+                    && !PurOrderStatus.CLOSED.is(line.getStatus())
+                    && !PurOrderStatus.CANCEL.is(line.getStatus())) {
+                throw new RuntimeException("存在未完成的物料行(" + line.getItemName()
+                    + ")，请先终止收货或取消该行");
+            }
+            if (PurOrderStatus.CLOSED.is(line.getStatus()) || PurOrderStatus.CANCEL.is(line.getStatus())) {
+                hasForceClose = true;
+            }
+        }
+        if (hasForceClose && StringUtils.isEmpty(closeReason)) {
+            throw new RuntimeException("存在终止/取消的行，请填写关闭原因");
+        }
+        // 更新头 -> CLOSED
+        order.setStatus(PurOrderStatus.CLOSED.getCode());
+        if (StringUtils.isNotEmpty(closeReason)) {
+            order.setCloseReason(closeReason);
+        }
+        order.setCloseTime(DateUtils.getNowDate());
+        order.setCloseBy(SecurityUtils.getUsername());
+        order.setUpdateTime(DateUtils.getNowDate());
+        order.setUpdateBy(SecurityUtils.getUsername());
+        int result = purOrderMapper.updatePurOrder(order);
+        // RECEIVED 行 -> CLOSED；CANCEL/CLOSED 行不动
+        for (PurOrderLine line : lines) {
+            if (PurOrderStatus.RECEIVED.is(line.getStatus())) {
+                line.setStatus(PurOrderStatus.CLOSED.getCode());
+                line.setCloseTime(DateUtils.getNowDate());
+                line.setUpdateTime(DateUtils.getNowDate());
+                line.setUpdateBy(SecurityUtils.getUsername());
+                purOrderLineService.updatePurOrderLine(line);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 取消采购订单（DRAFT/APPROVED/ORDERED -> CANCEL）
+     * 校验：所有行已收货数量为0
+     */
+    @Override
+    @Transactional
+    public int cancelPurOrder(Long orderId, String cancelReason)
+    {
+        PurOrder order = purOrderMapper.selectPurOrderByOrderId(orderId);
+        if (order == null) {
+            throw new RuntimeException("采购订单不存在");
+        }
+        if (!PurOrderStatus.DRAFT.is(order.getStatus())
+                && !PurOrderStatus.APPROVED.is(order.getStatus())
+                && !PurOrderStatus.ORDERED.is(order.getStatus())) {
+            throw new RuntimeException("只有草稿/已审批/已下单的采购订单才能取消，当前状态：" + order.getStatus());
+        }
+        // 校验所有行已收货数量为0
         PurOrderLine queryLine = new PurOrderLine();
         queryLine.setOrderId(orderId);
         List<PurOrderLine> lines = purOrderLineService.selectPurOrderLineList(queryLine);
         for (PurOrderLine line : lines) {
             BigDecimal received = line.getQuantityReceived() != null ? line.getQuantityReceived() : BigDecimal.ZERO;
-            BigDecimal ordered = line.getQuantityOrdered() != null ? line.getQuantityOrdered() : BigDecimal.ZERO;
-            if (received.compareTo(ordered) < 0) {
-                throw new RuntimeException("存在未收完的物料行(" + line.getItemName()
-                    + ")，已收" + received + "/订购" + ordered);
+            if (received.compareTo(BigDecimal.ZERO) > 0) {
+                throw new RuntimeException("物料行(" + line.getItemName()
+                    + ")已有收货记录(" + received + ")，不能取消，请改用终止收货");
             }
         }
-        // 更新头 + 所有行 → CLOSED
-        order.setStatus(PurOrderStatus.CLOSED.getCode());
+        // 更新头 -> CANCEL
+        order.setStatus(PurOrderStatus.CANCEL.getCode());
+        order.setCancelReason(cancelReason);
+        order.setCancelTime(DateUtils.getNowDate());
+        order.setCancelBy(SecurityUtils.getUsername());
         order.setUpdateTime(DateUtils.getNowDate());
         order.setUpdateBy(SecurityUtils.getUsername());
         int result = purOrderMapper.updatePurOrder(order);
+        // 所有行 -> CANCEL
         for (PurOrderLine line : lines) {
-            line.setStatus(PurOrderStatus.CLOSED.getCode());
+            line.setStatus(PurOrderStatus.CANCEL.getCode());
+            line.setCancelReason(cancelReason);
+            line.setCloseTime(DateUtils.getNowDate());
             line.setUpdateTime(DateUtils.getNowDate());
             line.setUpdateBy(SecurityUtils.getUsername());
             purOrderLineService.updatePurOrderLine(line);
         }
         return result;
+    }
+
+    /**
+     * 取消采购订单行（ORDERED/RECEIVING -> CANCEL）
+     * 校验：已收货数量为0
+     */
+    @Override
+    @Transactional
+    public int cancelPurOrderLine(Long lineId, String cancelReason)
+    {
+        PurOrderLine line = purOrderLineService.selectPurOrderLineByLineId(lineId);
+        if (line == null) {
+            throw new RuntimeException("采购订单行不存在");
+        }
+        if (!PurOrderStatus.ORDERED.is(line.getStatus())
+                && !PurOrderStatus.RECEIVING.is(line.getStatus())) {
+            throw new RuntimeException("只有已下单/收货中的行才能取消，当前状态：" + line.getStatus());
+        }
+        BigDecimal received = line.getQuantityReceived() != null ? line.getQuantityReceived() : BigDecimal.ZERO;
+        if (received.compareTo(BigDecimal.ZERO) > 0) {
+            throw new RuntimeException("该行已有收货记录(" + received + ")，不能取消，请改用终止收货");
+        }
+        // 行 -> CANCEL
+        line.setStatus(PurOrderStatus.CANCEL.getCode());
+        line.setCancelReason(cancelReason);
+        line.setCloseTime(DateUtils.getNowDate());
+        line.setUpdateTime(DateUtils.getNowDate());
+        line.setUpdateBy(SecurityUtils.getUsername());
+        int result = purOrderLineService.updatePurOrderLine(line);
+        // 联动检查：若所有行都为 CANCEL 且全部 qtyReceived==0，头自动转 CANCEL
+        checkAndAutoCloseOrder(line.getOrderId(), cancelReason);
+        return result;
+    }
+
+    /**
+     * 终止收货采购订单行（RECEIVING -> CLOSED）
+     * 校验：已收货数量 > 0 且 < 订购数量
+     */
+    @Override
+    @Transactional
+    public int terminatePurOrderLine(Long lineId, String closeReason)
+    {
+        PurOrderLine line = purOrderLineService.selectPurOrderLineByLineId(lineId);
+        if (line == null) {
+            throw new RuntimeException("采购订单行不存在");
+        }
+        if (!PurOrderStatus.RECEIVING.is(line.getStatus())) {
+            throw new RuntimeException("只有收货中的行才能终止收货，当前状态：" + line.getStatus());
+        }
+        BigDecimal received = line.getQuantityReceived() != null ? line.getQuantityReceived() : BigDecimal.ZERO;
+        BigDecimal ordered = line.getQuantityOrdered() != null ? line.getQuantityOrdered() : BigDecimal.ZERO;
+        if (received.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("该行没有收货记录，请改用取消");
+        }
+        if (received.compareTo(ordered) >= 0) {
+            throw new RuntimeException("该行已全部收完，无需终止收货");
+        }
+        // 行 -> CLOSED（保留已收数量，放弃未收数量）
+        line.setStatus(PurOrderStatus.CLOSED.getCode());
+        line.setCancelReason(closeReason);
+        line.setCloseTime(DateUtils.getNowDate());
+        line.setUpdateTime(DateUtils.getNowDate());
+        line.setUpdateBy(SecurityUtils.getUsername());
+        int result = purOrderLineService.updatePurOrderLine(line);
+        // 联动：若所有行都进终态，头按分档推进（本行 CLOSED 触发时，常见落到头 CLOSED）
+        checkAndAutoCloseOrder(line.getOrderId(), closeReason);
+        return result;
+    }
+
+    /**
+     * 联动检查：若订单所有行都进入终态，头自动推进（分三档）。
+     * <ul>
+     *   <li>全 RECEIVED                → 头 RECEIVED</li>
+     *   <li>全 CANCEL 且所有行 qty_received == 0 → 头 CANCEL（写 cancelReason/cancelTime/cancelBy）</li>
+     *   <li>其他混合终态（含 CLOSED，或已实收 + CANCEL 等）→ 头 CLOSED（写 closeReason/closeTime/closeBy）</li>
+     * </ul>
+     * 存在活跃行（非终态）则不推进；头已在终态则不重复推进。
+     */
+    @Override
+    public void checkAndAutoCloseOrder(Long orderId, String reason)
+    {
+        PurOrder order = purOrderMapper.selectPurOrderByOrderId(orderId);
+        if (order == null) return;
+        // 头已在终态则不重复推进
+        if (PurOrderStatus.RECEIVED.is(order.getStatus())
+                || PurOrderStatus.CLOSED.is(order.getStatus())
+                || PurOrderStatus.CANCEL.is(order.getStatus())) return;
+
+        PurOrderLine queryLine = new PurOrderLine();
+        queryLine.setOrderId(orderId);
+        List<PurOrderLine> lines = purOrderLineService.selectPurOrderLineList(queryLine);
+        if (lines.isEmpty()) return;
+
+        // 判定：所有行是否都在终态；同时收集是否全 RECEIVED / 全 CANCEL 无收货
+        boolean allTerminal = true;
+        boolean allReceived = true;
+        boolean allCancelNoRecv = true;
+        for (PurOrderLine line : lines) {
+            String st = line.getStatus();
+            boolean isTerminal = PurOrderStatus.RECEIVED.is(st)
+                    || PurOrderStatus.CLOSED.is(st)
+                    || PurOrderStatus.CANCEL.is(st);
+            if (!isTerminal) { allTerminal = false; break; }
+            if (!PurOrderStatus.RECEIVED.is(st)) allReceived = false;
+            BigDecimal recv = line.getQuantityReceived() != null ? line.getQuantityReceived() : BigDecimal.ZERO;
+            if (!PurOrderStatus.CANCEL.is(st) || recv.compareTo(BigDecimal.ZERO) > 0) {
+                allCancelNoRecv = false;
+            }
+        }
+        if (!allTerminal) return;
+
+        String username = SecurityUtils.getUsername();
+        Date now = DateUtils.getNowDate();
+        if (allReceived) {
+            order.setStatus(PurOrderStatus.RECEIVED.getCode());
+        } else if (allCancelNoRecv) {
+            order.setStatus(PurOrderStatus.CANCEL.getCode());
+            order.setCancelReason(reason);
+            order.setCancelTime(now);
+            order.setCancelBy(username);
+        } else {
+            order.setStatus(PurOrderStatus.CLOSED.getCode());
+            order.setCloseReason(reason);
+            order.setCloseTime(now);
+            order.setCloseBy(username);
+        }
+        order.setUpdateTime(now);
+        order.setUpdateBy(username);
+        purOrderMapper.updatePurOrder(order);
     }
 }

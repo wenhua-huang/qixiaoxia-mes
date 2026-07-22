@@ -7,18 +7,25 @@ export default {
     })
   },
   // 错误消息
+  // 注意：uni.showToast 在 icon 为 success/error 时，标题最多显示 7 个汉字，
+  // 超出会被截断（例如"该订单状态为"E→只显示半字）。这里对长文本回退到 icon:'none'
+  // 并延长显示时间，避免业务提示看不全。
   msgError(content) {
-    uni.showToast({
-      title: content,
-      icon: 'error'
-    })
+    const text = content == null ? '' : String(content)
+    if (text.length > 7) {
+      uni.showToast({ title: text, icon: 'none', duration: 3000 })
+    } else {
+      uni.showToast({ title: text, icon: 'error' })
+    }
   },
-  // 成功消息
+  // 成功消息（同样规避 7 字截断）
   msgSuccess(content) {
-    uni.showToast({
-      title: content,
-      icon: 'success'
-    })
+    const text = content == null ? '' : String(content)
+    if (text.length > 7) {
+      uni.showToast({ title: text, icon: 'none', duration: 2500 })
+    } else {
+      uni.showToast({ title: text, icon: 'success' })
+    }
   },
   // 隐藏消息
   hideMsg(content) {

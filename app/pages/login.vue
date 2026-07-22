@@ -107,6 +107,9 @@
       proxy.$modal.closeLoading()
       loginSuccess()
     }).catch(() => {
+      // 失败必须关 loading：uni.showLoading 是全局模态、跨页面不消失，
+      // 不关会让"登录中，请耐心等待..."永久残留，遮住后续所有 toast（如收货校验提示）
+      proxy.$modal.closeLoading()
       if (captchaEnabled.value) {
         getCode()
       }

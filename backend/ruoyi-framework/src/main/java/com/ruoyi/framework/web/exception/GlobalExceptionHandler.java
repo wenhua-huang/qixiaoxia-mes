@@ -10,6 +10,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingPathVariableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import com.ruoyi.common.constant.HttpStatus;
 import com.ruoyi.common.core.domain.AjaxResult;
@@ -88,6 +89,18 @@ public class GlobalExceptionHandler
         }
         log.error("请求参数类型不匹配'{}',发生系统异常.", requestURI, e);
         return AjaxResult.error(String.format("请求参数类型不匹配，参数[%s]要求类型为：'%s'，但输入值为：'%s'", e.getName(), e.getRequiredType().getName(), value));
+    }
+
+    /**
+     * 唯一约束冲突（重复键）
+     * MySQL DuplicateKeyException → 返回友好提示，不暴露 SQL
+     */
+    @ExceptionHandler(DuplicateKeyException.class)
+    public AjaxResult handleDuplicateKeyException(DuplicateKeyException e, HttpServletRequest request)
+    {
+        String requestURI = request.getRequestURI();
+        log.error("请求地址'{}',唯一约束冲突.", requestURI, e);
+        return AjaxResult.error("数据重复，请检查必填字段是否已存在相同记录");
     }
 
     /**

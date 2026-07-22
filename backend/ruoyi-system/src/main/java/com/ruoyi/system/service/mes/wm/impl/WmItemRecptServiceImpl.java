@@ -228,11 +228,33 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
 
         // 2. 创建入库单行 + 汇总 totalQuantity
         BigDecimal totalQty = BigDecimal.ZERO;
+        // 采购入库时,按 itemId 匹配 PO 行,回填 purOrderLineId(用于退货精确回写)
+        java.util.Map<Long, PurOrderLine> poLineByItemId = null;
+        if (header.getPurOrderId() != null && header.getPurOrderId() > 0) {
+            PurOrderLine poQuery = new PurOrderLine();
+            poQuery.setOrderId(header.getPurOrderId());
+            List<PurOrderLine> poLines = purOrderLineMapper.selectPurOrderLineList(poQuery);
+            if (poLines != null && !poLines.isEmpty()) {
+                poLineByItemId = new java.util.HashMap<>();
+                for (PurOrderLine pl : poLines) {
+                    if (pl.getItemId() != null && !poLineByItemId.containsKey(pl.getItemId())) {
+                        poLineByItemId.put(pl.getItemId(), pl);
+                    }
+                }
+            }
+        }
         for (WmItemRecptLine line : lines) {
             line.setRecptId(header.getRecptId());
             if (line.getWarehouseId() == null) line.setWarehouseId(header.getWarehouseId());
             if (line.getWarehouseCode() == null) line.setWarehouseCode(header.getWarehouseCode());
             if (line.getWarehouseName() == null) line.setWarehouseName(header.getWarehouseName());
+            // 回填采购订单行ID(历史入库未记录,这里按 itemId 匹配)
+            if (line.getPurOrderLineId() == null && poLineByItemId != null && line.getItemId() != null) {
+                PurOrderLine matched = poLineByItemId.get(line.getItemId());
+                if (matched != null) {
+                    line.setPurOrderLineId(matched.getLineId());
+                }
+            }
             // 自动生成批次号（无 batchCode 时，根据物料+供应商+生产日期+有效期匹配或新建）
             if (line.getBatchCode() == null) {
                 WmBatch batchParam = new WmBatch();
@@ -284,6 +306,15 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
         java.util.Map<Long, PurOrderLine> poLineByItemId = buildPoLineItemIdMap(allPoLines);
 
         String username = SecurityUtils.getUsername();
+        // 先推头再推行：checkLineStatusNotExceedOrder 要求行 status ≤ 头 status，
+        // 若先推行 → RECEIVING 而头仍是 ORDERED，会被联动校验拦截。
+        PurOrder purOrder = purOrderService.selectPurOrderByOrderId(purOrderId);
+        if (purOrder != null && PurOrderStatus.ORDERED.is(purOrder.getStatus())) {
+            purOrder.setStatus(PurOrderStatus.RECEIVING.getCode());
+            purOrder.setUpdateTime(DateUtils.getNowDate());
+            purOrderService.updatePurOrder(purOrder);
+        }
+
         for (WmItemRecptLine recptLine : recptLines) {
             PurOrderLine poLine = poLineByItemId.get(recptLine.getItemId());
             if (poLine != null) {
@@ -293,14 +324,6 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
                 poLine.setUpdateBy(username);
                 purOrderLineService.updatePurOrderLine(poLine);
             }
-        }
-
-        // PO 状态：ORDERED → RECEIVING
-        PurOrder purOrder = purOrderService.selectPurOrderByOrderId(purOrderId);
-        if (purOrder != null && PurOrderStatus.ORDERED.is(purOrder.getStatus())) {
-            purOrder.setStatus(PurOrderStatus.RECEIVING.getCode());
-            purOrder.setUpdateTime(DateUtils.getNowDate());
-            purOrderService.updatePurOrder(purOrder);
         }
     }
 
@@ -331,10 +354,15 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
                 }
             }
         }
-        // 2. 原子递增后重新加载，判断各行是否已收完
+        // 2. 原子递增后重新加载，先更新各行 status，再由 checkAndAutoCloseOrder 分档推进头。
+        // 校验白名单已放行 RECEIVED（业务子系统推进），行 RECEIVED 高于头 RECEIVING 不会被拦。
         allPoLines = loadPoLinesByOrderId(purOrderId);
-        boolean allReceived = true;
         for (PurOrderLine poLine : allPoLines) {
+            // 已终态行（CANCEL/CLOSED）保持不变
+            if (PurOrderStatus.CANCEL.is(poLine.getStatus())
+                    || PurOrderStatus.CLOSED.is(poLine.getStatus())) {
+                continue;
+            }
             BigDecimal received = poLine.getQuantityReceived() != null
                 ? poLine.getQuantityReceived() : BigDecimal.ZERO;
             BigDecimal ordered = poLine.getQuantityOrdered() != null
@@ -345,18 +373,9 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
             poLine.setUpdateTime(now);
             poLine.setUpdateBy(username);
             purOrderLineService.updatePurOrderLine(poLine);
-            if (!PurOrderStatus.RECEIVED.is(poLine.getStatus())) {
-                allReceived = false;
-            }
         }
-        if (allReceived && !allPoLines.isEmpty()) {
-            PurOrder purOrder = purOrderService.selectPurOrderByOrderId(purOrderId);
-            if (purOrder != null) {
-                purOrder.setStatus(PurOrderStatus.RECEIVED.getCode());
-                purOrder.setUpdateTime(DateUtils.getNowDate());
-                purOrderService.updatePurOrder(purOrder);
-            }
-        }
+        // 3. 头联动：由 PurOrderService 分档推进（全 RECEIVED→RECEIVED / 混合终态→CLOSED / 有活跃行→不动）
+        purOrderService.checkAndAutoCloseOrder(purOrderId, null);
     }
 
     /** 加载 PO 订单下所有行 */

@@ -17,6 +17,15 @@ export function getOrder(orderId) {
   })
 }
 
+// 一次拿到采购订单头+行（移动端扫码/搜索收货用，避免两次请求）
+export function getOrderDetailByCode(orderCode) {
+  return request({
+    url: '/mes/pur/order/byCode',
+    method: 'get',
+    params: { orderCode }
+  })
+}
+
 // 查询采购订单行列表
 export function listOrderLine(query) {
   return request({

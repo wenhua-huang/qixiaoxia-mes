@@ -26,4 +26,8 @@ export interface WmRtVendorLine extends BaseEntity {
   warehouseName?: string
   locationId?: number
   areaId?: number
+  locationName?: string
+  purOrderLineId?: number
+  purOrderLineNo?: string
+  quantityOrdered?: number
 }

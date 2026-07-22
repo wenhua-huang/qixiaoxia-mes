@@ -6,6 +6,8 @@
 node_modules/
 backend/node_modules/
 frontend/node_modules/
+# app/node_modules 是指向其他 worktree 的 symlink，node_modules/ 规则不匹配 symlink，需显式忽略
+/app/node_modules
 
 # --- Build outputs ---
 frontend/dist/

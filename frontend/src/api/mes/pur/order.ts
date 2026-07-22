@@ -43,7 +43,7 @@ export function delOrder(orderId) {
   })
 }
 
-// 审批采购订单（DRAFT → APPROVED）
+// 审批采购订单（DRAFT -> APPROVED）
 export function approveOrder(orderId) {
   return request({
     url: '/mes/pur/order/' + orderId + '/approve',
@@ -51,7 +51,7 @@ export function approveOrder(orderId) {
   })
 }
 
-// 下达采购订单（APPROVED → ORDERED）
+// 下达采购订单（APPROVED -> ORDERED）
 export function orderOrder(orderId) {
   return request({
     url: '/mes/pur/order/' + orderId + '/order',
@@ -59,10 +59,38 @@ export function orderOrder(orderId) {
   })
 }
 
-// 关闭采购订单（RECEIVED → CLOSED）
-export function closeOrder(orderId) {
+// 关闭采购订单（RECEIVED -> CLOSED 正常，RECEIVING -> CLOSED 强制关闭）
+export function closeOrder(orderId, closeReason) {
   return request({
     url: '/mes/pur/order/' + orderId + '/close',
-    method: 'post'
+    method: 'post',
+    params: { closeReason: closeReason }
+  })
+}
+
+// 取消采购订单（DRAFT/APPROVED/ORDERED -> CANCEL）
+export function cancelOrder(orderId, cancelReason) {
+  return request({
+    url: '/mes/pur/order/' + orderId + '/cancel',
+    method: 'post',
+    params: { cancelReason: cancelReason }
+  })
+}
+
+// 取消采购订单行（ORDERED/RECEIVING -> CANCEL）
+export function cancelLine(lineId, cancelReason) {
+  return request({
+    url: '/mes/pur/order/line/' + lineId + '/cancel',
+    method: 'post',
+    params: { cancelReason: cancelReason }
+  })
+}
+
+// 终止收货采购订单行（RECEIVING -> CLOSED）
+export function terminateLine(lineId, closeReason) {
+  return request({
+    url: '/mes/pur/order/line/' + lineId + '/terminate',
+    method: 'post',
+    params: { closeReason: closeReason }
   })
 }

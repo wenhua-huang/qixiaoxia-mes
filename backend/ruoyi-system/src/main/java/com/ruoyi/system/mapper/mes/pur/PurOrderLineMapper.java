@@ -76,4 +76,14 @@ public interface PurOrderLineMapper
      */
     public int addQuantityReceived(@org.apache.ibatis.annotations.Param("lineId") Long lineId,
                                    @org.apache.ibatis.annotations.Param("delta") java.math.BigDecimal delta);
+
+    /**
+     * 原子递增已退货数量（并发安全）
+     *
+     * @param lineId 采购订单行ID
+     * @param delta 增量
+     * @return 结果
+     */
+    public int addQuantityReturned(@org.apache.ibatis.annotations.Param("lineId") Long lineId,
+                                   @org.apache.ibatis.annotations.Param("delta") java.math.BigDecimal delta);
 }

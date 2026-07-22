@@ -24,14 +24,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="unitPrice"    column="unit_price"    />
         <result property="amount"    column="amount"    />
         <result property="taxRate"    column="tax_rate"    />
-        <result property="paperWidth"    column="paper_width"    />
-        <result property="paperWeight"    column="paper_weight"    />
-        <result property="paperType"    column="paper_type"    />
-        <result property="rollCount"    column="roll_count"    />
+        <result property="lineAttrs"    column="line_attrs"
+            typeHandler="com.ruoyi.common.core.handler.JsonMapTypeHandler" />
         <result property="sourceOrderCode"    column="source_order_code"    />
         <result property="expectedDate"    column="expected_date"    />
         <result property="arrivalNoticeId"    column="arrival_notice_id"    />
         <result property="status"    column="status"    />
+        <result property="quantityReturned"    column="quantity_returned"    />
+        <result property="cancelReason"    column="cancel_reason"    />
+        <result property="closeTime"    column="close_time"    />
         <result property="remark"    column="remark"    />
         <result property="createBy"    column="create_by"    />
         <result property="createTime"    column="create_time"    />
@@ -40,7 +41,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectPurOrderLineVo">
-        select line_id, factory_id, order_id, item_id, item_code, item_name, specification, unit_of_measure, unit_name, unit2, unit2_name, conversion_rate, quantity_ordered, quantity_ordered2, quantity_received, quantity_received2, unit_price, amount, tax_rate, paper_width, paper_weight, paper_type, roll_count, source_order_code, expected_date, arrival_notice_id, status, remark, create_by, create_time, update_by, update_time from qxx_pur_order_line
+        select line_id, factory_id, order_id, item_id, item_code, item_name, specification, unit_of_measure, unit_name, unit2, unit2_name, conversion_rate, quantity_ordered, quantity_ordered2, quantity_received, quantity_received2, unit_price, amount, tax_rate, line_attrs, source_order_code, expected_date, arrival_notice_id, status, quantity_returned, cancel_reason, close_time, remark, create_by, create_time, update_by, update_time from qxx_pur_order_line
     </sql>
 
     <select id="selectPurOrderLineList" parameterType="PurOrderLine" resultMap="PurOrderLineResult">
@@ -62,10 +63,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="unitPrice != null "> and unit_price = #{unitPrice}</if>
             <if test="amount != null "> and amount = #{amount}</if>
             <if test="taxRate != null "> and tax_rate = #{taxRate}</if>
-            <if test="paperWidth != null  and paperWidth != ''"> and paper_width = #{paperWidth}</if>
-            <if test="paperWeight != null  and paperWeight != ''"> and paper_weight = #{paperWeight}</if>
-            <if test="paperType != null  and paperType != ''"> and paper_type = #{paperType}</if>
-            <if test="rollCount != null "> and roll_count = #{rollCount}</if>
             <if test="sourceOrderCode != null  and sourceOrderCode != ''"> and source_order_code = #{sourceOrderCode}</if>
             <if test="expectedDate != null "> and expected_date = #{expectedDate}</if>
             <if test="arrivalNoticeId != null "> and arrival_notice_id = #{arrivalNoticeId}</if>
@@ -97,14 +94,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="unitPrice != null">unit_price,</if>
             <if test="amount != null">amount,</if>
             <if test="taxRate != null">tax_rate,</if>
-            <if test="paperWidth != null">paper_width,</if>
-            <if test="paperWeight != null">paper_weight,</if>
-            <if test="paperType != null">paper_type,</if>
-            <if test="rollCount != null">roll_count,</if>
+            <if test="lineAttrs != null">line_attrs,</if>
             <if test="sourceOrderCode != null">source_order_code,</if>
             <if test="expectedDate != null">expected_date,</if>
             <if test="arrivalNoticeId != null">arrival_notice_id,</if>
             <if test="status != null">status,</if>
+            <if test="quantityReturned != null">quantity_returned,</if>
+            <if test="cancelReason != null">cancel_reason,</if>
+            <if test="closeTime != null">close_time,</if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
@@ -128,14 +125,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="unitPrice != null">#{unitPrice},</if>
             <if test="amount != null">#{amount},</if>
             <if test="taxRate != null">#{taxRate},</if>
-            <if test="paperWidth != null">#{paperWidth},</if>
-            <if test="paperWeight != null">#{paperWeight},</if>
-            <if test="paperType != null">#{paperType},</if>
-            <if test="rollCount != null">#{rollCount},</if>
+            <if test="lineAttrs != null">#{lineAttrs, typeHandler=com.ruoyi.common.core.handler.JsonMapTypeHandler},</if>
             <if test="sourceOrderCode != null">#{sourceOrderCode},</if>
             <if test="expectedDate != null">#{expectedDate},</if>
             <if test="arrivalNoticeId != null">#{arrivalNoticeId},</if>
             <if test="status != null">#{status},</if>
+            <if test="quantityReturned != null">#{quantityReturned},</if>
+            <if test="cancelReason != null">#{cancelReason},</if>
+            <if test="closeTime != null">#{closeTime},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>         </trim>
@@ -160,14 +157,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="unitPrice != null">unit_price = #{unitPrice},</if>
             <if test="amount != null">amount = #{amount},</if>
             <if test="taxRate != null">tax_rate = #{taxRate},</if>
-            <if test="paperWidth != null">paper_width = #{paperWidth},</if>
-            <if test="paperWeight != null">paper_weight = #{paperWeight},</if>
-            <if test="paperType != null">paper_type = #{paperType},</if>
-            <if test="rollCount != null">roll_count = #{rollCount},</if>
+            <if test="lineAttrs != null">line_attrs = #{lineAttrs, typeHandler=com.ruoyi.common.core.handler.JsonMapTypeHandler},</if>
             <if test="sourceOrderCode != null">source_order_code = #{sourceOrderCode},</if>
             <if test="expectedDate != null">expected_date = #{expectedDate},</if>
             <if test="arrivalNoticeId != null">arrival_notice_id = #{arrivalNoticeId},</if>
             <if test="status != null">status = #{status},</if>
+            <if test="quantityReturned != null">quantity_returned = #{quantityReturned},</if>
+            <if test="cancelReason != null">cancel_reason = #{cancelReason},</if>
+            <if test="closeTime != null">close_time = #{closeTime},</if>
             <if test="remark != null">remark = #{remark},</if>
             <if test="createBy != null">create_by = #{createBy},</if>
             <if test="createTime != null">create_time = #{createTime},</if>
@@ -195,6 +192,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <update id="addQuantityReceived">
         UPDATE qxx_pur_order_line
         SET quantity_received = quantity_received + #{delta}
+        WHERE line_id = #{lineId}
+    </update>
+
+    <update id="addQuantityReturned">
+        UPDATE qxx_pur_order_line
+        SET quantity_returned = quantity_returned + #{delta}
         WHERE line_id = #{lineId}
     </update>
 </mapper>

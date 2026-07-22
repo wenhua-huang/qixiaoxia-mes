@@ -2,6 +2,7 @@ package com.ruoyi.system.domain.mes.pur;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
@@ -93,21 +94,8 @@ public class PurOrderLine extends BaseEntity
     @Excel(name = "税率(%)")
     private BigDecimal taxRate;
 
-    /** 门幅要求(mm),如925mm */
-    @Excel(name = "门幅要求(mm),如925mm")
-    private String paperWidth;
-
-    /** 克重要求(g),如120g */
-    @Excel(name = "克重要求(g),如120g")
-    private String paperWeight;
-
-    /** 纸张种类:乌卡/俄卡/箱板纸/白牛皮/TC箱板纸/瑞典赤牛 */
-    @Excel(name = "纸张种类:乌卡/俄卡/箱板纸/白牛皮/TC箱板纸/瑞典赤牛")
-    private String paperType;
-
-    /** 预计卷数(纸张行业用，其他行业=0) */
-    @Excel(name = "预计卷数(纸张行业用，其他行业=0)")
-    private Long rollCount;
+    /** 行业属性(JSON): {paper:{width,weight,source,type,rollCount}, paperBag:{ropeSpec,mouthType,bottomType}, product:{size,packageSpec,printingReq}} */
+    private Map<String, Object> lineAttrs;
 
     /** 关联客户订单号 */
     @Excel(name = "关联客户订单号")
@@ -122,9 +110,20 @@ public class PurOrderLine extends BaseEntity
     @Excel(name = "到货通知单ID(关联qxx_wm_arrival_notice,收货后回写)")
     private Long arrivalNoticeId;
 
-    /** 行状态:ORDERED-已下单,RECEIVING-收货中,RECEIVED-已收货,CLOSED-已关闭 */
-    @Excel(name = "行状态:ORDERED-已下单,RECEIVING-收货中,RECEIVED-已收货,CLOSED-已关闭")
+    /** 行状态:ORDERED-已下单,RECEIVING-收货中,RECEIVED-已收货,CLOSED-已关闭,CANCEL-已取消 */
+    @Excel(name = "行状态:ORDERED-已下单,RECEIVING-收货中,RECEIVED-已收货,CLOSED-已关闭,CANCEL-已取消")
     private String status;
+
+    /** 已退货数量(主单位) */
+    @Excel(name = "已退货数量(主单位)")
+    private BigDecimal quantityReturned;
+
+    /** 取消/终止原因 */
+    private String cancelReason;
+
+    /** 关闭/终止时间 */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date closeTime;
 
     public void setLineId(Long lineId) 
     {
@@ -316,44 +315,67 @@ public class PurOrderLine extends BaseEntity
         return taxRate;
     }
 
-    public void setPaperWidth(String paperWidth) 
+    public void setPaperWidth(String paperWidth)
     {
-        this.paperWidth = paperWidth;
+        // Deprecated: paperWidth migrated to lineAttrs.paper.width (V73)
     }
 
-    public String getPaperWidth() 
+    public String getPaperWidth()
     {
-        return paperWidth;
+        return getLineAttr("paper", "width");
     }
 
-    public void setPaperWeight(String paperWeight) 
+    public void setPaperWeight(String paperWeight)
     {
-        this.paperWeight = paperWeight;
+        // Deprecated: paperWeight migrated to lineAttrs.paper.weight (V73)
     }
 
-    public String getPaperWeight() 
+    public String getPaperWeight()
     {
-        return paperWeight;
+        return getLineAttr("paper", "weight");
     }
 
-    public void setPaperType(String paperType) 
+    public void setPaperType(String paperType)
     {
-        this.paperType = paperType;
+        // Deprecated: paperType migrated to lineAttrs.paper.type (V73)
     }
 
-    public String getPaperType() 
+    public String getPaperType()
     {
-        return paperType;
+        return getLineAttr("paper", "type");
     }
 
-    public void setRollCount(Long rollCount) 
+    public void setRollCount(Long rollCount)
     {
-        this.rollCount = rollCount;
+        // Deprecated: rollCount migrated to lineAttrs.paper.rollCount (V73)
     }
 
-    public Long getRollCount() 
+    public Long getRollCount()
     {
-        return rollCount;
+        String val = getLineAttr("paper", "rollCount");
+        if (val == null || val.isEmpty()) return null;
+        return Long.valueOf(val);
+    }
+
+    public Map<String, Object> getLineAttrs()
+    {
+        return lineAttrs;
+    }
+
+    public void setLineAttrs(Map<String, Object> lineAttrs)
+    {
+        this.lineAttrs = lineAttrs;
+    }
+
+    /** 从 lineAttrs 中按分组+属性名取字符串值 */
+    @SuppressWarnings("unchecked")
+    private String getLineAttr(String group, String key)
+    {
+        if (lineAttrs == null) return null;
+        Object groupObj = lineAttrs.get(group);
+        if (!(groupObj instanceof Map)) return null;
+        Object val = ((Map<String, Object>) groupObj).get(key);
+        return val != null ? val.toString() : null;
     }
 
     public void setSourceOrderCode(String sourceOrderCode) 
@@ -391,9 +413,39 @@ public class PurOrderLine extends BaseEntity
         this.status = status;
     }
 
-    public String getStatus() 
+    public String getStatus()
     {
         return status;
+    }
+
+    public void setQuantityReturned(BigDecimal quantityReturned)
+    {
+        this.quantityReturned = quantityReturned;
+    }
+
+    public BigDecimal getQuantityReturned()
+    {
+        return quantityReturned;
+    }
+
+    public void setCancelReason(String cancelReason)
+    {
+        this.cancelReason = cancelReason;
+    }
+
+    public String getCancelReason()
+    {
+        return cancelReason;
+    }
+
+    public void setCloseTime(Date closeTime)
+    {
+        this.closeTime = closeTime;
+    }
+
+    public Date getCloseTime()
+    {
+        return closeTime;
     }
 
     @Override
@@ -418,14 +470,14 @@ public class PurOrderLine extends BaseEntity
             .append("unitPrice", getUnitPrice())
             .append("amount", getAmount())
             .append("taxRate", getTaxRate())
-            .append("paperWidth", getPaperWidth())
-            .append("paperWeight", getPaperWeight())
-            .append("paperType", getPaperType())
-            .append("rollCount", getRollCount())
+            .append("lineAttrs", getLineAttrs())
             .append("sourceOrderCode", getSourceOrderCode())
             .append("expectedDate", getExpectedDate())
             .append("arrivalNoticeId", getArrivalNoticeId())
             .append("status", getStatus())
+            .append("quantityReturned", getQuantityReturned())
+            .append("cancelReason", getCancelReason())
+            .append("closeTime", getCloseTime())
             .append("remark", getRemark())
             .append("createBy", getCreateBy())
             .append("createTime", getCreateTime())

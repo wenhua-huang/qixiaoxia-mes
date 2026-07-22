@@ -22,6 +22,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="rqcId" column="rqc_id" />
         <result property="rqcCode" column="rqc_code" />
         <result property="status" column="status" />
+        <result property="purOrderId" column="pur_order_id" />
+        <result property="purOrderCode" column="pur_order_code" />
+        <result property="confirmTime" column="confirm_time" />
+        <result property="confirmBy" column="confirm_by" />
+        <result property="postTime" column="post_time" />
+        <result property="postBy" column="post_by" />
         <result property="remark" column="remark" />
         <result property="createBy" column="create_by" />
         <result property="createTime" column="create_time" />
@@ -30,7 +36,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectWmRtVendorVo">
-        select rt_id, factory_id, rt_code, rt_name, recpt_id, recpt_code, vendor_id, vendor_code, vendor_name, warehouse_id, warehouse_code, warehouse_name, rt_date, total_quantity, rqc_id, rqc_code, status, remark, create_by, create_time, update_by, update_time from qxx_wm_rt_vendor
+        select rt_id, factory_id, rt_code, rt_name, recpt_id, recpt_code, vendor_id, vendor_code, vendor_name, warehouse_id, warehouse_code, warehouse_name, rt_date, total_quantity, rqc_id, rqc_code, status, pur_order_id, pur_order_code, confirm_time, confirm_by, post_time, post_by, remark, create_by, create_time, update_by, update_time from qxx_wm_rt_vendor
     </sql>
 
     <select id="selectWmRtVendorList" parameterType="WmRtVendor" resultMap="WmRtVendorResult">
@@ -80,6 +86,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="rqcId != null">rqc_id,</if>
             <if test="rqcCode != null">rqc_code,</if>
             <if test="status != null">status,</if>
+            <if test="purOrderId != null">pur_order_id,</if>
+            <if test="purOrderCode != null">pur_order_code,</if>
+            <if test="confirmTime != null">confirm_time,</if>
+            <if test="confirmBy != null">confirm_by,</if>
+            <if test="postTime != null">post_time,</if>
+            <if test="postBy != null">post_by,</if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
@@ -101,6 +113,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="rqcId != null">#{rqcId},</if>
             <if test="rqcCode != null">#{rqcCode},</if>
             <if test="status != null">#{status},</if>
+            <if test="purOrderId != null">#{purOrderId},</if>
+            <if test="purOrderCode != null">#{purOrderCode},</if>
+            <if test="confirmTime != null">#{confirmTime},</if>
+            <if test="confirmBy != null">#{confirmBy},</if>
+            <if test="postTime != null">#{postTime},</if>
+            <if test="postBy != null">#{postBy},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
@@ -126,6 +144,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="rqcId != null">rqc_id = #{rqcId},</if>
             <if test="rqcCode != null">rqc_code = #{rqcCode},</if>
             <if test="status != null">status = #{status},</if>
+            <if test="purOrderId != null">pur_order_id = #{purOrderId},</if>
+            <if test="purOrderCode != null">pur_order_code = #{purOrderCode},</if>
+            <if test="confirmTime != null">confirm_time = #{confirmTime},</if>
+            <if test="confirmBy != null">confirm_by = #{confirmBy},</if>
+            <if test="postTime != null">post_time = #{postTime},</if>
+            <if test="postBy != null">post_by = #{postBy},</if>
             <if test="remark != null">remark = #{remark},</if>
             <if test="createBy != null">create_by = #{createBy},</if>
             <if test="createTime != null">create_time = #{createTime},</if>

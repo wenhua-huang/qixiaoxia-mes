@@ -101,8 +101,23 @@ public class WmProductSales extends BaseEntity
     @Excel(name = "出货检验单编码")
     private String oqcCode;
 
+    @Excel(name = "销售订单ID")
+    private Long salesOrderId;
+
+    @Excel(name = "销售订单编码")
+    private String salesOrderCode;
+
     @Excel(name = "状态:DRAFT-草稿")
     private String status;
+
+    @Excel(name = "已过账出库量")
+    private BigDecimal postedQuantity;
+
+    /** 行列表（详情接口聚合，非DB字段） */
+    private java.util.List<WmProductSalesLine> lines;
+
+    /** 明细列表（详情接口聚合，非DB字段） */
+    private java.util.List<WmProductSalesDetail> details;
 
     public Long getSalesId() { return salesId; }
     public void setSalesId(Long v) { this.salesId = v; }
@@ -190,6 +205,21 @@ public class WmProductSales extends BaseEntity
 
     public String getStatus() { return status; }
     public void setStatus(String v) { this.status = v; }
+
+    public Long getSalesOrderId() { return salesOrderId; }
+    public void setSalesOrderId(Long v) { this.salesOrderId = v; }
+
+    public String getSalesOrderCode() { return salesOrderCode; }
+    public void setSalesOrderCode(String v) { this.salesOrderCode = v; }
+
+    public BigDecimal getPostedQuantity() { return postedQuantity; }
+    public void setPostedQuantity(BigDecimal v) { this.postedQuantity = v; }
+
+    public java.util.List<WmProductSalesLine> getLines() { return lines; }
+    public void setLines(java.util.List<WmProductSalesLine> v) { this.lines = v; }
+
+    public java.util.List<WmProductSalesDetail> getDetails() { return details; }
+    public void setDetails(java.util.List<WmProductSalesDetail> v) { this.details = v; }
 
     @Override
     public String toString() {

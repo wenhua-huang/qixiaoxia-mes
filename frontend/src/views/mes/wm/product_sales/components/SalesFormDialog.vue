@@ -35,10 +35,13 @@
           </el-row>
           <el-row>
             <el-col :span="12">
-              <el-form-item label="出货仓库" prop="warehouseId">
-                <el-input v-model="form.warehouseName" placeholder="请选择仓库" readonly>
+              <el-form-item label="出货仓库">
+                <el-input v-model="form.warehouseName" placeholder="可选（批量改仓）" readonly>
                   <template #append><el-button icon="Search" @click="handleWarehouseSelect" /></template>
                 </el-input>
+                <div style="font-size:12px;color:#909399;line-height:1.4;margin-top:2px">
+                  仓库已按库存自动分配到各行；此处选择可批量覆盖所有行仓库
+                </div>
               </el-form-item>
             </el-col>
             <el-col :span="12">
@@ -84,6 +87,19 @@
           <el-table-column label="物料编码" prop="itemCode" width="130" />
           <el-table-column label="物料名称" prop="itemName" :show-overflow-tooltip="true" min-width="140" />
           <el-table-column label="规格" prop="specification" width="120" :show-overflow-tooltip="true" />
+          <el-table-column label="仓库" width="130">
+            <template #default="scope">
+              <span v-if="scope.row.warehouseName">{{ scope.row.warehouseName }}</span>
+              <span v-else style="color:#F56C6C">⚠ 无库存</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="本仓可用量" width="110" align="center">
+            <template #default="scope">
+              <span :style="{ color: availColor(scope.row), fontWeight: isAvailShort(scope.row) ? 'bold' : 'normal' }">
+                {{ scope.row.availableQty == null ? '-' : scope.row.availableQty }}
+              </span>
+            </template>
+          </el-table-column>
           <el-table-column label="出库数量" width="120" align="center">
             <template #default="scope">
               <el-input-number v-if="!readonly" v-model="scope.row.quantitySales" :min="0" :precision="2"
@@ -137,8 +153,7 @@ const form = reactive<WmProductSales>({} as WmProductSales)
 const lineList = ref<WmProductSalesLine[]>([])
 const rules = {
   salesName: [{ required: true, message: '请输入出库单名称' }],
-  clientId: [{ required: true, message: '请选择客户' }],
-  warehouseId: [{ required: true, message: '请选择出货仓库' }]
+  clientId: [{ required: true, message: '请选择客户' }]
 }
 
 const clientSelectRef = ref()
@@ -181,6 +196,16 @@ function openView(data: WmProductSales, lines: WmProductSalesLine[]) {
   show.value = true
 }
 
+/** 本仓可用量着色：不足需求红色，充足绿色，无数据灰色 */
+function availColor(row: WmProductSalesLine): string {
+  if (row.availableQty == null) return '#909399'
+  return Number(row.availableQty) < Number(row.quantitySales || 0) ? '#F56C6C' : '#67C23A'
+}
+/** 本仓可用量是否不足需求（用于加粗，与 availColor 共享同一判定基准） */
+function isAvailShort(row: WmProductSalesLine): boolean {
+  return row.availableQty != null && Number(row.availableQty) < Number(row.quantitySales || 0)
+}
+
 function reset() {
   Object.keys(form).forEach(k => delete (form as any)[k])
   lineList.value = []
@@ -211,6 +236,12 @@ function onWarehouseSelected(row: any) {
   form.warehouseId = row.warehouseId
   form.warehouseCode = row.warehouseCode
   form.warehouseName = row.warehouseName
+  // 批量覆盖所有行仓库（表头选仓即统一改仓）
+  lineList.value.forEach((l: WmProductSalesLine) => {
+    l.warehouseId = row.warehouseId
+    l.warehouseCode = row.warehouseCode
+    l.warehouseName = row.warehouseName
+  })
 }
 
 // 物料行
@@ -219,7 +250,8 @@ function onItemSelected(row: any) {
   lineList.value.push({
     itemId: row.itemId, itemCode: row.itemCode, itemName: row.itemName,
     specification: row.specification, unitOfMeasure: row.unitOfMeasure, unitName: row.unitName,
-    quantitySales: 1, quantityPosted: 0, warehouseId: form.warehouseId
+    quantitySales: 1, quantityPosted: 0, warehouseId: form.warehouseId,
+    warehouseCode: form.warehouseCode, warehouseName: form.warehouseName
   } as unknown as WmProductSalesLine)
 }
 function handleDelLine(idx: number) { lineList.value.splice(idx, 1) }
@@ -227,17 +259,24 @@ function handleDelLine(idx: number) { lineList.value.splice(idx, 1) }
 function handleSubmit() {
   formRef.value?.validate((v: boolean) => {
     if (!v) return
-    // 行仓库统一继承头仓库（避免先加行再改头仓库导致行仓库不一致）
-    if (form.warehouseId) {
-      lineList.value.forEach((l: WmProductSalesLine) => { l.warehouseId = form.warehouseId })
+    // 校验：无仓库行（无库存物料）需用户确认保留
+    const noWhLines = lineList.value.filter((l: WmProductSalesLine) => l.warehouseId == null)
+    const doSave = () => {
+      form.lines = lineList.value
+      const action = form.salesId ? updateWmProductSales(form) : addWmProductSales(form)
+      action.then(() => {
+        proxy.$modal.msgSuccess('保存成功')
+        show.value = false
+        emit('success')
+      })
     }
-    form.lines = lineList.value
-    const action = form.salesId ? updateWmProductSales(form) : addWmProductSales(form)
-    action.then(() => {
-      proxy.$modal.msgSuccess('保存成功')
-      show.value = false
-      emit('success')
-    })
+    if (noWhLines.length) {
+      proxy.$modal.confirm(
+        `${noWhLines.length} 行物料无库存未分配仓库，保存后这些行将无法过账出库。确认保留？`
+      ).then(doSave).catch(() => {})
+    } else {
+      doSave()
+    }
   })
 }
 

@@ -2,6 +2,7 @@ package com.ruoyi.system.mapper.mes.wm;
 
 import java.util.List;
 import com.ruoyi.system.domain.mes.wm.WmMaterialStock;
+import com.ruoyi.system.domain.mes.wm.vo.WmStockWarehouseSummary;
 import org.apache.ibatis.annotations.Param;
 
 public interface WmMaterialStockMapper
@@ -33,4 +34,10 @@ public interface WmMaterialStockMapper
             @Param("itemId") Long itemId,
             @Param("warehouseId") Long warehouseId,
             @Param("qualityStatus") String qualityStatus);
+
+    /**
+     * 按 itemId 聚合各仓库可用量（SUM quantity_available），用于「从销售订单生成」时建议出库仓库与按仓拆行。
+     * 按 MIN(create_time) ASC 排序（FIFO：早入库的仓优先）。factory_id 由拦截器注入。
+     */
+    public List<WmStockWarehouseSummary> selectStockWarehouseSummary(@Param("itemId") Long itemId);
 }

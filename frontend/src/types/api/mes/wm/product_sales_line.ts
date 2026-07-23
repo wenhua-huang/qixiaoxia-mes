@@ -32,6 +32,9 @@ export interface WmProductSalesLine extends BaseEntity {
   batchId?: number
   batchCode?: string
   warehouseId?: number
+  warehouseCode?: string
+  warehouseName?: string
+  availableQty?: number
   locationId?: number
   areaId?: number
 }

@@ -100,6 +100,31 @@
       </view>
     </view>
 
+    <!-- 步骤 3.5：工序参数填报 -->
+    <view v-if="selectedTask && paramList.length > 0" class="section">
+      <uni-section title="工序参数" type="line"></uni-section>
+      <view class="form-box">
+        <view v-for="(p, idx) in paramList" :key="idx" class="param-row">
+          <view class="param-head">
+            <view class="param-title">
+              <text class="param-name">{{ p.paramName }}</text>
+              <text v-if="p.unit" class="param-unit">{{ p.unit }}</text>
+            </view>
+            <!-- 标准图样缩略图，点击放大对照 -->
+            <image v-if="p.imageUrl" class="param-thumb"
+              :src="fullImgUrl(p.imageUrl.split(',')[0])" mode="aspectFill"
+              @click="previewParamImage(p)" />
+          </view>
+          <text v-if="formatRange(p)" class="param-range">标准范围：{{ formatRange(p) }}</text>
+          <view class="param-input">
+            <uni-easyinput v-model="p.actualValue" placeholder="输入实际值" :inputBorder="false" class="param-easyinput" />
+            <uni-tag v-if="p.isDeviation === 'Y'" type="error" text="偏差" size="mini" />
+            <uni-tag v-else-if="p.isDeviation === 'N'" type="success" text="正常" size="mini" />
+          </view>
+        </view>
+      </view>
+    </view>
+
     <!-- 步骤 4：备注 -->
     <view v-if="selectedTask" class="section">
       <uni-section title="备注（选填）" type="line"></uni-section>
@@ -123,8 +148,10 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, getCurrentInstance } from 'vue'
+import { ref, reactive, computed, watch, getCurrentInstance } from 'vue'
 import { addFeedback, getFeedbackEntry } from '@/api/mes/pro/feedback'
+import { listParamTemplateByProcessId } from '@/api/mes/pro/paramtemplate'
+import config from '@/config.js'
 
 const { proxy } = getCurrentInstance()
 const workorderCode = ref('')
@@ -141,6 +168,7 @@ const form = reactive({
   quantityMaterialScrap: 0,
   remark: ''
 })
+const paramList = ref([])
 
 // 本次报工总数 = 合格 + 不合格 + 工废 + 料废
 const totalQuantity = computed(() => {
@@ -194,6 +222,7 @@ function searchWorkorder() {
   taskList.value = []
   selectedTaskId.value = null
   selectedTask.value = null
+  paramList.value = []
   Object.assign(form, { quantityQualified: 0, quantityUnqualified: 0, quantityLaborScrap: 0, quantityMaterialScrap: 0, remark: '' })
 
   getFeedbackEntry(workorderCode.value.trim()).then(res => {
@@ -218,7 +247,65 @@ function searchWorkorder() {
 function selectTask(task) {
   selectedTaskId.value = task.taskId
   selectedTask.value = task
+  // 加载该工序报工可见的参数模板
+  paramList.value = []
+  if (task.processId) {
+    loadParams(task.processId)
+  }
 }
+
+// 加载工序参数模板（只加载报工可见 isReportVisible=Y 且启用 enableFlag=1 的）
+function loadParams(processId) {
+  listParamTemplateByProcessId(processId).then(res => {
+    paramList.value = (res.data || [])
+      .filter(t => t.isReportVisible === 'Y' && t.enableFlag === '1')
+      .map(t => ({
+        templateId: t.templateId,
+        workorderParamId: null,
+        paramName: t.paramName,
+        unit: t.unit || '',
+        minValue: t.minValue,
+        maxValue: t.maxValue,
+        imageUrl: t.imageUrl,
+        actualValue: '',
+        isDeviation: null
+      }))
+  }).catch(() => { paramList.value = [] })
+}
+
+// 图片相对路径 → 完整 URL（拼接 baseUrl）
+function fullImgUrl(rel) {
+  if (!rel) return ''
+  if (/^https?:/.test(rel)) return rel
+  return config.baseUrl + rel
+}
+
+// 点击缩略图全屏预览（支持多图逗号分隔）
+function previewParamImage(p) {
+  const urls = (p.imageUrl || '').split(',').filter(Boolean).map(fullImgUrl)
+  if (urls.length === 0) return
+  uni.previewImage({ current: urls[0], urls })
+}
+
+// 标准范围格式化
+function formatRange(p) {
+  if (p.minValue != null && p.maxValue != null) return `${p.minValue} ~ ${p.maxValue}`
+  if (p.minValue != null) return `≥ ${p.minValue}`
+  if (p.maxValue != null) return `≤ ${p.maxValue}`
+  return ''
+}
+
+// 实际值变化时本地预判偏差（提交前给工人即时反馈，最终以后端判定为准）
+watch(() => paramList.value.map(p => p.actualValue).join(','), () => {
+  paramList.value.forEach(p => {
+    if (!p.actualValue || (p.minValue == null && p.maxValue == null)) {
+      p.isDeviation = null; return
+    }
+    const v = Number(p.actualValue)
+    if (isNaN(v)) { p.isDeviation = null; return }
+    p.isDeviation = ((p.minValue != null && v < p.minValue) || (p.maxValue != null && v > p.maxValue)) ? 'Y' : 'N'
+  })
+})
 
 // 提交报工
 function submitReport() {
@@ -259,7 +346,15 @@ function submitReport() {
       feedbackTime: null,  // 后端兜底设为当前时间
       userName: null,
       remark: form.remark || null,
-      status: 'PREPARE'
+      status: 'PREPARE',
+      // 工序参数（后端自动判定偏差，只需 templateId + actualValue）
+      paramList: paramList.value
+        .filter(p => p.actualValue !== null && p.actualValue !== '')
+        .map(p => ({
+          templateId: p.templateId,
+          workorderParamId: p.workorderParamId,
+          actualValue: p.actualValue
+        }))
     }
     addFeedback(body).then(() => {
       proxy.$modal.msgSuccess('报工提交成功！')
@@ -341,6 +436,28 @@ page { background-color: #f5f6f7; min-height: 100%; }
 }
 
 .form-box { padding: 16rpx 24rpx 24rpx; }
+
+.param-row {
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #f5f5f5;
+}
+.param-row:last-child { border-bottom: none; }
+.param-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8rpx;
+}
+.param-title { display: flex; align-items: baseline; gap: 12rpx; }
+.param-name { font-size: 28rpx; color: #333; font-weight: 600; }
+.param-unit { font-size: 24rpx; color: #999; }
+.param-thumb {
+  width: 64rpx; height: 64rpx; border-radius: 8rpx;
+  border: 1rpx solid #e5e5e5; background: #f9f9f9;
+}
+.param-range { font-size: 24rpx; color: #e6a23c; display: block; margin-bottom: 12rpx; }
+.param-input {
+  display: flex; align-items: center; gap: 16rpx;
+}
+.param-easyinput { flex: 1; }
 
 .qty-row {
   display: flex; justify-content: space-between; align-items: center;

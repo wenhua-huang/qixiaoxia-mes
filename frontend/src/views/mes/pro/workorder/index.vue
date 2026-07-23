@@ -152,6 +152,12 @@
             <el-divider content-position="left">工序参数</el-divider>
             <el-table :data="proc.paramItems" size="small" v-if="proc.paramItems.length>0">
               <el-table-column label="参数名称" align="center" prop="_paramName" width="120" />
+              <el-table-column label="标准图样" align="center" width="70">
+                <template #default="scope">
+                  <image-preview v-if="scope.row.imageUrl" :src="scope.row.imageUrl" :width="40" :height="40" />
+                  <span v-else style="color: #909399">-</span>
+                </template>
+              </el-table-column>
               <el-table-column label="标准值" align="center" prop="standardValue" width="120" />
               <el-table-column label="调整值" align="center" prop="adjustedValue" width="120"><template #default="scope"><el-input v-if="optType!=='view'" v-model="scope.row.adjustedValue" size="small" /><span v-else>{{ scope.row.adjustedValue || scope.row.standardValue }}</span></template></el-table-column>
               <el-table-column label="调整原因" align="center" min-width="150"><template #default="scope"><el-input v-if="optType!=='view'" v-model="scope.row.remark" size="small" placeholder="调整原因" /><span v-else>{{ scope.row.remark }}</span></template></el-table-column>
@@ -456,12 +462,12 @@ export default {
                     ? l2Params.map(p => {
                         const tmpl = templateMap[p.templateId] || {}
                         const stdVal = p.paramValue || tmpl.defaultValue || ''
-                        return { ...p, _processName: this.getProcessName(p.processId), _paramName: tmpl.paramName || '', standardValue: stdVal, adjustedValue: '', paramName: tmpl.paramName || '' }
+                        return { ...p, _processName: this.getProcessName(p.processId), _paramName: tmpl.paramName || '', standardValue: stdVal, adjustedValue: '', paramName: tmpl.paramName || '', imageUrl: tmpl.imageUrl || '' }
                       })
                     : routeTemplates.map(t => ({
                         routeProductId: recordId, processId: t.processId, templateId: t.templateId,
                         _processName: this.getProcessName(t.processId), _paramName: t.paramName || '',
-                        standardValue: t.defaultValue || '', adjustedValue: '', paramName: t.paramName || '',
+                        standardValue: t.defaultValue || '', adjustedValue: '', paramName: t.paramName || '', imageUrl: t.imageUrl || '',
                       }))
                   // 合并已有 recordId
                   if (this.paramList.length > 0) {

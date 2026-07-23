@@ -176,6 +176,12 @@
           </el-table-column>
           <el-table-column label="单位" align="center" prop="unit" width="80" />
           <el-table-column label="默认值" align="center" prop="defaultValue" width="100" :show-overflow-tooltip="true" />
+          <el-table-column label="图样" align="center" width="70">
+            <template #default="scope">
+              <image-preview v-if="scope.row.imageUrl" :src="scope.row.imageUrl" :width="40" :height="40" />
+              <span v-else style="color: #909399">-</span>
+            </template>
+          </el-table-column>
           <el-table-column label="必填" align="center" prop="isRequired" width="60">
             <template #default="scope"><span :style="{color: scope.row.isRequired === 'Y' ? '#67C23A' : '#909399'}">{{ scope.row.isRequired === 'Y' ? '是' : '否' }}</span></template>
           </el-table-column>
@@ -310,6 +316,9 @@
         </el-row>
         <el-form-item label="备注">
           <el-input v-model="paramFormData.remark" type="textarea" placeholder="请输入" maxlength="500" />
+        </el-form-item>
+        <el-form-item label="标准图样">
+          <image-upload v-model="paramFormData.imageUrl" :limit="6" :file-size="10" :file-type="['png','jpg','jpeg']" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -584,6 +593,7 @@ export default {
         isRequired: 'Y',
         isReportVisible: 'Y',
         enableFlag: '1',
+        imageUrl: null,
         remark: null
       }
       this.paramTitle = '新增参数模版'

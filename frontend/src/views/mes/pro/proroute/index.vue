@@ -312,6 +312,7 @@
           <el-table :data="paramList" v-loading="paramLoading">
             <el-table-column label="工序" align="center" width="100"><template #default="scope">{{ getProcessName(scope.row.processId) }}</template></el-table-column>
             <el-table-column label="参数名称" align="center" width="160"><template #default="scope">{{ getTemplateName(scope.row.templateId) }}</template></el-table-column>
+            <el-table-column label="标准图样" align="center" width="70"><template #default="scope"><image-preview v-if="getTemplateImageUrl(scope.row.templateId)" :src="getTemplateImageUrl(scope.row.templateId)" :width="40" :height="40" /><span v-else style="color: #909399">-</span></template></el-table-column>
             <el-table-column label="参数值" align="center" prop="paramValue" width="200"><template #default="scope"><el-input v-if="optType!=='view'" v-model="scope.row.paramValue" size="small" /><span v-else>{{ scope.row.paramValue }}</span></template></el-table-column>
             <el-table-column label="操作" align="center" width="70" v-if="optType!=='view'"><template #default="scope"><el-button size="small" link @click="handleDelParamItem(scope.row)">删除</el-button></template></el-table-column>
           </el-table>
@@ -374,6 +375,7 @@
       </el-row>
       <el-table :data="_procParamList" v-loading="_procParamLoading" size="small">
         <el-table-column label="参数名称" width="160"><template #default="scope">{{ getTemplateName(scope.row.templateId) }}</template></el-table-column>
+        <el-table-column label="标准图样" align="center" width="70"><template #default="scope"><image-preview v-if="getTemplateImageUrl(scope.row.templateId)" :src="getTemplateImageUrl(scope.row.templateId)" :width="40" :height="40" /><span v-else style="color: #909399">-</span></template></el-table-column>
         <el-table-column label="参数值" prop="paramValue"><template #default="scope"><el-input v-if="optType!=='view'" v-model="scope.row.paramValue" size="small" /><span v-else>{{ scope.row.paramValue }}</span></template></el-table-column>
       </el-table>
       <template #footer>
@@ -571,7 +573,7 @@ export default {
       }
       Promise.all(processIds.map(pid =>
         listParamTemplateByProcessId(pid).then(tr => {
-          (tr.data || []).forEach(t => { this._templateMap[t.templateId] = t.paramName || t.paramCode })
+          (tr.data || []).forEach(t => { this._templateMap[t.templateId] = t })
         }).catch(() => { /* 单个失败不影响其他 */ })
       )).finally(() => {
         listRouteProcessParamByRouteProductId(this.currentRouteProductId).then(r => {
@@ -631,7 +633,7 @@ export default {
       // 先加载模版字典
       listParamTemplateByProcessId(this._currentProcProcessId).then(tr => {
         this._templateMap = {}
-        ;(tr.data || []).forEach(t => { this._templateMap[t.templateId] = t.paramName || t.paramCode })
+        ;(tr.data || []).forEach(t => { this._templateMap[t.templateId] = t })
         // 再加载参数值
         listRouteProcessParamByRouteProductId(this.currentRouteProductId).then(r => {
           this._procParamList = (r.data || []).filter(p => p.processId === this._currentProcProcessId)
@@ -645,7 +647,12 @@ export default {
       })
     },
     getTemplateName(templateId) {
-      return this._templateMap[templateId] || '模板#' + templateId
+      const t = this._templateMap[templateId]
+      return t ? (t.paramName || t.paramCode) : '模板#' + templateId
+    },
+    getTemplateImageUrl(templateId) {
+      const t = this._templateMap[templateId]
+      return t ? t.imageUrl : ''
     },
     handleAddProcBomItem() {
       this._bomItemForm.processId = this._currentProcProcessId

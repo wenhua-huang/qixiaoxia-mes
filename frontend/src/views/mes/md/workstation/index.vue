@@ -59,15 +59,49 @@
         <!-- 设备和人员子表 (编辑时显示) -->
         <template v-if="form.workstationId">
           <el-divider content-position="left">关联设备</el-divider>
-          <el-table :data="machineList" size="small"><el-table-column label="设备编码" prop="machineryCode" /><el-table-column label="设备名称" prop="machineryName" /><el-table-column label="操作" width="80"><template #default="s"><el-button link type="danger" icon="Delete" @click="handleDelMachine(s.row)" /></template></el-table-column></el-table>
+          <el-table :data="machineList" size="small">
+            <el-table-column label="设备编码" prop="machineryCode" />
+            <el-table-column label="设备名称" prop="machineryName" />
+            <el-table-column label="操作" width="80">
+              <template #default="s"><el-button link type="danger" icon="Delete" @click="handleDelMachine(s.row)" /></template>
+            </el-table-column>
+          </el-table>
           <el-button type="primary" size="small" icon="Plus" @click="handleAddMachine" style="margin-top:5px">添加设备</el-button>
 
           <el-divider content-position="left">操作人员</el-divider>
-          <el-table :data="workerList" size="small"><el-table-column label="用户名" prop="userName" /><el-table-column label="角色" prop="roleType" /><el-table-column label="操作" width="80"><template #default="s"><el-button link type="danger" icon="Delete" @click="handleDelWorker(s.row)" /></template></el-table-column></el-table>
+          <el-table :data="workerList" size="small">
+            <el-table-column label="用户名" prop="userName" />
+            <el-table-column label="角色">
+              <template #default="s">{{ roleLabel(s.row.roleType) }}</template>
+            </el-table-column>
+            <el-table-column label="操作" width="80">
+              <template #default="s"><el-button link type="danger" icon="Delete" @click="handleDelWorker(s.row)" /></template>
+            </el-table-column>
+          </el-table>
           <el-button type="primary" size="small" icon="Plus" @click="handleAddWorker" style="margin-top:5px">添加人员</el-button>
         </template>
       </el-form>
       <template #footer><el-button type="primary" @click="submitForm">确 定</el-button><el-button @click="cancel">取 消</el-button></template>
+    </el-dialog>
+
+    <!-- 设备选择器 -->
+    <MachinerySelect ref="machinerySelectRef" @onSelected="onMachinesSelected" />
+    <!-- 人员选择器 -->
+    <UserMultiSelect v-model:showFlag="userSelectVisible" @onSelected="onUsersSelected" />
+    <!-- 角色选择弹窗（选完人员后统一指定角色） -->
+    <el-dialog v-model="roleDialogVisible" title="选择角色" width="360px" append-to-body>
+      <el-form label-width="70px">
+        <el-form-item label="角色">
+          <el-select v-model="pendingRole" style="width:100%">
+            <el-option v-for="r in ROLE_OPTIONS" :key="r.value" :label="r.label" :value="r.value" />
+          </el-select>
+        </el-form-item>
+        <div style="font-size:12px;color:#909399">将为已选 {{ pendingUsers.length }} 人统一设置角色</div>
+      </el-form>
+      <template #footer>
+        <el-button @click="roleDialogVisible = false">取 消</el-button>
+        <el-button type="primary" @click="confirmAddWorkers">确 定</el-button>
+      </template>
     </el-dialog>
   </div>
 </template>
@@ -80,6 +114,8 @@ import type { MdWorkstation, WorkstationQueryParams, MdWorkstationMachine, MdWor
 import { listWorkstation, getWorkstation, delWorkstation, addWorkstation, updateWorkstation, listMachines, addMachine, delMachine, listWorkers, addWorker, delWorker } from '@/api/mes/md/workstation'
 import { listAllWorkshop } from '@/api/mes/md/workshop'
 import { listAllProcess } from '@/api/mes/pro/process'
+import MachinerySelect from '@/components/machinerySelect/multi.vue'
+import UserMultiSelect from '@/components/UserSelect/multi.vue'
 
 const { proxy } = getCurrentInstance() as any; const { sys_yes_no } = useDict('sys_yes_no')
 const { mes_workstation_type, mes_workstation_status } = useDict('mes_workstation_type', 'mes_workstation_status')
@@ -89,6 +125,20 @@ const autoGenFlag = ref(false)
 const optType = ref<string | undefined>(undefined)
 const workshopOptions = ref<any[]>([]); const machineList = ref<MdWorkstationMachine[]>([]); const workerList = ref<MdWorkstationWorker[]>([])
 const processOptions = ref<any[]>([])
+
+// 设备/人员选择相关
+const machinerySelectRef = ref()
+const userSelectVisible = ref(false)
+const roleDialogVisible = ref(false)
+const pendingUsers = ref<any[]>([])
+const pendingRole = ref('OPERATOR')
+const ROLE_OPTIONS = [
+  { label: '操作工', value: 'OPERATOR' },
+  { label: '调机工', value: 'SETUP' },
+  { label: '检验员', value: 'INSPECTOR' },
+]
+const ROLE_LABEL_MAP: Record<string, string> = { OPERATOR: '操作工', SETUP: '调机工', INSPECTOR: '检验员' }
+function roleLabel(v?: string) { return v ? (ROLE_LABEL_MAP[v] || v) : '' }
 const data = reactive({ form: { enableFlag: '1', status: 'IDLE' } as MdWorkstation, queryParams: { pageNum: 1, pageSize: 10, processId: undefined } as WorkstationQueryParams, rules: { workstationCode: [{ required: true, message: '编码不能为空' }], workstationName: [{ required: true, message: '名称不能为空' }], workshopId: [{ required: true, message: '请选择车间' }] } })
 const { queryParams, form, rules } = toRefs(data)
 
@@ -120,9 +170,60 @@ function handleEnableChange(row: any) {
 function handleDelete(row?: MdWorkstation) { const ids_ = row?.workstationId || ids.value; proxy.$modal.confirm('确认删除？').then(() => delWorkstation(ids_)).then(() => { getList(); proxy.$modal.msgSuccess('删除成功') }).catch(() => {}) }
 function handleExport() { proxy.download('mes/md/workstation/export', { ...queryParams.value }, `workstation_${Date.now()}.xlsx`) }
 
-function handleAddMachine() { proxy.$prompt('请输入设备编码', '添加设备').then(({ value: code }: any) => { proxy.$prompt('请输入设备名称', '添加设备').then(({ value: name }: any) => { const m = { workstationId: form.value.workstationId, machineryCode: code, machineryName: name } as MdWorkstationMachine; addMachine(m).then(() => { proxy.$modal.msgSuccess('添加成功'); loadSubData(form.value.workstationId!) }) }) }) }
+function handleAddMachine() {
+  const excludeIds = machineList.value.map((m: MdWorkstationMachine) => m.machineryId!).filter((v: number | undefined) => v != null && v > 0)
+  machinerySelectRef.value?.open(excludeIds)
+}
+async function onMachinesSelected(rows: any[]) {
+  const existed = new Set(machineList.value.map((m: MdWorkstationMachine) => m.machineryId).filter((v: number | undefined) => v != null && v > 0))
+  const toAdd = (rows || []).filter((r: any) => !existed.has(r.machineryId))
+  if (!toAdd.length) { proxy.$modal.msgWarning('所选设备已全部关联'); return }
+  try {
+    for (const r of toAdd) {
+      await addMachine({
+        workstationId: form.value.workstationId,
+        machineryId: r.machineryId,
+        machineryCode: r.machineryCode,
+        machineryName: r.machineryName,
+      } as MdWorkstationMachine)
+    }
+    proxy.$modal.msgSuccess(`成功添加 ${toAdd.length} 台设备`)
+  } catch (e: any) {
+    proxy.$modal.msgError(e?.msg || '添加失败')
+  } finally {
+    loadSubData(form.value.workstationId!)
+  }
+}
 function handleDelMachine(row: MdWorkstationMachine) { delMachine(row.recordId!).then(() => { proxy.$modal.msgSuccess('删除成功'); loadSubData(form.value.workstationId!) }) }
-function handleAddWorker() { proxy.$prompt('请输入用户名', '添加人员').then(({ value: name }: any) => { proxy.$prompt('请输入角色(OPERATOR/SETUP/INSPECTOR)', '添加人员', { inputValue: 'OPERATOR' }).then(({ value: role }: any) => { const w = { workstationId: form.value.workstationId, userName: name, roleType: role } as MdWorkstationWorker; addWorker(w).then(() => { proxy.$modal.msgSuccess('添加成功'); loadSubData(form.value.workstationId!) }) }) }) }
+
+function handleAddWorker() { userSelectVisible.value = true }
+function onUsersSelected(rows: any[]) {
+  pendingUsers.value = rows || []
+  pendingRole.value = 'OPERATOR'
+  roleDialogVisible.value = true
+}
+async function confirmAddWorkers() {
+  const role = pendingRole.value
+  const existedKey = new Set(workerList.value.map((w: MdWorkstationWorker) => `${w.userId}-${w.roleType}`))
+  const toAdd = pendingUsers.value.filter((u: any) => !existedKey.has(`${u.userId}-${role}`))
+  if (!toAdd.length) { proxy.$modal.msgWarning('所选人员已关联该角色'); roleDialogVisible.value = false; return }
+  try {
+    for (const u of toAdd) {
+      await addWorker({
+        workstationId: form.value.workstationId,
+        userId: u.userId,
+        userName: u.userName,
+        roleType: role,
+      } as MdWorkstationWorker)
+    }
+    proxy.$modal.msgSuccess(`成功添加 ${toAdd.length} 人`)
+  } catch (e: any) {
+    proxy.$modal.msgError(e?.msg || '添加失败')
+  } finally {
+    roleDialogVisible.value = false
+    loadSubData(form.value.workstationId!)
+  }
+}
 function handleDelWorker(row: MdWorkstationWorker) { delWorker(row.recordId!).then(() => { proxy.$modal.msgSuccess('删除成功'); loadSubData(form.value.workstationId!) }) }
 
 getList()

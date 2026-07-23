@@ -42,21 +42,27 @@ export JAVA_HOME=/usr/lib/jvm/java-17-alibaba-dragonwell-17.0.9.0.10.9-1.al8.x86
 export PATH=$JAVA_HOME/bin:$PATH
 cd backend && mvn clean package -pl ruoyi-admin -am -DskipTests -Dcheckstyle.skip=true -q
 
-# 重启（⚠️ 服务器仅 1.8GB 内存，必须限制全部 JVM 内存区，否则 OOM Killer 会杀进程）
-# ⚠️ 关键：仅 -Xmx 不够！Metaspace + DirectMemory + 线程栈会让总虚拟内存飙到 3.8GB，仍触发全局 OOM
+# 重启（⚠️ 双重坑：内存 + SSH 信号传导，两条都要防住）
+# 坑 1: 服务器仅 1.8GB 内存，必须限制全部 JVM 内存区（仅 -Xmx 不够！Metaspace + DirectMemory + 线程栈会让总虚拟内存飙到 3.8GB）
+# 坑 2: `nohup ... &` 在 ssh heredoc 里会被 SSH session 结束的 SIGHUP/SIGKILL 波及（实测：JVM 启动瞬间被 Killed，日志空、dmesg 无 OOM）
+#       → 必须用 `setsid ... </dev/null ... & disown` 让 JVM 彻底脱离 SSH 会话
 pkill -f 'org.codehaus.plexus.classworlds.launcher.Launcher' 2>/dev/null  # 清 Maven 残留进程
+pkill -9 -f 'ruoyi-admin.jar' 2>/dev/null
 sleep 2
 kill $(lsof -ti :8081) 2>/dev/null; sleep 2
-nohup java -Xms256m -Xmx512m -XX:MaxMetaspaceSize=256m -XX:MaxDirectMemorySize=128m -XX:+UseG1GC \
+
+setsid nohup java -Xms256m -Xmx512m -XX:MaxMetaspaceSize=256m -XX:MaxDirectMemorySize=128m -XX:+UseG1GC \
   -jar /var/www/qixiaoxia-mes/backend/ruoyi-admin/target/ruoyi-admin.jar \
   --server.port=8081 --ruoyi.profile=/var/www/qixiaoxia-mes/uploadPath \
-  > /tmp/qxx-backend.log 2>&1 &
+  </dev/null > /tmp/qxx-backend.log 2>&1 &
+disown
 
-# 等待就绪（最多 150s，Flyway 迁移 + Spring 启动约需 20-40s）
-for i in $(seq 1 150); do
+# 等待就绪（最多 180s，Flyway 迁移 + Spring 启动约需 20-40s）
+# ⚠️ 不能用 `kill -0 $!`，setsid 后 $! 归属已变；改用 pgrep 判断进程是否还在
+for i in $(seq 1 180); do
   code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/login -X POST -H "Content-Type: application/json" -d '{}' 2>/dev/null)
-  if [ "$code" != "000" ] && [ -n "$code" ]; then echo "后端就绪 HTTP $code (${i}s)"; break; fi
-  if ! kill -0 $! 2>/dev/null; then echo "❌ 进程退出（查 /tmp/qxx-backend.log）"; tail -20 /tmp/qxx-backend.log; exit 1; fi
+  if [ "$code" != "000" ] && [ -n "$code" ]; then echo "✅ 后端就绪 HTTP $code (${i}s)"; break; fi
+  if ! pgrep -f 'ruoyi-admin.jar' >/dev/null; then echo "❌ 进程退出（查 /tmp/qxx-backend.log）"; tail -30 /tmp/qxx-backend.log; exit 1; fi
   sleep 1
 done
 EOF
@@ -64,12 +70,16 @@ EOF
 
 ### 3. 本机上传前端 + 重载 Nginx
 
-```bash
-scp -r /Users/huangwenhua/company/self/qixiaoxia-mes/frontend/dist/* \
-  qxx:/var/www/qixiaoxia-mes/frontend/dist/
+⚠️ **不要用 `scp -r dist/*`** —— 服务器 SSH 有并发/时长限制，实测多次 `Connection closed by remote host`（退出码 255）。用 **tar 管道单连接** 更稳，且先清空旧 dist 避免残留：
 
-ssh qxx 'nginx -s reload'
+```bash
+cd /Users/huangwenhua/company/self/qixiaoxia-mes/frontend/dist && \
+ssh qxx 'rm -rf /var/www/qixiaoxia-mes/frontend/dist/* && echo "已清空旧 dist"' && \
+tar czf - . 2>/dev/null | ssh qxx 'tar xzf - -C /var/www/qixiaoxia-mes/frontend/dist/ 2>/dev/null && echo "✅ 解包完成"' && \
+ssh qxx 'nginx -s reload && echo "✅ nginx reloaded"'
 ```
+
+> macOS 的 tar 会输出 `Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'` 警告，`2>/dev/null` 已吞掉；不影响内容。
 
 ### 4. 验证
 
@@ -135,7 +145,9 @@ ssh qxx 'rm -rf /var/www/qixiaoxia-mes/app/dist && mv /var/www/qixiaoxia-mes/app
 | 现象 | 原因 | 解决 |
 |------|------|------|
 | 后端启动后立即退出 | Docker 容器未启动 | `docker start qxx-mysql qxx-redis qxx-minio` |
+| 后端启动瞬间被 Killed，日志空、dmesg 无新 OOM | ssh heredoc 里 `nohup ... &` 收到 SSH session 结束的 SIGHUP/SIGKILL，JVM 还没输出就被杀 | 启动命令必须是 `setsid nohup java ... </dev/null > log 2>&1 &` + 显式 `disown`（见步骤 2）；判活用 `pgrep -f 'ruoyi-admin.jar'` 而不是 `kill -0 $!`（setsid 后 $! 归属已变） |
 | 后端进程被 Killed（OOM） | JVM 总虚拟内存超物理内存被 OOM Killer 杀（**仅 `-Xmx` 不够**，Metaspace/DirectMemory 会让总内存飙到 ~3.8GB） | 启动前 `pkill -f classworlds` 清 Maven 残留；启动命令必须同时限制 `-Xmx512m -XX:MaxMetaspaceSize=256m -XX:MaxDirectMemorySize=128m`（见步骤 2）；等 `free -m` available > 800MB 再启；查 `dmesg -T \| grep -i oom` 确认是否 OOM |
+| `scp -r dist/*` 中途 `Connection closed by remote host`（退出码 255） | scp 建大量小连接超出服务器 SSH 限制 | 改用步骤 3 的 tar 管道方案（单连接一次性传完），并先 `rm -rf dist/*` 清残留 |
 | Nginx 502 | 后端未就绪 | 等 `curl :8081` 返回 200 后再重载 |
 | 前端 404 | dist/ 未上传或路径错误 | 确认 scp 目标路径 `/var/www/qixiaoxia-mes/frontend/dist/` |
 | 登录验证码报错 | 服务器已关闭验证码 | `"uuid":""` 传空字符串 |

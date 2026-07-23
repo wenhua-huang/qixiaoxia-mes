@@ -22,6 +22,7 @@ import com.ruoyi.system.domain.mes.wm.WmProductSalesDetail;
 import com.ruoyi.system.domain.mes.wm.WmProductSalesLine;
 import com.ruoyi.system.domain.mes.wm.WmMaterialStock;
 import com.ruoyi.system.domain.mes.wm.WmTransaction;
+import com.ruoyi.system.domain.mes.wm.vo.WmStockWarehouseSummary;
 import com.ruoyi.system.domain.mes.pro.ProMaterialTrace;
 import com.ruoyi.system.domain.mes.sal.SalOrder;
 import com.ruoyi.system.domain.mes.sal.SalOrderLine;
@@ -500,23 +501,59 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         return draft;
     }
 
+    /**
+     * 订单行 → 出库行映射：按各仓库可用量自动拆行（FIFO，早入库的仓优先）。
+     * - 无库存：生成 1 行，warehouseId=null（前端红色提示「无库存」，由用户决定删行/保留）
+     * - 库存充足：按 FIFO 仓序逐仓分配，拆多行
+     * - 库存不足：剩余需求挂最后一行（availableQty < quantitySales，前端红标）
+     */
     private List<WmProductSalesLine> mapOrderLinesToSalesLines(List<SalOrderLine> orderLines) {
         List<WmProductSalesLine> result = new ArrayList<>();
         if (orderLines == null) return result;
         for (SalOrderLine ol : orderLines) {
-            WmProductSalesLine sl = new WmProductSalesLine();
-            sl.setSalesOrderLineId(ol.getLineId());
-            sl.setItemId(ol.getProductId());
-            sl.setItemCode(ol.getProductCode());
-            sl.setItemName(ol.getProductName());
-            sl.setSpecification(ol.getProductSpc());
-            sl.setUnitOfMeasure(ol.getUnitOfMeasure());
-            sl.setUnitName(ol.getUnitName());
-            sl.setQuantitySales(ol.getQuantity());
-            sl.setQuantityPosted(BigDecimal.ZERO);
-            result.add(sl);
+            BigDecimal need = ol.getQuantity() != null ? ol.getQuantity() : BigDecimal.ZERO;
+            List<WmStockWarehouseSummary> stocks = wmMaterialStockMapper.selectStockWarehouseSummary(ol.getProductId());
+            if (stocks == null || stocks.isEmpty()) {
+                // 无库存：仓库留空，前端提示
+                result.add(buildSalesLine(ol, null, null, null, need, BigDecimal.ZERO));
+                continue;
+            }
+            // FIFO 按可用量拆行
+            BigDecimal remaining = need;
+            for (WmStockWarehouseSummary s : stocks) {
+                if (remaining.compareTo(BigDecimal.ZERO) <= 0) break;
+                BigDecimal take = remaining.min(s.getQuantityAvailable());
+                result.add(buildSalesLine(ol, s.getWarehouseId(), s.getWarehouseCode(),
+                        s.getWarehouseName(), take, s.getQuantityAvailable()));
+                remaining = remaining.subtract(take);
+            }
+            // 库存总量不足：剩余需求挂最后一仓（take > available，前端红标）
+            if (remaining.compareTo(BigDecimal.ZERO) > 0) {
+                WmStockWarehouseSummary last = stocks.get(stocks.size() - 1);
+                result.add(buildSalesLine(ol, last.getWarehouseId(), last.getWarehouseCode(),
+                        last.getWarehouseName(), remaining, last.getQuantityAvailable()));
+            }
         }
         return result;
+    }
+
+    private WmProductSalesLine buildSalesLine(SalOrderLine ol, Long whId, String whCode,
+                                              String whName, BigDecimal qty, BigDecimal avail) {
+        WmProductSalesLine sl = new WmProductSalesLine();
+        sl.setSalesOrderLineId(ol.getLineId());
+        sl.setItemId(ol.getProductId());
+        sl.setItemCode(ol.getProductCode());
+        sl.setItemName(ol.getProductName());
+        sl.setSpecification(ol.getProductSpc());
+        sl.setUnitOfMeasure(ol.getUnitOfMeasure());
+        sl.setUnitName(ol.getUnitName());
+        sl.setQuantitySales(qty);
+        sl.setQuantityPosted(BigDecimal.ZERO);
+        sl.setWarehouseId(whId);
+        sl.setWarehouseCode(whCode);
+        sl.setWarehouseName(whName);
+        sl.setAvailableQty(avail);
+        return sl;
     }
 
     // ════════════════════ 行保存（头保存时全量替换行） ════════════════════
@@ -532,8 +569,10 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         for (WmProductSalesLine l : lines) {
             l.setLineId(null);
             l.setSalesId(entity.getSalesId());
-            // 行的仓库默认从头表继承（warehouse_id NOT NULL）
-            if (l.getWarehouseId() == null) l.setWarehouseId(entity.getWarehouseId());
+            // 行仓库：无库存行可能为 null（头表 warehouse_id 已允许 NULL，仓库下沉到行）
+            if (l.getWarehouseId() == null && entity.getWarehouseId() != null) {
+                l.setWarehouseId(entity.getWarehouseId());
+            }
             if (l.getQuantityPosted() == null) l.setQuantityPosted(BigDecimal.ZERO);
             l.setCreateTime(DateUtils.getNowDate());
             l.setCreateBy(SecurityUtils.getUsername());

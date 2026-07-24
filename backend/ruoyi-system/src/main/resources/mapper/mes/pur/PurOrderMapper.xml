@@ -75,6 +75,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="workorderId != null "> and workorder_id = #{workorderId}</if>
             <if test="workorderCode != null  and workorderCode != ''"> and workorder_code = #{workorderCode}</if>
             <if test="status != null  and status != ''"> and status = #{status}</if>
+            <if test="statusList != null and statusList.size() > 0">
+                and status in
+                <foreach collection="statusList" item="item" open="(" separator="," close=")">#{item}</foreach>
+            </if>
         </where>
         ORDER BY create_time DESC
     </select>

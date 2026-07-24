@@ -8,6 +8,8 @@ export interface PurOrderQueryParams extends PageDomain {
   vendorName?: string;
   purchaseType?: string;
   status?: string;
+  /** 状态多值筛选(查询专用):供选择器按业务语义默认筛选多个状态 */
+  statusList?: string[];
 }
 
 export interface PurOrder extends BaseEntity {

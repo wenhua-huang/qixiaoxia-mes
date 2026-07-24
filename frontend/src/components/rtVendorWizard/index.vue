@@ -177,8 +177,8 @@ watch(() => props.modelValue, (open) => {
   }
 })
 
-// 选择采购订单
-function handleSelectPo() { purOrderSelectRef.value?.open() }
+// 选择采购订单（退货默认只看已收货的单据：收货中 + 已收货）
+function handleSelectPo() { purOrderSelectRef.value?.open(['RECEIVING', 'RECEIVED']) }
 function onPoSelected(row: { orderId: number; orderCode?: string; vendorName?: string } | PurOrder | null) {
   if (!row) return
   const r: any = row

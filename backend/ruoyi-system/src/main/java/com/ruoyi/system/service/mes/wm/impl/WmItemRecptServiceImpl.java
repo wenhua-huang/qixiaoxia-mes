@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.enums.PurOrderStatus;
 import com.ruoyi.system.domain.mes.pur.PurOrder;
 import com.ruoyi.system.domain.mes.pur.PurOrderLine;
@@ -79,7 +80,16 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
     @Transactional
     public int insertWmItemRecpt(WmItemRecpt entity) {
         entity.setCreateTime(DateUtils.getNowDate());
-        return wmItemRecptMapper.insertWmItemRecpt(entity);
+        entity.setCreateBy(SecurityUtils.getUsername());
+        if (entity.getStatus() == null || entity.getStatus().isEmpty()) {
+            entity.setStatus("DRAFT");
+        }
+        wmItemRecptMapper.insertWmItemRecpt(entity);
+        // 携带行时一次性插入（从采购订单生成场景）；无行时仅插头（向后兼容原新增流程）
+        if (entity.getLines() != null && !entity.getLines().isEmpty()) {
+            saveRecptLines(entity, entity.getLines());
+        }
+        return 1;
     }
 
     @Override
@@ -226,14 +236,24 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
         header.setCreateBy(SecurityUtils.getUsername());
         wmItemRecptMapper.insertWmItemRecpt(header);
 
-        // 2. 创建入库单行 + 汇总 totalQuantity
-        BigDecimal totalQty = BigDecimal.ZERO;
+        // 2. 创建入库单行（公共逻辑，与 PC 端从采购订单生成共享）
+        saveRecptLines(header, lines);
+
+        // 3. 确认收货 + 过账入库（直接传入已加载对象，避免重复 DB 查询）
+        doConfirmItemRecpt(header, lines);
+        doPostItemRecpt(header);
+    }
+
+    /**
+     * 批量保存入库单行（头表已落库）：逐行回填 recptId/仓库/purOrderLineId、
+     * 自动生成批次号、累加 totalQuantity 并回写头。
+     * 由 insertWmItemRecpt（PC 从采购订单生成）与 receiveWithLines（移动端一键收货）共享。
+     */
+    private void saveRecptLines(WmItemRecpt header, List<WmItemRecptLine> lines) {
         // 采购入库时,按 itemId 匹配 PO 行,回填 purOrderLineId(用于退货精确回写)
         java.util.Map<Long, PurOrderLine> poLineByItemId = null;
         if (header.getPurOrderId() != null && header.getPurOrderId() > 0) {
-            PurOrderLine poQuery = new PurOrderLine();
-            poQuery.setOrderId(header.getPurOrderId());
-            List<PurOrderLine> poLines = purOrderLineMapper.selectPurOrderLineList(poQuery);
+            List<PurOrderLine> poLines = loadPoLinesByOrderId(header.getPurOrderId());
             if (poLines != null && !poLines.isEmpty()) {
                 poLineByItemId = new java.util.HashMap<>();
                 for (PurOrderLine pl : poLines) {
@@ -243,6 +263,7 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
                 }
             }
         }
+        BigDecimal totalQty = BigDecimal.ZERO;
         for (WmItemRecptLine line : lines) {
             line.setRecptId(header.getRecptId());
             if (line.getWarehouseId() == null) line.setWarehouseId(header.getWarehouseId());
@@ -257,18 +278,7 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
             }
             // 自动生成批次号（无 batchCode 时，根据物料+供应商+生产日期+有效期匹配或新建）
             if (line.getBatchCode() == null) {
-                WmBatch batchParam = new WmBatch();
-                batchParam.setItemId(line.getItemId());
-                batchParam.setItemCode(line.getItemCode());
-                batchParam.setItemName(line.getItemName());
-                batchParam.setSpecification(line.getSpecification());
-                batchParam.setVendorId(header.getVendorId());
-                batchParam.setVendorCode(header.getVendorCode());
-                batchParam.setVendorName(header.getVendorName());
-                batchParam.setProduceDate(line.getProduceDate());
-                batchParam.setExpireDate(line.getExpireDate());
-                batchParam.setLotNumber(line.getLotNumber());
-                WmBatch generated = wmBatchService.getOrGenerateBatchCode(batchParam);
+                WmBatch generated = wmBatchService.getOrGenerateBatchCode(buildBatchParam(header, line));
                 if (generated != null) {
                     line.setBatchId(generated.getBatchId());
                     line.setBatchCode(generated.getBatchCode());
@@ -285,10 +295,22 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
         header.setTotalQuantity(totalQty);
         header.setUpdateTime(DateUtils.getNowDate());
         wmItemRecptMapper.updateWmItemRecpt(header);
+    }
 
-        // 3. 确认收货 + 过账入库（直接传入已加载对象，避免重复 DB 查询）
-        doConfirmItemRecpt(header, lines);
-        doPostItemRecpt(header);
+    /** 构造批次匹配参数（供 getOrGenerateBatchCode） */
+    private WmBatch buildBatchParam(WmItemRecpt header, WmItemRecptLine line) {
+        WmBatch param = new WmBatch();
+        param.setItemId(line.getItemId());
+        param.setItemCode(line.getItemCode());
+        param.setItemName(line.getItemName());
+        param.setSpecification(line.getSpecification());
+        param.setVendorId(header.getVendorId());
+        param.setVendorCode(header.getVendorCode());
+        param.setVendorName(header.getVendorName());
+        param.setProduceDate(line.getProduceDate());
+        param.setExpireDate(line.getExpireDate());
+        param.setLotNumber(line.getLotNumber());
+        return param;
     }
 
     /**
@@ -390,6 +412,75 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
         WmItemRecptLine query = new WmItemRecptLine();
         query.setRecptId(recptId);
         return wmItemRecptLineService.selectWmItemRecptLineList(query);
+    }
+
+    // ════════════════════ 从采购订单生成草稿 ════════════════════
+
+    /**
+     * 从采购订单生成入库单草稿（不落库）。仅允许 ORDERED/RECEIVING 状态的 PO 收货。
+     * 读取 PO 头+行，1:1 映射，入库数量预填「订购 − 已收」未收量，跳过已收完/取消/关闭行。
+     */
+    @Override
+    public WmItemRecpt buildFromPurOrder(Long orderId) {
+        PurOrder order = purOrderService.selectPurOrderByOrderId(orderId);
+        if (order == null) {
+            throw new ServiceException("采购订单不存在");
+        }
+        String poStatus = order.getStatus();
+        if (!PurOrderStatus.ORDERED.is(poStatus) && !PurOrderStatus.RECEIVING.is(poStatus)) {
+            throw new ServiceException("采购订单当前状态[" + poStatus + "]不允许收货，仅已下单/收货中可生成入库单");
+        }
+        List<PurOrderLine> poLines = loadPoLinesByOrderId(orderId);
+        List<WmItemRecptLine> recptLines = mapPoLinesToRecptLines(poLines);
+        if (recptLines.isEmpty()) {
+            throw new ServiceException("该采购订单已全部收货完成，无可入库行");
+        }
+        WmItemRecpt draft = new WmItemRecpt();
+        draft.setPurOrderId(order.getOrderId());
+        draft.setPurOrderCode(order.getOrderCode());
+        draft.setVendorId(order.getVendorId());
+        draft.setVendorCode(order.getVendorCode());
+        draft.setVendorName(order.getVendorName());
+        draft.setRecptType("PURCHASE");
+        draft.setStatus("DRAFT");
+        draft.setLines(recptLines);
+        return draft;
+    }
+
+    /**
+     * 采购订单行 → 入库单行映射。跳过终态行（已收满/已取消/已关闭）。
+     * 入库数量 = 订购 − 已收（max 0），仓库留空由用户在头表选择后回填。
+     */
+    private List<WmItemRecptLine> mapPoLinesToRecptLines(List<PurOrderLine> poLines) {
+        List<WmItemRecptLine> result = new ArrayList<>();
+        if (poLines == null) return result;
+        for (PurOrderLine pl : poLines) {
+            if (PurOrderStatus.CANCEL.is(pl.getStatus()) || PurOrderStatus.CLOSED.is(pl.getStatus())) {
+                continue;
+            }
+            BigDecimal ordered = pl.getQuantityOrdered() != null ? pl.getQuantityOrdered() : BigDecimal.ZERO;
+            BigDecimal received = pl.getQuantityReceived() != null ? pl.getQuantityReceived() : BigDecimal.ZERO;
+            BigDecimal remain = ordered.subtract(received);
+            if (remain.compareTo(BigDecimal.ZERO) <= 0) {
+                continue; // 已收满
+            }
+            WmItemRecptLine line = new WmItemRecptLine();
+            line.setPurOrderLineId(pl.getLineId());
+            line.setItemId(pl.getItemId());
+            line.setItemCode(pl.getItemCode());
+            line.setItemName(pl.getItemName());
+            line.setSpecification(pl.getSpecification());
+            line.setUnitOfMeasure(pl.getUnitOfMeasure());
+            line.setUnitName(pl.getUnitName());
+            line.setUnit2(pl.getUnit2());
+            line.setUnit2Name(pl.getUnit2Name());
+            line.setConversionRate(pl.getConversionRate());
+            line.setQuantityRecpt(remain);
+            line.setQuantityOrdered(ordered);     // transient 展示值
+            line.setQuantityReceived(received);   // transient 展示值
+            result.add(line);
+        }
+        return result;
     }
 
     /**

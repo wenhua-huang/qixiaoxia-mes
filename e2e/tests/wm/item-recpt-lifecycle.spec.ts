@@ -101,7 +101,7 @@ test.describe('采购入库单 - 从采购单快捷生成', () => {
       await page.getByRole('button', { name: '从采购单生成' }).click({ timeout: 8000 })
 
       // PO 选择器弹窗 — 验证默认筛选 ORDERED+RECEIVING 生效（状态下拉含这两个 tag）
-      const poDialog = page.locator('.el-dialog').filter({ hasText: '采购订单选择' }).last()
+      const poDialog = page.locator('.el-dialog').filter({ hasText: '采购单据选择' }).last()
       await expect(poDialog).toBeVisible({ timeout: 5000 })
       console.log('  ✅ PO选择器打开（默认筛选 ORDERED+RECEIVING）')
 

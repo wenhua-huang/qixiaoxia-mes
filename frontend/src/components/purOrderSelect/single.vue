@@ -15,7 +15,7 @@
       <el-form-item label="状态" prop="statusList">
         <el-select v-model="queryParams.statusList" placeholder="请选择" multiple clearable collapse-tags
                    collapse-tags-tooltip style="width:220px" @change="handleQuery">
-          <el-option v-for="opt in statusOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+          <el-option v-for="d in mes_order_status" :key="d.value" :label="d.label" :value="d.value" />
         </el-select>
       </el-form-item>
       <el-form-item>
@@ -39,7 +39,7 @@
         <template #default="scope">{{ purchaseTypeMap[scope.row.purchaseType] || scope.row.purchaseType }}</template>
       </el-table-column>
       <el-table-column label="状态" align="center" prop="status" width="80">
-        <template #default="scope">{{ statusMap[scope.row.status] || scope.row.status }}</template>
+        <template #default="scope"><dict-tag :options="mes_order_status" :value="scope.row.status" /></template>
       </el-table-column>
     </el-table>
 
@@ -55,13 +55,16 @@
 </template>
 
 <script setup lang="ts" name="PurOrderSelect">
-import { ref, reactive, toRefs } from 'vue'
+import { ref, reactive, toRefs, getCurrentInstance } from 'vue'
 import { listOrder } from '@/api/mes/pur/order'
 import { ElMessage } from 'element-plus'
 import type { PurOrder } from '@/types/api/mes/pur/order'
 import VendorSelect from '@/components/vendorSelect/single.vue'
 
 const emit = defineEmits<{ onSelected: [row: PurOrder] }>()
+const { proxy } = getCurrentInstance() as any
+/** 状态枚举走后端字典 mes_order_status（frontend/AGENTS.md 硬编码禁令） */
+const { mes_order_status } = proxy.useDict('mes_order_status')
 
 const showFlag = ref(false)
 const loading = ref(false)
@@ -74,23 +77,12 @@ const vendorSelectRef = ref()
 
 /** 默认状态：可收货（已下单 + 收货中）。入库场景通用；退货场景调用时传 ['RECEIVING','RECEIVED']。 */
 const DEFAULT_STATUS_LIST = ['ORDERED', 'RECEIVING']
+/** 记录 caller 传入的默认 statusList，用于「重置」按钮恢复到打开时的场景过滤。 */
+const currentDefaultStatusList = ref<string[]>([...DEFAULT_STATUS_LIST])
 
 const purchaseTypeMap: Record<string, string> = {
   PAPER: '纸张', AUX: '辅料', PACK: '包材', OTHER: '其他'
 }
-const statusMap: Record<string, string> = {
-  DRAFT: '草稿', APPROVED: '已审批', ORDERED: '已下单', RECEIVING: '收货中', RECEIVED: '已收货', CLOSED: '已关闭', CANCEL: '已取消'
-}
-/** 状态多选下拉选项（按业务流转顺序） */
-const statusOptions = [
-  { value: 'DRAFT', label: '草稿' },
-  { value: 'APPROVED', label: '已审批' },
-  { value: 'ORDERED', label: '已下单' },
-  { value: 'RECEIVING', label: '收货中' },
-  { value: 'RECEIVED', label: '已收货' },
-  { value: 'CLOSED', label: '已关闭' },
-  { value: 'CANCEL', label: '已取消' }
-]
 
 const data = reactive({
   queryParams: { pageNum: 1, pageSize: 10, statusList: [...DEFAULT_STATUS_LIST] } as any
@@ -103,7 +95,8 @@ function getList() {
 }
 function handleQuery() { queryParams.value.pageNum = 1; getList() }
 function resetQuery() {
-  queryParams.value = { pageNum: 1, pageSize: 10, statusList: [...DEFAULT_STATUS_LIST] }
+  // 复用 caller 打开时传入的默认 statusList，避免退货场景 reset 后错筛
+  queryParams.value = { pageNum: 1, pageSize: 10, statusList: [...currentDefaultStatusList.value] }
   handleQuery()
 }
 function handleRowChange(row: PurOrder) { selectedRow.value = row }
@@ -137,6 +130,7 @@ function open(defaultStatusList?: string[]) {
   selectedOrderId.value = undefined
   selectedRow.value = undefined
   const list = defaultStatusList === undefined ? DEFAULT_STATUS_LIST : defaultStatusList
+  currentDefaultStatusList.value = [...list]
   queryParams.value = { pageNum: 1, pageSize: 10, statusList: [...list] }
   getList()
 }

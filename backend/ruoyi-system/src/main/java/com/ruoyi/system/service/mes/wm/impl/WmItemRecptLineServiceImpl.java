@@ -55,4 +55,10 @@ public class WmItemRecptLineServiceImpl implements IWmItemRecptLineService
     public int deleteWmItemRecptLineByLineIds(Long[] lineIds) {
         return wmItemRecptLineMapper.deleteWmItemRecptLineByLineIds(lineIds);
     }
+
+    @Override
+    @Transactional
+    public int deleteWmItemRecptLineByRecptId(Long recptId) {
+        return wmItemRecptLineMapper.deleteWmItemRecptLineByRecptId(recptId);
+    }
 }

@@ -96,7 +96,23 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
     @Transactional
     public int updateWmItemRecpt(WmItemRecpt entity) {
         entity.setUpdateTime(DateUtils.getNowDate());
-        return wmItemRecptMapper.updateWmItemRecpt(entity);
+        int rows = wmItemRecptMapper.updateWmItemRecpt(entity);
+        // 携带行时全量重建（仅 DRAFT 状态允许改行，其他状态守卫由 controller/前端负责）
+        // 与 insertWmItemRecpt 对称：一次提交连头带行，避免行改动被静默丢弃
+        if (entity.getLines() != null && entity.getRecptId() != null) {
+            WmItemRecpt current = wmItemRecptMapper.selectWmItemRecptByRecptId(entity.getRecptId());
+            if (current == null) {
+                throw new ServiceException("入库单不存在");
+            }
+            if (!"DRAFT".equals(current.getStatus())) {
+                throw new ServiceException("仅草稿状态可编辑物料行");
+            }
+            wmItemRecptLineService.deleteWmItemRecptLineByRecptId(entity.getRecptId());
+            if (!entity.getLines().isEmpty()) {
+                saveRecptLines(entity, entity.getLines());
+            }
+        }
+        return rows;
     }
 
     @Override

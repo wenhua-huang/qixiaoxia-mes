@@ -14,7 +14,7 @@
     </el-form>
 
     <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5"><el-button type="primary" plain icon="Plus" size="small" @click="handleAdd" v-hasPermi="['mes:wm:issue:add']">新增</el-button></el-col>
+      <el-col :span="1.5"><el-button type="primary" plain icon="Link" size="small" @click="handleFromWorkorder" v-hasPermi="['mes:wm:issue:add']">从工单生成</el-button></el-col>
       <el-col :span="1.5"><el-button type="success" plain icon="Edit" size="small" :disabled="single" @click="handleUpdate" v-hasPermi="['mes:wm:issue:edit']">修改</el-button></el-col>
       <el-col :span="1.5"><el-button type="danger" plain icon="Delete" size="small" :disabled="multiple" @click="handleDelete" v-hasPermi="['mes:wm:issue:remove']">删除</el-button></el-col>
       <el-col :span="1.5"><el-button type="warning" plain icon="Download" size="small" @click="handleExport" v-hasPermi="['mes:wm:issue:export']">导出</el-button></el-col>
@@ -56,22 +56,20 @@
         <el-tab-pane label="基本信息" name="header">
           <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
             <el-row>
-              <el-col :span="16"><el-form-item label="领料单编码" prop="issueCode"><el-input v-model="form.issueCode" placeholder="请输入" :disabled="optType!=='add'" /></el-form-item></el-col>
-              <el-col :span="8"><el-form-item label-width="80"><el-switch v-model="autoGenFlag" @change="handleAutoGen" active-text="自动生成" v-if="optType==='add'" /></el-form-item></el-col>
+              <el-col :span="16"><el-form-item label="领料单编码" prop="issueCode"><el-input v-model="form.issueCode" :placeholder="optType==='add' ? '保存时自动生成' : '请输入'" :disabled="true" /></el-form-item></el-col>
             </el-row>
             <el-row><el-col :span="12"><el-form-item label="领料单名称" prop="issueName"><el-input v-model="form.issueName" placeholder="请输入" /></el-form-item></el-col>
             <el-col :span="12"><el-form-item label="领料类型"><el-select v-model="form.issueType" disabled><el-option label="生产领料" value="PRODUCE" /></el-select></el-form-item></el-col></el-row>
-            <el-row><el-col :span="12"><el-form-item label="生产工单" prop="workorderId"><template v-if="optType==='view'"><el-input v-model="form.workorderCode" :disabled="true" /></template><template v-else><el-input v-model="form.workorderName" :placeholder="form.workorderCode || '请选择生产工单'" readonly><template #append><el-button icon="Search" @click="handleWorkorderSelect" /></template></el-input><workorderSelect ref="woSelectRef" @onSelected="onWorkorderSelected" /></template></el-form-item></el-col>
+            <el-row><el-col :span="12"><el-form-item label="生产工单" prop="workorderId"><template v-if="optType!=='edit'"><el-input v-model="form.workorderCode" :disabled="true" /></template><template v-else><el-input v-model="form.workorderName" :placeholder="form.workorderCode || '请选择生产工单'" readonly><template #append><el-button icon="Search" @click="handleWorkorderSelect" /></template></el-input><workorderSelect ref="woSelectRef" @onSelected="onWorkorderSelected" /></template></el-form-item></el-col>
             <el-col :span="12"><el-form-item label="仓库" prop="warehouseId"><template v-if="optType==='view'"><el-input v-model="form.warehouseName" :disabled="true" /></template><template v-else><el-input v-model="form.warehouseName" placeholder="请选择仓库" readonly><template #append><el-button icon="Search" @click="handleWarehouseSelect" /></template></el-input><WarehouseSelect ref="warehouseSelectRef" @onSelected="onWarehouseSelected" /></template></el-form-item></el-col></el-row>
             <el-row><el-col :span="12"><el-form-item label="库区"><template v-if="optType==='view'"><el-input v-model="form.locationName" :disabled="true" /></template><template v-else><el-input v-model="form.locationName" placeholder="请选择库区" readonly><template #append><el-button icon="Search" @click="handleLocationSelect" /></template></el-input><LocationSelect ref="locationSelectRef" @onSelected="onLocationSelected" /></template></el-form-item></el-col>
             <el-col :span="12"><el-form-item label="领料日期"><el-date-picker v-model="form.issueDate" type="date" value-format="YYYY-MM-DD HH:mm:ss" style="width:100%" :disabled="optType==='view'" /></el-form-item></el-col></el-row>
             <el-row><el-col :span="24"><el-form-item label="备注"><el-input v-model="form.remark" type="textarea" :rows="2" :disabled="optType==='view'" /></el-form-item></el-col></el-row>
           </el-form>
         </el-tab-pane>
-        <el-tab-pane label="领料明细" name="lines" v-if="form.issueId">
+        <el-tab-pane label="领料明细" name="lines" v-if="form.issueId || optType==='add'">
           <el-row class="mb8" v-if="optType==='add' || optType==='edit'">
-            <el-col :span="1.5"><el-button type="primary" plain icon="Plus" size="small" @click="handleAddLine">添加物料</el-button></el-col>
-            <el-col :span="1.5" v-if="form.workorderId"><el-button type="success" plain icon="MagicStick" size="small" @click="handleLoadBom">从BOM导入</el-button></el-col>
+            <el-col :span="1.5" v-if="form.workorderId"><el-button type="success" plain icon="MagicStick" size="small" @click="handleLoadBom">重新从BOM拉取</el-button></el-col>
           </el-row>
           <el-table :data="lineList" size="small">
             <el-table-column label="物料编码" align="center" prop="itemCode" width="120" />
@@ -80,9 +78,6 @@
             <el-table-column label="申请数量" align="center" width="110"><template #default="scope"><el-input-number v-if="optType!=='view'" v-model="scope.row.quantityIssue" :min="0" :precision="2" size="small" controls-position="right" style="width:100px" /><span v-else>{{ scope.row.quantityIssue }}</span></template></el-table-column>
             <el-table-column label="已发料" align="center" width="80"><template #default="scope">{{ scope.row.quantityIssued || 0 }}</template></el-table-column>
             <el-table-column label="单位" align="center" prop="unitName" width="60" />
-            <el-table-column label="操作" align="center" width="70" v-if="optType!=='view'">
-              <template #default="scope"><el-button link type="danger" icon="Delete" @click="handleDelLine(scope.row)"></el-button></template>
-            </el-table-column>
           </el-table>
         </el-tab-pane>
       </el-tabs>
@@ -94,8 +89,8 @@
 
     <!-- 发料弹窗 -->
     <IssueOutDialog ref="issueOutRef" @success="getList" />
-    <!-- 物料选择器（用于添加领料行） -->
-    <ItemSelect ref="itemSelectRef" @onSelected="onItemSelected" />
+    <!-- 从工单生成：工单选择器（固定只列待生产/生产中工单） -->
+    <workorderSelect ref="genWoSelectRef" :status-list="['PREPARE','PRODUCING']" @onSelected="onGenWorkorderSelected" />
 
     <!-- 作废原因弹窗 -->
     <el-dialog title="作废领料单" v-model="cancelOpen" width="450px" append-to-body>
@@ -109,47 +104,58 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, getCurrentInstance, nextTick } from 'vue'
-import { listIssueHeader, getIssueDetail, addIssueHeader, updateIssueHeader, delIssueHeader, confirmIssue, releaseAllocation, submitForApprove, approveIssue, rejectIssue, closeIssue, cancelIssue } from '@/api/mes/wm/issueheader'
-import { addIssueLine, updateIssueLine, delIssueLine } from '@/api/mes/wm/issueline'
-import { loadBomLines } from '@/api/mes/wm/issueheader'
-import { genSerialCode } from '@/api/mes/sys/autocoderule'
+import { listIssueHeader, getIssueDetail, addIssueHeader, updateIssueHeader, delIssueHeader, confirmIssue, releaseAllocation, submitForApprove, approveIssue, rejectIssue, closeIssue, cancelIssue, buildFromWorkorder } from '@/api/mes/wm/issueheader'
 import workorderSelect from '@/components/workorderSelect/single.vue'
 import WarehouseSelect from '@/components/warehouseSelect/single.vue'
 import LocationSelect from '@/components/locationSelect/single.vue'
-import ItemSelect from '@/components/itemSelect/single.vue'
 import IssueOutDialog from './components/IssueOutDialog.vue'
 
 const { proxy } = getCurrentInstance() as any
 const { issue_status } = proxy.useDict('mes_wm_issue_status')
 
 const loading = ref(true); const ids = ref<number[]>([]); const single = ref(true); const multiple = ref(true); const showSearch = ref(true); const total = ref(0)
-const title = ref(''); const open = ref(false); const optType = ref(''); const activeTab = ref('header'); const autoGenFlag = ref(false)
+const title = ref(''); const open = ref(false); const optType = ref(''); const activeTab = ref('header')
 const dataList = ref<any[]>([]); const lineList = ref<any[]>([])
 const form = reactive<any>({ issueType: 'PRODUCE' })
 const queryParams = reactive<any>({ pageNum: 1, pageSize: 10, issueCode: null, workorderName: null, status: null })
-const rules = { issueCode: [{ required: true, message: '编码不能为空' }], issueName: [{ required: true, message: '名称不能为空' }], workorderId: [{ required: true, message: '工单不能为空' }] }
+const rules = { issueName: [{ required: true, message: '名称不能为空' }], workorderId: [{ required: true, message: '工单不能为空' }], warehouseId: [{ required: true, message: '仓库不能为空' }] }
 const TERMINAL = ['CLOSED', 'CANCELED']
 const isTerminal = (s: string) => TERMINAL.includes(s)
 
 // selector refs
-const woSelectRef = ref(); const warehouseSelectRef = ref(); const locationSelectRef = ref(); const itemSelectRef = ref()
+const woSelectRef = ref(); const warehouseSelectRef = ref(); const locationSelectRef = ref(); const genWoSelectRef = ref()
 // 发料弹窗 ref
 const issueOutRef = ref()
 // 作废弹窗
 const cancelOpen = ref(false); const cancelReason = ref(''); const cancelTargetId = ref<number | null>(null)
-// 物料选择回调目标行（新增时存当前编辑行索引）
-const lineSelectIdx = ref(-1)
 
 onMounted(() => getList())
 function getList() { loading.value = true; listIssueHeader(queryParams).then((r: any) => { dataList.value = r.rows; total.value = r.total; loading.value = false }).catch(() => { loading.value = false }) }
 function cancel() { open.value = false; reset() }
-function reset() { Object.keys(form).forEach(k => delete (form as any)[k]); form.issueType = 'PRODUCE'; lineList.value = []; activeTab.value = 'header'; autoGenFlag.value = false }
+function reset() { Object.keys(form).forEach(k => delete (form as any)[k]); form.issueType = 'PRODUCE'; lineList.value = []; activeTab.value = 'header' }
 function handleQuery() { queryParams.pageNum = 1; getList() }
 function resetQuery() { Object.keys(queryParams).forEach(k => { if (k !== 'pageNum' && k !== 'pageSize') (queryParams as any)[k] = null }); handleQuery() }
 function handleSelectionChange(sel: any[]) { ids.value = sel.map(i => i.issueId); single.value = sel.length !== 1; multiple.value = !sel.length }
-function handleAutoGen(f: boolean) { if (f) genSerialCode('ISSUE_CODE').then((r: any) => { form.issueCode = r.data }); else form.issueCode = null }
-
-function handleAdd() { reset(); open.value = true; title.value = '新增生产领料单'; optType.value = 'add'; activeTab.value = 'header'; autoGenFlag.value = true }
+// 从工单生成：打开工单选择器（固定状态过滤 PREPARE/PRODUCING）
+function handleFromWorkorder() { genWoSelectRef.value?.open() }
+async function onGenWorkorderSelected(row: any) {
+  if (!row) return
+  try {
+    const r: any = await buildFromWorkorder(row.workorderId)
+    openAddDraft(r.data)
+  } catch (e) { /* 错误已由 request 拦截器提示 */ }
+}
+// 用草稿打开编辑弹窗（工单驱动，工单/BOM 锁定不可改，仅可调领料数量/仓库/批次/日期/备注）
+function openAddDraft(draft: any) {
+  reset()
+  const { lines, ...header } = draft
+  Object.assign(form, header)
+  form.issueCode = '' // 草稿态无编码，保存时后端自动生成
+  lineList.value = (lines || []).map((l: any) => ({ ...l }))
+  optType.value = 'add'; activeTab.value = 'header'
+  title.value = '从工单生成领料单'
+  open.value = true
+}
 async function fill(row: any, type: string, ttl: string) { reset(); const r: any = await getIssueDetail(row.issueId); const h = r.data?.header || r.data; const lines = r.data?.lines || []; Object.assign(form, h); lineList.value = lines; title.value = ttl; optType.value = type; activeTab.value = 'header'; await nextTick(); open.value = true }
 function handleView(row: any) { fill(row, 'view', '查看领料单') }
 function handleUpdate(row: any) { fill(row, 'edit', '修改领料单') }
@@ -187,41 +193,25 @@ function onWarehouseSelected(row: any) { if (!row) return; form.warehouseId = ro
 function handleLocationSelect() { locationSelectRef.value?.open() }
 function onLocationSelected(row: any) { if (!row) return; form.locationId = row.locationId; form.locationName = row.locationName; form.locationCode = row.locationCode }
 
-// 物料行
-function handleAddLine() {
-  lineSelectIdx.value = -1
-  itemSelectRef.value?.open()
-}
-function onItemSelected(row: any) {
-  // 新增一行领料明细（默认带入物料信息）
-  lineList.value.push({
-    itemId: row.itemId, itemCode: row.itemCode, itemName: row.itemName,
-    itemSpc: row.specification, unitOfMeasure: row.unitOfMeasure, unitName: row.unitOfMeasure,
-    quantityIssue: 1, warehouseId: form.warehouseId
-  })
-}
+// 重新从工单 BOM 拉取领料明细（覆盖当前明细，不落库）
 function handleLoadBom() {
-  if (!form.workorderId) { proxy.$modal.msgError('请先选择工单'); return }
-  loadBomLines(form.issueId, form.workorderId).then(() => {
-    proxy.$modal.msgSuccess('BOM 导入成功')
-    // 重新加载明细
-    getIssueDetail(form.issueId).then((r: any) => { lineList.value = r.data?.lines || [] })
+  if (!form.workorderId) { proxy.$modal.msgError('工单缺失，无法拉取BOM'); return }
+  buildFromWorkorder(form.workorderId).then((r: any) => {
+    const draft = r.data
+    if (draft && draft.lines) {
+      lineList.value = draft.lines.map((l: any) => ({ ...l, warehouseId: form.warehouseId || l.warehouseId }))
+      proxy.$modal.msgSuccess('已从BOM重新拉取明细')
+    }
   })
 }
-function handleDelLine(row: any) { const idx = lineList.value.indexOf(row); if (idx >= 0) lineList.value.splice(idx, 1) }
 
 function submitForm() {
   (proxy.$refs.formRef as any).validate((v: boolean) => {
     if (!v) return
+    // 头+明细一次性提交（后端原子事务落库，修复旧版脏单/删行不生效问题）
+    form.lines = lineList.value.map((l: any) => ({ ...l, issueId: form.issueId || undefined }))
     const action = form.issueId ? updateIssueHeader(form) : addIssueHeader(form)
-    action.then((r: any) => {
-      const headerId = form.issueId || r.data?.issueId
-      if (!headerId) { proxy.$modal.msgSuccess('保存成功'); open.value = false; getList(); return }
-      Promise.all(lineList.value.map((l: any) => {
-        l.issueId = headerId
-        return l.lineId ? updateIssueLine(l) : addIssueLine(l)
-      })).then(() => { proxy.$modal.msgSuccess('保存成功'); open.value = false; getList() }).catch(() => {})
-    })
+    action.then(() => { proxy.$modal.msgSuccess('保存成功'); open.value = false; getList() }).catch(() => {})
   })
 }
 </script>

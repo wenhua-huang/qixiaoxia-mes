@@ -25,4 +25,9 @@ public interface ProFeedbackConsumeMapper
      * 根据报工ID查询物料消耗列表
      */
     List<ProFeedbackConsume> selectByFeedbackId(Long feedbackId);
+
+    /**
+     * 根据工单ID查询全部报工的物料消耗（批量，消除按报工循环查的 N+1）
+     */
+    List<ProFeedbackConsume> selectByWorkorderId(Long workorderId);
 }

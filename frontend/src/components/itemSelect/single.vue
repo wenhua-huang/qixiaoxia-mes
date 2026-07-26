@@ -10,6 +10,11 @@
       <el-form-item label="规格型号" prop="specification">
         <el-input v-model="queryParams.specification" placeholder="请输入" clearable @keyup.enter="handleQuery" />
       </el-form-item>
+      <el-form-item label="物料分类" prop="itemTypeId">
+        <el-tree-select v-model="queryParams.itemTypeId" :data="itemTypeTree" check-strictly node-key="id"
+          :props="{ value: 'id', label: 'label', children: 'children' }"
+          placeholder="全部" clearable style="width: 200px" @change="handleQuery" />
+      </el-form-item>
       <el-form-item>
         <el-button type="primary" icon="Search" size="small" @click="handleQuery">搜索</el-button>
         <el-button icon="Refresh" size="small" @click="resetQuery">重置</el-button>
@@ -26,7 +31,7 @@
       <el-table-column label="名称" align="center" prop="itemName" :show-overflow-tooltip="true" />
       <el-table-column label="规格型号" align="center" prop="specification" :show-overflow-tooltip="true" width="150" />
       <el-table-column label="单位" align="center" prop="unitOfMeasure" width="70" />
-      <el-table-column label="分类" align="center" prop="itemTypeId" width="80" />
+      <el-table-column label="分类" align="center" prop="itemTypeName" width="80" />
       <el-table-column label="启用" align="center" prop="enableFlag" width="70">
         <template #default="scope">{{ scope.row.enableFlag === '1' ? '是' : '否' }}</template>
       </el-table-column>
@@ -44,7 +49,8 @@
 <script setup lang="ts" name="ItemSelect">
 import { ref, reactive, toRefs } from 'vue'
 import { listItem } from '@/api/mes/md/item'
-import type { MdItem } from '@/types'
+import { treeselect } from '@/api/mes/md/itemtype'
+import type { MdItem, TreeSelect } from '@/types'
 import { ElMessage } from 'element-plus'
 
 const emit = defineEmits<{ onSelected: [row: MdItem] }>()
@@ -56,18 +62,26 @@ const showSearch = ref(true)
 const selectedItemId = ref<number>()
 const selectedRow = ref<MdItem>()
 const itemList = ref<MdItem[]>([])
+const itemTypeTree = ref<TreeSelect[]>([])
 
 const data = reactive({
   queryParams: { pageNum: 1, pageSize: 10, enableFlag: '1' } as any
 })
 const { queryParams } = toRefs(data)
 
+function loadItemTypeTree() {
+  treeselect().then(r => { itemTypeTree.value = r.data || [] }).catch(() => {})
+}
+
 function getList() {
   loading.value = true
   listItem(queryParams.value).then(r => { itemList.value = r.rows; total.value = r.total; loading.value = false })
 }
 function handleQuery() { queryParams.value.pageNum = 1; getList() }
-function resetQuery() { queryParams.value = {}; handleQuery() }
+function resetQuery() {
+  queryParams.value = { pageNum: 1, pageSize: 10, enableFlag: '1', itemTypeId: undefined }
+  handleQuery()
+}
 function handleRowChange(row: MdItem) { selectedRow.value = row }
 function handleRowDbClick(row: MdItem) {
   selectedRow.value = row
@@ -82,6 +96,7 @@ function confirmSelect() {
 function open(id?: number) {
   showFlag.value = true
   selectedItemId.value = id
+  if (!itemTypeTree.value.length) loadItemTypeTree()
   if (!itemList.value.length) getList()
 }
 

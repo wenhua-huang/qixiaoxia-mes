@@ -2,6 +2,7 @@ package com.ruoyi.system.domain.mes.pur;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.List;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
@@ -92,6 +93,9 @@ public class PurOrder extends BaseEntity
     /** 状态:DRAFT-草稿,APPROVED-已审批,ORDERED-已下单,RECEIVING-收货中,RECEIVED-已收货,CLOSED-已关闭,CANCEL-已取消 */
     @Excel(name = "状态:DRAFT-草稿,APPROVED-已审批,ORDERED-已下单,RECEIVING-收货中,RECEIVED-已收货,CLOSED-已关闭,CANCEL-已取消")
     private String status;
+
+    /** 状态多值筛选(查询专用,不落库):供选择器按"可收货/可退货"等业务语义默认筛选多个状态 */
+    private List<String> statusList;
 
     /** 取消原因 */
     private String cancelReason;
@@ -301,6 +305,16 @@ public class PurOrder extends BaseEntity
     public String getStatus()
     {
         return status;
+    }
+
+    public List<String> getStatusList()
+    {
+        return statusList;
+    }
+
+    public void setStatusList(List<String> statusList)
+    {
+        this.statusList = statusList;
     }
 
     public void setCancelReason(String cancelReason)

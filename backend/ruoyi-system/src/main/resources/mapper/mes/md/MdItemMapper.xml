@@ -37,35 +37,38 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectMdItemVo">
-        select item_id, factory_id, item_code, item_name, specification, unit_of_measure,
-               unit_name, unit2, unit2_name, conversion_rate, item_type_id, item_type_code,
-               item_type_name, parent_id, product_size, package_spec, printing_req,
-               enable_flag, safe_stock_flag, min_stock, max_stock, alert_stock,
-               high_value, batch_flag, remark, create_by, create_time, update_by, update_time
-        from qxx_md_item
+        select i.item_id, i.factory_id, i.item_code, i.item_name, i.specification, i.unit_of_measure,
+               i.unit_name, i.unit2, i.unit2_name, i.conversion_rate, i.item_type_id,
+               coalesce(nullif(i.item_type_code, ''), t.item_type_code) as item_type_code,
+               coalesce(nullif(i.item_type_name, ''), t.item_type_name) as item_type_name,
+               i.parent_id, i.product_size, i.package_spec, i.printing_req,
+               i.enable_flag, i.safe_stock_flag, i.min_stock, i.max_stock, i.alert_stock,
+               i.high_value, i.batch_flag, i.remark, i.create_by, i.create_time, i.update_by, i.update_time
+        from qxx_md_item i
+        left join qxx_md_item_type t on i.item_type_id = t.item_type_id
     </sql>
 
     <select id="selectMdItemList" parameterType="com.ruoyi.system.domain.mes.md.MdItem" resultMap="MdItemResult">
         <include refid="selectMdItemVo"/>
         <where>
-            <if test="itemCode != null and itemCode != ''"> and item_code like concat('%', #{itemCode}, '%')</if>
-            <if test="itemName != null and itemName != ''"> and item_name like concat('%', #{itemName}, '%')</if>
-            <if test="itemTypeId != null and itemTypeId != 0"> and item_type_id = #{itemTypeId}</if>
-            <if test="specification != null and specification != ''"> and specification like concat('%', #{specification}, '%')</if>
-            <if test="enableFlag != null and enableFlag != ''"> and enable_flag = #{enableFlag}</if>
-            <if test="parentIdFilter == 'spu'"> and parent_id = 0</if>
-            <if test="parentIdFilter == 'variant'"> and parent_id > 0</if>
+            <if test="itemCode != null and itemCode != ''"> and i.item_code like concat('%', #{itemCode}, '%')</if>
+            <if test="itemName != null and itemName != ''"> and i.item_name like concat('%', #{itemName}, '%')</if>
+            <if test="itemTypeId != null and itemTypeId != 0"> and i.item_type_id = #{itemTypeId}</if>
+            <if test="specification != null and specification != ''"> and i.specification like concat('%', #{specification}, '%')</if>
+            <if test="enableFlag != null and enableFlag != ''"> and i.enable_flag = #{enableFlag}</if>
+            <if test="parentIdFilter == 'spu'"> and i.parent_id = 0</if>
+            <if test="parentIdFilter == 'variant'"> and i.parent_id > 0</if>
         </where>
     </select>
 
     <select id="selectMdItemById" parameterType="Long" resultMap="MdItemResult">
         <include refid="selectMdItemVo"/>
-        where item_id = #{itemId}
+        where i.item_id = #{itemId}
     </select>
 
     <select id="checkItemCodeUnique" parameterType="com.ruoyi.system.domain.mes.md.MdItem" resultMap="MdItemResult">
         <include refid="selectMdItemVo"/>
-        where item_code = #{itemCode} limit 1
+        where i.item_code = #{itemCode} limit 1
     </select>
 
     <insert id="insertMdItem" parameterType="com.ruoyi.system.domain.mes.md.MdItem" useGeneratedKeys="true" keyProperty="itemId">

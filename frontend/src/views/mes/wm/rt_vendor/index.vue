@@ -243,7 +243,7 @@ function onWarehouseSelected(row: any) {
   form.value.warehouseCode = row.warehouseCode
   form.value.warehouseName = row.warehouseName
 }
-function handleSelectPurOrder() { purOrderSelectRef.value.open() }
+function handleSelectPurOrder() { purOrderSelectRef.value.open(['RECEIVING', 'RECEIVED']) }
 function onPurOrderSelected(row: PurOrder) {
   form.value.purOrderId = row.orderId
   form.value.purOrderCode = row.orderCode

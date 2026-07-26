@@ -32,4 +32,9 @@ export interface WmItemRecptLine extends BaseEntity {
   areaId?: number
   expireDate?: string
   noticeLineId?: number
+  purOrderLineId?: number
+  /** 订购数量(展示用,不落库) */
+  quantityOrdered?: number
+  /** 已收数量(展示用,不落库) */
+  quantityReceived?: number
 }

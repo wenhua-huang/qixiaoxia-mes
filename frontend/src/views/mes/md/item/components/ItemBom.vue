@@ -31,9 +31,10 @@
     <el-dialog :title="bomTitle" v-model="bomOpen" width="500px" append-to-body>
       <el-form ref="bomFormRef" :model="bomForm" :rules="bomRules" label-width="90px">
         <el-form-item label="子物料" prop="bomItemId">
-          <el-select v-model="bomForm.bomItemId" filterable placeholder="请选择子物料" style="width:100%">
-            <el-option v-for="i in itemOptions" :key="i.itemId" :label="i.itemName + ' (' + i.itemCode + ')'" :value="i.itemId" />
-          </el-select>
+          <el-input v-model="bomForm.bomItemName" readonly placeholder="请选择子物料">
+            <template #append><el-button @click="handleSelectItem">搜索</el-button></template>
+          </el-input>
+          <ItemSelect ref="itemSelectRef" @onSelected="onItemSelected" />
         </el-form-item>
         <el-row>
           <el-col :span="12">
@@ -56,7 +57,7 @@ import { ref, reactive, toRefs } from 'vue'
 import { getCurrentInstance } from 'vue'
 import type { MdProductBom } from '@/types/api/mes/md/bom'
 import { listBom, addBom, updateBom, delBom } from '@/api/mes/md/bom'
-import { listItem } from '@/api/mes/md/item'
+import ItemSelect from '@/components/itemSelect/single.vue'
 
 const props = defineProps<{ itemId: number }>()
 const { proxy } = getCurrentInstance() as any
@@ -66,7 +67,7 @@ const bomList = ref<any[]>([])
 const bomOpen = ref(false)
 const bomTitle = ref('')
 const multiple = ref(true)
-const itemOptions = ref<any[]>([])
+const itemSelectRef = ref()
 const ids = ref<number[]>([])
 
 const data = reactive({
@@ -87,13 +88,6 @@ async function load() {
   loading.value = false
 }
 
-async function loadItems() {
-  try {
-    const r = await listItem({ pageSize: 999 })
-    itemOptions.value = r.rows || []
-  } catch (e) { /* ignore */ }
-}
-
 function handleSelectionChange(s: any[]) { ids.value = s.map(i => i.bomId); multiple.value = !s.length }
 
 function resetBomForm() {
@@ -101,8 +95,19 @@ function resetBomForm() {
   proxy?.resetForm('bomFormRef')
 }
 
-function handleAdd() { loadItems(); resetBomForm(); bomOpen.value = true; bomTitle.value = '添加BOM物料' }
-function handleUpdate(row: any) { loadItems(); bomForm.value = { ...row }; bomOpen.value = true; bomTitle.value = '修改BOM物料' }
+function handleSelectItem() {
+  itemSelectRef.value?.open()
+}
+
+function onItemSelected(row: any) {
+  bomForm.value.bomItemId = row.itemId
+  bomForm.value.bomItemCode = row.itemCode
+  bomForm.value.bomItemName = row.itemName
+  if (row.unitOfMeasure) bomForm.value.unitOfMeasure = row.unitOfMeasure
+}
+
+function handleAdd() { resetBomForm(); bomOpen.value = true; bomTitle.value = '添加BOM物料' }
+function handleUpdate(row: any) { bomForm.value = { ...row }; bomOpen.value = true; bomTitle.value = '修改BOM物料' }
 
 async function submitBomForm() {
   proxy.$refs['bomFormRef'].validate(async (valid: boolean) => {

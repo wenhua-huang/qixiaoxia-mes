@@ -4,6 +4,10 @@ import request from '@/utils/request'
 export function listIssueHeader(query: any) {
   return request({ url: '/mes/wm/issueheader/list', method: 'get', params: query })
 }
+// 从工单生成领料单草稿（不落库，返回头+行草稿供前端编辑）
+export function buildFromWorkorder(workorderId: number) {
+  return request({ url: `/mes/wm/issueheader/buildFromWorkorder/${workorderId}`, method: 'get' })
+}
 // 从工单BOM导入领料行
 export function loadBomLines(issueId: number, workorderId: number) {
   return request({ url: `/mes/wm/issueheader/loadBom/${issueId}/${workorderId}`, method: 'put' })

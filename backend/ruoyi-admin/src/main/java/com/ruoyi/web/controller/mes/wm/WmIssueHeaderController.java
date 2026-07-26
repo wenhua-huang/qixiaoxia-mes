@@ -127,12 +127,21 @@ public class WmIssueHeaderController extends BaseController
     @DeleteMapping("/{issueIds}")
     public AjaxResult remove(@PathVariable Long[] issueIds) { return toAjax(wmIssueHeaderService.deleteWmIssueHeaderByIssueIds(issueIds)); }
 
-    /** 根据工单BOM自动生成领料行 */
+    /** 根据工单BOM自动生成领料行（落库式，需已存在头） */
     @PreAuthorize("@ss.hasPermi('mes:wm:issue:edit')")
     @Log(title = "生产领料单", businessType = BusinessType.UPDATE)
     @PutMapping("/loadBom/{issueId}/{workorderId}")
     public AjaxResult loadBom(@PathVariable Long issueId, @PathVariable Long workorderId)
     { return toAjax(wmIssueHeaderService.loadBomLines(issueId, workorderId)); }
+
+    /**
+     * 从工单生成领料单草稿（不落库）。
+     * 读工单 BOM 组装头+行草稿返回前端编辑，落库走 POST /mes/wm/issueheader。
+     */
+    @PreAuthorize("@ss.hasPermi('mes:wm:issue:add')")
+    @GetMapping("/buildFromWorkorder/{workorderId}")
+    public AjaxResult buildFromWorkorder(@PathVariable Long workorderId)
+    { return AjaxResult.success(wmIssueHeaderService.buildFromWorkorder(workorderId)); }
 
     /** 确认领料单：DRAFT → ALLOCATED（已预占），扣减可用库存 */
     @PreAuthorize("@ss.hasPermi('mes:wm:issue:edit')")

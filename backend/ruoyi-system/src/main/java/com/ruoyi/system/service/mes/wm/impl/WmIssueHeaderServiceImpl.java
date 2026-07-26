@@ -32,6 +32,8 @@ import com.ruoyi.system.domain.mes.wm.WmMaterialStock;
 import com.ruoyi.system.domain.mes.wm.WmTransaction;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderBom;
 import com.ruoyi.system.domain.mes.pro.ProMaterialTrace;
+import com.ruoyi.system.domain.mes.pro.ProWorkorder;
+import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
 import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 import com.ruoyi.system.service.mes.wm.IWmIssueHeaderService;
 
@@ -69,6 +71,9 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
     private AutoCodeGenerator autoCodeGenerator;
 
     @Autowired
+    private ProWorkorderMapper proWorkorderMapper;
+
+    @Autowired
     private RedisLockTemplate lockTemplate;
 
     @Autowired
@@ -97,18 +102,55 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
         e.setCreateTime(DateUtils.getNowDate());
         e.setCreateBy(SecurityUtils.getUsername());
         if (e.getStatus() == null) e.setStatus(WmIssueConstants.STATUS_DRAFT);
+        // 仓库必填（领料必须有发料仓库定位，否则后续预占/发料无法定位库存）
+        if (e.getWarehouseId() == null) {
+            throw new ServiceException("领料仓库不能为空");
+        }
         // issueCode 为空时自动生成（编码规则 ISSUE_CODE：ISS+yyyyMMdd+3位流水）
         if (StringUtils.isEmpty(e.getIssueCode())) {
             e.setIssueCode(autoCodeGenerator.genSerialCode(WmIssueConstants.CODE_RULE_ISSUE, ""));
         }
-        return wmIssueHeaderMapper.insertWmIssueHeader(e);
+        // 查重：生产领料同一工单不允许存在多张非终态领料单（防止重复生成造成多扣库存）
+        if (e.getWorkorderId() != null && WmIssueConstants.TYPE_PRODUCE.equals(e.getIssueType())) {
+            WmIssueHeader q = new WmIssueHeader();
+            q.setWorkorderId(e.getWorkorderId());
+            q.setIssueType(WmIssueConstants.TYPE_PRODUCE);
+            List<WmIssueHeader> existings = wmIssueHeaderMapper.selectWmIssueHeaderList(q);
+            if (existings != null) {
+                for (WmIssueHeader ex : existings) {
+                    if (!WmIssueConstants.isTerminal(ex.getStatus())) {
+                        throw new ServiceException("工单[" + e.getWorkorderCode()
+                                + "]已有进行中的领料单[" + ex.getIssueCode() + "]，请勿重复生成");
+                    }
+                }
+            }
+        }
+        wmIssueHeaderMapper.insertWmIssueHeader(e);
+        // 头行一次性原子落库（修复旧版"先存头后存行中途出错留脏单"问题）
+        if (e.getLines() != null && !e.getLines().isEmpty()) {
+            saveIssueLines(e, e.getLines());
+        }
+        return 1;
     }
 
     @Override
     public int updateWmIssueHeader(WmIssueHeader e) {
         e.setUpdateTime(DateUtils.getNowDate());
         e.setUpdateBy(SecurityUtils.getUsername());
-        return wmIssueHeaderMapper.updateWmIssueHeader(e);
+        // 携带 lines 表示全量替换明细（修复旧版"编辑删行不生效"问题）
+        if (e.getLines() != null) {
+            WmIssueHeader header = wmIssueHeaderMapper.selectWmIssueHeaderByIssueId(e.getIssueId());
+            if (header != null && !WmIssueConstants.isEditable(header.getStatus())) {
+                throw new ServiceException("领料单[" + header.getIssueCode() + "]状态["
+                        + header.getStatus() + "]不可修改明细");
+            }
+            wmIssueLineMapper.deleteWmIssueLineByIssueId(e.getIssueId());
+        }
+        wmIssueHeaderMapper.updateWmIssueHeader(e);
+        if (e.getLines() != null) {
+            saveIssueLines(e, e.getLines());
+        }
+        return 1;
     }
 
     /**
@@ -169,6 +211,72 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
         header.setUpdateTime(DateUtils.getNowDate());
         header.setUpdateBy(SecurityUtils.getUsername());
         return wmIssueHeaderMapper.updateWmIssueHeader(header);
+    }
+
+    // ── 2a-bis. 从工单生成领料单草稿（不落库，前端编辑后走 insert）──
+
+    @Override
+    public WmIssueHeader buildFromWorkorder(Long workorderId)
+    {
+        ProWorkorder wo = proWorkorderMapper.selectProWorkorderByWorkorderId(workorderId);
+        if (wo == null) throw new ServiceException("工单不存在");
+        String woStatus = wo.getStatus();
+        if (!"PREPARE".equals(woStatus) && !"PRODUCING".equals(woStatus)) {
+            throw new ServiceException("工单状态[" + woStatus + "]不可生成领料单，仅待生产/生产中可生成");
+        }
+
+        ProWorkorderBom query = new ProWorkorderBom();
+        query.setWorkorderId(workorderId);
+        List<ProWorkorderBom> bomList = proWorkorderBomMapper.selectProWorkorderBomList(query);
+        if (bomList == null || bomList.isEmpty()) throw new ServiceException("工单BOM为空，请先维护工单BOM");
+
+        List<WmIssueLine> lines = new ArrayList<>();
+        for (ProWorkorderBom bom : bomList) {
+            WmIssueLine line = new WmIssueLine();
+            line.setItemId(bom.getItemId());
+            line.setItemCode(bom.getItemCode());
+            line.setItemName(bom.getItemName());
+            line.setUnitOfMeasure(bom.getUnitOfMeasure());
+            line.setUnitName(bom.getUnitName());
+            line.setProcessId(bom.getProcessId());
+            line.setQuantityIssue(bom.getTotalQuantity() != null ? bom.getTotalQuantity() : BigDecimal.ZERO);
+            lines.add(line);
+        }
+
+        WmIssueHeader draft = new WmIssueHeader();
+        draft.setWorkorderId(wo.getWorkorderId());
+        draft.setWorkorderCode(wo.getWorkorderCode());
+        draft.setWorkorderName(wo.getWorkorderName());
+        draft.setIssueType(WmIssueConstants.TYPE_PRODUCE);
+        draft.setIssueName(wo.getWorkorderCode() + "-领料单");
+        draft.setIssueDate(DateUtils.getNowDate());
+        draft.setStatus(WmIssueConstants.STATUS_DRAFT);
+        draft.setLines(lines);
+        return draft;
+    }
+
+    /**
+     * 公共：批量保存领料明细行（insert/update 复用）。
+     * 回填 issueId/issueCode/warehouseId，累加 quantityTotal 到头。
+     */
+    private void saveIssueLines(WmIssueHeader header, List<WmIssueLine> lines)
+    {
+        if (lines == null || lines.isEmpty()) return;
+        BigDecimal totalQty = BigDecimal.ZERO;
+        for (WmIssueLine line : lines) {
+            line.setIssueId(header.getIssueId());
+            line.setIssueCode(header.getIssueCode());
+            if (line.getWarehouseId() == null) line.setWarehouseId(header.getWarehouseId());
+            line.setCreateTime(DateUtils.getNowDate());
+            line.setCreateBy(SecurityUtils.getUsername());
+            wmIssueLineMapper.insertWmIssueLine(line);
+            BigDecimal qty = line.getQuantityIssue() != null ? line.getQuantityIssue() : BigDecimal.ZERO;
+            totalQty = totalQty.add(qty);
+        }
+        header.setQuantityTotal(totalQty);
+        header.setUpdateTime(DateUtils.getNowDate());
+        header.setUpdateBy(SecurityUtils.getUsername());
+        wmIssueHeaderMapper.updateWmIssueHeader(header);
     }
 
     // ── 2b. 确认领料单：Redis 锁 + TransactionTemplate，预占库存 ──

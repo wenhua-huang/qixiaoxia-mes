@@ -31,8 +31,15 @@ public interface IWmIssueHeaderService
     public int deleteWmIssueHeaderByIssueIds(Long[] issueIds);
     public int deleteWmIssueHeaderByIssueId(Long issueId);
 
-    /** 根据工单BOM自动生成领料行 */
+    /** 根据工单BOM自动生成领料行（落库式，需已存在头） */
     public int loadBomLines(Long issueId, Long workorderId);
+
+    /**
+     * 从工单生成领料单草稿（不落库）。
+     * 读取工单 BOM 映射成领料明细行，组装草稿头返回给前端编辑，
+     * 真正落库走 {@link #insertWmIssueHeader}。
+     */
+    public WmIssueHeader buildFromWorkorder(Long workorderId);
 
     // ══════════════════════════════════════════════
     // 生命周期状态流转

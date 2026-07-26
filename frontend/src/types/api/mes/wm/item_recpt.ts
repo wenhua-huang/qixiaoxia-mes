@@ -1,4 +1,5 @@
 import { PageDomain, BaseEntity } from "@/types/api/common"
+import type { WmItemRecptLine } from "./item_recpt_line"
 
 export interface WmItemRecptQueryParams extends PageDomain {
   recptCode?: string
@@ -27,4 +28,6 @@ export interface WmItemRecpt extends BaseEntity {
   iqcId?: number
   iqcCode?: string
   status?: string
+  /** 入库单行列表（新增草稿/详情返回，非持久化） */
+  lines?: WmItemRecptLine[]
 }

@@ -41,4 +41,11 @@ public interface IWmItemRecptService
      * 若任一步失败全部回滚，不会产生孤儿入库单头。
      */
     public void receiveWithLines(ItemRecptReceiveBody body);
+
+    /**
+     * 从采购订单生成入库单草稿（不落库，返回前端编辑）。
+     * 读取采购订单头+行，1:1 映射为入库单头+行，入库数量预填为「订购 − 已收」未收量。
+     * 自动跳过已收完/已取消/已关闭的订单行；全部跳过则抛业务异常。
+     */
+    public WmItemRecpt buildFromPurOrder(Long orderId);
 }

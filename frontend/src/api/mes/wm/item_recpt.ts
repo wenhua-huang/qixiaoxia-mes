@@ -24,3 +24,8 @@ export function updateWmItemRecpt(d: WmItemRecpt): Promise<AjaxResult> {
 export function delWmItemRecpt(recptId: number | number[]): Promise<AjaxResult> {
   return request({ url: '/mes/wm/item_recpt/' + recptId, method: 'delete' })
 }
+
+/** 从采购订单生成入库单草稿（不落库，返回前端编辑） */
+export function buildFromPurOrder(orderId: number): Promise<AjaxResult<WmItemRecpt>> {
+  return request({ url: '/mes/wm/item_recpt/fromPurOrder/' + orderId, method: 'get' })
+}

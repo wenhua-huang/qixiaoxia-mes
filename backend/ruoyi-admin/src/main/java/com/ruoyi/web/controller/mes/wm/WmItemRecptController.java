@@ -89,6 +89,16 @@ public class WmItemRecptController extends BaseController
     }
 
     /**
+     * 从采购订单生成入库单草稿（不落库，返回前端编辑）。
+     * 入库数量预填为「订购 − 已收」未收量，支持同一采购订单分批入库。
+     */
+    @PreAuthorize("@ss.hasPermi('mes:wm:item_recpt:add')")
+    @GetMapping("/fromPurOrder/{orderId}")
+    public AjaxResult fromPurOrder(@PathVariable("orderId") Long orderId) {
+        return AjaxResult.success(wmItemRecptService.buildFromPurOrder(orderId));
+    }
+
+    /**
      * 确认收货 — 更新库存 + 回写PO到货标记（在同一事务中）
      */
     @PreAuthorize("@ss.hasPermi('mes:wm:item_recpt:edit')")

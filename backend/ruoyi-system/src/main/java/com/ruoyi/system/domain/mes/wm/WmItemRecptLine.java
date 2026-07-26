@@ -98,6 +98,12 @@ public class WmItemRecptLine extends BaseEntity
     /** 采购订单行ID(回写退货量精确匹配) */
     private Long purOrderLineId;
 
+    /** 订购数量(展示用,不落库) — 从采购订单行带出，供草稿页核对 */
+    private BigDecimal quantityOrdered;
+
+    /** 已收数量(展示用,不落库) — 从采购订单行带出，供草稿页核对 */
+    private BigDecimal quantityReceived;
+
     public Long getLineId() { return lineId; }
     public void setLineId(Long v) { this.lineId = v; }
 
@@ -175,6 +181,12 @@ public class WmItemRecptLine extends BaseEntity
 
     public Long getPurOrderLineId() { return purOrderLineId; }
     public void setPurOrderLineId(Long v) { this.purOrderLineId = v; }
+
+    public BigDecimal getQuantityOrdered() { return quantityOrdered; }
+    public void setQuantityOrdered(BigDecimal v) { this.quantityOrdered = v; }
+
+    public BigDecimal getQuantityReceived() { return quantityReceived; }
+    public void setQuantityReceived(BigDecimal v) { this.quantityReceived = v; }
 
     @Override
     public String toString() {

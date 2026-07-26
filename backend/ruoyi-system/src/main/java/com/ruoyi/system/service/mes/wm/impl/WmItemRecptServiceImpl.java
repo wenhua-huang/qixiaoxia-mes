@@ -95,18 +95,28 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
     @Override
     @Transactional
     public int updateWmItemRecpt(WmItemRecpt entity) {
+        // 先读 current 做状态守卫，再改 header（confirm/post 同款顺序）；
+        // 否则 mapper 动态 <set> 会先把 status 写成客户端传入的值，之后再读就是"自己写的 DRAFT"，
+        // 校验穿透 → 已过账单据可被回滚为 DRAFT 并清空行。
+        if (entity.getRecptId() == null) {
+            throw new ServiceException("入库单主键不能为空");
+        }
+        WmItemRecpt current = wmItemRecptMapper.selectWmItemRecptByRecptId(entity.getRecptId());
+        if (current == null) {
+            throw new ServiceException("入库单不存在");
+        }
+        // 状态、创建人、创建时间不允许通过 edit 接口改写；由生命周期方法(confirm/post/cancel)统一变更
+        entity.setStatus(current.getStatus());
+        entity.setCreateBy(current.getCreateBy());
+        entity.setCreateTime(current.getCreateTime());
         entity.setUpdateTime(DateUtils.getNowDate());
+        // 携带行时全量重建（仅 DRAFT 允许改行；非 DRAFT 直接拒绝改行意图）
+        boolean editLines = entity.getLines() != null;
+        if (editLines && !"DRAFT".equals(current.getStatus())) {
+            throw new ServiceException("仅草稿状态可编辑物料行");
+        }
         int rows = wmItemRecptMapper.updateWmItemRecpt(entity);
-        // 携带行时全量重建（仅 DRAFT 状态允许改行，其他状态守卫由 controller/前端负责）
-        // 与 insertWmItemRecpt 对称：一次提交连头带行，避免行改动被静默丢弃
-        if (entity.getLines() != null && entity.getRecptId() != null) {
-            WmItemRecpt current = wmItemRecptMapper.selectWmItemRecptByRecptId(entity.getRecptId());
-            if (current == null) {
-                throw new ServiceException("入库单不存在");
-            }
-            if (!"DRAFT".equals(current.getStatus())) {
-                throw new ServiceException("仅草稿状态可编辑物料行");
-            }
+        if (editLines) {
             wmItemRecptLineService.deleteWmItemRecptLineByRecptId(entity.getRecptId());
             if (!entity.getLines().isEmpty()) {
                 saveRecptLines(entity, entity.getLines());

@@ -27,6 +27,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by consume_id
     </select>
 
+    <select id="selectByWorkorderId" parameterType="Long" resultMap="ProFeedbackConsumeResult">
+        <include refid="selectProFeedbackConsumeVo"/>
+        where workorder_id = #{workorderId}
+        order by consume_id
+    </select>
+
     <insert id="insertBatch" parameterType="list">
         insert into qxx_pro_feedback_consume (feedback_id, workorder_id, item_id, item_code, item_name, quantity, batch_code)
         values

@@ -8,6 +8,9 @@
       <el-form-item label="工单名称" prop="workorderName">
         <el-input v-model="queryParams.workorderName" placeholder="请输入工单名称" clearable style="width:180px" @keyup.enter="handleQuery" />
       </el-form-item>
+      <el-form-item label="原领料单" prop="issueCode">
+        <el-input v-model="queryParams.issueCode" placeholder="请输入原领料单编码" clearable style="width:180px" @keyup.enter="handleQuery" />
+      </el-form-item>
       <el-form-item label="状态" prop="status">
         <el-select v-model="queryParams.status" placeholder="请选择状态" clearable style="width:120px">
           <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
@@ -22,7 +25,7 @@
     <!-- 工具栏 -->
     <el-row :gutter="10" class="mb8">
       <el-col :span="1.5">
-        <el-button type="primary" plain icon="Plus" size="small" @click="handleAdd" v-hasPermi="['mes:wm:rtissue:add']">新增</el-button>
+        <el-button type="primary" plain icon="Link" size="small" @click="handleFromIssue" v-hasPermi="['mes:wm:rtissue:add']">从领料单生成</el-button>
       </el-col>
       <el-col :span="1.5">
         <el-button type="success" plain icon="Edit" size="small" :disabled="single" @click="handleUpdate()" v-hasPermi="['mes:wm:rtissue:edit']">修改</el-button>
@@ -39,7 +42,7 @@
     <!-- 表格 -->
     <el-table v-loading="loading" :data="dataList" size="small" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="45" align="center" />
-      <el-table-column label="退料单编码" align="center" prop="rtCode" width="150">
+      <el-table-column label="退料单编码" align="center" prop="rtCode" width="160">
         <template #default="scope">
           <el-button link type="primary" size="small" @click="handleView(scope.row)">{{ scope.row.rtCode }}</el-button>
         </template>
@@ -53,7 +56,6 @@
         </template>
       </el-table-column>
       <el-table-column label="退料总数" align="center" prop="quantityTotal" width="90" />
-      <el-table-column label="单位" align="center" prop="unitName" width="80" />
       <el-table-column label="状态" align="center" prop="status" width="90">
         <template #default="scope">
           <el-tag :type="statusTag[scope.row.status] || 'info'" size="small">
@@ -61,11 +63,12 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="150" fixed="right" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="230" fixed="right" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="View" size="small" @click="handleView(scope.row)" v-hasPermi="['mes:wm:rtissue:query']">查看</el-button>
           <el-button link type="primary" icon="Edit" size="small" v-if="scope.row.status === 'DRAFT'" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:rtissue:edit']">修改</el-button>
-          <el-button link type="primary" icon="Delete" size="small" v-if="scope.row.status === 'DRAFT'" @click="handleDelete(scope.row)" v-hasPermi="['mes:wm:rtissue:remove']">删除</el-button>
+          <el-button link type="success" icon="Upload" size="small" v-if="scope.row.status === 'DRAFT'" @click="handleExecute(scope.row)" v-hasPermi="['mes:wm:rtissue:edit']">执行退库</el-button>
+          <el-button link type="danger" icon="Delete" size="small" v-if="scope.row.status === 'DRAFT'" @click="handleDelete(scope.row)" v-hasPermi="['mes:wm:rtissue:remove']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -81,12 +84,7 @@
             <el-row>
               <el-col :span="16">
                 <el-form-item label="退料单编码" prop="rtCode">
-                  <el-input v-model="form.rtCode" placeholder="请输入退料单编码" maxlength="64" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label-width="70" v-if="isAdd">
-                  <el-switch v-model="autoGenFlag" active-color="#13ce66" active-text="自动生成" @change="handleAutoGenChange" />
+                  <el-input v-model="form.rtCode" :placeholder="isAdd ? '保存时自动生成' : '请输入退料单编码'" disabled maxlength="64" />
                 </el-form-item>
               </el-col>
             </el-row>
@@ -98,19 +96,19 @@
               </el-col>
               <el-col :span="12">
                 <el-form-item label="生产工单" prop="workorderId">
-                  <el-input-number v-model="form.workorderId" :min="1" style="width:100%" placeholder="请输入工单ID" controls-position="right" />
+                  <el-input v-model="form.workorderCode" disabled placeholder="来源于领料单" />
                 </el-form-item>
               </el-col>
             </el-row>
             <el-row>
               <el-col :span="12">
                 <el-form-item label="原领料单" prop="issueId">
-                  <el-input-number v-model="form.issueId" :min="1" style="width:100%" placeholder="请输入原领料单ID" controls-position="right" />
+                  <el-input v-model="form.issueCode" disabled placeholder="来源于领料单" />
                 </el-form-item>
               </el-col>
               <el-col :span="12">
                 <el-form-item label="仓库" prop="warehouseId">
-                  <el-input-number v-model="form.warehouseId" :min="1" style="width:100%" placeholder="请输入仓库ID" controls-position="right" />
+                  <el-input v-model="form.warehouseName" disabled placeholder="来源于领料单" />
                 </el-form-item>
               </el-col>
             </el-row>
@@ -122,7 +120,7 @@
               </el-col>
               <el-col :span="12">
                 <el-form-item label="退料总数" prop="quantityTotal">
-                  <el-input-number v-model="form.quantityTotal" :min="0" :precision="2" style="width:100%" placeholder="退料总数量" controls-position="right" />
+                  <el-input v-model="form.quantityTotal" disabled placeholder="按明细自动汇总" />
                 </el-form-item>
               </el-col>
             </el-row>
@@ -137,45 +135,38 @@
         </el-tab-pane>
 
         <!-- Tab2: 退料行明细 -->
-        <el-tab-pane label="退料行明细" name="lines" :disabled="!form.rtId">
-          <template v-if="form.rtId">
-            <!-- 行工具栏 -->
-            <el-row :gutter="10" class="mb8" v-if="isEdit && form.status === 'DRAFT'">
-              <el-col :span="1.5">
-                <el-button type="primary" plain icon="Plus" size="small" @click="handleAddLine">新增退料行</el-button>
-              </el-col>
-            </el-row>
-            <!-- 行表格 -->
-            <el-table :data="lineList" size="small" v-loading="lineLoading">
-              <el-table-column label="物料ID" align="center" prop="itemId" width="90" />
-              <el-table-column label="物料编码" align="center" prop="itemCode" width="130" :show-overflow-tooltip="true" />
-              <el-table-column label="物料名称" align="center" prop="itemName" min-width="140" :show-overflow-tooltip="true" />
-              <el-table-column label="退料数量" align="center" prop="quantityRt" width="110">
-                <template #default="scope">
-                  <el-input-number v-if="isEdit && form.status === 'DRAFT'" v-model="scope.row.quantityRt" :min="0" :precision="2" size="small" controls-position="right" style="width:95px" @change="handleLineQuantityChange(scope.row)" />
-                  <span v-else>{{ scope.row.quantityRt }}</span>
-                </template>
-              </el-table-column>
-              <el-table-column label="已退数量" align="center" prop="quantityRted" width="100">
-                <template #default="scope">
-                  <span>{{ scope.row.quantityRted || 0 }}</span>
-                </template>
-              </el-table-column>
-              <el-table-column label="批次号" align="center" prop="batchCode" width="130">
-                <template #default="scope">
-                  <el-input v-if="isEdit && form.status === 'DRAFT'" v-model="scope.row.batchCode" size="small" placeholder="批次号" style="width:110px" />
-                  <span v-else>{{ scope.row.batchCode }}</span>
-                </template>
-              </el-table-column>
-              <el-table-column label="操作" align="center" width="110" v-if="isEdit && form.status === 'DRAFT'" class-name="small-padding fixed-width">
-                <template #default="scope">
-                  <el-button link type="primary" icon="Edit" size="small" @click="handleEditLine(scope.row)">编辑</el-button>
-                  <el-button link type="primary" icon="Delete" size="small" @click="handleDelLine(scope.row)">删除</el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-          </template>
-          <el-empty v-else description="请先保存单据头后再管理退料行明细" :image-size="80" />
+        <el-tab-pane label="退料行明细" name="lines">
+          <!-- 行工具栏：草稿态可重新从领料单拉取 -->
+          <el-row :gutter="10" class="mb8" v-if="!isView && form.status === 'DRAFT' && form.issueId">
+            <el-col :span="1.5">
+              <el-button type="success" plain icon="MagicStick" size="small" @click="handleReloadDraft">重新从领料单拉取</el-button>
+            </el-col>
+          </el-row>
+          <!-- 行表格 -->
+          <el-table :data="lineList" size="small" v-loading="lineLoading">
+            <el-table-column label="物料编码" align="center" prop="itemCode" width="130" :show-overflow-tooltip="true" />
+            <el-table-column label="物料名称" align="center" prop="itemName" min-width="140" :show-overflow-tooltip="true" />
+            <el-table-column label="规格" align="center" prop="itemSpc" width="120" :show-overflow-tooltip="true" />
+            <el-table-column label="退料数量" align="center" prop="quantityRt" width="120">
+              <template #default="scope">
+                <el-input-number v-if="!isView && form.status === 'DRAFT'" v-model="scope.row.quantityRt" :min="0" :precision="2" size="small" controls-position="right" style="width:105px" />
+                <span v-else>{{ scope.row.quantityRt }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="已退数量" align="center" prop="quantityRted" width="100">
+              <template #default="scope">
+                <span>{{ scope.row.quantityRted || 0 }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="单位" align="center" prop="unitName" width="70" />
+            <el-table-column label="批次号" align="center" prop="batchCode" width="130">
+              <template #default="scope">
+                <el-input v-if="!isView && form.status === 'DRAFT'" v-model="scope.row.batchCode" size="small" placeholder="批次号" style="width:110px" />
+                <span v-else>{{ scope.row.batchCode }}</span>
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-empty v-if="!lineList.length" description="暂无退料明细" :image-size="80" />
         </el-tab-pane>
       </el-tabs>
 
@@ -187,56 +178,80 @@
       </template>
     </el-dialog>
 
-    <!-- 退料行编辑弹窗 -->
-    <el-dialog :title="lineEditTitle" v-model="lineEditOpen" width="500px" append-to-body :close-on-click-modal="false">
-      <el-form ref="lineFormRef" :model="lineForm" :rules="lineRules" label-width="100px">
-        <el-form-item label="物料ID" prop="itemId">
-          <el-input-number v-model="lineForm.itemId" :min="1" style="width:100%" placeholder="请输入物料ID" controls-position="right" />
+    <!-- 领料单选择弹窗（从领料单生成退料单入口） -->
+    <el-dialog title="选择领料单（仅已发料可退料）" v-model="issueSelectOpen" width="900px" append-to-body :close-on-click-modal="false">
+      <el-form :inline="true" size="small" :model="issueQueryParams">
+        <el-form-item label="领料单编码">
+          <el-input v-model="issueQueryParams.issueCode" placeholder="请输入" clearable style="width:160px" @keyup.enter="loadIssueList" />
         </el-form-item>
-        <el-form-item label="物料编码" prop="itemCode">
-          <el-input v-model="lineForm.itemCode" placeholder="选择物料后自动回填" disabled />
+        <el-form-item label="工单名称">
+          <el-input v-model="issueQueryParams.workorderName" placeholder="请输入" clearable style="width:160px" @keyup.enter="loadIssueList" />
         </el-form-item>
-        <el-form-item label="物料名称" prop="itemName">
-          <el-input v-model="lineForm.itemName" placeholder="选择物料后自动回填" disabled />
-        </el-form-item>
-        <el-form-item label="退料数量" prop="quantityRt">
-          <el-input-number v-model="lineForm.quantityRt" :min="0" :precision="2" style="width:100%" placeholder="请输入退料数量" controls-position="right" />
-        </el-form-item>
-        <el-form-item label="批次号" prop="batchCode">
-          <el-input v-model="lineForm.batchCode" placeholder="请输入批次号" maxlength="64" />
+        <el-form-item>
+          <el-button type="primary" icon="Search" size="small" @click="loadIssueList">搜索</el-button>
         </el-form-item>
       </el-form>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button type="primary" @click="confirmLineEdit">确 定</el-button>
-          <el-button @click="lineEditOpen = false">取 消</el-button>
-        </div>
-      </template>
+      <el-table v-loading="issueLoading" :data="issueList" size="small" highlight-current-row :row-class-name="issueRowClass" @row-dblclick="onIssueRowDblClick">
+        <el-table-column label="领料单编码" align="center" prop="issueCode" width="160" />
+        <el-table-column label="工单" align="center" prop="workorderName" min-width="140" :show-overflow-tooltip="true" />
+        <el-table-column label="状态" align="center" prop="status" width="90">
+          <template #default="scope">
+            <el-tag size="small">{{ issueStatusMap[scope.row.status] || scope.row.status }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="申请/已发" align="center" width="110">
+          <template #default="scope">
+            <span>{{ scope.row.quantityTotal || 0 }} / {{ scope.row.quantityIssuedTotal || 0 }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="可退量" align="center" width="100">
+          <template #default="scope">
+            <el-tag v-if="(scope.row.returnableQty || 0) > 0" type="success" size="small">{{ scope.row.returnableQty }}</el-tag>
+            <el-tag v-else type="danger" size="small">无可退</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="领料日期" align="center" width="110">
+          <template #default="scope">
+            <span>{{ parseTime(scope.row.issueDate, '{y}-{m}-{d}') }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" align="center" width="90" fixed="right">
+          <template #default="scope">
+            <el-button link type="primary" size="small" :disabled="(scope.row.returnableQty || 0) <= 0" @click="onIssueSelected(scope.row)">选择</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <pagination v-show="issueTotal>0" :total="issueTotal" v-model:page="issueQueryParams.pageNum" v-model:limit="issueQueryParams.pageSize" @pagination="loadIssueList" />
     </el-dialog>
   </div>
 </template>
 
-<script setup lang="ts" name="WmRtIssue">
+<script setup lang="ts" name="WmRTIssue">
 import { ref, reactive, toRefs, getCurrentInstance, computed, onMounted } from 'vue'
-import { listRtIssue, getRtIssue, addRtIssue, updateRtIssue, delRtIssue } from '@/api/mes/wm/rtissue'
-import { listRtIssueLineByRtId, addRtIssueLine, updateRtIssueLine, delRtIssueLine } from '@/api/mes/wm/rtissueline'
-import { genSerialCode } from '@/api/mes/sys/autocoderule'
+import { listRtIssue, getRtIssue, addRtIssue, updateRtIssue, delRtIssue, buildFromIssue, executeReturn, returnablePreview } from '@/api/mes/wm/rtissue'
+import { listRtIssueLineByRtId } from '@/api/mes/wm/rtissueline'
 
 const { proxy } = getCurrentInstance() as any
 
 // -------------------- 常量 --------------------
+// 状态机：DRAFT → POSTED（与后端 doExecuteReturn 一致）
 const statusMap: Record<string, string> = {
   DRAFT: '草稿',
-  CONFIRMED: '已确认'
+  POSTED: '已退库'
 }
 const statusTag: Record<string, string> = {
   DRAFT: 'warning',
-  CONFIRMED: 'success'
+  POSTED: 'success'
 }
 const statusOptions = [
   { label: '草稿', value: 'DRAFT' },
-  { label: '已确认', value: 'CONFIRMED' }
+  { label: '已退库', value: 'POSTED' }
 ]
+// 领料单状态映射（选择弹窗展示用）
+const issueStatusMap: Record<string, string> = {
+  DRAFT: '草稿', PENDING: '待审核', APPROVED: '已审核', ALLOCATED: '已预占',
+  ISSUED: '已发料', PARTIAL_ISSUED: '部分发料', CLOSED: '已关闭', CANCELED: '已作废'
+}
 
 // -------------------- 状态定义 --------------------
 const loading = ref(true)
@@ -245,7 +260,6 @@ const lineLoading = ref(false)
 const open = ref(false)
 const showSearch = ref(true)
 const title = ref('')
-const autoGenFlag = ref(false)
 const activeTab = ref('header')
 const ids = ref<number[]>([])
 const single = ref(true)
@@ -254,26 +268,19 @@ const total = ref(0)
 const dataList = ref<any[]>([])
 const lineList = ref<any[]>([])
 
-// 弹窗模式判断
+// 弹窗模式判断（草稿态=新增，有 rtId 且非查看=编辑）
+const isView = ref(false)
 const isAdd = computed(() => !form.value.rtId)
 const isEdit = computed(() => !!form.value.rtId && !isView.value)
-const isView = ref(false)
 
-// 退料行编辑弹窗状态
-const lineEditOpen = ref(false)
-const lineEditTitle = ref('')
-const lineEditIndex = ref(-1)
-const lineForm = reactive<any>({
-  itemId: undefined,
-  itemCode: '',
-  itemName: '',
-  quantityRt: 0,
-  batchCode: ''
+// 领料单选择弹窗状态
+const issueSelectOpen = ref(false)
+const issueLoading = ref(false)
+const issueList = ref<any[]>([])
+const issueTotal = ref(0)
+const issueQueryParams = reactive<any>({
+  pageNum: 1, pageSize: 10, issueCode: undefined, workorderName: undefined, status: 'ISSUED'
 })
-const lineRules = {
-  itemId: [{ required: true, message: '物料ID不能为空', trigger: 'blur' }],
-  quantityRt: [{ required: true, message: '退料数量不能为空', trigger: 'blur' }]
-}
 
 const data = reactive({
   form: {} as any,
@@ -282,12 +289,11 @@ const data = reactive({
     pageSize: 10,
     rtCode: undefined,
     workorderName: undefined,
+    issueCode: undefined,
     status: undefined
   } as any,
   rules: {
-    rtCode: [{ required: true, message: '退料单编码不能为空', trigger: 'blur' }],
-    rtName: [{ required: true, message: '退料单名称不能为空', trigger: 'blur' }],
-    workorderId: [{ required: true, message: '生产工单不能为空', trigger: 'blur' }]
+    rtName: [{ required: true, message: '退料单名称不能为空', trigger: 'blur' }]
   }
 })
 
@@ -335,30 +341,71 @@ function cancel() {
 function reset() {
   isView.value = false
   submitLoading.value = false
-  autoGenFlag.value = false
   activeTab.value = 'header'
   lineList.value = []
-  lineEditIndex.value = -1
   form.value = {} as any
   proxy.resetForm('formRef')
 }
 
-// -------------------- 自动生成编码 --------------------
-function handleAutoGenChange(flag: boolean) {
-  if (flag) {
-    genSerialCode('RT_ISSUE_CODE').then((r: any) => {
-      form.value.rtCode = r.data
-    }).catch(() => { proxy.$modal.msgError('生成编码失败') })
-  } else {
-    form.value.rtCode = ''
-  }
+// -------------------- 从领料单生成（主入口）--------------------
+function handleFromIssue() {
+  issueQueryParams.pageNum = 1
+  issueSelectOpen.value = true
+  loadIssueList()
 }
 
-// -------------------- 新增 --------------------
-function handleAdd() {
+// 可退量=0 的行置灰
+function issueRowClass({ row }: { row: any }) {
+  return (row.returnableQty || 0) <= 0 ? 'disabled-row' : ''
+}
+
+function loadIssueList() {
+  issueLoading.value = true
+  returnablePreview(issueQueryParams)
+    .then((r: any) => {
+      issueList.value = r.rows
+      issueTotal.value = r.total
+    })
+    .catch(() => { proxy.$modal.msgError('加载领料单列表失败') })
+    .finally(() => { issueLoading.value = false })
+}
+
+async function onIssueSelected(row: any) {
+  if (!row || !row.issueId) return
+  try {
+    const r: any = await buildFromIssue(row.issueId)
+    issueSelectOpen.value = false
+    openAddDraft(r.data)
+  } catch (e) { /* 错误已由 request 拦截器提示 */ }
+}
+
+// 双击领料单行直接选中
+function onIssueRowDblClick(row: any) {
+  onIssueSelected(row)
+}
+
+// 用草稿打开编辑弹窗（领料单驱动，关联字段锁定只读，可调退料量/批次/日期/备注）
+function openAddDraft(draft: any) {
   reset()
+  const { lines, ...header } = draft
+  Object.assign(form.value, header)
+  form.value.rtCode = '' // 草稿态无编码，保存时后端自动生成
+  lineList.value = (lines || []).map((l: any) => ({ ...l }))
+  activeTab.value = 'header'
+  title.value = '从领料单生成退料单'
   open.value = true
-  title.value = '新增生产退料单'
+}
+
+// 草稿态重新从领料单拉取明细（覆盖当前明细）
+function handleReloadDraft() {
+  if (!form.value.issueId) { proxy.$modal.msgError('领料单缺失，无法拉取'); return }
+  buildFromIssue(form.value.issueId).then((r: any) => {
+    const draft = r.data
+    if (draft && draft.lines) {
+      lineList.value = draft.lines.map((l: any) => ({ ...l }))
+      proxy.$modal.msgSuccess('已从领料单重新拉取明细')
+    }
+  })
 }
 
 // -------------------- 查看 --------------------
@@ -391,6 +438,14 @@ function handleUpdate(row?: any) {
     .catch(() => { proxy.$modal.msgError('获取退料单详情失败') })
 }
 
+// -------------------- 执行退库（DRAFT→POSTED，加库存）--------------------
+function handleExecute(row: any) {
+  proxy.$modal.confirm(`确认对退料单【${row.rtCode}】执行退库？将增加库存且不可撤销。`)
+    .then(() => executeReturn(row.rtId))
+    .then(() => { proxy.$modal.msgSuccess('退库成功'); getList() })
+    .catch(() => {})
+}
+
 // -------------------- 删除 --------------------
 function handleDelete(row?: any) {
   const _ids = row?.rtId ? String(row.rtId) : ids.value.join(',')
@@ -409,130 +464,25 @@ function handleExport() {
   proxy.download('/mes/wm/rtissue/export', { ...queryParams.value }, `生产退料单_${new Date().getTime()}.xlsx`)
 }
 
-// -------------------- 退料行管理 --------------------
+// -------------------- 退料行加载（查看/修改已有单时用）--------------------
 function loadLines(rtId: number) {
   if (!rtId) return
   lineLoading.value = true
   listRtIssueLineByRtId(rtId)
-    .then((r: any) => {
-      lineList.value = r.data || r.rows || []
-    })
+    .then((r: any) => { lineList.value = r.data || r.rows || [] })
     .catch(() => { proxy.$modal.msgError('加载退料行明细失败') })
     .finally(() => { lineLoading.value = false })
 }
 
-function handleAddLine() {
-  lineEditIndex.value = -1
-  lineForm.itemId = undefined
-  lineForm.itemCode = ''
-  lineForm.itemName = ''
-  lineForm.quantityRt = 0
-  lineForm.batchCode = ''
-  lineEditTitle.value = '新增退料行'
-  lineEditOpen.value = true
-}
-
-function handleEditLine(row: any) {
-  lineEditIndex.value = lineList.value.indexOf(row)
-  lineForm.itemId = row.itemId
-  lineForm.itemCode = row.itemCode || ''
-  lineForm.itemName = row.itemName || ''
-  lineForm.quantityRt = row.quantityRt || 0
-  lineForm.batchCode = row.batchCode || ''
-  lineEditTitle.value = '编辑退料行'
-  lineEditOpen.value = true
-}
-
-function handleDelLine(row: any) {
-  const idx = lineList.value.indexOf(row)
-  if (idx < 0) return
-  if (row.lineId) {
-    // 已持久化的行，调用后端删除
-    delRtIssueLine(row.lineId).then(() => {
-      lineList.value.splice(idx, 1)
-      proxy.$modal.msgSuccess('删除退料行成功')
-    }).catch(() => { proxy.$modal.msgError('删除退料行失败') })
-  } else {
-    // 未持久化的行，仅从本地移除
-    lineList.value.splice(idx, 1)
-    proxy.$modal.msgSuccess('已移除')
-  }
-}
-
-function handleLineQuantityChange(row: any) {
-  // quantityRt 通过 v-model 已直接绑定，此处可用于联动逻辑（如需）
-}
-
-function confirmLineEdit() {
-  proxy.$refs['lineFormRef'].validate((valid: boolean) => {
-    if (!valid) return
-
-    const lineData = {
-      rtId: form.value.rtId,
-      itemId: lineForm.itemId,
-      itemCode: lineForm.itemCode,
-      itemName: lineForm.itemName,
-      quantityRt: lineForm.quantityRt,
-      batchCode: lineForm.batchCode
-    }
-
-    if (lineEditIndex.value >= 0) {
-      // 编辑已有行
-      const existing = lineList.value[lineEditIndex.value]
-      lineData.lineId = existing.lineId
-      if (existing.lineId) {
-        // 已持久化：调用更新API
-        updateRtIssueLine(lineData).then(() => {
-          lineList.value.splice(lineEditIndex.value, 1, { ...existing, ...lineData })
-          proxy.$modal.msgSuccess('更新退料行成功')
-          lineEditOpen.value = false
-        }).catch(() => { proxy.$modal.msgError('更新退料行失败') })
-      } else {
-        // 本地行：直接替换
-        lineList.value.splice(lineEditIndex.value, 1, { ...existing, ...lineData })
-        lineEditOpen.value = false
-      }
-    } else {
-      // 新增行
-      if (form.value.rtId) {
-        // 已有单据头ID，直接调用新增API
-        addRtIssueLine(lineData).then((r: any) => {
-          lineList.value.push(r.data || lineData)
-          proxy.$modal.msgSuccess('新增退料行成功')
-          lineEditOpen.value = false
-        }).catch(() => { proxy.$modal.msgError('新增退料行失败') })
-      } else {
-        // 尚未保存单据头，暂存到本地
-        lineList.value.push(lineData)
-        lineEditOpen.value = false
-      }
-    }
-  })
-}
-
-// -------------------- 提交保存 --------------------
+// -------------------- 提交保存（头+明细一次性提交）--------------------
 function submitForm() {
   proxy.$refs['formRef'].validate((valid: boolean) => {
     if (!valid) return
     submitLoading.value = true
-
+    // 头+明细一次性提交（后端原子事务落库，修复旧版脏单/删行不生效问题）
+    form.value.lines = lineList.value.map((l: any) => ({ ...l, rtId: form.value.rtId || undefined }))
     const action = form.value.rtId ? updateRtIssue(form.value) : addRtIssue(form.value)
     action
-      .then((r: any) => {
-        // 新增时获取返回的 rtId
-        if (!form.value.rtId && r.data?.rtId) {
-          form.value.rtId = r.data.rtId
-        }
-        // 保存未持久化的本地行
-        const unsavedLines = lineList.value.filter((l: any) => !l.lineId && l.itemId)
-        if (unsavedLines.length > 0 && form.value.rtId) {
-          const savePromises = unsavedLines.map((l: any) => {
-            l.rtId = form.value.rtId
-            return addRtIssueLine(l)
-          })
-          return Promise.all(savePromises).then(() => undefined)
-        }
-      })
       .then(() => {
         proxy.$modal.msgSuccess(form.value.rtId ? '修改成功' : '新增成功')
         open.value = false
@@ -550,5 +500,10 @@ function submitForm() {
 }
 :deep(.el-tabs__header) {
   margin-bottom: 16px;
+}
+/* 可退量=0 的领料单行置灰 */
+:deep(.el-table .disabled-row) {
+  color: #c0c4cc;
+  background-color: #fafafa;
 }
 </style>

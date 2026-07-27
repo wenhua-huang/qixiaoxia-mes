@@ -58,14 +58,17 @@
         <el-descriptions-item label="收货地址">{{ viewData.shippingAddress || '-' }}</el-descriptions-item>
         <el-descriptions-item label="签收时间" v-if="viewData.receivedTime">{{ parseTime(viewData.receivedTime) }}</el-descriptions-item>
         <el-descriptions-item label="签收人" v-if="viewData.receivedBy">{{ viewData.receivedBy }}</el-descriptions-item>
-        <el-descriptions-item label="回单附件" :span="2" v-if="viewData.attachmentUrl">
+        <el-descriptions-item label="回单附件" :span="2" v-if="attachments.length">
           <div class="att-list">
-            <div v-for="(u,i) in viewData.attachmentUrl.split(',')" :key="i" class="att-item">
-              <img :src="baseUrl+u" class="att-thumb" @click="previewImg=i; previewShow=true" />
+            <div v-for="(att, i) in attachments" :key="i" class="att-item" @click="handlePreview(att, i)">
+              <img v-if="att.isImage" :src="att.fullUrl" class="att-thumb" />
+              <div v-else class="att-file">
+                <el-icon :size="28"><Document /></el-icon>
+                <span class="att-name">{{ att.name }}</span>
+              </div>
             </div>
           </div>
-          <el-image-viewer v-if="previewShow" :url-list="viewData.attachmentUrl.split(',').map(x=>baseUrl+x)"
-                           :initial-index="previewImg" @close="previewShow=false" />
+          <el-image-viewer v-if="previewShow" :url-list="imageUrls" :initial-index="previewImg" @close="previewShow=false" />
         </el-descriptions-item>
       </el-descriptions>
       <div v-if="viewData?.boxes?.length" class="mt8">
@@ -83,7 +86,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, getCurrentInstance } from 'vue'
+import { ref, computed, getCurrentInstance } from 'vue'
+import { Document } from '@element-plus/icons-vue'
 import { getShipment, delShipment, cancelShipment } from '@/api/mes/wm/product_sales_shipment'
 import type { WmProductSales, WmProductSalesShipment, WmProductSalesBox } from '@/types'
 import ShipmentForm from './ShipmentForm.vue'
@@ -109,6 +113,30 @@ const viewShow = ref(false)
 const viewData = ref<WmProductSalesShipment | null>(null)
 const previewShow = ref(false)
 const previewImg = ref(0)
+
+// 附件解析：把 attachmentUrl(逗号分隔) 拆成结构化列表；区分图片(可预览)与其他文件(点击下载)
+interface Attachment { raw: string; fullUrl: string; name: string; isImage: boolean }
+const attachments = computed<Attachment[]>(() => {
+  const s = viewData.value?.attachmentUrl
+  if (!s) return []
+  return s.split(',').map(u => u.trim()).filter(Boolean).map(u => {
+    const name = u.split('/').pop() || u
+    const ext = name.split('.').pop()?.toLowerCase() || ''
+    return { raw: u, fullUrl: baseUrl + u, name, isImage: ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext) }
+  })
+})
+const imageUrls = computed(() => attachments.value.filter(a => a.isImage).map(a => a.fullUrl))
+
+function handlePreview(att: Attachment, i: number) {
+  if (att.isImage) {
+    // 大图预览：以图片列表中的位置为准，非图片不参与
+    previewImg.value = attachments.value.slice(0, i).filter(a => a.isImage).length
+    previewShow.value = true
+  } else {
+    // 非图片(pdf 等) 新 tab 打开
+    window.open(att.fullUrl, '_blank')
+  }
+}
 
 function handleAdd() { formRef.value?.open() }
 function emitRefresh() { emit('refresh') }
@@ -143,4 +171,6 @@ function handleDel(row: WmProductSalesShipment) {
 .att-list { display: flex; gap: 8px; flex-wrap: wrap; }
 .att-item { width: 100px; height: 100px; border-radius: 4px; overflow: hidden; border: 1px solid #dcdfe6; cursor: pointer; }
 .att-thumb { width: 100%; height: 100%; object-fit: cover; }
+.att-file { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f5f7fa; }
+.att-name { font-size: 11px; color: #606266; margin-top: 4px; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>

@@ -68,6 +68,58 @@ public final class WmProductSalesConstants
     /** 正常（销售出库默认只发正常库存） */
     public static final String QUALITY_NORMAL = "NORMAL";
 
+    // ==================== 头表发运子状态 ship_status（与主 status 正交，多次发运追踪） ====================
+    /** 未发运 */
+    public static final String SHIP_STATUS_UN_SHIPPED = "UN_SHIPPED";
+    /** 部分发运（多次发运进行中） */
+    public static final String SHIP_STATUS_PARTIAL_SHIPPED = "PARTIAL_SHIPPED";
+    /** 已发运（全部数量已发出） */
+    public static final String SHIP_STATUS_SHIPPED = "SHIPPED";
+    /** 已签收（全部发运已签收） */
+    public static final String SHIP_STATUS_RECEIVED = "RECEIVED";
+
+    /** 仍可继续发运的发运子状态（未全部发完） */
+    public static final String[] SHIPTABLE_SHIP_STATUSES = {
+            SHIP_STATUS_UN_SHIPPED, SHIP_STATUS_PARTIAL_SHIPPED
+    };
+
+    // ==================== 发运单状态 qxx_wm_product_sales_shipment.status ====================
+    /**
+     * 发运单生命周期：
+     * <pre>
+     *   SHIPPING(待发运) ──ship──▶ IN_TRANSIT(在途) ──receive──▶ RECEIVED(已签收)
+     *       │                          │
+     *       └──cancel(未发出)──▶ CANCELED   └──cancel(发出后不可取消，需走退货)──▶ ×
+     * </pre>
+     */
+    public static final String SHIPMENT_STATUS_SHIPPING = "SHIPPING";
+    public static final String SHIPMENT_STATUS_IN_TRANSIT = "IN_TRANSIT";
+    public static final String SHIPMENT_STATUS_RECEIVED = "RECEIVED";
+    public static final String SHIPMENT_STATUS_CANCELED = "CANCELED";
+
+    /** 可取消的发运单状态（仅待发运可取消） */
+    public static final String[] CANCELABLE_SHIPMENT_STATUSES = {SHIPMENT_STATUS_SHIPPING};
+
+    // ==================== 发货方式 ship_method ====================
+    /** 物流 */
+    public static final String SHIP_METHOD_LOGISTICS = "LOGISTICS";
+    /** 快递 */
+    public static final String SHIP_METHOD_EXPRESS = "EXPRESS";
+    /** 自提 */
+    public static final String SHIP_METHOD_PICKUP = "PICKUP";
+    /** 客户自送 */
+    public static final String SHIP_METHOD_SELF = "SELF";
+
+    // ==================== 装箱状态 qxx_wm_product_sales_box.status ====================
+    /** 已装箱（待发运） */
+    public static final String BOX_STATUS_PACKED = "PACKED";
+    /** 已发运（随发运单发出） */
+    public static final String BOX_STATUS_SHIPPED = "SHIPPED";
+
+    // ==================== 自动编码规则（续） ====================
+    /** 发运单编码规则 */
+    public static final String CODE_RULE_SHIP = "SHIP_NO";
+
     // ==================== 辅助方法 ====================
 
     /** 判断状态是否可编辑（修改/删除） */
@@ -92,6 +144,18 @@ public final class WmProductSalesConstants
     public static boolean isTerminal(String status)
     {
         return contains(TERMINAL_STATUSES, status);
+    }
+
+    /** 判断发运子状态是否仍可继续发运（未全部发完） */
+    public static boolean isShippableShipStatus(String shipStatus)
+    {
+        return contains(SHIPTABLE_SHIP_STATUSES, shipStatus);
+    }
+
+    /** 判断发运单是否可取消（仅待发运可取消） */
+    public static boolean isCancelableShipment(String shipmentStatus)
+    {
+        return contains(CANCELABLE_SHIPMENT_STATUSES, shipmentStatus);
     }
 
     private static boolean contains(String[] arr, String status)

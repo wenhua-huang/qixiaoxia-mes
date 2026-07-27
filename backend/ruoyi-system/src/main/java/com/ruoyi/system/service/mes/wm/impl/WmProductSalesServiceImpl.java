@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import com.ruoyi.system.domain.mes.wm.WmProductSales;
 import com.ruoyi.system.domain.mes.wm.WmProductSalesDetail;
 import com.ruoyi.system.domain.mes.wm.WmProductSalesLine;
+import com.ruoyi.system.domain.mes.wm.WmProductSalesShipment;
 import com.ruoyi.system.domain.mes.wm.WmMaterialStock;
 import com.ruoyi.system.domain.mes.wm.WmTransaction;
 import com.ruoyi.system.domain.mes.wm.vo.WmStockWarehouseSummary;
@@ -35,6 +36,8 @@ import com.ruoyi.system.mapper.mes.pro.ProMaterialTraceMapper;
 import com.ruoyi.system.service.mes.sal.ISalOrderService;
 import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 import com.ruoyi.system.service.mes.wm.IWmProductSalesService;
+import com.ruoyi.system.service.mes.wm.IWmProductSalesShipmentService;
+import com.ruoyi.system.service.mes.wm.IWmProductSalesBoxService;
 
 /**
  * 销售出库单业务层（状态机 + 过账扣库存 + FIFO 批次拣货）
@@ -56,6 +59,8 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
     @Autowired private RedisLockTemplate lockTemplate;
     @Autowired private PlatformTransactionManager transactionManager;
     @Autowired private ISalOrderService salOrderService;
+    @Autowired private IWmProductSalesShipmentService shipmentService;
+    @Autowired private IWmProductSalesBoxService boxService;
 
     private TransactionTemplate txTemplate;
 
@@ -144,6 +149,9 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         if (header == null) throw new ServiceException("出库单不存在");
         header.setLines(wmProductSalesLineMapper.selectLinesBySalesId(salesId));
         header.setDetails(wmProductSalesDetailMapper.selectDetailsBySalesId(salesId));
+        // 聚发运 + 装箱（发货工作台用）
+        header.setShipments(shipmentService.selectShipmentsBySalesId(salesId));
+        header.setBoxes(boxService.selectBoxesBySalesId(salesId));
         return header;
     }
 
@@ -359,34 +367,35 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         proMaterialTraceMapper.insertProMaterialTrace(trace);
     }
 
-    // ════════════════════ 发货 ════════════════════
+    // ════════════════════ 发货（委托发运单 Service，支持多次发运） ════════════════════
 
+    /**
+     * 发货（向后兼容入口）：将旧式「一次性发货」转为创建一条发运单。
+     * 新前端应直接走 /mes/wm/product_sales_shipment POST（支持勾选箱）。
+     * 旧前端 shipOut(salesId, info) 仍可用：把 info 的物流字段组装成 Shipment 落库。
+     */
     @Override
     public int ship(Long salesId, WmProductSales info) {
-        return lockTemplate.executeWithResult("wm:salesout:lock:" + salesId, 10,
-                () -> txTemplate.execute(status -> doShip(salesId, info)));
-    }
-
-    private Integer doShip(Long salesId, WmProductSales info) {
         WmProductSales header = wmProductSalesMapper.selectWmProductSalesBySalesId(salesId);
         if (header == null) throw new ServiceException("出库单不存在");
         if (!WmProductSalesConstants.isShippable(header.getStatus())) {
             throw new ServiceException("当前状态[" + header.getStatus() + "]不允许发货");
         }
-        header.setStatus(WmProductSalesConstants.STATUS_SHIPPED);
-        copyShipFields(header, info);
-        header.setUpdateTime(DateUtils.getNowDate());
-        header.setUpdateBy(SecurityUtils.getUsername());
-        return wmProductSalesMapper.updateWmProductSales(header);
-    }
-
-    private void copyShipFields(WmProductSales target, WmProductSales src) {
-        if (src.getLogisticsCompany() != null) target.setLogisticsCompany(src.getLogisticsCompany());
-        if (src.getTrackingNo() != null) target.setTrackingNo(src.getTrackingNo());
-        if (src.getLogisticsFee() != null) target.setLogisticsFee(src.getLogisticsFee());
-        if (src.getShippingAddress() != null) target.setShippingAddress(src.getShippingAddress());
-        if (src.getReceiverName() != null) target.setReceiverName(src.getReceiverName());
-        if (src.getReceiverTel() != null) target.setReceiverTel(src.getReceiverTel());
+        if (!WmProductSalesConstants.isShippableShipStatus(header.getShipStatus())) {
+            throw new ServiceException("发运已完成[" + header.getShipStatus() + "]，不可再发运");
+        }
+        WmProductSalesShipment ship = new WmProductSalesShipment();
+        ship.setSalesId(salesId);
+        ship.setShipMethod(WmProductSalesConstants.SHIP_METHOD_LOGISTICS);
+        ship.setLogisticsCompany(info.getLogisticsCompany());
+        ship.setTrackingNo(info.getTrackingNo());
+        ship.setLogisticsFee(info.getLogisticsFee());
+        ship.setReceiverName(info.getReceiverName());
+        ship.setReceiverTel(info.getReceiverTel());
+        ship.setShippingAddress(info.getShippingAddress());
+        ship.setPlanShipDate(info.getPlanShipDate());
+        // 不指定 boxes：发运单 Service 会自动取该单所有 PACKED 箱
+        return shipmentService.createShipment(ship);
     }
 
     // ════════════════════ 关闭 ════════════════════
@@ -395,8 +404,12 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
     public int close(Long salesId) {
         WmProductSales header = wmProductSalesMapper.selectWmProductSalesBySalesId(salesId);
         if (header == null) throw new ServiceException("出库单不存在");
-        if (!WmProductSalesConstants.STATUS_SHIPPED.equals(header.getStatus())) {
-            throw new ServiceException("只有已发货状态才能关闭");
+        // 允许「全部发运完成」或「已签收」关闭（SHIPPED 或 RECEIVED）
+        boolean shippedDone = WmProductSalesConstants.STATUS_SHIPPED.equals(header.getStatus())
+                || WmProductSalesConstants.SHIP_STATUS_RECEIVED.equals(header.getShipStatus());
+        if (!shippedDone) {
+            throw new ServiceException("仅全部发运完成或已签收的出库单可关闭，当前发运状态["
+                    + header.getShipStatus() + "]");
         }
         header.setStatus(WmProductSalesConstants.STATUS_CLOSED);
         header.setUpdateTime(DateUtils.getNowDate());

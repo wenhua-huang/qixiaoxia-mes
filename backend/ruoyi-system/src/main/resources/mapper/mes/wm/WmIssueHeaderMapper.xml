@@ -68,6 +68,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="warehouseId != null"> and warehouse_id = #{warehouseId}</if>
             <if test="issueType != null  and issueType != ''"> and issue_type = #{issueType}</if>
             <if test="status != null  and status != ''"> and status = #{status}</if>
+            <if test="params.beginTime != null and params.beginTime != ''"> and issue_date &gt;= #{params.beginTime}</if>
+            <if test="params.endTime != null and params.endTime != ''"> and issue_date &lt;= #{params.endTime}</if>
         </where>
         order by issue_id desc
     </select>

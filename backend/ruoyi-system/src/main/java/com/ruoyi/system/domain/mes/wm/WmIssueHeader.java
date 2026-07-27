@@ -2,6 +2,7 @@ package com.ruoyi.system.domain.mes.wm;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.List;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
@@ -60,6 +61,12 @@ public class WmIssueHeader extends BaseEntity
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date approveTime;
     private String cancelReason;
+
+    /** 领料明细列表（聚合字段，不落库；用于头行一次性提交/查询返回） */
+    private List<WmIssueLine> lines;
+
+    /** 可退料量（聚合字段，不落库；退料选择弹窗预算用 = 已发料 − 工单级报工消耗） */
+    private BigDecimal returnableQty;
 
     public Long getIssueId() { return issueId; }
     public void setIssueId(Long v) { this.issueId = v; }
@@ -123,6 +130,10 @@ public class WmIssueHeader extends BaseEntity
     public void setApproveTime(Date v) { this.approveTime = v; }
     public String getCancelReason() { return cancelReason; }
     public void setCancelReason(String v) { this.cancelReason = v; }
+    public List<WmIssueLine> getLines() { return lines; }
+    public void setLines(List<WmIssueLine> lines) { this.lines = lines; }
+    public BigDecimal getReturnableQty() { return returnableQty; }
+    public void setReturnableQty(BigDecimal returnableQty) { this.returnableQty = returnableQty; }
 
     @Override
     public String toString() {

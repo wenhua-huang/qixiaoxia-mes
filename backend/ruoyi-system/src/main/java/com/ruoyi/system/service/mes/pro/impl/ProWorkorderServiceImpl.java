@@ -292,6 +292,7 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
                 ep.put("_processName", processName != null ? processName : "");
                 ep.put("_paramName", paramName);
                 ep.put("paramName", paramName);
+                ep.put("imageUrl", tmpl != null ? tmpl.getImageUrl() : null);
 
                 enrichedParams.add(ep);
             }

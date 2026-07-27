@@ -78,6 +78,9 @@ public class ProParamTemplate extends BaseEntity
     @Excel(name = "是否启用")
     private String enableFlag;
 
+    /** 标准图样(多个逗号分隔,存/common/upload返回的相对路径) */
+    private String imageUrl;
+
     public void setTemplateId(Long templateId)
     {
         this.templateId = templateId;
@@ -223,6 +226,16 @@ public class ProParamTemplate extends BaseEntity
         return enableFlag;
     }
 
+    public void setImageUrl(String imageUrl)
+    {
+        this.imageUrl = imageUrl;
+    }
+
+    public String getImageUrl()
+    {
+        return imageUrl;
+    }
+
     @Override
     public String toString() {
         return new ToStringBuilder(this,ToStringStyle.MULTI_LINE_STYLE)
@@ -242,6 +255,7 @@ public class ProParamTemplate extends BaseEntity
             .append("isRequired", getIsRequired())
             .append("isReportVisible", getIsReportVisible())
             .append("enableFlag", getEnableFlag())
+            .append("imageUrl", getImageUrl())
             .append("remark", getRemark())
             .append("createBy", getCreateBy())
             .append("createTime", getCreateTime())

@@ -63,7 +63,7 @@ function getList() {
   listVendor(queryParams.value).then(r => { vendorList.value = r.rows; total.value = r.total; loading.value = false })
 }
 function handleQuery() { queryParams.value.pageNum = 1; getList() }
-function resetQuery() { queryParams.value = {}; handleQuery() }
+function resetQuery() { queryParams.value = { pageNum: 1, pageSize: 10, enableFlag: '1' }; handleQuery() }
 function handleRowChange(row: MdVendor) { selectedRow.value = row }
 function handleRowDbClick(row: MdVendor) {
   selectedRow.value = row
@@ -75,10 +75,26 @@ function confirmSelect() {
   emit('onSelected', selectedRow.value)
   showFlag.value = false
 }
-function open(id?: number) {
+
+/**
+ * 打开供应商选择器。
+ * @param idOrVendorName 数字视为已选 ID（单选回显）；字符串视为供应商名称预填查询。
+ */
+function open(idOrVendorName?: number | string) {
   showFlag.value = true
-  selectedVendorId.value = id
-  if (!vendorList.value.length) getList()
+  selectedRow.value = undefined
+  if (typeof idOrVendorName === 'number') {
+    selectedVendorId.value = idOrVendorName
+  } else {
+    selectedVendorId.value = undefined
+  }
+  // 每次打开重置查询条件 + 应用预填，保证上一次的筛选不残留
+  const presetName = typeof idOrVendorName === 'string' ? idOrVendorName : ''
+  queryParams.value = {
+    pageNum: 1, pageSize: 10, enableFlag: '1',
+    vendorName: presetName || undefined
+  }
+  getList()
 }
 
 defineExpose({ open })

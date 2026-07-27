@@ -101,8 +101,38 @@ public class WmProductSales extends BaseEntity
     @Excel(name = "出货检验单编码")
     private String oqcCode;
 
+    @Excel(name = "销售订单ID")
+    private Long salesOrderId;
+
+    @Excel(name = "销售订单编码")
+    private String salesOrderCode;
+
     @Excel(name = "状态:DRAFT-草稿")
     private String status;
+
+    @Excel(name = "已过账出库量")
+    private BigDecimal postedQuantity;
+
+    @Excel(name = "已发运量")
+    private BigDecimal shippedQuantity;
+
+    @Excel(name = "发运状态")
+    private String shipStatus;
+
+    @Excel(name = "计划发货日期")
+    private Date planShipDate;
+
+    /** 行列表（详情接口聚合，非DB字段） */
+    private java.util.List<WmProductSalesLine> lines;
+
+    /** 明细列表（详情接口聚合，非DB字段） */
+    private java.util.List<WmProductSalesDetail> details;
+
+    /** 发运单列表（详情接口聚合，非DB字段） */
+    private java.util.List<WmProductSalesShipment> shipments;
+
+    /** 装箱列表（详情接口聚合，非DB字段） */
+    private java.util.List<WmProductSalesBox> boxes;
 
     public Long getSalesId() { return salesId; }
     public void setSalesId(Long v) { this.salesId = v; }
@@ -190,6 +220,36 @@ public class WmProductSales extends BaseEntity
 
     public String getStatus() { return status; }
     public void setStatus(String v) { this.status = v; }
+
+    public Long getSalesOrderId() { return salesOrderId; }
+    public void setSalesOrderId(Long v) { this.salesOrderId = v; }
+
+    public String getSalesOrderCode() { return salesOrderCode; }
+    public void setSalesOrderCode(String v) { this.salesOrderCode = v; }
+
+    public BigDecimal getPostedQuantity() { return postedQuantity; }
+    public void setPostedQuantity(BigDecimal v) { this.postedQuantity = v; }
+
+    public BigDecimal getShippedQuantity() { return shippedQuantity; }
+    public void setShippedQuantity(BigDecimal v) { this.shippedQuantity = v; }
+
+    public String getShipStatus() { return shipStatus; }
+    public void setShipStatus(String v) { this.shipStatus = v; }
+
+    public Date getPlanShipDate() { return planShipDate; }
+    public void setPlanShipDate(Date v) { this.planShipDate = v; }
+
+    public java.util.List<WmProductSalesLine> getLines() { return lines; }
+    public void setLines(java.util.List<WmProductSalesLine> v) { this.lines = v; }
+
+    public java.util.List<WmProductSalesDetail> getDetails() { return details; }
+    public void setDetails(java.util.List<WmProductSalesDetail> v) { this.details = v; }
+
+    public java.util.List<WmProductSalesShipment> getShipments() { return shipments; }
+    public void setShipments(java.util.List<WmProductSalesShipment> v) { this.shipments = v; }
+
+    public java.util.List<WmProductSalesBox> getBoxes() { return boxes; }
+    public void setBoxes(java.util.List<WmProductSalesBox> v) { this.boxes = v; }
 
     @Override
     public String toString() {

@@ -64,6 +64,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where detail_id = #{detailId}
     </select>
 
+    <select id="selectDetailsBySalesId" parameterType="Long" resultMap="WmProductSalesDetailResult">
+        <include refid="selectWmProductSalesDetailVo"/>
+        where sales_id = #{salesId}
+        order by create_time desc
+    </select>
+
     <insert id="insertWmProductSalesDetail" parameterType="WmProductSalesDetail" useGeneratedKeys="true" keyProperty="detailId">
         insert into qxx_wm_product_sales_detail
         <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="salesId != null">sales_id,</if>

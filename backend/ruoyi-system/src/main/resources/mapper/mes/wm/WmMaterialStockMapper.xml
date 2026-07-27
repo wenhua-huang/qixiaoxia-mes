@@ -270,4 +270,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         for update
     </select>
 
+    <!-- 按 itemId 聚合各仓库可用量（建议出库仓库 / 按仓拆行用）FIFO：早入库的仓优先 -->
+    <select id="selectStockWarehouseSummary" resultType="com.ruoyi.system.domain.mes.wm.vo.WmStockWarehouseSummary">
+        select s.warehouse_id as warehouseId,
+               max(s.warehouse_code) as warehouseCode,
+               coalesce(max(s.warehouse_name), max(w.warehouse_name)) as warehouseName,
+               sum(s.quantity_available) as quantityAvailable
+        from qxx_wm_material_stock s
+        left join qxx_wm_warehouse w on w.warehouse_id = s.warehouse_id
+        where s.item_id = #{itemId}
+          and s.quantity_available > 0
+        group by s.warehouse_id
+        order by min(s.create_time) asc
+    </select>
+
 </mapper>

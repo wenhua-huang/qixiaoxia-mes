@@ -42,7 +42,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <include refid="selectWmRtIssueVo"/>
         <where>
             <if test="rtCode != null  and rtCode != ''"> and rt_code = #{rtCode}</if>
+            <if test="rtName != null  and rtName != ''"> and rt_name like concat('%', #{rtName}, '%')</if>
             <if test="workorderId != null"> and workorder_id = #{workorderId}</if>
+            <if test="workorderCode != null  and workorderCode != ''"> and workorder_code = #{workorderCode}</if>
+            <if test="workorderName != null  and workorderName != ''"> and workorder_name like concat('%', #{workorderName}, '%')</if>
+            <if test="issueId != null"> and issue_id = #{issueId}</if>
+            <if test="issueCode != null  and issueCode != ''"> and issue_code = #{issueCode}</if>
             <if test="status != null  and status != ''"> and status = #{status}</if>
         </where>
         order by rt_id desc

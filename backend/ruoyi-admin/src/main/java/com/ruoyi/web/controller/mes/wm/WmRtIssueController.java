@@ -17,6 +17,7 @@ import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.system.domain.mes.wm.WmRtIssue;
+import com.ruoyi.system.domain.mes.wm.WmIssueHeader;
 import com.ruoyi.system.service.mes.wm.IWmRtIssueService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.page.TableDataInfo;
@@ -70,7 +71,7 @@ public class WmRtIssueController extends BaseController
     @DeleteMapping("/{rtIds}")
     public AjaxResult remove(@PathVariable Long[] rtIds) { return toAjax(wmRtIssueService.deleteWmRtIssueByRtIds(rtIds)); }
 
-    /** 从领料单生成退料单：复制 issue lines → rt issues */
+    /** 从领料单生成退料单（落库式，全量退，需已存在领料单） */
     @PreAuthorize("@ss.hasPermi('mes:wm:rtissue:add')")
     @Log(title = "生产退料单", businessType = BusinessType.INSERT)
     @PostMapping("/createFromIssue/{issueId}")
@@ -78,6 +79,24 @@ public class WmRtIssueController extends BaseController
         Long rtId = wmRtIssueService.createFromIssue(issueId);
         return success(rtId);
     }
+
+    /**
+     * 从领料单生成退料单草稿（不落库，差额退料）。
+     * 读领料明细 + 工单报工消耗，组装差额退料草稿返回前端编辑，落库走 POST /mes/wm/rtissue。
+     */
+    @PreAuthorize("@ss.hasPermi('mes:wm:rtissue:add')")
+    @GetMapping("/buildFromIssue/{issueId}")
+    public AjaxResult buildFromIssue(@PathVariable Long issueId)
+    { return AjaxResult.success(wmRtIssueService.buildFromIssue(issueId)); }
+
+    /**
+     * 退料领料单选择弹窗：分页查 ISSUED 领料单，每行带预算可退量（已发料−工单级消耗）。
+     * 复用领料单查询条件（status/workorderName/issueCode 等）。同工单的消耗只算一次（消除 N+1）。
+     */
+    @PreAuthorize("@ss.hasPermi('mes:wm:rtissue:add')")
+    @GetMapping("/returnablePreview")
+    public TableDataInfo returnablePreview(WmIssueHeader query)
+    { startPage(); return getDataTable(wmRtIssueService.returnablePreview(query)); }
 
     /** 执行退库：加库存 + 写追溯 + 状态改为POSTED */
     @PreAuthorize("@ss.hasPermi('mes:wm:rtissue:edit')")

@@ -14,6 +14,8 @@ public interface WmItemRecptLineMapper
     public int updateWmItemRecptLine(WmItemRecptLine entity);
     public int deleteWmItemRecptLineByLineId(Long lineId);
     public int deleteWmItemRecptLineByLineIds(Long[] lineIds);
+    /** 按入库单头ID批量删除所有行（用于编辑草稿时全量重建行明细） */
+    public int deleteWmItemRecptLineByRecptId(Long recptId);
 
     /**
      * 可退批次聚合:按 (item, warehouse, batch) 聚合该 PO 已收货入库的可退量

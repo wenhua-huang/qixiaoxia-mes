@@ -8,8 +8,12 @@ public interface WmProductSalesLineMapper
     public List<WmProductSalesLine> selectWmProductSalesLineList(WmProductSalesLine entity);
     public List<WmProductSalesLine> selectWmProductSalesLineAll();
     public WmProductSalesLine selectWmProductSalesLineByLineId(Long lineId);
+    /** 按出库单ID查全部行（出库/详情用） */
+    public List<WmProductSalesLine> selectLinesBySalesId(Long salesId);
     public int insertWmProductSalesLine(WmProductSalesLine entity);
     public int updateWmProductSalesLine(WmProductSalesLine entity);
     public int deleteWmProductSalesLineByLineId(Long lineId);
     public int deleteWmProductSalesLineByLineIds(Long[] lineIds);
+    /** 按出库单ID删除全部行（编辑/重建用） */
+    public int deleteWmProductSalesLineBySalesId(Long salesId);
 }

@@ -28,9 +28,10 @@
     <el-dialog v-model="addOpen" title="添加供应物料" width="500px" append-to-body>
       <el-form label-width="100px">
         <el-form-item label="选择物料">
-          <el-select v-model="addForm.itemId" filterable placeholder="搜索物料" style="width:100%">
-            <el-option v-for="it in itemOptions" :key="it.itemId" :label="it.itemCode + ' ' + it.itemName" :value="it.itemId" />
-          </el-select>
+          <el-input v-model="addForm.itemName" readonly placeholder="请选择物料">
+            <template #append><el-button @click="handleSelectItem">搜索</el-button></template>
+          </el-input>
+          <ItemSelect ref="itemSelectRef" @onSelected="onItemSelected" />
         </el-form-item>
         <el-form-item label="最小起订量"><el-input-number v-model="addForm.minOrderQty" :min="0" style="width:100%" /></el-form-item>
         <el-form-item label="提前期(天)"><el-input-number v-model="addForm.leadTimeDays" :min="0" style="width:100%" /></el-form-item>
@@ -43,15 +44,15 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
 import { listByVendorId, addItemVendor, updateItemVendor, delItemVendor } from '@/api/mes/md/itemvendor'
-import { listItem } from '@/api/mes/md/item'
+import ItemSelect from '@/components/itemSelect/single.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const props = defineProps<{ vendorId: number }>()
 
 const list = ref<any[]>([])
 const addOpen = ref(false)
-const itemOptions = ref<any[]>([])
-const addForm = ref({ itemId: null as number | null, minOrderQty: 0, leadTimeDays: 0 })
+const itemSelectRef = ref()
+const addForm = ref({ itemId: null as number | null, itemCode: '', itemName: '', minOrderQty: 0, leadTimeDays: 0 })
 
 function load() {
   if (!props.vendorId) return
@@ -62,17 +63,25 @@ watch(() => props.vendorId, load)
 onMounted(load)
 
 function handleAdd() {
-  addForm.value = { itemId: null, minOrderQty: 0, leadTimeDays: 0 }
-  listItem({ pageSize: 500 }).then((r: any) => { itemOptions.value = r.rows || [] }).catch(() => {})
+  addForm.value = { itemId: null, itemCode: '', itemName: '', minOrderQty: 0, leadTimeDays: 0 }
   addOpen.value = true
+}
+
+function handleSelectItem() {
+  itemSelectRef.value?.open()
+}
+
+function onItemSelected(row: any) {
+  addForm.value.itemId = row.itemId
+  addForm.value.itemCode = row.itemCode
+  addForm.value.itemName = row.itemName
 }
 
 function submitAdd() {
   if (!addForm.value.itemId) { ElMessage.warning('请选择物料'); return }
-  const it = itemOptions.value.find(i => i.itemId === addForm.value.itemId)
   addItemVendor({
     vendorId: props.vendorId, itemId: addForm.value.itemId,
-    itemCode: it?.itemCode, itemName: it?.itemName,
+    itemCode: addForm.value.itemCode, itemName: addForm.value.itemName,
     isPreferred: 'N', minOrderQty: addForm.value.minOrderQty, leadTimeDays: addForm.value.leadTimeDays
   }).then(() => { addOpen.value = false; load(); ElMessage.success('添加成功') }).catch(() => {})
 }

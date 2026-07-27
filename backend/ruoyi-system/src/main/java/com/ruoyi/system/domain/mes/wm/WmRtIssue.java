@@ -2,6 +2,7 @@ package com.ruoyi.system.domain.mes.wm;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.List;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
@@ -48,6 +49,9 @@ public class WmRtIssue extends BaseEntity
     @Excel(name = "状态")
     private String status;
 
+    /** 退料明细列表（聚合字段，不落库；用于头行一次性提交/查询返回） */
+    private List<WmRtIssueLine> lines;
+
     public Long getRtId() { return rtId; }
     public void setRtId(Long v) { this.rtId = v; }
     public Long getFactoryId() { return factoryId; }
@@ -92,6 +96,8 @@ public class WmRtIssue extends BaseEntity
     public void setRqcCode(String v) { this.rqcCode = v; }
     public String getStatus() { return status; }
     public void setStatus(String v) { this.status = v; }
+    public List<WmRtIssueLine> getLines() { return lines; }
+    public void setLines(List<WmRtIssueLine> lines) { this.lines = lines; }
 
     @Override
     public String toString() {

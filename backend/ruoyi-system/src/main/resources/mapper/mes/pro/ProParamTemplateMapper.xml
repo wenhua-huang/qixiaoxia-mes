@@ -21,6 +21,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="isRequired"    column="is_required"    />
         <result property="isReportVisible"    column="is_report_visible"    />
         <result property="enableFlag"    column="enable_flag"    />
+        <result property="imageUrl"    column="image_url"    />
         <result property="remark"    column="remark"    />
         <result property="createBy"    column="create_by"    />
         <result property="createTime"    column="create_time"    />
@@ -29,7 +30,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectProParamTemplateVo">
-        select template_id, factory_id, process_id, param_code, param_name, param_group, param_type, unit, enum_values, default_value, min_value, max_value, sort_order, is_required, is_report_visible, enable_flag, remark, create_by, create_time, update_by, update_time from qxx_pro_param_template
+        select template_id, factory_id, process_id, param_code, param_name, param_group, param_type, unit, enum_values, default_value, min_value, max_value, sort_order, is_required, is_report_visible, enable_flag, image_url, remark, create_by, create_time, update_by, update_time from qxx_pro_param_template
     </sql>
 
     <select id="selectProParamTemplateList" parameterType="ProParamTemplate" resultMap="ProParamTemplateResult">
@@ -73,6 +74,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="isRequired != null">is_required,</if>
             <if test="isReportVisible != null">is_report_visible,</if>
             <if test="enableFlag != null">enable_flag,</if>
+            <if test="imageUrl != null">image_url,</if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
@@ -92,6 +94,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="isRequired != null">#{isRequired},</if>
             <if test="isReportVisible != null">#{isReportVisible},</if>
             <if test="enableFlag != null">#{enableFlag},</if>
+            <if test="imageUrl != null">#{imageUrl},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
@@ -115,6 +118,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="isRequired != null">is_required = #{isRequired},</if>
             <if test="isReportVisible != null">is_report_visible = #{isReportVisible},</if>
             <if test="enableFlag != null">enable_flag = #{enableFlag},</if>
+            <if test="imageUrl != null">image_url = #{imageUrl},</if>
             <if test="remark != null">remark = #{remark},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="updateTime != null">update_time = #{updateTime},</if>

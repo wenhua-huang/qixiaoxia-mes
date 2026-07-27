@@ -335,6 +335,12 @@
                 <span>{{ formatRange(scope.row) }}</span>
               </template>
             </el-table-column>
+            <el-table-column label="标准图样" align="center" width="70">
+              <template #default="scope">
+                <image-preview v-if="scope.row.imageUrl" :src="scope.row.imageUrl" :width="40" :height="40" />
+                <span v-else style="color: #909399">-</span>
+              </template>
+            </el-table-column>
             <el-table-column label="实际值" align="center" prop="actualValue" min-width="150">
               <template #default="scope">
                 <el-input v-model="scope.row.actualValue" size="small" placeholder="请输入" :disabled="optType === 'view'" />
@@ -606,6 +612,7 @@ function loadParamTemplates(processId: number) {
       unit: t.unit || '',
       minValue: t.minValue,
       maxValue: t.maxValue,
+      imageUrl: t.imageUrl,
       actualValue: '',
       isDeviation: null,
     }))

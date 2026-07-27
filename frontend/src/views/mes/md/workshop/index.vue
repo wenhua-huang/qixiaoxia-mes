@@ -69,7 +69,9 @@
       <el-table-column label="车间编码" align="center" prop="workshopCode" />
       <el-table-column label="车间名称" align="center" prop="workshopName" />
       <el-table-column label="车间地址" align="center" prop="address" :show-overflow-tooltip="true" />
-      <el-table-column label="负责人" align="center" prop="manager" />
+      <el-table-column label="负责人" align="center" prop="manager">
+        <template #default="scope">{{ nickOf(scope.row.manager) }}</template>
+      </el-table-column>
       <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
       <el-table-column label="启用" align="center" width="70">
         <template #default="scope">
@@ -113,7 +115,20 @@
           <el-input v-model="form.address" placeholder="请输入车间地址" />
         </el-form-item>
         <el-form-item label="负责人" prop="manager">
-          <el-input v-model="form.manager" placeholder="请输入负责人" />
+          <el-select
+            v-model="form.manager"
+            placeholder="请选择负责人"
+            clearable
+            filterable
+            style="width:100%"
+          >
+            <el-option
+              v-for="u in userOptions"
+              :key="u.userName"
+              :label="u.nickName || u.userName"
+              :value="u.userName"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="是否启用" prop="enableFlag">
           <el-radio-group v-model="form.enableFlag">
@@ -141,9 +156,23 @@ import { getCurrentInstance } from 'vue'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import type { MdWorkshop, WorkshopQueryParams } from '@/types/api/mes/md/workshop'
 import { listWorkshop, getWorkshop, delWorkshop, addWorkshop, updateWorkshop } from '@/api/mes/md/workshop'
+import { listUser } from '@/api/system/user'
 
 const { proxy } = getCurrentInstance() as any
 const { sys_yes_no } = useDict('sys_yes_no')
+
+// 负责人下拉数据源（预加载 SysUser 列表，表单存 userName，展示 nickName）
+const userOptions = ref<any[]>([])
+function loadUserOptions() {
+  listUser({ pageNum: 1, pageSize: 999 } as any).then((res: any) => {
+    userOptions.value = res.rows || []
+  })
+}
+function nickOf(userName?: string) {
+  if (!userName) return ''
+  const u = userOptions.value.find((x: any) => x.userName === userName)
+  return u ? (u.nickName || u.userName) : userName
+}
 
 const workshopList = ref<MdWorkshop[]>([])
 const open = ref<boolean>(false)
@@ -299,6 +328,7 @@ function handleExport() {
 }
 
 getList()
+loadUserOptions()
 </script>
 
 <style scoped>

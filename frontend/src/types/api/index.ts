@@ -55,6 +55,7 @@ export * from "./mes/wm/package_line";
 export * from "./mes/wm/product_sales";
 export * from "./mes/wm/product_sales_detail";
 export * from "./mes/wm/product_sales_line";
+export * from "./mes/wm/product_sales_shipment";
 export * from "./mes/wm/roll_detail";
 export * from "./mes/wm/rt_sales";
 export * from "./mes/wm/rt_sales_detail";

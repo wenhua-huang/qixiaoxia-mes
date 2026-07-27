@@ -47,7 +47,7 @@
         <template #default="scope">
           <el-tooltip content="查看" placement="top"><el-button link type="primary" icon="View" @click="handleView(scope.row)" /></el-tooltip>
           <el-tooltip content="过账出库" placement="top" v-if="scope.row.status==='DRAFT' || scope.row.status==='PARTIAL_POSTED'"><el-button link type="warning" icon="Upload" @click="handlePost(scope.row)" v-hasPermi="['mes:wm:sales:post']" /></el-tooltip>
-          <el-tooltip content="发货" placement="top" v-if="scope.row.status==='POSTED' || scope.row.status==='PARTIAL_POSTED'"><el-button link type="success" icon="Van" @click="handleShip(scope.row)" v-hasPermi="['mes:wm:sales:ship']" /></el-tooltip>
+          <el-tooltip content="发货" placement="top" v-if="scope.row.status==='POSTED' || scope.row.status==='PARTIAL_POSTED' || scope.row.status==='SHIPPED'"><el-button link type="success" icon="Van" @click="handleShip(scope.row)" v-hasPermi="['mes:wm:sales:ship']" /></el-tooltip>
           <el-tooltip content="关闭" placement="top" v-if="scope.row.status==='SHIPPED'"><el-button link type="primary" icon="CircleClose" @click="handleCloseRow(scope.row)" v-hasPermi="['mes:wm:sales:close']" /></el-tooltip>
           <el-tooltip content="修改" placement="top" v-if="scope.row.status==='DRAFT'"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:sales:edit']" /></el-tooltip>
           <el-tooltip content="作废" placement="top" v-if="!isTerminal(scope.row.status) && scope.row.status!=='POSTED' && scope.row.status!=='SHIPPED'"><el-button link type="danger" icon="Close" @click="handleCancelRow(scope.row)" v-hasPermi="['mes:wm:sales:cancel']" /></el-tooltip>
@@ -62,38 +62,14 @@
     <SalesOutDialog ref="outDialogRef" @success="getList" />
     <!-- 销售订单选择 -->
     <SaleOrderSelect ref="orderSelectRef" @onSelected="onOrderSelected" />
-    <!-- 发货弹窗 -->
-    <el-dialog title="发货登记" v-model="shipOpen" width="600px" append-to-body>
-      <el-form :model="shipForm" label-width="100px">
-        <el-row>
-          <el-col :span="24"><el-form-item label="物流公司"><el-input v-model="shipForm.logisticsCompany" /></el-form-item></el-col>
-        </el-row>
-        <el-row>
-          <el-col :span="24"><el-form-item label="物流单号"><el-input v-model="shipForm.trackingNo" /></el-form-item></el-col>
-        </el-row>
-        <el-row>
-          <el-col :span="12"><el-form-item label="物流费用"><el-input-number v-model="shipForm.logisticsFee" :min="0" :precision="2" /></el-form-item></el-col>
-        </el-row>
-        <el-row>
-          <el-col :span="24"><el-form-item label="收货地址"><el-input v-model="shipForm.shippingAddress" type="textarea" :rows="2" /></el-form-item></el-col>
-        </el-row>
-        <el-row>
-          <el-col :span="12"><el-form-item label="收货人"><el-input v-model="shipForm.receiverName" /></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="联系电话"><el-input v-model="shipForm.receiverTel" /></el-form-item></el-col>
-        </el-row>
-      </el-form>
-      <template #footer>
-        <el-button type="primary" @click="confirmShip">确认发货</el-button>
-        <el-button @click="shipOpen=false">取 消</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts" name="WmProductSales">
 import { ref, reactive, getCurrentInstance } from 'vue'
+import { useRouter } from 'vue-router'
 import type { WmProductSalesQueryParams, WmProductSales } from '@/types/api/mes/wm/product_sales'
-import { listWmProductSales, getSalesDetail, delWmProductSales, shipOut, closeSales, cancelSales, buildFromSaleOrder } from '@/api/mes/wm/product_sales'
+import { listWmProductSales, getSalesDetail, delWmProductSales, closeSales, cancelSales, buildFromSaleOrder } from '@/api/mes/wm/product_sales'
 import SalesFormDialog from './components/SalesFormDialog.vue'
 import SalesOutDialog from './components/SalesOutDialog.vue'
 import SaleOrderSelect from './components/SaleOrderSelect.vue'
@@ -112,9 +88,7 @@ const queryParams = reactive<WmProductSalesQueryParams>({ pageNum: 1, pageSize: 
 const formDialogRef = ref()
 const outDialogRef = ref()
 const orderSelectRef = ref()
-const shipOpen = ref(false)
-const shipTargetId = ref<number | null>(null)
-const shipForm = reactive<Partial<WmProductSales>>({})
+const router = useRouter()
 
 const TERMINAL = ['CLOSED', 'CANCELED']
 const isTerminal = (s: string) => TERMINAL.includes(s)
@@ -153,23 +127,9 @@ function handleExport() { proxy.download('/mes/wm/product_sales/export', { ...qu
 // 过账出库
 function handlePost(row: WmProductSales) { outDialogRef.value?.open(row) }
 
-// 发货
+// 发货：跳转独立发货工作台
 function handleShip(row: WmProductSales) {
-  shipTargetId.value = row.salesId
-  Object.keys(shipForm).forEach(k => delete (shipForm as any)[k])
-  // 预填客户地址
-  if (row.shippingAddress) shipForm.shippingAddress = row.shippingAddress
-  if (row.receiverName) shipForm.receiverName = row.receiverName
-  if (row.receiverTel) shipForm.receiverTel = row.receiverTel
-  shipOpen.value = true
-}
-function confirmShip() {
-  if (!shipTargetId.value) return
-  shipOut(shipTargetId.value, shipForm).then(() => {
-    proxy.$modal.msgSuccess('发货成功')
-    shipOpen.value = false
-    getList()
-  })
+  router.push({ path: '/mes/wm/product_sales_ship', query: { salesId: row.salesId } })
 }
 
 // 关闭

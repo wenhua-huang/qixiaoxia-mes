@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.wm.WmProductSalesShipmentMapper">
+
+    <resultMap type="WmProductSalesShipment" id="WmProductSalesShipmentResult">
+        <id property="shipmentId" column="shipment_id" />
+        <result property="factoryId" column="factory_id" />
+        <result property="salesId" column="sales_id" />
+        <result property="shipmentCode" column="shipment_code" />
+        <result property="shipMethod" column="ship_method" />
+        <result property="logisticsCompany" column="logistics_company" />
+        <result property="trackingNo" column="tracking_no" />
+        <result property="logisticsFee" column="logistics_fee" />
+        <result property="vehicleNo" column="vehicle_no" />
+        <result property="driverName" column="driver_name" />
+        <result property="driverTel" column="driver_tel" />
+        <result property="receiverName" column="receiver_name" />
+        <result property="receiverTel" column="receiver_tel" />
+        <result property="shippingAddress" column="shipping_address" />
+        <result property="planShipDate" column="plan_ship_date" />
+        <result property="actualShipDate" column="actual_ship_date" />
+        <result property="shippedQuantity" column="shipped_quantity" />
+        <result property="boxCount" column="box_count" />
+        <result property="status" column="status" />
+        <result property="receivedTime" column="received_time" />
+        <result property="receivedBy" column="received_by" />
+        <result property="receivedRemark" column="received_remark" />
+        <result property="attachmentUrl" column="attachment_url" />
+        <result property="remark" column="remark" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <sql id="selectWmProductSalesShipmentVo">
+        select shipment_id, factory_id, sales_id, shipment_code, ship_method, logistics_company, tracking_no,
+               logistics_fee, vehicle_no, driver_name, driver_tel, receiver_name, receiver_tel, shipping_address,
+               plan_ship_date, actual_ship_date, shipped_quantity, box_count, status, received_time, received_by,
+               received_remark, attachment_url, remark, create_by, create_time, update_by, update_time
+        from qxx_wm_product_sales_shipment
+    </sql>
+
+    <select id="selectWmProductSalesShipmentList" parameterType="WmProductSalesShipment" resultMap="WmProductSalesShipmentResult">
+        <include refid="selectWmProductSalesShipmentVo"/>
+        <where>
+            <if test="salesId != null"> and sales_id = #{salesId}</if>
+            <if test="shipmentCode != null and shipmentCode != ''"> and shipment_code like concat('%', #{shipmentCode}, '%')</if>
+            <if test="shipMethod != null and shipMethod != ''"> and ship_method = #{shipMethod}</if>
+            <if test="logisticsCompany != null and logisticsCompany != ''"> and logistics_company like concat('%', #{logisticsCompany}, '%')</if>
+            <if test="trackingNo != null and trackingNo != ''"> and tracking_no like concat('%', #{trackingNo}, '%')</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+            <if test="receiverName != null and receiverName != ''"> and receiver_name like concat('%', #{receiverName}, '%')</if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <select id="selectWmProductSalesShipmentAll" resultMap="WmProductSalesShipmentResult">
+        <include refid="selectWmProductSalesShipmentVo"/>
+    </select>
+
+    <select id="selectWmProductSalesShipmentByShipmentId" parameterType="Long" resultMap="WmProductSalesShipmentResult">
+        <include refid="selectWmProductSalesShipmentVo"/>
+        where shipment_id = #{shipmentId}
+    </select>
+
+    <select id="selectShipmentsBySalesId" parameterType="Long" resultMap="WmProductSalesShipmentResult">
+        <include refid="selectWmProductSalesShipmentVo"/>
+        where sales_id = #{salesId}
+        order by shipment_id asc
+    </select>
+
+    <insert id="insertWmProductSalesShipment" parameterType="WmProductSalesShipment" useGeneratedKeys="true" keyProperty="shipmentId">
+        insert into qxx_wm_product_sales_shipment
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="salesId != null">sales_id,</if>
+            <if test="shipmentCode != null">shipment_code,</if>
+            <if test="shipMethod != null">ship_method,</if>
+            <if test="logisticsCompany != null">logistics_company,</if>
+            <if test="trackingNo != null">tracking_no,</if>
+            <if test="logisticsFee != null">logistics_fee,</if>
+            <if test="vehicleNo != null">vehicle_no,</if>
+            <if test="driverName != null">driver_name,</if>
+            <if test="driverTel != null">driver_tel,</if>
+            <if test="receiverName != null">receiver_name,</if>
+            <if test="receiverTel != null">receiver_tel,</if>
+            <if test="shippingAddress != null">shipping_address,</if>
+            <if test="planShipDate != null">plan_ship_date,</if>
+            <if test="actualShipDate != null">actual_ship_date,</if>
+            <if test="shippedQuantity != null">shipped_quantity,</if>
+            <if test="boxCount != null">box_count,</if>
+            <if test="status != null">status,</if>
+            <if test="receivedTime != null">received_time,</if>
+            <if test="receivedBy != null">received_by,</if>
+            <if test="receivedRemark != null">received_remark,</if>
+            <if test="attachmentUrl != null">attachment_url,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="salesId != null">#{salesId},</if>
+            <if test="shipmentCode != null">#{shipmentCode},</if>
+            <if test="shipMethod != null">#{shipMethod},</if>
+            <if test="logisticsCompany != null">#{logisticsCompany},</if>
+            <if test="trackingNo != null">#{trackingNo},</if>
+            <if test="logisticsFee != null">#{logisticsFee},</if>
+            <if test="vehicleNo != null">#{vehicleNo},</if>
+            <if test="driverName != null">#{driverName},</if>
+            <if test="driverTel != null">#{driverTel},</if>
+            <if test="receiverName != null">#{receiverName},</if>
+            <if test="receiverTel != null">#{receiverTel},</if>
+            <if test="shippingAddress != null">#{shippingAddress},</if>
+            <if test="planShipDate != null">#{planShipDate},</if>
+            <if test="actualShipDate != null">#{actualShipDate},</if>
+            <if test="shippedQuantity != null">#{shippedQuantity},</if>
+            <if test="boxCount != null">#{boxCount},</if>
+            <if test="status != null">#{status},</if>
+            <if test="receivedTime != null">#{receivedTime},</if>
+            <if test="receivedBy != null">#{receivedBy},</if>
+            <if test="receivedRemark != null">#{receivedRemark},</if>
+            <if test="attachmentUrl != null">#{attachmentUrl},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateWmProductSalesShipment" parameterType="WmProductSalesShipment">
+        update qxx_wm_product_sales_shipment
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="salesId != null">sales_id = #{salesId},</if>
+            <if test="shipmentCode != null">shipment_code = #{shipmentCode},</if>
+            <if test="shipMethod != null">ship_method = #{shipMethod},</if>
+            <if test="logisticsCompany != null">logistics_company = #{logisticsCompany},</if>
+            <if test="trackingNo != null">tracking_no = #{trackingNo},</if>
+            <if test="logisticsFee != null">logistics_fee = #{logisticsFee},</if>
+            <if test="vehicleNo != null">vehicle_no = #{vehicleNo},</if>
+            <if test="driverName != null">driver_name = #{driverName},</if>
+            <if test="driverTel != null">driver_tel = #{driverTel},</if>
+            <if test="receiverName != null">receiver_name = #{receiverName},</if>
+            <if test="receiverTel != null">receiver_tel = #{receiverTel},</if>
+            <if test="shippingAddress != null">shipping_address = #{shippingAddress},</if>
+            <if test="planShipDate != null">plan_ship_date = #{planShipDate},</if>
+            <if test="actualShipDate != null">actual_ship_date = #{actualShipDate},</if>
+            <if test="shippedQuantity != null">shipped_quantity = #{shippedQuantity},</if>
+            <if test="boxCount != null">box_count = #{boxCount},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="receivedTime != null">received_time = #{receivedTime},</if>
+            <if test="receivedBy != null">received_by = #{receivedBy},</if>
+            <if test="receivedRemark != null">received_remark = #{receivedRemark},</if>
+            <if test="attachmentUrl != null">attachment_url = #{attachmentUrl},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where shipment_id = #{shipmentId}
+    </update>
+
+    <delete id="deleteWmProductSalesShipmentByShipmentId" parameterType="Long">
+        delete from qxx_wm_product_sales_shipment where shipment_id = #{shipmentId}
+    </delete>
+
+    <delete id="deleteWmProductSalesShipmentByShipmentIds" parameterType="String">
+        delete from qxx_wm_product_sales_shipment where shipment_id in
+        <foreach item="shipmentId" collection="array" open="(" separator="," close=")">
+            #{shipmentId}
+        </foreach>
+    </delete>
+
+    <delete id="deleteWmProductSalesShipmentBySalesId" parameterType="Long">
+        delete from qxx_wm_product_sales_shipment where sales_id = #{salesId}
+    </delete>
+
+</mapper>

@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.wm.WmProductSalesBoxMapper">
+
+    <resultMap type="WmProductSalesBox" id="WmProductSalesBoxResult">
+        <id property="boxId" column="box_id" />
+        <result property="factoryId" column="factory_id" />
+        <result property="salesId" column="sales_id" />
+        <result property="lineId" column="line_id" />
+        <result property="boxNo" column="box_no" />
+        <result property="itemId" column="item_id" />
+        <result property="itemCode" column="item_code" />
+        <result property="itemName" column="item_name" />
+        <result property="specification" column="specification" />
+        <result property="quantity" column="quantity" />
+        <result property="unitOfMeasure" column="unit_of_measure" />
+        <result property="unitName" column="unit_name" />
+        <result property="boxSpec" column="box_spec" />
+        <result property="boxLength" column="box_length" />
+        <result property="boxWidth" column="box_width" />
+        <result property="boxHeight" column="box_height" />
+        <result property="volume" column="volume" />
+        <result property="weight" column="weight" />
+        <result property="shipmentId" column="shipment_id" />
+        <result property="status" column="status" />
+        <result property="remark" column="remark" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <sql id="selectWmProductSalesBoxVo">
+        select box_id, factory_id, sales_id, line_id, box_no, item_id, item_code, item_name, specification,
+               quantity, unit_of_measure, unit_name, box_spec, box_length, box_width, box_height, volume, weight,
+               shipment_id, status, remark, create_by, create_time, update_by, update_time
+        from qxx_wm_product_sales_box
+    </sql>
+
+    <select id="selectWmProductSalesBoxList" parameterType="WmProductSalesBox" resultMap="WmProductSalesBoxResult">
+        <include refid="selectWmProductSalesBoxVo"/>
+        <where>
+            <if test="salesId != null"> and sales_id = #{salesId}</if>
+            <if test="lineId != null"> and line_id = #{lineId}</if>
+            <if test="boxNo != null and boxNo != ''"> and box_no like concat('%', #{boxNo}, '%')</if>
+            <if test="itemId != null"> and item_id = #{itemId}</if>
+            <if test="itemCode != null and itemCode != ''"> and item_code like concat('%', #{itemCode}, '%')</if>
+            <if test="shipmentId != null"> and shipment_id = #{shipmentId}</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+        </where>
+        order by box_id asc
+    </select>
+
+    <select id="selectWmProductSalesBoxByBoxId" parameterType="Long" resultMap="WmProductSalesBoxResult">
+        <include refid="selectWmProductSalesBoxVo"/>
+        where box_id = #{boxId}
+    </select>
+
+    <select id="selectBoxesBySalesId" parameterType="Long" resultMap="WmProductSalesBoxResult">
+        <include refid="selectWmProductSalesBoxVo"/>
+        where sales_id = #{salesId}
+        order by box_id asc
+    </select>
+
+    <select id="selectBoxesByShipmentId" parameterType="Long" resultMap="WmProductSalesBoxResult">
+        <include refid="selectWmProductSalesBoxVo"/>
+        where shipment_id = #{shipmentId}
+        order by box_id asc
+    </select>
+
+    <insert id="insertWmProductSalesBox" parameterType="WmProductSalesBox" useGeneratedKeys="true" keyProperty="boxId">
+        insert into qxx_wm_product_sales_box
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="salesId != null">sales_id,</if>
+            <if test="lineId != null">line_id,</if>
+            <if test="boxNo != null">box_no,</if>
+            <if test="itemId != null">item_id,</if>
+            <if test="itemCode != null">item_code,</if>
+            <if test="itemName != null">item_name,</if>
+            <if test="specification != null">specification,</if>
+            <if test="quantity != null">quantity,</if>
+            <if test="unitOfMeasure != null">unit_of_measure,</if>
+            <if test="unitName != null">unit_name,</if>
+            <if test="boxSpec != null">box_spec,</if>
+            <if test="boxLength != null">box_length,</if>
+            <if test="boxWidth != null">box_width,</if>
+            <if test="boxHeight != null">box_height,</if>
+            <if test="volume != null">volume,</if>
+            <if test="weight != null">weight,</if>
+            <if test="shipmentId != null">shipment_id,</if>
+            <if test="status != null">status,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="salesId != null">#{salesId},</if>
+            <if test="lineId != null">#{lineId},</if>
+            <if test="boxNo != null">#{boxNo},</if>
+            <if test="itemId != null">#{itemId},</if>
+            <if test="itemCode != null">#{itemCode},</if>
+            <if test="itemName != null">#{itemName},</if>
+            <if test="specification != null">#{specification},</if>
+            <if test="quantity != null">#{quantity},</if>
+            <if test="unitOfMeasure != null">#{unitOfMeasure},</if>
+            <if test="unitName != null">#{unitName},</if>
+            <if test="boxSpec != null">#{boxSpec},</if>
+            <if test="boxLength != null">#{boxLength},</if>
+            <if test="boxWidth != null">#{boxWidth},</if>
+            <if test="boxHeight != null">#{boxHeight},</if>
+            <if test="volume != null">#{volume},</if>
+            <if test="weight != null">#{weight},</if>
+            <if test="shipmentId != null">#{shipmentId},</if>
+            <if test="status != null">#{status},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateWmProductSalesBox" parameterType="WmProductSalesBox">
+        update qxx_wm_product_sales_box
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="salesId != null">sales_id = #{salesId},</if>
+            <if test="lineId != null">line_id = #{lineId},</if>
+            <if test="boxNo != null">box_no = #{boxNo},</if>
+            <if test="itemId != null">item_id = #{itemId},</if>
+            <if test="itemCode != null">item_code = #{itemCode},</if>
+            <if test="itemName != null">item_name = #{itemName},</if>
+            <if test="specification != null">specification = #{specification},</if>
+            <if test="quantity != null">quantity = #{quantity},</if>
+            <if test="unitOfMeasure != null">unit_of_measure = #{unitOfMeasure},</if>
+            <if test="unitName != null">unit_name = #{unitName},</if>
+            <if test="boxSpec != null">box_spec = #{boxSpec},</if>
+            <if test="boxLength != null">box_length = #{boxLength},</if>
+            <if test="boxWidth != null">box_width = #{boxWidth},</if>
+            <if test="boxHeight != null">box_height = #{boxHeight},</if>
+            <if test="volume != null">volume = #{volume},</if>
+            <if test="weight != null">weight = #{weight},</if>
+            <if test="shipmentId != null">shipment_id = #{shipmentId},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where box_id = #{boxId}
+    </update>
+
+    <!-- 批量更新改在 Service 层逐条调用 updateWmProductSalesBox（未开 allowMultiQueries） -->
+
+    <delete id="deleteWmProductSalesBoxByBoxId" parameterType="Long">
+        delete from qxx_wm_product_sales_box where box_id = #{boxId}
+    </delete>
+
+    <delete id="deleteWmProductSalesBoxByBoxIds" parameterType="String">
+        delete from qxx_wm_product_sales_box where box_id in
+        <foreach item="boxId" collection="array" open="(" separator="," close=")">
+            #{boxId}
+        </foreach>
+    </delete>
+
+    <delete id="deleteWmProductSalesBoxBySalesId" parameterType="Long">
+        delete from qxx_wm_product_sales_box where sales_id = #{salesId}
+    </delete>
+
+    <!-- 取当前 sales_id 下最大箱号序号（box_no 形如 BOX-001，取数字部分最大） -->
+    <select id="selectMaxBoxSeqBySalesId" parameterType="Long" resultType="java.lang.Integer">
+        select ifnull(max(cast(substring(box_no, 5) as unsigned)), 0)
+        from qxx_wm_product_sales_box
+        where sales_id = #{salesId} and box_no like 'BOX-%'
+    </select>
+
+    <!-- 发运时标记箱（显式 SET，不依赖 <if> null 判断） -->
+    <update id="markShipped">
+        update qxx_wm_product_sales_box
+        set shipment_id = #{shipmentId},
+            status = 'SHIPPED',
+            update_by = #{updateBy},
+            update_time = #{updateTime}
+        where box_id = #{boxId}
+    </update>
+
+    <!-- 删除发运回滚箱（shipment_id 显式置 null，<if test!=null> 无法表达） -->
+    <update id="rollbackToPacked">
+        update qxx_wm_product_sales_box
+        set shipment_id = null,
+            status = 'PACKED',
+            update_by = #{updateBy},
+            update_time = #{updateTime}
+        where box_id = #{boxId}
+    </update>
+
+</mapper>

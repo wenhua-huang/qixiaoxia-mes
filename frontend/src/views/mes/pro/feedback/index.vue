@@ -65,6 +65,12 @@
         <el-button type="danger" plain icon="Delete" size="small" :disabled="multiple" @click="handleDelete()" v-hasPermi="['mes:pro:feedback:remove']">删除</el-button>
       </el-col>
       <el-col :span="1.5">
+        <el-button type="warning" plain icon="CircleCheck" size="small" :disabled="multiple" @click="handleBatchConfirm" v-hasPermi="['mes:pro:feedback:edit']">批量确认</el-button>
+      </el-col>
+      <el-col :span="1.5">
+        <el-button type="success" plain icon="Check" size="small" :disabled="multiple" @click="handleBatchAudit" v-hasPermi="['mes:pro:feedback:edit']">批量审核</el-button>
+      </el-col>
+      <el-col :span="1.5">
         <el-button type="warning" plain icon="Download" size="small" @click="handleExport" v-hasPermi="['mes:pro:feedback:export']">导出</el-button>
       </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList" />
@@ -198,6 +204,17 @@
                       <el-button icon="Search" @click="handleWorkstationSelect" />
                     </template>
                   </el-input>
+                </el-form-item>
+              </el-col>
+            </el-row>
+
+            <!-- 第6行：流转卡（可选，后端自动带默认卡） -->
+            <el-row>
+              <el-col :span="12">
+                <el-form-item label="流转卡">
+                  <el-select v-model="form.cardId" placeholder="不选则自动取工单默认卡" clearable :disabled="optType === 'view'" style="width: 100%" @focus="loadCardOptions">
+                    <el-option v-for="c in cardOptions" :key="c.cardId" :label="c.cardCode + (c.status ? ' (' + (cardStatusLabel(c.status)) + ')' : '')" :value="c.cardId" />
+                  </el-select>
                 </el-form-item>
               </el-col>
             </el-row>
@@ -381,10 +398,11 @@
 <script setup lang="ts">
 import { ref, reactive, getCurrentInstance } from 'vue'
 import { Warning } from '@element-plus/icons-vue'
-import { listFeedback, getFeedback, addFeedback, updateFeedback, delFeedback, confirmFeedback, auditFeedback, getConsumeDefaults } from '@/api/mes/pro/feedback'
+import { listFeedback, getFeedback, addFeedback, updateFeedback, delFeedback, confirmFeedback, auditFeedback, batchConfirmFeedback, batchAuditFeedback, getConsumeDefaults } from '@/api/mes/pro/feedback'
 import { getTask } from '@/api/mes/pro/task'
 import { listParamTemplateByProcessId } from '@/api/mes/pro/paramtemplate'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
+import { listProcard } from '@/api/mes/pro/procard'
 import WorkstationSelect from '@/components/workstationSelect/single.vue'
 import taskSelect from '@/components/taskSelect/single.vue'
 import workorderSelect from '@/components/workorderSelect/single.vue'
@@ -478,6 +496,7 @@ const form = reactive<any>({
   taskId: null,
   workorderId: null,
   workorderName: null,
+  cardId: null,
   processId: null,
   processName: null,
   workstationId: null,
@@ -630,8 +649,20 @@ function onWorkorderSelected(row: any) {
     form.workorderName = row.workorderName
     form.itemId = row.productId
     form.itemName = row.productName
+    form.cardId = null
+    cardOptions.value = []
     fetchConsumeDefaults(row.workorderId)
   }
+}
+
+// ==================== 流转卡选择 ====================
+const cardOptions = ref<any[]>([])
+const cardStatusLabel = (s: string) => ({ ACTIVE: '流转中', COMPLETED: '已完工', SCRAPPED: '已报废' } as Record<string, string>)[s] || s
+function loadCardOptions() {
+  if (!form.workorderId) return
+  listProcard({ workorderId: form.workorderId, status: 'ACTIVE', pageNum: 1, pageSize: 50 }).then((res: any) => {
+    cardOptions.value = res.rows || []
+  }).catch(() => {})
 }
 
 // ==================== 工作站选择 ====================
@@ -697,6 +728,8 @@ function reset() {
   form.taskId = null
   form.workorderId = null
   form.workorderName = null
+  form.cardId = null
+  cardOptions.value = []
   form.processId = null
   form.processName = null
   form.workstationId = null
@@ -819,6 +852,27 @@ function handleAudit(row: any) {
     auditFeedback(row.recordId).then(() => { proxy.$modal.msgSuccess('已审核'); getList() }).catch(() => {})
   }).catch(() => {})
 }
+
+// 批量流转动作：尽力执行，失败明细用 alert 列出（复用 wm/issue 已跑顺的模式）
+const actBatch = (api: any, verb: string, expectStatus: string) => {
+  if (!ids.value.length) return
+  proxy.$modal.confirm(`确认对选中的 ${ids.value.length} 条报工执行「${verb}」？状态不是"${expectStatus}"的记录将被跳过并提示。`)
+    .then(() => api([...ids.value]).then((res: any) => {
+      const r = res.data || {}
+      const ok = r.successCount ?? 0, fail = r.failedCount ?? 0
+      const msg = `${verb}完成:成功 ${ok} 条` + (fail ? `,失败 ${fail} 条` : '')
+      if (fail === 0) proxy.$modal.msgSuccess(msg)
+      else if (ok === 0) proxy.$modal.msgError(msg)
+      else proxy.$modal.msgWarning(msg)
+      if (fail && r.failures?.length) {
+        const lines = r.failures.map((f: any) => `· ${f.feedbackCode || f.recordId}:${f.reason}`).join('\n')
+        proxy.$modal.alertError(`${verb}失败明细(${fail} 条):\n\n${lines}`)
+      }
+      getList()
+    })).catch(() => {})
+}
+function handleBatchConfirm() { actBatch(batchConfirmFeedback, '确认', '待确认') }
+function handleBatchAudit()   { actBatch(batchAuditFeedback,   '审核', '已确认') }
 
 // ==================== 删除 / 导出 ====================
 function handleDelete(row?: any) {

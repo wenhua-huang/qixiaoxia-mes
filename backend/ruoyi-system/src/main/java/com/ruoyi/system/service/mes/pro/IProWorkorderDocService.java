@@ -1,5 +1,6 @@
 package com.ruoyi.system.service.mes.pro;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -33,8 +34,13 @@ public interface IProWorkorderDocService
      * 报工审核后的自动触发：末工序报工 → 生成入库单 + 退料单。
      * <p>职责边界：仅生成单据，**不更新 workorder** (quantity_produced 更新 / 完工判定
      * 由调用方 auditFeedback 在外层事务完成, 见 {@link #autoCompleteWorkorderIfQualified})。
+     *
+     * @param feedbackId 报工 ID
+     * @param producedAfterDelta 外层事务 addQuantityProduced 后的工单已生产量。本方法走
+     *         REQUIRES_NEW 独立事务，MySQL REPEATABLE READ 下读不到外层未提交值，故由调用方
+     *         在同事务读出后显式传入，绕开事务隔离问题。传 null 时回退到读取当前 workorder 行。
      */
-    List<Map<String, Object>> onFeedbackAudited(Long feedbackId);
+    List<Map<String, Object>> onFeedbackAudited(Long feedbackId, BigDecimal producedAfterDelta);
 
     /**
      * 自动完工判定：quantity_produced >= 计划量时，精准条件 UPDATE 置 COMPLETED。

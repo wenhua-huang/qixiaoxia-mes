@@ -16,5 +16,13 @@ export function delFeedback(ids: any) { return request({ url: '/mes/pro/feedback
 export function confirmFeedback(recordId: number) { return request({ url: '/mes/pro/feedback/confirm/' + recordId, method: 'put' }) }
 // 审核报工：CONFIRMED → AUDITED
 export function auditFeedback(recordId: number) { return request({ url: '/mes/pro/feedback/audit/' + recordId, method: 'put' }) }
+// 批量确认报工：PREPARE → CONFIRMED，尽力执行
+export function batchConfirmFeedback(recordIds: number[]) {
+  return request({ url: '/mes/pro/feedback/batchConfirm', method: 'put', data: recordIds })
+}
+// 批量审核报工：CONFIRMED → AUDITED，尽力执行
+export function batchAuditFeedback(recordIds: number[]) {
+  return request({ url: '/mes/pro/feedback/batchAudit', method: 'put', data: recordIds })
+}
 // 获取工单默认物料消耗（新增报工时预填）
 export function getConsumeDefaults(workorderId: number) { return request({ url: '/mes/pro/feedback/consumeDefaults/' + workorderId, method: 'get' }) }

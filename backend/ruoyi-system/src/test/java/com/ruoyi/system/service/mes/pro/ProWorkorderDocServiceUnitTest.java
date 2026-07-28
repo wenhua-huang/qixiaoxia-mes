@@ -358,14 +358,12 @@ class ProWorkorderDocServiceUnitTest {
         when(proFeedbackMapper.selectProFeedbackList(any())).thenReturn(
                 Collections.singletonList(fb));
 
-        List<Map<String, Object>> result = docService.onFeedbackAudited(1L);
+        List<Map<String, Object>> result = docService.onFeedbackAudited(1L, new BigDecimal("100"));
 
         assertThat(result).isNotEmpty();
         // 应生成 1 张入库单
         boolean hasReceipt = result.stream().anyMatch(m -> m.containsKey("recptId"));
         assertThat(hasReceipt).isTrue();
-        // 完工判定已移交 autoCompleteWorkorderIfQualified (由 auditFeedback 外层事务调用)，
-        // onFeedbackAudited 只负责入库单/退料单生成，不再调 completeWorkorderIfProducing。
         // 完工判定已移交 autoCompleteWorkorderIfQualified (由 auditFeedback 外层事务调用)，
         // onFeedbackAudited 只负责入库单/退料单生成，不再调 completeWorkorderIfProducing。
     }
@@ -396,7 +394,7 @@ class ProWorkorderDocServiceUnitTest {
         when(docLogMapper.insert(any())).thenReturn(1);
         when(proFeedbackMapper.selectProFeedbackList(any())).thenReturn(Collections.singletonList(fb));
 
-        List<Map<String, Object>> result = docService.onFeedbackAudited(1L);
+        List<Map<String, Object>> result = docService.onFeedbackAudited(1L, new BigDecimal("110"));
 
         assertThat(result).isNotEmpty();
         ArgumentCaptor<WmProductRecpt> captor = ArgumentCaptor.forClass(WmProductRecpt.class);
@@ -416,7 +414,7 @@ class ProWorkorderDocServiceUnitTest {
         lastProcess.setRouteId(10L); lastProcess.setProcessId(30L);
         when(proRouteProcessMapper.selectLastProcessByRouteId(10L)).thenReturn(lastProcess);
 
-        List<Map<String, Object>> result = docService.onFeedbackAudited(1L);
+        List<Map<String, Object>> result = docService.onFeedbackAudited(1L, null);
 
         assertThat(result).isEmpty();
         // 不应生成任何单据
@@ -450,7 +448,7 @@ class ProWorkorderDocServiceUnitTest {
         when(docLogMapper.insert(any())).thenReturn(1);
         when(proFeedbackMapper.selectProFeedbackList(any())).thenReturn(Collections.singletonList(fb));
 
-        docService.onFeedbackAudited(1L);
+        docService.onFeedbackAudited(1L, new BigDecimal("50"));
 
         // 入库单已生成
         verify(wmProductRecptService).insertWmProductRecpt(any());
@@ -473,7 +471,7 @@ class ProWorkorderDocServiceUnitTest {
         when(docLogMapper.selectList(any())).thenReturn(Collections.emptyList());
         when(proFeedbackMapper.selectProFeedbackList(any())).thenReturn(Collections.emptyList());
 
-        docService.onFeedbackAudited(1L);
+        docService.onFeedbackAudited(1L, null);
 
         // 验证使用了统一锁 key（Fix Finding #3/#4/#10：五入口共用同一 key）
         verify(lockTemplate).execute(eq("pro:workorder:doc-gen:1"), any(java.util.function.Supplier.class));

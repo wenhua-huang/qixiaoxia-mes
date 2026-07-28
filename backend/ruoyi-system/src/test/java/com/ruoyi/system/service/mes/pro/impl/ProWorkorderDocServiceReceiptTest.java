@@ -141,7 +141,7 @@ class ProWorkorderDocServiceReceiptTest {
         when(docLogMapper.selectList(any())).thenReturn(Collections.emptyList());
 
         // Act
-        List<Map<String, Object>> result = docService.onFeedbackAudited(205L);
+        List<Map<String, Object>> result = docService.onFeedbackAudited(205L, new BigDecimal("100"));
 
         // Assert：入库单量为 feedback 合格 100
         verify(wmProductRecptService).insertWmProductRecpt(argThat(r ->
@@ -177,7 +177,7 @@ class ProWorkorderDocServiceReceiptTest {
         existingRecpt.setRecptId(300L); existingRecpt.setRecptCode("PR001"); existingRecpt.setStatus("DRAFT");
         when(wmProductRecptService.selectWmProductRecptByRecptId(300L)).thenReturn(existingRecpt);
 
-        docService.onFeedbackAudited(205L);
+        docService.onFeedbackAudited(205L, null);
 
         // 不应插入新入库单/新 log
         verify(wmProductRecptService, never()).insertWmProductRecpt(any());
@@ -242,7 +242,7 @@ class ProWorkorderDocServiceReceiptTest {
                 .thenThrow(new DuplicateKeyException("Duplicate entry ..."));
 
         // Act & Assert：DuplicateKeyException 被转为 ServiceException
-        assertThatThrownBy(() -> docService.onFeedbackAudited(205L))
+        assertThatThrownBy(() -> docService.onFeedbackAudited(205L, null))
                 .isInstanceOf(com.ruoyi.common.exception.ServiceException.class)
                 .hasMessageContaining("单据正在生成中");
         // 验证走到了 recpt/line 插入步骤 (保证测试意图 —— 事务边界内已 insert，靠外层回滚兜底)

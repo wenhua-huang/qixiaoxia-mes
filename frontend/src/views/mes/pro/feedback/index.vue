@@ -409,6 +409,9 @@ import workorderSelect from '@/components/workorderSelect/single.vue'
 
 const { proxy } = getCurrentInstance() as any
 
+// 流转卡状态字典（后端字典 mes_pro_card_status，禁硬编码 Record<string,string>）
+const { mes_pro_card_status: cardStatusDict } = proxy.useDict('mes_pro_card_status')
+
 // ==================== 常量映射 ====================
 const statusOptions = [
   { label: '待确认', value: 'PREPARE' },
@@ -657,7 +660,7 @@ function onWorkorderSelected(row: any) {
 
 // ==================== 流转卡选择 ====================
 const cardOptions = ref<any[]>([])
-const cardStatusLabel = (s: string) => ({ ACTIVE: '流转中', COMPLETED: '已完工', SCRAPPED: '已报废' } as Record<string, string>)[s] || s
+const cardStatusLabel = (s: string) => cardStatusDict.value?.find((d: any) => d.value === s)?.label || s
 function loadCardOptions() {
   if (!form.workorderId) return
   listProcard({ workorderId: form.workorderId, status: 'ACTIVE', pageNum: 1, pageSize: 50 }).then((res: any) => {

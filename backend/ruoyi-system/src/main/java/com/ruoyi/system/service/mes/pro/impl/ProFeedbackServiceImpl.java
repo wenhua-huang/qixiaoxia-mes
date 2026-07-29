@@ -483,7 +483,17 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
             cardUpd.setCurrentProcessId(fb.getProcessId());
             cardUpd.setCurrentProcessName(fb.getProcessName());
             if (isLastProcess) {
-                cardUpd.setStatus("COMPLETED");
+                // 末工序完工判定：累计审核合格量 >= 计划量才置 COMPLETED（对齐 autoCompleteWorkorderIfQualified 的工单完工逻辑）
+                // 避免多批次末工序审核时，首批就把卡误判完工（破坏 resolveActiveCardId 的 ACTIVE 过滤 + 状态一致性）
+                ProCard card = proCardMapper.selectProCardByCardId(fb.getCardId());
+                if (card != null) {
+                    BigDecimal produced = nvl(qxxProFeedbackMapper.sumAuditedQualifiedByCardAndProcess(
+                            fb.getCardId(), fb.getProcessId()));
+                    BigDecimal planned = nvl(card.getQuantityTransfered());
+                    if (produced.compareTo(planned) >= 0) {
+                        cardUpd.setStatus("COMPLETED");
+                    }
+                }
             }
             cardUpd.setUpdateBy(SecurityUtils.getUsername());
             cardUpd.setUpdateTime(DateUtils.getNowDate());

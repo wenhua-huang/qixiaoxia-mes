@@ -43,6 +43,7 @@ export default defineConfig(({ mode, command }) => {
     // vite 相关配置
     server: {
       port: 5173,
+      strictPort: true,
       host: true,
       open: true,
       proxy: {

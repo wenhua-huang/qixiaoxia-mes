@@ -81,6 +81,13 @@ temp/
 frontend/node_modules
 .session-baseline
 
+# --- 临时截图（验证用，不入库）---
+*-verified.png
+*-final.png
+trace-*.png
+materialtrace-*.png
+issue-batch-*.png
+
 # --- DB backups ---
 mes_full_backup_*.sql
 mes_full_backup_*.sql.gz

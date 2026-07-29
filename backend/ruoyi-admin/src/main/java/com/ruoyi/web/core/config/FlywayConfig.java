@@ -39,6 +39,9 @@ public class FlywayConfig
     @Value("${spring.flyway.repair-before-migrate:false}")
     private boolean repairBeforeMigrate;
 
+    @Value("${spring.flyway.out-of-order:false}")
+    private boolean outOfOrder;
+
     @Value("${spring.datasource.druid.master.url}")
     private String masterUrl;
 
@@ -74,6 +77,7 @@ public class FlywayConfig
                 .baselineOnMigrate(baselineOnMigrate)
                 .baselineVersion(org.flywaydb.core.api.MigrationVersion.fromVersion(baselineVersion))
                 .validateOnMigrate(true)  // history 已对齐，开启校验
+                .outOfOrder(outOfOrder)
                 .load();
         if (repairBeforeMigrate) {
             // 测试环境:Testcontainers 容器 reuse 残留 history（V01-V08 成功 + V09 failed），

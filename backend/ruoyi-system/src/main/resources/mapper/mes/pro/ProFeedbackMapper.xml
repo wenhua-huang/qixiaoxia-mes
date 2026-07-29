@@ -15,6 +15,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="workorderId"    column="workorder_id"    />
         <result property="workorderCode"    column="workorder_code"    />
         <result property="workorderName"    column="workorder_name"    />
+        <result property="cardId"    column="card_id"    />
         <result property="routeId"    column="route_id"    />
         <result property="routeCode"    column="route_code"    />
         <result property="processId"    column="process_id"    />
@@ -60,7 +61,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectProFeedbackVo">
-        select record_id, factory_id, feedback_type, feedback_code, workstation_id, workstation_code, workstation_name, workorder_id, workorder_code, workorder_name, route_id, route_code, process_id, process_code, process_name, task_id, task_code, item_id, item_code, item_name, unit_of_measure, unit_name, specification, vendor_id, vendor_code, vendor_name, outsource_factory_id, outsource_issue_id, outsource_issue_code, outsource_recpt_id, expire_date, lot_number, quantity, quantity_feedback, quantity_qualified, quantity_unqualified, quantity_uncheck, quantity_labor_scrap, quantity_material_scrap, quantity_other_scrap, user_name, nick_name, feedback_channel, feedback_time, record_user, record_nick, status, remark, create_by, create_time, update_by, update_time from qxx_pro_feedback
+        select record_id, factory_id, feedback_type, feedback_code, workstation_id, workstation_code, workstation_name, workorder_id, workorder_code, workorder_name, card_id, route_id, route_code, process_id, process_code, process_name, task_id, task_code, item_id, item_code, item_name, unit_of_measure, unit_name, specification, vendor_id, vendor_code, vendor_name, outsource_factory_id, outsource_issue_id, outsource_issue_code, outsource_recpt_id, expire_date, lot_number, quantity, quantity_feedback, quantity_qualified, quantity_unqualified, quantity_uncheck, quantity_labor_scrap, quantity_material_scrap, quantity_other_scrap, user_name, nick_name, feedback_channel, feedback_time, record_user, record_nick, status, remark, create_by, create_time, update_by, update_time from qxx_pro_feedback
     </sql>
 
     <select id="selectProFeedbackList" parameterType="ProFeedback" resultMap="ProFeedbackResult">
@@ -107,6 +108,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="workorderId != null">workorder_id,</if>
             <if test="workorderCode != null">workorder_code,</if>
             <if test="workorderName != null">workorder_name,</if>
+            <if test="cardId != null">card_id,</if>
             <if test="routeId != null">route_id,</if>
             <if test="routeCode != null">route_code,</if>
             <if test="processId != null">process_id,</if>
@@ -157,6 +159,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="workorderId != null">#{workorderId},</if>
             <if test="workorderCode != null">#{workorderCode},</if>
             <if test="workorderName != null">#{workorderName},</if>
+            <if test="cardId != null">#{cardId},</if>
             <if test="routeId != null">#{routeId},</if>
             <if test="routeCode != null">#{routeCode},</if>
             <if test="processId != null">#{processId},</if>
@@ -211,6 +214,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="workorderId != null">workorder_id = #{workorderId},</if>
             <if test="workorderCode != null">workorder_code = #{workorderCode},</if>
             <if test="workorderName != null">workorder_name = #{workorderName},</if>
+            <if test="cardId != null">card_id = #{cardId},</if>
             <if test="routeId != null">route_id = #{routeId},</if>
             <if test="routeCode != null">route_code = #{routeCode},</if>
             <if test="processId != null">process_id = #{processId},</if>
@@ -265,4 +269,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             #{recordId}
         </foreach>
     </delete>
+
+    <!-- 统计流转卡在某工序已审核报工的合格品总量（用于判断卡是否完工）。
+         factory_id 由 FactoryIdInterceptor 自动注入 SQL 文本，无需在 XML 显式写条件。 -->
+    <select id="sumAuditedQualifiedByCardAndProcess" resultType="java.math.BigDecimal">
+        select IFNULL(sum(quantity_qualified), 0)
+        from qxx_pro_feedback
+        where card_id = #{cardId}
+          and process_id = #{processId}
+          and status = 'AUDITED'
+    </select>
 </mapper>

@@ -82,4 +82,10 @@ public class ProMaterialTraceController extends BaseController
     @GetMapping("/backward")
     public AjaxResult backward(@RequestParam String childType, @RequestParam Long childId)
     { return success(proMaterialTraceService.traceBackward(childType, childId)); }
+
+    /** 深度追溯：一次性返回完整链路（替代前端逐跳递归调用） */
+    @PreAuthorize("@ss.hasPermi('mes:pro:materialtrace:query')")
+    @GetMapping("/traceChain")
+    public AjaxResult traceChain(@RequestParam String startType, @RequestParam Long startId, @RequestParam String direction)
+    { return success(proMaterialTraceService.traceChain(startType, startId, direction)); }
 }

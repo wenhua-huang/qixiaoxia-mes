@@ -17,6 +17,9 @@
       <el-col :span="1.5"><el-button type="primary" plain icon="Link" size="small" @click="handleFromWorkorder" v-hasPermi="['mes:wm:issue:add']">从工单生成</el-button></el-col>
       <el-col :span="1.5"><el-button type="success" plain icon="Edit" size="small" :disabled="single" @click="handleUpdate" v-hasPermi="['mes:wm:issue:edit']">修改</el-button></el-col>
       <el-col :span="1.5"><el-button type="danger" plain icon="Delete" size="small" :disabled="multiple" @click="handleDelete" v-hasPermi="['mes:wm:issue:remove']">删除</el-button></el-col>
+      <el-col :span="1.5"><el-button type="primary" plain icon="Promotion" size="small" :disabled="multiple" @click="handleBatchSubmit" v-hasPermi="['mes:wm:issue:submit']">批量提交</el-button></el-col>
+      <el-col :span="1.5"><el-button type="success" plain icon="Check" size="small" :disabled="multiple" @click="handleBatchApprove" v-hasPermi="['mes:wm:issue:approve']">批量审核</el-button></el-col>
+      <el-col :span="1.5"><el-button type="warning" plain icon="Lock" size="small" :disabled="multiple" @click="handleBatchConfirm" v-hasPermi="['mes:wm:issue:edit']">批量预占</el-button></el-col>
       <el-col :span="1.5"><el-button type="warning" plain icon="Download" size="small" @click="handleExport" v-hasPermi="['mes:wm:issue:export']">导出</el-button></el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
@@ -64,6 +67,7 @@
             <el-col :span="12"><el-form-item label="仓库" prop="warehouseId"><template v-if="optType==='view'"><el-input v-model="form.warehouseName" :disabled="true" /></template><template v-else><el-input v-model="form.warehouseName" placeholder="请选择仓库" readonly><template #append><el-button icon="Search" @click="handleWarehouseSelect" /></template></el-input><WarehouseSelect ref="warehouseSelectRef" @onSelected="onWarehouseSelected" /></template></el-form-item></el-col></el-row>
             <el-row><el-col :span="12"><el-form-item label="库区"><template v-if="optType==='view'"><el-input v-model="form.locationName" :disabled="true" /></template><template v-else><el-input v-model="form.locationName" placeholder="请选择库区" readonly><template #append><el-button icon="Search" @click="handleLocationSelect" /></template></el-input><LocationSelect ref="locationSelectRef" @onSelected="onLocationSelected" /></template></el-form-item></el-col>
             <el-col :span="12"><el-form-item label="领料日期"><el-date-picker v-model="form.issueDate" type="date" value-format="YYYY-MM-DD HH:mm:ss" style="width:100%" :disabled="optType==='view'" /></el-form-item></el-col></el-row>
+            <el-row><el-col :span="12"><el-form-item label="流转卡"><el-select v-model="form.cardId" placeholder="不选则自动取工单默认卡" clearable :disabled="optType==='view'" style="width:100%" @focus="loadCardOptions"><el-option v-for="c in cardOptions" :key="c.cardId" :label="c.cardCode" :value="c.cardId" /></el-select></el-form-item></el-col></el-row>
             <el-row><el-col :span="24"><el-form-item label="备注"><el-input v-model="form.remark" type="textarea" :rows="2" :disabled="optType==='view'" /></el-form-item></el-col></el-row>
           </el-form>
         </el-tab-pane>
@@ -104,18 +108,26 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, getCurrentInstance, nextTick } from 'vue'
-import { listIssueHeader, getIssueDetail, addIssueHeader, updateIssueHeader, delIssueHeader, confirmIssue, releaseAllocation, submitForApprove, approveIssue, rejectIssue, closeIssue, cancelIssue, buildFromWorkorder } from '@/api/mes/wm/issueheader'
+import { useRouter } from 'vue-router'
+import { listIssueHeader, getIssueDetail, addIssueHeader, updateIssueHeader, delIssueHeader, confirmIssue, releaseAllocation, submitForApprove, approveIssue, rejectIssue, closeIssue, cancelIssue, buildFromWorkorder, batchSubmitForApprove, batchApprove, batchConfirmIssue } from '@/api/mes/wm/issueheader'
+import { addIssueLine, updateIssueLine, delIssueLine } from '@/api/mes/wm/issueline'
+import { loadBomLines } from '@/api/mes/wm/issueheader'
+import { genSerialCode } from '@/api/mes/sys/autocoderule'
+import { listProcard } from '@/api/mes/pro/procard'
+import { getWorkorder } from '@/api/mes/pro/workorder'
 import workorderSelect from '@/components/workorderSelect/single.vue'
 import WarehouseSelect from '@/components/warehouseSelect/single.vue'
 import LocationSelect from '@/components/locationSelect/single.vue'
 import IssueOutDialog from './components/IssueOutDialog.vue'
 
 const { proxy } = getCurrentInstance() as any
+const router = useRouter()
 const { issue_status } = proxy.useDict('mes_wm_issue_status')
 
 const loading = ref(true); const ids = ref<number[]>([]); const single = ref(true); const multiple = ref(true); const showSearch = ref(true); const total = ref(0)
 const title = ref(''); const open = ref(false); const optType = ref(''); const activeTab = ref('header')
 const dataList = ref<any[]>([]); const lineList = ref<any[]>([])
+const cardOptions = ref<any[]>([])
 const form = reactive<any>({ issueType: 'PRODUCE' })
 const queryParams = reactive<any>({ pageNum: 1, pageSize: 10, issueCode: null, workorderName: null, status: null })
 const rules = { issueName: [{ required: true, message: '名称不能为空' }], workorderId: [{ required: true, message: '工单不能为空' }], warehouseId: [{ required: true, message: '仓库不能为空' }] }
@@ -177,8 +189,52 @@ function handleClose2(row: any) { act(row, closeIssue, '已关闭', `关闭领�
 function handleCancel(row: any) { cancelTargetId.value = row.issueId; cancelReason.value = ''; cancelOpen.value = true }
 function confirmCancel() { if (!cancelTargetId.value) return; cancelIssue(cancelTargetId.value, cancelReason.value).then(() => { proxy.$modal.msgSuccess('已作废'); cancelOpen.value = false; getList() }) }
 
+// 批量流转动作：尽力执行，失败明细用 alert 列出
+const actBatch = (api: any, verb: string) => {
+  if (!ids.value.length) return
+  proxy.$modal.confirm(`确认对选中的 ${ids.value.length} 张领料单执行「${verb}」？状态不符或库存不足的单据将被跳过并提示。`)
+    .then(() => api([...ids.value]).then((res: any) => {
+      const r = res.data || {}
+      const ok = r.successCount ?? 0, fail = r.failedCount ?? 0
+      // 全成功→success；部分成功→warning；全失败→error（避免"完成: 0 张成功"这种矛盾提示）
+      const msg = `${verb}完成：成功 ${ok} 张` + (fail ? `，失败 ${fail} 张` : '')
+      if (fail === 0) proxy.$modal.msgSuccess(msg)
+      else if (ok === 0) proxy.$modal.msgError(msg)
+      else proxy.$modal.msgWarning(msg)
+      if (fail && r.failures?.length) {
+        const lines = r.failures.map((f: any) => `· ${f.issueCode || f.issueId}：${f.reason}`).join('\n')
+        proxy.$modal.alertError(`${verb}失败明细（${fail} 张）：\n\n${lines}`)
+      }
+      getList()
+    })).catch(() => {})
+}
+function handleBatchSubmit()  { actBatch(batchSubmitForApprove, '提交审核') }
+function handleBatchApprove() { actBatch(batchApprove, '审核') }
+function handleBatchConfirm() { actBatch(batchConfirmIssue, '预占库存') }
+
 // 发料出库（打开弹窗）
 async function handleIssueOut(row: any) {
+  // 前置校验：工单必须已开工（开工时自动建立流转卡作为物料追溯载体）
+  // 未开工发料会导致物料无处挂载，追溯链断裂
+  if (row.workorderId) {
+    try {
+      const woRes: any = await getWorkorder(row.workorderId)
+      const wo = woRes?.data || {}
+      if (wo.status !== 'PRODUCING') {
+        proxy.$modal.confirm(
+          `工单【${wo.workorderCode || row.workorderName}】尚未开工（当前状态：${wo.status || '未知'}）。\n\n` +
+          `发料出库前需要先开工，开工时会自动建立流转卡作为物料追溯载体。\n\n` +
+          `点击「确定」跳转到工单管理页面完成开工。`
+        ).then(() => {
+          router.push({ path: '/mes/pro/workorder', query: { workorderId: row.workorderId, action: 'start' } })
+        }).catch(() => {})
+        return
+      }
+    } catch (e) {
+      // 工单查询失败不阻断，让后端校验兜底
+      console.warn('查询工单状态失败，交由后端校验', e)
+    }
+  }
   const r: any = await getIssueDetail(row.issueId)
   const h = r.data?.header || r.data
   const lines = r.data?.lines || []
@@ -187,7 +243,15 @@ async function handleIssueOut(row: any) {
 
 // 选择器 handlers
 function handleWorkorderSelect() { woSelectRef.value?.open() }
-function onWorkorderSelected(row: any) { if (!row) return; form.workorderId = row.workorderId; form.workorderCode = row.workorderCode; form.workorderName = row.workorderName }
+function onWorkorderSelected(row: any) { if (!row) return; form.workorderId = row.workorderId; form.workorderCode = row.workorderCode; form.workorderName = row.workorderName; form.cardId = null; cardOptions.value = [] }
+
+// ==================== 流转卡选择 ====================
+function loadCardOptions() {
+  if (!form.workorderId) return
+  listProcard({ workorderId: form.workorderId, status: 'ACTIVE', pageNum: 1, pageSize: 50 }).then((res: any) => {
+    cardOptions.value = res.rows || []
+  }).catch(() => {})
+}
 function handleWarehouseSelect() { warehouseSelectRef.value?.open() }
 function onWarehouseSelected(row: any) { if (!row) return; form.warehouseId = row.warehouseId; form.warehouseName = row.warehouseName; form.warehouseCode = row.warehouseCode }
 function handleLocationSelect() { locationSelectRef.value?.open() }

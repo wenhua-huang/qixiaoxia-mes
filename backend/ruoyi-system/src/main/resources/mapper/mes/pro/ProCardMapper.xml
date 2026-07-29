@@ -139,4 +139,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             #{cardId}
         </foreach>
     </delete>
+
+    <!-- 拆卡原子扣减：仅 status=ACTIVE 且余量充足时扣减。返回 0 表示不满足条件（并发/状态/余量），调用方应抛异常回滚 -->
+    <update id="decrementQuantity">
+        update qxx_pro_card
+        set quantity_transfered = quantity_transfered - #{delta}
+        where card_id = #{cardId}
+          and factory_id = #{factoryId}
+          and status = 'ACTIVE'
+          and quantity_transfered &gt;= #{delta}
+    </update>
 </mapper>

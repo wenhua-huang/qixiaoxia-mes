@@ -85,6 +85,7 @@
         <template #default="scope">
           <el-button link type="primary" size="small" icon="View" @click="handleView(scope.row)" v-hasPermi="['mes:pro:card:query']">查看</el-button>
           <el-button link type="primary" size="small" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:pro:card:edit']">修改</el-button>
+          <el-button link type="primary" size="small" icon="SplitScreen" @click="handleSplit(scope.row)" v-if="scope.row.status === 'ACTIVE'" v-hasPermi="['mes:pro:card:edit']">拆卡</el-button>
           <el-button link type="primary" size="small" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:pro:card:remove']">删除</el-button>
         </template>
       </el-table-column>
@@ -210,12 +211,29 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 拆卡对话框 -->
+    <el-dialog title="拆分流转卡" v-model="splitOpen" width="450px" append-to-body :close-on-click-modal="false">
+      <el-form label-width="100px">
+        <el-form-item label="原流转卡">
+          <span>{{ splitForm.cardCode }} （当前数量：{{ splitForm.originQty }}）</span>
+        </el-form-item>
+        <el-form-item label="拆出数量" required>
+          <el-input-number v-model="splitForm.splitQty" :min="1" :max="splitForm.originQty ? splitForm.originQty - 1 : 1" :precision="2" style="width: 100%" />
+          <div style="color:#909399;font-size:12px;line-height:1.6;margin-top:4px">拆出一张新流转卡承载此数量，原卡数量自动扣减。新卡继承工单/产品信息。</div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button type="primary" @click="submitSplit" :loading="splitLoading">确 定</el-button>
+        <el-button @click="splitOpen = false">关 闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, getCurrentInstance } from 'vue'
-import { listProcard, getProcard, addProcard, updateProcard, delProcard } from '@/api/mes/pro/procard'
+import { listProcard, getProcard, addProcard, updateProcard, delProcard, splitProcard } from '@/api/mes/pro/procard'
 import { listCardProcessByCardId } from '@/api/mes/pro/cardprocess'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import workorderSelect from '@/components/workorderSelect/single.vue'
@@ -445,6 +463,40 @@ function handleExport() {
   proxy.download('/mes/pro/procard/export', {
     ...queryParams,
   }, `procard_${new Date().getTime()}.xlsx`)
+}
+
+// ==================== 拆卡 ====================
+const splitOpen = ref(false)
+const splitLoading = ref(false)
+const splitForm = reactive<any>({ cardId: null, cardCode: '', originQty: 0, splitQty: 1 })
+
+function handleSplit(row: any) {
+  splitForm.cardId = row.cardId
+  splitForm.cardCode = row.cardCode
+  splitForm.originQty = Number(row.quantityTransfered) || 0
+  splitForm.splitQty = 1
+  splitOpen.value = true
+}
+
+function submitSplit() {
+  if (!splitForm.splitQty || splitForm.splitQty < 1) {
+    proxy.$modal.msgError('拆出数量必须大于 0')
+    return
+  }
+  if (splitForm.splitQty >= splitForm.originQty) {
+    proxy.$modal.msgError('拆出数量必须小于原卡数量')
+    return
+  }
+  splitLoading.value = true
+  // 单事务接口：原卡扣减 + 新卡创建原子完成（后端 Redis 锁 + 事务保证，失败自动回滚）
+  splitProcard({ cardId: splitForm.cardId, quantityTransfered: splitForm.splitQty }).then(() => {
+    splitLoading.value = false
+    splitOpen.value = false
+    proxy.$modal.msgSuccess('拆卡成功：原卡剩余 ' + (splitForm.originQty - splitForm.splitQty) + '，新卡 ' + splitForm.splitQty)
+    getList()
+  }).catch(() => {
+    splitLoading.value = false
+  })
 }
 
 // ==================== 自动编码 ====================

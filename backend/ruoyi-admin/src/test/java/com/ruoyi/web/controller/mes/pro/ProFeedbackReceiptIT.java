@@ -158,7 +158,8 @@ class ProFeedbackReceiptIT extends BaseIntegrationTest {
     void midProcessAudit_shouldNotGenerateReceipt() {
         Long midFeedbackId = insertFeedback(PROC_MID, new BigDecimal("100"));
 
-        docService.onFeedbackAudited(midFeedbackId);
+        // 中间工序：produced 参数无关（非末工序直接 return），传 null 即可
+        docService.onFeedbackAudited(midFeedbackId, null);
 
         assertThat(countRecpts(workorderId)).isZero();
         assertThat(countRecptLogs(workorderId)).isZero();
@@ -170,16 +171,16 @@ class ProFeedbackReceiptIT extends BaseIntegrationTest {
     @Test
     @DisplayName("末工序分批报工 40 + 60 → 生成两张独立入库单，总量 100")
     void lastProcessBatched_shouldGenerateTwoReceipts() {
-        // 第一批：40
+        // 第一批：40 (模拟外层事务已 addQuantityProduced 累加到 40)
         Long fb1 = insertFeedback(PROC_LAST, new BigDecimal("40"));
-        docService.onFeedbackAudited(fb1);
+        docService.onFeedbackAudited(fb1, new BigDecimal("40"));
 
         assertThat(countRecpts(workorderId)).isEqualTo(1);
         assertThat(sumRecptQty(workorderId)).isEqualByComparingTo(new BigDecimal("40.0000"));
 
-        // 第二批：60
+        // 第二批：60 (模拟外层事务已累加到 100)
         Long fb2 = insertFeedback(PROC_LAST, new BigDecimal("60"));
-        docService.onFeedbackAudited(fb2);
+        docService.onFeedbackAudited(fb2, new BigDecimal("100"));
 
         assertThat(countRecpts(workorderId)).isEqualTo(2);
         assertThat(sumRecptQty(workorderId)).isEqualByComparingTo(new BigDecimal("100.0000"));
@@ -202,8 +203,23 @@ class ProFeedbackReceiptIT extends BaseIntegrationTest {
     void sameFeedbackTwice_shouldBeIdempotent() {
         Long fb = insertFeedback(PROC_LAST, new BigDecimal("100"));
 
-        docService.onFeedbackAudited(fb);
-        docService.onFeedbackAudited(fb);
+        docService.onFeedbackAudited(fb, new BigDecimal("100"));
+        docService.onFeedbackAudited(fb, new BigDecimal("100"));
+
+        assertThat(countRecpts(workorderId)).isEqualTo(1);
+        assertThat(sumRecptQty(workorderId)).isEqualByComparingTo(new BigDecimal("100.0000"));
+    }
+
+    // ═══════════════════════════════════════
+    // C2) 【回归 REQUIRES_NEW 可见性 bug】末工序报工 produced 传入 0（模拟外层未提交场景）
+    //     修复前会跳过入库单生成；修复后应使用合格数回退（兜底）或正确传值
+    // ═══════════════════════════════════════
+    @Test
+    @DisplayName("末工序 produced=0 时传 null 走合格数兜底，不应跳过")
+    void producedZero_shouldFallbackToQualified() {
+        Long fb = insertFeedback(PROC_LAST, new BigDecimal("100"));
+        // 传 null：onFeedbackAudited 会用 fb.quantityQualified 作为 producedResolved 兜底
+        docService.onFeedbackAudited(fb, null);
 
         assertThat(countRecpts(workorderId)).isEqualTo(1);
         assertThat(sumRecptQty(workorderId)).isEqualByComparingTo(new BigDecimal("100.0000"));

@@ -162,11 +162,7 @@ public class ProFeedbackController extends BaseController
     @PutMapping("/confirm/{recordId}")
     public AjaxResult confirm(@PathVariable Long recordId)
     {
-        ProFeedback fb = proFeedbackService.selectProFeedbackByRecordId(recordId);
-        if (fb == null) return error("报工记录不存在");
-        if (!"PREPARE".equals(fb.getStatus())) return error("只有待确认状态的报工才能确认");
-        fb.setStatus("CONFIRMED");
-        proFeedbackService.updateProFeedback(fb);
+        proFeedbackService.confirmFeedback(recordId);
         return success();
     }
 
@@ -178,5 +174,28 @@ public class ProFeedbackController extends BaseController
     {
         proFeedbackService.auditFeedback(recordId);
         return success();
+    }
+
+    /** 批量确认报工：PREPARE → CONFIRMED，尽力执行，失败逐条返回。 */
+    @PreAuthorize("@ss.hasPermi('mes:pro:feedback:edit')")
+    @Log(title = "报工批量确认", businessType = BusinessType.UPDATE)
+    @PutMapping("/batchConfirm")
+    public AjaxResult batchConfirm(@RequestBody(required = false) List<Long> recordIds)
+    {
+        return success(proFeedbackService.batchConfirmFeedback(toIdArray(recordIds)));
+    }
+
+    /** 批量审核报工：CONFIRMED → AUDITED，尽力执行，失败逐条返回。 */
+    @PreAuthorize("@ss.hasPermi('mes:pro:feedback:edit')")
+    @Log(title = "报工批量审核", businessType = BusinessType.UPDATE)
+    @PutMapping("/batchAudit")
+    public AjaxResult batchAudit(@RequestBody(required = false) List<Long> recordIds)
+    {
+        return success(proFeedbackService.batchAuditFeedback(toIdArray(recordIds)));
+    }
+
+    private static Long[] toIdArray(List<Long> ids)
+    {
+        return ids == null ? new Long[0] : ids.toArray(new Long[0]);
     }
 }

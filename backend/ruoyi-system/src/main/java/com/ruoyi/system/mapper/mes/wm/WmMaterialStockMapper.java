@@ -20,6 +20,9 @@ public interface WmMaterialStockMapper
     public List<WmMaterialStock> selectWmMaterialStockList(WmMaterialStock entity);
     public List<WmMaterialStock> selectWmMaterialStockAll();
     public WmMaterialStock selectWmMaterialStockByMaterialStockId(Long materialStockId);
+
+    /** 按 materialStockId 查询并锁定行（发料指定批次扣减用） */
+    public WmMaterialStock selectMaterialStockForUpdateById(Long materialStockId);
     public int insertWmMaterialStock(WmMaterialStock entity);
     public int updateWmMaterialStock(WmMaterialStock entity);
     public int deleteWmMaterialStockByMaterialStockId(Long materialStockId);
@@ -31,6 +34,15 @@ public interface WmMaterialStockMapper
      * 不限定 vendor_id/workorder_id/batch_id —— 跨任意批次/vendor 分配。
      */
     public List<WmMaterialStock> selectAvailableStocksForFifo(
+            @Param("itemId") Long itemId,
+            @Param("warehouseId") Long warehouseId,
+            @Param("qualityStatus") String qualityStatus);
+
+    /**
+     * 查可用批次列表（前端发料弹窗批次下拉用，只读不加行锁）。
+     * 返回所有 onhand>0 的批次记录（含已预占的），前端据此选择指定发料批次。
+     */
+    public List<WmMaterialStock> selectAvailableBatches(
             @Param("itemId") Long itemId,
             @Param("warehouseId") Long warehouseId,
             @Param("qualityStatus") String qualityStatus);

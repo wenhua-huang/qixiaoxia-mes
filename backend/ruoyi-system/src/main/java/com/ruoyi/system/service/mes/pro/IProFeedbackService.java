@@ -76,4 +76,19 @@ public interface IProFeedbackService
 
     /** 审核报工：CONFIRMED→AUDITED，同时增量更新任务和工单已生产数量 */
     public void auditFeedback(Long recordId);
+
+    /** 确认报工：PREPARE → CONFIRMED（下沉自 Controller，供批量复用）。 */
+    public int confirmFeedback(Long recordId);
+
+    /**
+     * 批量确认报工：逐条调用 confirmFeedback，尽力执行，失败逐条收集。
+     * @return total/successCount/failedCount/failures[{recordId,feedbackCode,workorderName,reason}]
+     */
+    public java.util.Map<String, Object> batchConfirmFeedback(Long[] recordIds);
+
+    /**
+     * 批量审核报工：逐条调用 auditFeedback，尽力执行，失败逐条收集。
+     * @return total/successCount/failedCount/failures[{recordId,feedbackCode,workorderName,reason}]
+     */
+    public java.util.Map<String, Object> batchAuditFeedback(Long[] recordIds);
 }

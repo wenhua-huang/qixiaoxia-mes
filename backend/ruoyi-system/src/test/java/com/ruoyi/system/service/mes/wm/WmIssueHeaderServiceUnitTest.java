@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 import com.ruoyi.common.core.redis.RedisLockTemplate;
 import com.ruoyi.common.exception.ServiceException;
@@ -72,8 +73,8 @@ class WmIssueHeaderServiceUnitTest {
         dateUtilsMock = mockStatic(DateUtils.class);
         dateUtilsMock.when(DateUtils::getNowDate).thenReturn(new Date());
 
-        // Mock lockTemplate：直接执行 Runnable action（绕过 Redis）
-        doAnswer(inv -> { Runnable action = inv.getArgument(2); action.run(); return null; })
+        // Mock lockTemplate：直接执行 Runnable action（绕过 Redis）；lenient 因 submit/approve 单条不走锁
+        lenient().doAnswer(inv -> { Runnable action = inv.getArgument(2); action.run(); return null; })
                 .when(lockTemplate).execute(anyString(), anyLong(), any(Runnable.class));
 
         // 手动创建 txTemplate（@PostConstruct 在 Mockito 下不触发）
@@ -572,5 +573,73 @@ class WmIssueHeaderServiceUnitTest {
         assertThat(stockCaptor.getValue().getQuantityAvailable()).isEqualByComparingTo(new BigDecimal("50"));
         assertThat(stockCaptor.getValue().getQuantityOnhand()).isEqualByComparingTo(new BigDecimal("100"));
         verify(transactionMapper).insertWmTransaction(any(WmTransaction.class));
+    }
+
+    // ══════════════════════════════════════════════
+    // 批量操作测试（batchSubmitForApprove / batchApprove / batchConfirmIssue）
+    // ══════════════════════════════════════════════
+
+    @Test
+    @DisplayName("22. 批量提交审核：混合 DRAFT+非草稿，成功1失败1，failures 含原因")
+    void testBatchSubmitMixedStatus() {
+        // 单1：DRAFT + 有明细 → 成功；单2：PENDING → 失败
+        WmIssueHeader h1 = new WmIssueHeader(); h1.setIssueId(1L); h1.setStatus("DRAFT");
+        WmIssueHeader h2 = new WmIssueHeader(); h2.setIssueId(2L); h2.setIssueCode("LL002"); h2.setIssueName("单2"); h2.setStatus("PENDING");
+        when(issueHeaderMapper.selectWmIssueHeaderByIssueId(1L)).thenReturn(h1, h1); // submit 内查 + executeBatch 失败回查（成功路径不回查）
+        when(issueHeaderMapper.selectWmIssueHeaderByIssueId(2L)).thenReturn(h2);
+        when(issueLineMapper.selectWmIssueLineList(any(WmIssueLine.class))).thenReturn(List.of(testLine));
+
+        Map<String, Object> r = service.batchSubmitForApprove(new Long[]{1L, 2L});
+
+        assertThat(r.get("total")).isEqualTo(2);
+        assertThat(r.get("successCount")).isEqualTo(1);
+        assertThat(r.get("failedCount")).isEqualTo(1);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> failures = (List<Map<String, Object>>) r.get("failures");
+        assertThat(failures).hasSize(1);
+        assertThat(failures.get(0).get("issueCode")).isEqualTo("LL002");
+        assertThat((String) failures.get(0).get("reason")).contains("草稿");
+    }
+
+    @Test
+    @DisplayName("23. 批量预占库存：库存不足单据进 failures，其余成功，返回明细含 issueCode/reason")
+    void testBatchConfirmInsufficientStock() {
+        // 单1：APPROVED + 库存足 → 成功；单3：APPROVED + 库存不足 → 失败
+        WmIssueHeader h1 = new WmIssueHeader(); h1.setIssueId(1L); h1.setStatus("APPROVED"); h1.setWarehouseId(1L);
+        WmIssueHeader h3 = new WmIssueHeader(); h3.setIssueId(3L); h3.setIssueCode("LL003"); h3.setIssueName("单3"); h3.setStatus("APPROVED"); h3.setWarehouseId(1L);
+        when(issueHeaderMapper.selectWmIssueHeaderByIssueId(1L)).thenReturn(h1);
+        when(issueHeaderMapper.selectWmIssueHeaderByIssueId(3L)).thenReturn(h3);
+        WmIssueLine lineFor3 = new WmIssueLine(); lineFor3.setLineId(3L); lineFor3.setIssueId(3L); lineFor3.setItemId(100L);
+        lineFor3.setQuantityIssue(new BigDecimal("50")); lineFor3.setWarehouseId(1L); lineFor3.setBatchId(1L);
+        when(issueLineMapper.selectWmIssueLineList(any(WmIssueLine.class)))
+                .thenReturn(List.of(testLine))     // 单1
+                .thenReturn(List.of(lineFor3));     // 单3
+        // 单1 库存足(200)，单3 库存不足(10)
+        WmMaterialStock stockEnough = new WmMaterialStock(); stockEnough.setMaterialStockId(1L); stockEnough.setItemId(100L);
+        stockEnough.setQuantityOnhand(new BigDecimal("200")); stockEnough.setQuantityAvailable(new BigDecimal("200"));
+        WmMaterialStock stockLow = new WmMaterialStock(); stockLow.setMaterialStockId(1L); stockLow.setItemId(100L);
+        stockLow.setQuantityOnhand(new BigDecimal("200")); stockLow.setQuantityAvailable(new BigDecimal("10"));
+        when(materialStockMapper.loadMaterialStockForUpdate(any(WmMaterialStock.class)))
+                .thenReturn(stockEnough).thenReturn(stockLow);
+
+        Map<String, Object> r = service.batchConfirmIssue(new Long[]{1L, 3L});
+
+        assertThat(r.get("successCount")).isEqualTo(1);
+        assertThat(r.get("failedCount")).isEqualTo(1);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> failures = (List<Map<String, Object>>) r.get("failures");
+        assertThat(failures.get(0).get("issueCode")).isEqualTo("LL003");
+        assertThat((String) failures.get(0).get("reason")).contains("可用库存不足");
+    }
+
+    @Test
+    @DisplayName("24. 批量操作：空数组拒绝")
+    void testBatchRejectsEmpty() {
+        assertThatThrownBy(() -> service.batchSubmitForApprove(new Long[]{}))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("未选择");
+        assertThatThrownBy(() -> service.batchApprove(null))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("未选择");
     }
 }

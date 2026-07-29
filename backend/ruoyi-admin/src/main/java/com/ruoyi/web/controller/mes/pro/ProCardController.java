@@ -65,6 +65,14 @@ public class ProCardController extends BaseController
     @PutMapping
     public AjaxResult edit(@RequestBody ProCard e) { return toAjax(proCardService.updateProCard(e)); }
 
+    /** 拆卡：单事务接口，原卡扣减 + 新卡创建原子完成 */
+    @PreAuthorize("@ss.hasPermi('mes:pro:card:edit')")
+    @Log(title = "流转卡拆分", businessType = BusinessType.UPDATE)
+    @PostMapping("/split")
+    public AjaxResult split(@RequestBody ProCard e) {
+        return success(proCardService.splitCard(e.getCardId(), e.getQuantityTransfered()));
+    }
+
     @PreAuthorize("@ss.hasPermi('mes:pro:card:remove')")
     @Log(title = "流转卡", businessType = BusinessType.DELETE)
     @DeleteMapping("/{cardIds}")

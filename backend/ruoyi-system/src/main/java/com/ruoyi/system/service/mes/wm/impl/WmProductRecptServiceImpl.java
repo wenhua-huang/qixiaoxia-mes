@@ -10,12 +10,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
+import com.ruoyi.system.domain.mes.pro.ProDocGenerationLog;
+import com.ruoyi.system.domain.mes.pro.ProMaterialTrace;
 import com.ruoyi.system.domain.mes.wm.WmProductRecpt;
 import com.ruoyi.system.domain.mes.wm.WmProductRecptLine;
 import com.ruoyi.system.domain.mes.wm.WmProductRecptMobileBody;
 import com.ruoyi.system.domain.mes.wm.WmProductRecptMobileBody.MobileLineItem;
+import com.ruoyi.system.domain.mes.wm.WmTransaction;
 import com.ruoyi.system.domain.mes.wm.tx.ProductRecptTxBean;
+import com.ruoyi.system.mapper.mes.pro.ProDocGenerationLogMapper;
 import com.ruoyi.system.mapper.mes.wm.WmProductRecptMapper;
+import com.ruoyi.system.mapper.mes.wm.WmTransactionMapper;
+import com.ruoyi.system.service.mes.pro.IProMaterialTraceService;
 import com.ruoyi.system.service.mes.wm.IWmProductRecptLineService;
 import com.ruoyi.system.service.mes.wm.IWmProductRecptService;
 import com.ruoyi.system.service.mes.wm.IWmStorageCoreService;
@@ -31,6 +37,15 @@ public class WmProductRecptServiceImpl implements IWmProductRecptService
 
     @Autowired
     private IWmStorageCoreService storageCoreService;
+
+    @Autowired
+    private WmTransactionMapper wmTransactionMapper;
+
+    @Autowired
+    private ProDocGenerationLogMapper proDocGenerationLogMapper;
+
+    @Autowired
+    private IProMaterialTraceService proMaterialTraceService;
 
     @Override
     public List<WmProductRecpt> selectWmProductRecptList(WmProductRecpt entity) {
@@ -139,6 +154,49 @@ public class WmProductRecptServiceImpl implements IWmProductRecptService
         header.setUpdateBy(SecurityUtils.getUsername());
         header.setUpdateTime(DateUtils.getNowDate());
         wmProductRecptMapper.updateWmProductRecpt(header);
+        // 补写产出回库的追溯链路（FEEDBACK → MATERIAL_STOCK），打通产出→销售的全链路
+        writeProduceStockinTrace(header);
+    }
+
+    /**
+     * 补写"报工产出 → 成品入库"的追溯记录。
+     * 报工审核时已写 CARD→FEEDBACK，但产出物入库是异步的（确认收货才生成库存），
+     * 此处补上 FEEDBACK→MATERIAL_STOCK 这一跳，让产出→销售链路可追溯。
+     * 非报工产生的入库（手动建单）查不到 feedbackId 则跳过，不阻断入库。
+     */
+    private void writeProduceStockinTrace(WmProductRecpt header) {
+        Long recptId = header.getRecptId();
+        // 1. 通过 doc_generation_log 反查 sourceFeedbackId（RECPT 类型 + docId=recptId）
+        ProDocGenerationLog logQuery = new ProDocGenerationLog();
+        logQuery.setDocType("RECPT");
+        logQuery.setDocId(recptId);
+        List<ProDocGenerationLog> logs = proDocGenerationLogMapper.selectList(logQuery);
+        if (logs == null || logs.isEmpty()) return;
+        Long feedbackId = logs.get(0).getSourceFeedbackId();
+        if (feedbackId == null) return;
+        // 2. 查刚处理的事务，拿 materialStockId（每行一条事务）
+        WmTransaction txQuery = new WmTransaction();
+        txQuery.setSourceDocType("wm_product_recpt");
+        txQuery.setSourceDocId(recptId);
+        List<WmTransaction> txs = wmTransactionMapper.selectWmTransactionList(txQuery);
+        if (txs == null || txs.isEmpty()) return;
+        // 3. 每条事务补写一条 PRODUCE_STOCKIN trace
+        for (WmTransaction tx : txs) {
+            if (tx.getMaterialStockId() == null) continue;
+            ProMaterialTrace t = new ProMaterialTrace();
+            t.setTraceType("PRODUCE_STOCKIN");
+            t.setParentType("FEEDBACK");
+            t.setParentId(feedbackId);
+            t.setChildType("MATERIAL_STOCK");
+            t.setChildId(tx.getMaterialStockId());
+            t.setQuantity(tx.getQuantity());
+            t.setUnitOfMeasure(tx.getUnitOfMeasure());
+            t.setFeedbackId(feedbackId);
+            t.setTransactionId(tx.getTransactionId());
+            t.setWorkorderId(header.getWorkorderId());
+            t.setTraceTime(DateUtils.getNowDate());
+            proMaterialTraceService.insertProMaterialTrace(t);
+        }
     }
 
     /**

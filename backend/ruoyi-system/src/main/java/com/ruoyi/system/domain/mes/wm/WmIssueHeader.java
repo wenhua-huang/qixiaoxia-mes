@@ -31,11 +31,16 @@ public class WmIssueHeader extends BaseEntity
     private Long workorderId;
     private String workorderCode;
     private String workorderName;
+    @Excel(name = "流转卡ID")
+    private Long cardId;
+    private String cardCode;
     private Long taskId;
     private String taskCode;
     private Long workstationId;
     private String workstationCode;
     private String workstationName;
+    @Excel(name = "供应商ID") private Long vendorId;
+    private String vendorCode;
     private Long warehouseId;
     private String warehouseCode;
     private String warehouseName;
@@ -84,6 +89,10 @@ public class WmIssueHeader extends BaseEntity
     public void setWorkorderCode(String v) { this.workorderCode = v; }
     public String getWorkorderName() { return workorderName; }
     public void setWorkorderName(String v) { this.workorderName = v; }
+    public Long getCardId() { return cardId; }
+    public void setCardId(Long v) { this.cardId = v; }
+    public String getCardCode() { return cardCode; }
+    public void setCardCode(String v) { this.cardCode = v; }
     public Long getTaskId() { return taskId; }
     public void setTaskId(Long v) { this.taskId = v; }
     public String getTaskCode() { return taskCode; }
@@ -94,6 +103,10 @@ public class WmIssueHeader extends BaseEntity
     public void setWorkstationCode(String v) { this.workstationCode = v; }
     public String getWorkstationName() { return workstationName; }
     public void setWorkstationName(String v) { this.workstationName = v; }
+    public Long getVendorId() { return vendorId; }
+    public void setVendorId(Long v) { this.vendorId = v; }
+    public String getVendorCode() { return vendorCode; }
+    public void setVendorCode(String v) { this.vendorCode = v; }
     public Long getWarehouseId() { return warehouseId; }
     public void setWarehouseId(Long v) { this.warehouseId = v; }
     public String getWarehouseCode() { return warehouseCode; }

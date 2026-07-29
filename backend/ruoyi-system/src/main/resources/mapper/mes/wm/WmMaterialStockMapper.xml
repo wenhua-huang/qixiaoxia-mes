@@ -96,6 +96,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where material_stock_id = #{materialStockId}
     </select>
 
+    <!-- 按 materialStockId 查询并锁定行（发料指定批次扣减用） -->
+    <select id="selectMaterialStockForUpdateById" parameterType="Long" resultMap="WmMaterialStockResult">
+        <include refid="selectWmMaterialStockVo"/>
+        where material_stock_id = #{materialStockId}
+        for update
+    </select>
+
     <insert id="insertWmMaterialStock" parameterType="WmMaterialStock" useGeneratedKeys="true" keyProperty="materialStockId">
         insert into qxx_wm_material_stock
         <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="itemId != null">item_id,</if>
@@ -268,6 +275,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           <if test="warehouseId != null"> and warehouse_id = #{warehouseId}</if>
         order by create_time asc
         for update
+    </select>
+
+    <!-- 查可用批次列表（前端发料弹窗批次下拉用，只读不加行锁）：quantity_available>0 才展示；被本单预占的批次用户可点"清除选择"回归预占 -->
+    <select id="selectAvailableBatches" resultMap="WmMaterialStockResult">
+        <include refid="selectWmMaterialStockVo"/>
+        where item_id = #{itemId}
+          and quantity_available > 0
+          and quality_status = #{qualityStatus}
+          <if test="warehouseId != null"> and warehouse_id = #{warehouseId}</if>
+        order by create_time asc
     </select>
 
     <!-- 按 itemId 聚合各仓库可用量（建议出库仓库 / 按仓拆行用）FIFO：早入库的仓优先 -->

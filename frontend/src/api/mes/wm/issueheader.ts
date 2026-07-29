@@ -40,3 +40,9 @@ export function issueOut(issueId: number, details: any[]) { return request({ url
 export function closeIssue(issueId: number) { return request({ url: '/mes/wm/issueheader/close/' + issueId, method: 'put' }) }
 // 作废（非终态→CANCELED）
 export function cancelIssue(issueId: number, reason?: string) { return request({ url: '/mes/wm/issueheader/cancel/' + issueId, method: 'put', data: { reason: reason || '' } }) }
+// 批量提交审核（DRAFT→PENDING），尽力执行，返回 total/successCount/failedCount/failures
+export function batchSubmitForApprove(issueIds: number[]) { return request({ url: '/mes/wm/issueheader/batchSubmit', method: 'put', data: issueIds }) }
+// 批量审核通过（PENDING→APPROVED）
+export function batchApprove(issueIds: number[]) { return request({ url: '/mes/wm/issueheader/batchApprove', method: 'put', data: issueIds }) }
+// 批量预占库存（APPROVED→ALLOCATED，扣减可用库存）
+export function batchConfirmIssue(issueIds: number[]) { return request({ url: '/mes/wm/issueheader/batchConfirm', method: 'put', data: issueIds }) }

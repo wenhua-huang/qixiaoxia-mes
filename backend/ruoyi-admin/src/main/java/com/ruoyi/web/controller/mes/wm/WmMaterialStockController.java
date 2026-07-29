@@ -36,6 +36,18 @@ public class WmMaterialStockController extends BaseController
         return getDataTable(list);
     }
 
+    /**
+     * 查可用批次列表（发料弹窗批次下拉用）：按 itemId 查所有 onhand>0 的批次记录。
+     * 返回字段含 batchId/batchCode/quantityAvailable/quantityOnhand/warehouseId 等。
+     */
+    @PreAuthorize("@ss.hasPermi('mes:wm:material_stock:list')")
+    @GetMapping("/availableBatches")
+    public AjaxResult availableBatches(@RequestParam("itemId") Long itemId,
+                                       @RequestParam(value = "warehouseId", required = false) Long warehouseId)
+    {
+        return AjaxResult.success(wmMaterialStockService.selectAvailableBatches(itemId, warehouseId));
+    }
+
     @PreAuthorize("@ss.hasPermi('mes:wm:material_stock:query')")
     @GetMapping("/listAll")
     public AjaxResult listAll()

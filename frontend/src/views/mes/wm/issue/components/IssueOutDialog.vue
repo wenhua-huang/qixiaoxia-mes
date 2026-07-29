@@ -28,8 +28,13 @@
           </el-select>
         </template>
       </el-table-column>
-      <el-table-column label="批次编码" width="130">
-        <template #default="scope"><el-input v-model="scope.row.batchCode" size="small" placeholder="可选" /></template>
+      <el-table-column label="批次" width="240">
+        <template #default="scope">
+          <el-select v-model="scope.row.materialStockId" placeholder="按预占发料" size="small" clearable filterable style="width:100%" @change="(v) => onBatchChange(scope.$index, v)">
+            <el-option v-for="b in (scope.row._batchOptions || [])" :key="b.materialStockId"
+              :label="`${b.batchCode || '无批次'} · ${b.warehouseName || ('仓' + b.warehouseId)} (可用${b.quantityAvailable}/${b.quantityOnhand})`" :value="b.materialStockId" />
+          </el-select>
+        </template>
       </el-table-column>
       <el-table-column label="本次发料量" width="120">
         <template #default="scope">
@@ -67,6 +72,7 @@
 import { ref, computed } from 'vue'
 import { issueOut } from '@/api/mes/wm/issueheader'
 import { listIssueDetail } from '@/api/mes/wm/issuedetail'
+import { availableBatches } from '@/api/mes/wm/material_stock'
 import { getCurrentInstance } from 'vue'
 
 const proxy = getCurrentInstance()?.proxy as any
@@ -104,17 +110,21 @@ function open(headerData: any, lineData: any[]) {
 function addDetailRow() {
   // 默认选第一个可发料行
   const first = issueableLines.value[0]
-  details.value.push({
+  const row = {
     lineId: first?.lineId || null,
     itemId: first?.itemId || null,
     itemCode: first?.itemCode || '',
     itemName: first?.itemName || '',
     unitOfMeasure: first?.unitOfMeasure || '',
     unitName: first?.unitName || '',
+    materialStockId: null,  // 不选 = 按预占发料
     batchId: null,
     batchCode: '',
-    quantity: first ? remain(first) : 0
-  })
+    quantity: first ? remain(first) : 0,
+    _batchOptions: [] as any[]
+  }
+  details.value.push(row)
+  if (first) loadBatchOptions(details.value.length - 1, first)
 }
 
 function onLineChange(idx: number, lineId: number) {
@@ -123,9 +133,32 @@ function onLineChange(idx: number, lineId: number) {
     Object.assign(details.value[idx], {
       itemId: line.itemId, itemCode: line.itemCode, itemName: line.itemName,
       unitOfMeasure: line.unitOfMeasure, unitName: line.unitName,
-      quantity: remain(line)
+      quantity: remain(line),
+      materialStockId: null, batchId: null, batchCode: ''  // 切换物料重置批次
     })
+    loadBatchOptions(idx, line)
   }
+}
+
+/** 加载该行物料的可选批次（跨仓：不传 warehouseId），按入库时间升序 */
+function loadBatchOptions(idx: number, line: any) {
+  if (!line?.itemId) return
+  availableBatches(line.itemId).then((r: any) => {
+    details.value[idx]._batchOptions = r.data || []
+  }).catch(() => { details.value[idx]._batchOptions = [] })
+}
+
+/** 选择批次下拉：把 materialStockId 反填 batchId/batchCode */
+function onBatchChange(idx: number, materialStockId: any) {
+  const row = details.value[idx]
+  if (!materialStockId) {
+    row.batchId = null; row.batchCode = ''
+    return
+  }
+  const b = (row._batchOptions || []).find((x: any) => x.materialStockId === materialStockId)
+  row.batchId = b?.batchId ?? null
+  row.batchCode = b?.batchCode ?? ''
+  row.warehouseId = b?.warehouseId ?? row.warehouseId
 }
 
 function handleConfirm() {
@@ -141,7 +174,17 @@ function handleConfirm() {
     }
   }
   submitting.value = true
-  issueOut(header.value.issueId, valid).then(() => {
+  // 剥离前端辅助字段 _batchOptions，组装后端需要的字段
+  const payload = valid.map(d => ({
+    lineId: d.lineId, itemId: d.itemId, itemCode: d.itemCode, itemName: d.itemName,
+    unitOfMeasure: d.unitOfMeasure, unitName: d.unitName,
+    quantity: d.quantity,
+    batchId: d.batchId ?? null,
+    batchCode: d.batchCode || null,
+    materialStockId: d.materialStockId ?? null,
+    warehouseId: d.warehouseId ?? null
+  }))
+  issueOut(header.value.issueId, payload).then(() => {
     proxy.$modal.msgSuccess('发料成功')
     show.value = false
     emit('success')

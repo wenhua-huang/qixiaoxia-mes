@@ -85,6 +85,7 @@
         <template #default="scope">
           <el-button link type="primary" size="small" icon="View" @click="handleView(scope.row)" v-hasPermi="['mes:pro:card:query']">查看</el-button>
           <el-button link type="primary" size="small" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:pro:card:edit']">修改</el-button>
+          <el-button link type="primary" size="small" icon="SplitScreen" @click="handleSplit(scope.row)" v-if="scope.row.status === 'ACTIVE'" v-hasPermi="['mes:pro:card:edit']">拆卡</el-button>
           <el-button link type="primary" size="small" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:pro:card:remove']">删除</el-button>
         </template>
       </el-table-column>
@@ -208,6 +209,23 @@
           <el-button type="primary" @click="submitForm" v-if="optType !== 'view'">确 定</el-button>
           <el-button @click="cancel">关 闭</el-button>
         </div>
+      </template>
+    </el-dialog>
+
+    <!-- 拆卡对话框 -->
+    <el-dialog title="拆分流转卡" v-model="splitOpen" width="450px" append-to-body :close-on-click-modal="false">
+      <el-form label-width="100px">
+        <el-form-item label="原流转卡">
+          <span>{{ splitForm.cardCode }} （当前数量：{{ splitForm.originQty }}）</span>
+        </el-form-item>
+        <el-form-item label="拆出数量" required>
+          <el-input-number v-model="splitForm.splitQty" :min="1" :max="splitForm.originQty ? splitForm.originQty - 1 : 1" :precision="2" style="width: 100%" />
+          <div style="color:#909399;font-size:12px;line-height:1.6;margin-top:4px">拆出一张新流转卡承载此数量，原卡数量自动扣减。新卡继承工单/产品信息。</div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button type="primary" @click="submitSplit" :loading="splitLoading">确 定</el-button>
+        <el-button @click="splitOpen = false">关 闭</el-button>
       </template>
     </el-dialog>
   </div>
@@ -445,6 +463,68 @@ function handleExport() {
   proxy.download('/mes/pro/procard/export', {
     ...queryParams,
   }, `procard_${new Date().getTime()}.xlsx`)
+}
+
+// ==================== 拆卡 ====================
+const splitOpen = ref(false)
+const splitLoading = ref(false)
+const splitForm = reactive<any>({ cardId: null, cardCode: '', originQty: 0, splitQty: 1 })
+
+function handleSplit(row: any) {
+  splitForm.cardId = row.cardId
+  splitForm.cardCode = row.cardCode
+  splitForm.originQty = Number(row.quantityTransfered) || 0
+  splitForm.splitQty = 1
+  splitOpen.value = true
+}
+
+function submitSplit() {
+  if (!splitForm.splitQty || splitForm.splitQty < 1) {
+    proxy.$modal.msgError('拆出数量必须大于 0')
+    return
+  }
+  if (splitForm.splitQty >= splitForm.originQty) {
+    proxy.$modal.msgError('拆出数量必须小于原卡数量')
+    return
+  }
+  splitLoading.value = true
+  // 原卡扣减数量
+  const remainQty = splitForm.originQty - splitForm.splitQty
+  updateProcard({ cardId: splitForm.cardId, quantityTransfered: remainQty }).then(() => {
+    // 查原卡完整信息用于复制到新卡
+    return getProcard(splitForm.cardId)
+  }).then((res: any) => {
+    const src = res.data
+    // 生成新卡编码
+    return genSerialCode('PRO_CARD_CODE').then((r: any) => {
+      const newCard: any = {
+        factoryId: src.factoryId,
+        cardCode: r.data,
+        workorderId: src.workorderId,
+        workorderCode: src.workorderCode,
+        workorderName: src.workorderName,
+        taskId: src.taskId,
+        batchCode: src.batchCode,
+        itemId: src.itemId,
+        itemCode: src.itemCode,
+        itemName: src.itemName,
+        unitOfMeasure: src.unitOfMeasure,
+        unitName: src.unitName,
+        quantityTransfered: splitForm.splitQty,
+        currentProcessId: src.currentProcessId,
+        currentProcessName: src.currentProcessName,
+        status: 'ACTIVE',
+      }
+      return addProcard(newCard)
+    })
+  }).then(() => {
+    splitLoading.value = false
+    splitOpen.value = false
+    proxy.$modal.msgSuccess('拆卡成功：原卡剩余 ' + remainQty + '，新卡 ' + splitForm.splitQty)
+    getList()
+  }).catch(() => {
+    splitLoading.value = false
+  })
 }
 
 // ==================== 自动编码 ====================

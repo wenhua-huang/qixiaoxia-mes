@@ -126,6 +126,14 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
     @Autowired
     private PlatformTransactionManager txManager;
 
+    @Autowired
+    private com.ruoyi.system.mapper.mes.pro.ProCardMapper proCardMapper;
+
+    @Autowired
+    private com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator autoCodeGenerator;
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ProWorkorderServiceImpl.class);
+
     /**
      * 查询生产工单
      *
@@ -524,7 +532,44 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         int rows = qxxProWorkorderMapper.updateProWorkorder(wo);
         // 级联：工单开工 → 该工单下所有 NORMAL/PREPARE 任务自动下发为 PRODUCING
         proTaskService.dispatchByWorkorder(workorderId);
+        // 开工自动建流转卡（一工单至少一张卡，追溯载体）
+        try {
+            ensureDefaultCardForWorkorder(wo);
+        } catch (Exception e) {
+            log.error("开工自动建流转卡失败, workorderId={}", workorderId, e);
+        }
         return rows;
+    }
+
+    /**
+     * 确保工单至少有一张流转卡。已存在则跳过，否则按工单数量建默认卡。
+     * 用于追溯链的 CARD 节点——领料投到卡、报工产出到卡、出入库都经卡追溯。
+     */
+    private void ensureDefaultCardForWorkorder(ProWorkorder wo) {
+        com.ruoyi.system.domain.mes.pro.ProCard query = new com.ruoyi.system.domain.mes.pro.ProCard();
+        query.setWorkorderId(wo.getWorkorderId());
+        List<com.ruoyi.system.domain.mes.pro.ProCard> existing = proCardMapper.selectProCardList(query);
+        if (existing != null && !existing.isEmpty()) {
+            return; // 已有卡，不重复建
+        }
+        String cardCode = autoCodeGenerator.genSerialCode("PRO_CARD_CODE", null);
+        com.ruoyi.system.domain.mes.pro.ProCard card = new com.ruoyi.system.domain.mes.pro.ProCard();
+        card.setFactoryId(wo.getFactoryId());
+        card.setCardCode(cardCode);
+        card.setWorkorderId(wo.getWorkorderId());
+        card.setWorkorderCode(wo.getWorkorderCode());
+        card.setWorkorderName(wo.getWorkorderName());
+        card.setItemId(wo.getProductId());
+        card.setItemCode(wo.getProductCode());
+        card.setItemName(wo.getProductName());
+        card.setUnitOfMeasure(wo.getUnitOfMeasure());
+        card.setUnitName(wo.getUnitName());
+        card.setQuantityTransfered(wo.getQuantity() != null ? new BigDecimal(wo.getQuantity().toString()) : BigDecimal.ZERO);
+        card.setStatus("ACTIVE");
+        card.setCreateBy(SecurityUtils.getUsername());
+        card.setCreateTime(DateUtils.getNowDate());
+        proCardMapper.insertProCard(card);
+        log.info("开工自动建流转卡: workorderId={}, cardCode={}", wo.getWorkorderId(), cardCode);
     }
 
     /**

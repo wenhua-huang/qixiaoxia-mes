@@ -30,6 +30,7 @@ public class ProFeedback extends BaseEntity
     @Excel(name = "工单ID") private Long workorderId;
     @Excel(name = "工单编码") private String workorderCode;
     @Excel(name = "工单名称") private String workorderName;
+    @Excel(name = "流转卡ID") private Long cardId;
     @Excel(name = "路线ID") private Long routeId;
     @Excel(name = "路线编码") private String routeCode;
     @Excel(name = "工序ID") private Long processId;
@@ -100,6 +101,8 @@ public class ProFeedback extends BaseEntity
     public void setWorkorderCode(String v) { this.workorderCode = v; }
     public String getWorkorderName() { return workorderName; }
     public void setWorkorderName(String v) { this.workorderName = v; }
+    public Long getCardId() { return cardId; }
+    public void setCardId(Long v) { this.cardId = v; }
     public Long getRouteId() { return routeId; }
     public void setRouteId(Long v) { this.routeId = v; }
     public String getRouteCode() { return routeCode; }

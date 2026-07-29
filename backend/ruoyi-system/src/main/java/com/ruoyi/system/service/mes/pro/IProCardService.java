@@ -18,4 +18,6 @@ public interface IProCardService
     public int updateProCard(ProCard e);
     public int deleteProCardByCardIds(Long[] cardIds);
     public int deleteProCardByCardId(Long cardId);
+    /** 拆卡：从原卡拆出 splitQty 生成新卡，原卡数量原子扣减，单事务保证一致性 */
+    public ProCard splitCard(Long cardId, java.math.BigDecimal splitQty);
 }

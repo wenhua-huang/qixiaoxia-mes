@@ -233,7 +233,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, getCurrentInstance } from 'vue'
-import { listProcard, getProcard, addProcard, updateProcard, delProcard } from '@/api/mes/pro/procard'
+import { listProcard, getProcard, addProcard, updateProcard, delProcard, splitProcard } from '@/api/mes/pro/procard'
 import { listCardProcessByCardId } from '@/api/mes/pro/cardprocess'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import workorderSelect from '@/components/workorderSelect/single.vue'
@@ -488,39 +488,11 @@ function submitSplit() {
     return
   }
   splitLoading.value = true
-  // 原卡扣减数量
-  const remainQty = splitForm.originQty - splitForm.splitQty
-  updateProcard({ cardId: splitForm.cardId, quantityTransfered: remainQty }).then(() => {
-    // 查原卡完整信息用于复制到新卡
-    return getProcard(splitForm.cardId)
-  }).then((res: any) => {
-    const src = res.data
-    // 生成新卡编码
-    return genSerialCode('PRO_CARD_CODE').then((r: any) => {
-      const newCard: any = {
-        factoryId: src.factoryId,
-        cardCode: r.data,
-        workorderId: src.workorderId,
-        workorderCode: src.workorderCode,
-        workorderName: src.workorderName,
-        taskId: src.taskId,
-        batchCode: src.batchCode,
-        itemId: src.itemId,
-        itemCode: src.itemCode,
-        itemName: src.itemName,
-        unitOfMeasure: src.unitOfMeasure,
-        unitName: src.unitName,
-        quantityTransfered: splitForm.splitQty,
-        currentProcessId: src.currentProcessId,
-        currentProcessName: src.currentProcessName,
-        status: 'ACTIVE',
-      }
-      return addProcard(newCard)
-    })
-  }).then(() => {
+  // 单事务接口：原卡扣减 + 新卡创建原子完成（后端 Redis 锁 + 事务保证，失败自动回滚）
+  splitProcard({ cardId: splitForm.cardId, quantityTransfered: splitForm.splitQty }).then(() => {
     splitLoading.value = false
     splitOpen.value = false
-    proxy.$modal.msgSuccess('拆卡成功：原卡剩余 ' + remainQty + '，新卡 ' + splitForm.splitQty)
+    proxy.$modal.msgSuccess('拆卡成功：原卡剩余 ' + (splitForm.originQty - splitForm.splitQty) + '，新卡 ' + splitForm.splitQty)
     getList()
   }).catch(() => {
     splitLoading.value = false

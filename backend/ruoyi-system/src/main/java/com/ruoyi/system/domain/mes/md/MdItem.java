@@ -1,6 +1,7 @@
 package com.ruoyi.system.domain.mes.md;
 
 import java.math.BigDecimal;
+import java.util.List;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import com.ruoyi.common.annotation.Excel;
@@ -69,6 +70,9 @@ public class MdItem extends BaseEntity
 
     /** 产品类型筛选(spu=标准/variant=变体，仅查询参数用，非DB字段) */
     private String parentIdFilter;
+
+    /** 物料类型ID列表(含子分类，仅查询参数用，非DB字段) */
+    private List<Long> itemTypeIds;
 
     /** 产品尺寸 */
     @Excel(name = "产品尺寸")
@@ -157,6 +161,9 @@ public class MdItem extends BaseEntity
     public void setParentId(Long parentId) { this.parentId = parentId; }
     public String getParentIdFilter() { return parentIdFilter; }
     public void setParentIdFilter(String parentIdFilter) { this.parentIdFilter = parentIdFilter; }
+
+    public List<Long> getItemTypeIds() { return itemTypeIds; }
+    public void setItemTypeIds(List<Long> itemTypeIds) { this.itemTypeIds = itemTypeIds; }
 
     public String getProductSize() { return productSize; }
     public void setProductSize(String productSize) { this.productSize = productSize; }

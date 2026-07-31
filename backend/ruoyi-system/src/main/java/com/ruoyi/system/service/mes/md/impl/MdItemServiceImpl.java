@@ -1,5 +1,6 @@
 package com.ruoyi.system.service.mes.md.impl;
 
+import java.util.Collections;
 import java.util.List;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.utils.DateUtils;
@@ -52,6 +53,15 @@ public class MdItemServiceImpl implements IMdItemService
     @Override
     public List<MdItem> selectMdItemList(MdItem mdItem)
     {
+        // 点击父分类时，展开为「自身+所有子分类」ID 列表，使子分类下的物料也能被查出
+        if (mdItem.getItemTypeId() != null && mdItem.getItemTypeId() != 0)
+        {
+            List<Long> descendantIds = itemTypeMapper.selectDescendantIds(mdItem.getItemTypeId());
+            // CTE 返回空说明该分类ID不存在，塞入-1使 IN(-1) 不命中任何记录（主键永不为负）
+            mdItem.setItemTypeIds(descendantIds.isEmpty()
+                ? Collections.singletonList(-1L) : descendantIds);
+            mdItem.setItemTypeId(null);
+        }
         return mdItemMapper.selectMdItemList(mdItem);
     }
 

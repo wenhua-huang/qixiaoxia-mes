@@ -339,6 +339,8 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
                 traceType = "PRODUCE";
             } else if (proc != null && "OUTSOURCE".equals(proc.getProcessType())) {
                 traceType = "OUTSOURCE_PROCESS";
+            } else if (proc != null && "SLITTING".equals(proc.getProcessType())) {
+                traceType = "SLIT";
             } else {
                 traceType = "PROCESS";
             }
@@ -434,33 +436,39 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
             if (fb.getWorkorderId() != null) {
                 BigDecimal deltaProduced = nvl(fb.getQuantityFeedback());
                 if (fb.getRouteId() != null && fb.getProcessId() != null) {
+                    // 查工序类型（用于判断分切工序：分切不触发产品入库，库存由 SlittingService 处理）
+                    ProProcess proc = proProcessMapper.selectProProcessByProcessId(fb.getProcessId());
+                    boolean isSlitting = proc != null && "SLITTING".equals(proc.getProcessType());
                     // 有工艺路线信息：仅末工序报工才更新工单已生产数
                     if (isLastProcessOfRoute(fb.getRouteId(), fb.getProcessId())) {
                         // 【Fix #1/#2/#4】末工序场景：quantity_produced 更新 + 完工判定 都在外层本事务完成，
-                        // 与单据生成 (REQUIRES_NEW) 解耦 —— 单据失败回滚不影响 quantity_produced / 审核提交。
+                        // 与单据生成 (REQUIRES_NEW) 解耦 -- 单据失败回滚不影响 quantity_produced / 审核提交。
                         proWorkorderMapper.addQuantityProduced(fb.getWorkorderId(), deltaProduced);
                         // 完工判定先于单据生成：若 autoComplete 失败，外层事务整体回滚，避免
                         // REQUIRES_NEW 已提交的入库单成孤儿 (autoComplete 失败时 onFeedbackAudited 未执行)。
                         proWorkorderDocService.autoCompleteWorkorderIfQualified(fb.getWorkorderId());
-                        // 【Fix REQUIRES_NEW 可见性】同事务重读 workorder 拿到 addQuantityProduced 后的
-                        // quantity_produced（InnoDB 同事务内可见自己未提交的写），传给 onFeedbackAudited。
-                        // 不传的话 REQUIRES_NEW 子事务在 MySQL REPEATABLE READ 下读到的是旧值（produced=0），
-                        // 会导致 qtyToRecpt=min(合格数, produced-alreadyRecpt)=0，跳过入库单生成。
-                        ProWorkorder woAfter = proWorkorderMapper.selectProWorkorderByWorkorderId(fb.getWorkorderId());
-                        BigDecimal producedAfter = woAfter != null && woAfter.getQuantityProduced() != null
-                                ? woAfter.getQuantityProduced() : BigDecimal.ZERO;
-                        // 末工序报工审核后：自动生成入库单 + 退料单 (独立事务, 失败不影响审核)
-                        try {
-                            proWorkorderDocService.onFeedbackAudited(recordId, producedAfter);
-                        } catch (Exception e) {
-                            // 单据生成失败：审核仍提交，用户需手动补录入库单
-                            log.warn("自动生成入库单/退料单失败, 需手动补录. feedbackId={}, workorderId={}, err={}",
-                                    recordId, fb.getWorkorderId(), e.getMessage());
+                        // 分切工序不生成产品入库单（产出是半成品原料，库存由 SlittingService 的 SPLIT/ITEM_RECPT 事务处理）
+                        if (!isSlitting) {
+                            // 【Fix REQUIRES_NEW 可见性】同事务重读 workorder 拿到 addQuantityProduced 后的
+                            // quantity_produced（InnoDB 同事务内可见自己未提交的写），传给 onFeedbackAudited。
+                            // 不传的话 REQUIRES_NEW 子事务在 MySQL REPEATABLE READ 下读到的是旧值（produced=0），
+                            // 会导致 qtyToRecpt=min(合格数, produced-alreadyRecpt)=0，跳过入库单生成。
+                            ProWorkorder woAfter = proWorkorderMapper.selectProWorkorderByWorkorderId(fb.getWorkorderId());
+                            BigDecimal producedAfter = woAfter != null && woAfter.getQuantityProduced() != null
+                                    ? woAfter.getQuantityProduced() : BigDecimal.ZERO;
+                            // 末工序报工审核后：自动生成入库单 + 退料单 (独立事务, 失败不影响审核)
+                            try {
+                                proWorkorderDocService.onFeedbackAudited(recordId, producedAfter);
+                            } catch (Exception e) {
+                                // 单据生成失败：审核仍提交，用户需手动补录入库单
+                                log.warn("自动生成入库单/退料单失败, 需手动补录. feedbackId={}, workorderId={}, err={}",
+                                        recordId, fb.getWorkorderId(), e.getMessage());
+                            }
                         }
-                        // 推进流转卡：末工序完工 → 卡置 COMPLETED
+                        // 推进流转卡：末工序完工 -> 卡置 COMPLETED
                         advanceCardStatus(fb, true);
                     } else {
-                        // 中间工序报工审核 → 更新流转卡当前工序（status 保持 ACTIVE）
+                        // 中间工序报工审核 -> 更新流转卡当前工序（status 保持 ACTIVE）
                         advanceCardStatus(fb, false);
                     }
                 } else {

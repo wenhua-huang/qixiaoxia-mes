@@ -16,7 +16,8 @@ public enum TransactionTypeEnum {
     PRODUCT_RT("PRODUCT_RT", "销售退货"),
     TRANS_OUT("TRANS_OUT", "调拨出库"),
     TRANS_IN("TRANS_IN", "调拨入库"),
-    PRODUCT_RECPT("PRODUCT_RECPT", "产品入库");
+    PRODUCT_RECPT("PRODUCT_RECPT", "产品入库"),
+    SPLIT("SPLIT", "分切出库");
 
     private final String code;
     private final String info;

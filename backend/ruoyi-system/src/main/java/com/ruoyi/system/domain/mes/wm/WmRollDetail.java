@@ -116,6 +116,9 @@ public class WmRollDetail extends BaseEntity
     @Excel(name = "纸卷状态:IN_STOCK-在库")
     private String status;
 
+    /** 分切批次号（同一次分切产生的子卷共享，便于按次查询） */
+    private String slitBatchNo;
+
     public Long getRollId() { return rollId; }
     public void setRollId(Long v) { this.rollId = v; }
 
@@ -214,6 +217,9 @@ public class WmRollDetail extends BaseEntity
 
     public String getStatus() { return status; }
     public void setStatus(String v) { this.status = v; }
+
+    public String getSlitBatchNo() { return slitBatchNo; }
+    public void setSlitBatchNo(String v) { this.slitBatchNo = v; }
 
     @Override
     public String toString() {

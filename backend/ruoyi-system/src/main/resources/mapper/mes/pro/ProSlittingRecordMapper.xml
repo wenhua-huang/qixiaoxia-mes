@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.pro.ProSlittingRecordMapper">
+
+    <resultMap type="ProSlittingRecord" id="ProSlittingRecordResult">
+        <id property="slitId" column="slit_id" />
+        <result property="factoryId" column="factory_id" />
+        <result property="slitBatchNo" column="slit_batch_no" />
+        <result property="feedbackId" column="feedback_id" />
+        <result property="workorderId" column="workorder_id" />
+        <result property="workorderCode" column="workorder_code" />
+        <result property="processId" column="process_id" />
+        <result property="processCode" column="process_code" />
+        <result property="processName" column="process_name" />
+        <result property="cardId" column="card_id" />
+        <result property="parentRollId" column="parent_roll_id" />
+        <result property="parentRollCode" column="parent_roll_code" />
+        <result property="sourceItemId" column="source_item_id" />
+        <result property="sourceItemCode" column="source_item_code" />
+        <result property="sourceItemName" column="source_item_name" />
+        <result property="sourceWarehouseId" column="source_warehouse_id" />
+        <result property="sourceWarehouseCode" column="source_warehouse_code" />
+        <result property="sourceWarehouseName" column="source_warehouse_name" />
+        <result property="pickQty" column="pick_qty" />
+        <result property="pickTime" column="pick_time" />
+        <result property="pickBy" column="pick_by" />
+        <result property="parentItemId" column="parent_item_id" />
+        <result property="parentItemCode" column="parent_item_code" />
+        <result property="parentItemName" column="parent_item_name" />
+        <result property="parentWidth" column="parent_width" />
+        <result property="parentWeight" column="parent_weight" />
+        <result property="childCount" column="child_count" />
+        <result property="childTotalWeight" column="child_total_weight" />
+        <result property="edgeItemId" column="edge_item_id" />
+        <result property="edgeItemCode" column="edge_item_code" />
+        <result property="edgeItemName" column="edge_item_name" />
+        <result property="edgeWeight" column="edge_weight" />
+        <result property="lossWeight" column="loss_weight" />
+        <result property="lossRate" column="loss_rate" />
+        <result property="operator" column="operator" />
+        <result property="workstationId" column="workstation_id" />
+        <result property="slitTime" column="slit_time" />
+        <result property="status" column="status" />
+        <result property="remark" column="remark" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <sql id="selectProSlittingRecordVo">
+        select slit_id, factory_id, slit_batch_no, feedback_id, workorder_id, workorder_code,
+               process_id, process_code, process_name, card_id,
+               parent_roll_id, parent_roll_code,
+               source_item_id, source_item_code, source_item_name,
+               source_warehouse_id, source_warehouse_code, source_warehouse_name,
+               pick_qty, pick_time, pick_by,
+               parent_item_id, parent_item_code, parent_item_name,
+               parent_width, parent_weight, child_count, child_total_weight,
+               edge_item_id, edge_item_code, edge_item_name, edge_weight,
+               loss_weight, loss_rate, operator, workstation_id, slit_time, status,
+               remark, create_by, create_time, update_by, update_time
+        from qxx_pro_slitting_record
+    </sql>
+
+    <select id="selectProSlittingRecordList" parameterType="ProSlittingRecord" resultMap="ProSlittingRecordResult">
+        <include refid="selectProSlittingRecordVo"/>
+        <where>
+            <if test="slitBatchNo != null and slitBatchNo != ''"> and slit_batch_no like concat('%', #{slitBatchNo}, '%')</if>
+            <if test="workorderCode != null and workorderCode != ''"> and workorder_code like concat('%', #{workorderCode}, '%')</if>
+            <if test="workorderId != null"> and workorder_id = #{workorderId}</if>
+            <if test="parentRollCode != null and parentRollCode != ''"> and parent_roll_code like concat('%', #{parentRollCode}, '%')</if>
+            <if test="parentItemName != null and parentItemName != ''"> and parent_item_name like concat('%', #{parentItemName}, '%')</if>
+            <if test="processId != null"> and process_id = #{processId}</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+            <if test="operator != null and operator != ''"> and operator like concat('%', #{operator}, '%')</if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <select id="selectProSlittingRecordBySlitId" parameterType="Long" resultMap="ProSlittingRecordResult">
+        <include refid="selectProSlittingRecordVo"/>
+        where slit_id = #{slitId}
+    </select>
+
+    <insert id="insertProSlittingRecord" parameterType="ProSlittingRecord" useGeneratedKeys="true" keyProperty="slitId">
+        insert into qxx_pro_slitting_record
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="slitBatchNo != null">slit_batch_no,</if>
+            <if test="feedbackId != null">feedback_id,</if>
+            <if test="workorderId != null">workorder_id,</if>
+            <if test="workorderCode != null">workorder_code,</if>
+            <if test="processId != null">process_id,</if>
+            <if test="processCode != null">process_code,</if>
+            <if test="processName != null">process_name,</if>
+            <if test="cardId != null">card_id,</if>
+            <if test="parentRollId != null">parent_roll_id,</if>
+            <if test="parentRollCode != null">parent_roll_code,</if>
+            <if test="sourceItemId != null">source_item_id,</if>
+            <if test="sourceItemCode != null">source_item_code,</if>
+            <if test="sourceItemName != null">source_item_name,</if>
+            <if test="sourceWarehouseId != null">source_warehouse_id,</if>
+            <if test="sourceWarehouseCode != null">source_warehouse_code,</if>
+            <if test="sourceWarehouseName != null">source_warehouse_name,</if>
+            <if test="pickQty != null">pick_qty,</if>
+            <if test="pickTime != null">pick_time,</if>
+            <if test="pickBy != null">pick_by,</if>
+            <if test="parentItemId != null">parent_item_id,</if>
+            <if test="parentItemCode != null">parent_item_code,</if>
+            <if test="parentItemName != null">parent_item_name,</if>
+            <if test="parentWidth != null">parent_width,</if>
+            <if test="parentWeight != null">parent_weight,</if>
+            <if test="childCount != null">child_count,</if>
+            <if test="childTotalWeight != null">child_total_weight,</if>
+            <if test="edgeItemId != null">edge_item_id,</if>
+            <if test="edgeItemCode != null">edge_item_code,</if>
+            <if test="edgeItemName != null">edge_item_name,</if>
+            <if test="edgeWeight != null">edge_weight,</if>
+            <if test="lossWeight != null">loss_weight,</if>
+            <if test="lossRate != null">loss_rate,</if>
+            <if test="operator != null">operator,</if>
+            <if test="workstationId != null">workstation_id,</if>
+            <if test="slitTime != null">slit_time,</if>
+            <if test="status != null">status,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="slitBatchNo != null">#{slitBatchNo},</if>
+            <if test="feedbackId != null">#{feedbackId},</if>
+            <if test="workorderId != null">#{workorderId},</if>
+            <if test="workorderCode != null">#{workorderCode},</if>
+            <if test="processId != null">#{processId},</if>
+            <if test="processCode != null">#{processCode},</if>
+            <if test="processName != null">#{processName},</if>
+            <if test="cardId != null">#{cardId},</if>
+            <if test="parentRollId != null">#{parentRollId},</if>
+            <if test="parentRollCode != null">#{parentRollCode},</if>
+            <if test="sourceItemId != null">#{sourceItemId},</if>
+            <if test="sourceItemCode != null">#{sourceItemCode},</if>
+            <if test="sourceItemName != null">#{sourceItemName},</if>
+            <if test="sourceWarehouseId != null">#{sourceWarehouseId},</if>
+            <if test="sourceWarehouseCode != null">#{sourceWarehouseCode},</if>
+            <if test="sourceWarehouseName != null">#{sourceWarehouseName},</if>
+            <if test="pickQty != null">#{pickQty},</if>
+            <if test="pickTime != null">#{pickTime},</if>
+            <if test="pickBy != null">#{pickBy},</if>
+            <if test="parentItemId != null">#{parentItemId},</if>
+            <if test="parentItemCode != null">#{parentItemCode},</if>
+            <if test="parentItemName != null">#{parentItemName},</if>
+            <if test="parentWidth != null">#{parentWidth},</if>
+            <if test="parentWeight != null">#{parentWeight},</if>
+            <if test="childCount != null">#{childCount},</if>
+            <if test="childTotalWeight != null">#{childTotalWeight},</if>
+            <if test="edgeItemId != null">#{edgeItemId},</if>
+            <if test="edgeItemCode != null">#{edgeItemCode},</if>
+            <if test="edgeItemName != null">#{edgeItemName},</if>
+            <if test="edgeWeight != null">#{edgeWeight},</if>
+            <if test="lossWeight != null">#{lossWeight},</if>
+            <if test="lossRate != null">#{lossRate},</if>
+            <if test="operator != null">#{operator},</if>
+            <if test="workstationId != null">#{workstationId},</if>
+            <if test="slitTime != null">#{slitTime},</if>
+            <if test="status != null">#{status},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateProSlittingRecord" parameterType="ProSlittingRecord">
+        update qxx_pro_slitting_record
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="slitBatchNo != null">slit_batch_no = #{slitBatchNo},</if>
+            <if test="feedbackId != null">feedback_id = #{feedbackId},</if>
+            <if test="workorderId != null">workorder_id = #{workorderId},</if>
+            <if test="workorderCode != null">workorder_code = #{workorderCode},</if>
+            <if test="processId != null">process_id = #{processId},</if>
+            <if test="processCode != null">process_code = #{processCode},</if>
+            <if test="processName != null">process_name = #{processName},</if>
+            <if test="cardId != null">card_id = #{cardId},</if>
+            <if test="parentRollId != null">parent_roll_id = #{parentRollId},</if>
+            <if test="parentRollCode != null">parent_roll_code = #{parentRollCode},</if>
+            <if test="parentItemId != null">parent_item_id = #{parentItemId},</if>
+            <if test="parentItemCode != null">parent_item_code = #{parentItemCode},</if>
+            <if test="parentItemName != null">parent_item_name = #{parentItemName},</if>
+            <if test="parentWidth != null">parent_width = #{parentWidth},</if>
+            <if test="parentWeight != null">parent_weight = #{parentWeight},</if>
+            <if test="childCount != null">child_count = #{childCount},</if>
+            <if test="childTotalWeight != null">child_total_weight = #{childTotalWeight},</if>
+            <if test="edgeItemId != null">edge_item_id = #{edgeItemId},</if>
+            <if test="edgeItemCode != null">edge_item_code = #{edgeItemCode},</if>
+            <if test="edgeItemName != null">edge_item_name = #{edgeItemName},</if>
+            <if test="edgeWeight != null">edge_weight = #{edgeWeight},</if>
+            <if test="lossWeight != null">loss_weight = #{lossWeight},</if>
+            <if test="lossRate != null">loss_rate = #{lossRate},</if>
+            <if test="operator != null">operator = #{operator},</if>
+            <if test="workstationId != null">workstation_id = #{workstationId},</if>
+            <if test="slitTime != null">slit_time = #{slitTime},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where slit_id = #{slitId}
+    </update>
+
+    <delete id="deleteProSlittingRecordBySlitId" parameterType="Long">
+        delete from qxx_pro_slitting_record where slit_id = #{slitId}
+    </delete>
+
+    <delete id="deleteProSlittingRecordBySlitIds" parameterType="String">
+        delete from qxx_pro_slitting_record where slit_id in
+        <foreach item="slitId" collection="array" open="(" separator="," close=")">
+            #{slitId}
+        </foreach>
+    </delete>
+
+</mapper>

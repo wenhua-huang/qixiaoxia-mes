@@ -52,6 +52,13 @@ public class MdItemServiceImpl implements IMdItemService
     @Override
     public List<MdItem> selectMdItemList(MdItem mdItem)
     {
+        // 点击父分类时，展开为「自身+所有子分类」ID 列表，使子分类下的物料也能被查出
+        if (mdItem.getItemTypeId() != null && mdItem.getItemTypeId() != 0)
+        {
+            List<Long> descendantIds = itemTypeMapper.selectDescendantIds(mdItem.getItemTypeId());
+            mdItem.setItemTypeIds(descendantIds);
+            mdItem.setItemTypeId(null);
+        }
         return mdItemMapper.selectMdItemList(mdItem);
     }
 

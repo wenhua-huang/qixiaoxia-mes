@@ -508,61 +508,6 @@ CREATE TABLE IF NOT EXISTS `qxx_md_item` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE IF NOT EXISTS `qxx_md_item_attr_gift_box` (
-  `attr_id` bigint NOT NULL AUTO_INCREMENT COMMENT '属性ID',
-  `factory_id` bigint NOT NULL COMMENT '工厂ID(关联qxx_md_factory)',
-  `item_id` bigint NOT NULL COMMENT '物料ID(关联qxx_md_item)',
-  `remark` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '备注',
-  `create_by` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '创建者',
-  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_by` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '更新者',
-  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`attr_id`),
-  UNIQUE KEY `uk_item_id` (`item_id`),
-  KEY `idx_factory_id` (`factory_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='物料礼品盒属性表';
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE IF NOT EXISTS `qxx_md_item_attr_paper` (
-  `attr_id` bigint NOT NULL AUTO_INCREMENT COMMENT '属性ID',
-  `factory_id` bigint NOT NULL COMMENT '工厂ID(关联qxx_md_factory)',
-  `item_id` bigint NOT NULL COMMENT '物料ID(关联qxx_md_item)',
-  `paper_width` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '纸张门幅(mm),如925mm',
-  `paper_weight` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '纸张克重(g),如120g',
-  `paper_source` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '纸张来源/品牌,如联盛A2/蓝叶-牛卡',
-  `paper_type` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '纸张种类:乌卡/俄卡/箱板纸/白牛皮/TC箱板纸/瑞典赤牛',
-  `remark` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '备注',
-  `create_by` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '创建者',
-  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_by` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '更新者',
-  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`attr_id`),
-  UNIQUE KEY `uk_item_id` (`item_id`),
-  KEY `idx_factory_id` (`factory_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=205 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='物料纸张属性表';
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE IF NOT EXISTS `qxx_md_item_attr_paper_bag` (
-  `attr_id` bigint NOT NULL AUTO_INCREMENT COMMENT '属性ID',
-  `factory_id` bigint NOT NULL COMMENT '工厂ID(关联qxx_md_factory)',
-  `item_id` bigint NOT NULL COMMENT '物料ID(关联qxx_md_item)',
-  `rope_spec` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '绳料规格要求,如7.5cm间距黄牛皮色圆纸绳',
-  `mouth_type` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '口部提拔:锯齿口/平口/翻口',
-  `bottom_type` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '底板类型:无/灰底白板/加强底板',
-  `remark` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '备注',
-  `create_by` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '创建者',
-  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_by` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '更新者',
-  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`attr_id`),
-  UNIQUE KEY `uk_item_id` (`item_id`),
-  KEY `idx_factory_id` (`factory_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=222 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='物料纸袋成品属性表';
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE IF NOT EXISTS `qxx_md_item_batch_config` (
   `config_id` bigint NOT NULL AUTO_INCREMENT COMMENT '配置ID',
   `factory_id` bigint NOT NULL COMMENT '工厂ID(关联qxx_md_factory)',
@@ -1465,6 +1410,7 @@ CREATE TABLE IF NOT EXISTS `qxx_pro_workorder` (
   `rope_spec` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '绳料规格要求(纸袋专用,礼品盒留NULL)',
   `package_req` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '包装要求描述,如250个/箱,贴唛头',
   `shipping_req` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '发货要求描述',
+  `line_attrs` json DEFAULT NULL COMMENT '扩展属性(扁平JSON {attrCode:value}),分类驱动动态属性',
   `order_type` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT 'NEW' COMMENT '订单类型:NEW-新单,REPEAT-返单',
   `vendor_id` bigint DEFAULT NULL COMMENT '外协供应商ID(关联qxx_md_vendor)',
   `vendor_code` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '外协供应商编码',

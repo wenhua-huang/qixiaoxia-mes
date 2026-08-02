@@ -95,29 +95,31 @@ EOF
 
 #### 2.2 停旧进程（单行 ssh，避免 heredoc）
 
+> ⚠️ **`pkill/pgrep -f` 的模式必须用 `^java` 锚定开头**。单行 ssh 时远端是 `bash -c '<整串命令>'`，其命令行里就含 `ruoyi-admin.jar` 字样；若写成 `pkill -f 'ruoyi-admin.jar'`，会把执行命令的 bash 自身也匹配上杀掉，导致 SSH 返回 255（旧 java 虽已被杀，但脚本中途死掉，后续 kill 端口/sleep 都不执行）。用 `^java.*ruoyi-admin.jar` 只匹配以 `java` 开头的真正 JVM 进程。
+
 ```bash
-ssh qxx "pkill -f 'org.codehaus.plexus.classworlds.launcher.Launcher' 2>/dev/null; pkill -9 -f 'ruoyi-admin.jar' 2>/dev/null; sleep 2; kill \$(lsof -ti :8081) 2>/dev/null; sleep 2; pgrep -af ruoyi-admin.jar; lsof -ti :8081; echo done"
+ssh qxx "pkill -f '^java.*classworlds.launcher.Launcher' 2>/dev/null; pkill -9 -f '^java.*ruoyi-admin.jar' 2>/dev/null; sleep 2; kill \$(lsof -ti :8081) 2>/dev/null; sleep 2; echo '残留 java:'; pgrep -af '^java'; echo '8081 占用:'; lsof -ti :8081; echo done"
 ```
 
-期望输出仅 `done`（无残留进程、8081 空闲）。
+期望：`残留 java:` 和 `8081 占用:` 两行后面均无输出，最后是 `done`（无残留 JVM、8081 空闲）。`pkill` 没匹配到进程时返回非 0 是正常的（分号连接、无 `set -e`，不会中断）。
 
 #### 2.3 启动 JVM（单行 ssh，关键）
 
 ```bash
-ssh qxx 'setsid nohup java -Xms256m -Xmx512m -XX:MaxMetaspaceSize=256m -XX:MaxDirectMemorySize=128m -XX:+UseG1GC -jar /var/www/qixiaoxia-mes/backend/ruoyi-admin/target/ruoyi-admin.jar --server.port=8081 --ruoyi.profile=/var/www/qixiaoxia-mes/uploadPath </dev/null > /tmp/qxx-backend.log 2>&1 & disown; sleep 2; pgrep -af ruoyi-admin.jar'
+ssh qxx 'setsid nohup java -Xms256m -Xmx512m -XX:MaxMetaspaceSize=256m -XX:MaxDirectMemorySize=128m -XX:+UseG1GC -jar /var/www/qixiaoxia-mes/backend/ruoyi-admin/target/ruoyi-admin.jar --server.port=8081 --ruoyi.profile=/var/www/qixiaoxia-mes/uploadPath </dev/null > /tmp/qxx-backend.log 2>&1 & disown; sleep 3; echo "java 进程:"; pgrep -af "^java.*ruoyi-admin.jar"'
 ```
 
-期望：一行 `<pid> java -Xms256m ...` 输出，表示进程已起。
+期望：输出一行 `<pid> java -Xms256m ... ruoyi-admin.jar ...`，表示 JVM 已起。`pgrep` 同样用 `^java` 锚定，避免把当前 `bash -c` 自身列出来干扰判断。
 
 **坑位备忘**：
 - **内存**：仅 `-Xmx512m` 不够（Metaspace + DirectMemory 会让总虚拟内存飙到 ~3.8GB 触发 OOM Killer），必须同时 `-XX:MaxMetaspaceSize=256m -XX:MaxDirectMemorySize=128m`。
 - **信号**：`nohup ... &` 单独不够，SSH session 结束的 SIGHUP 仍可能波及新进程；必须 `setsid ... </dev/null > log 2>&1 & disown` 彻底脱离控制终端与作业表。
-- **PID**：`setsid` 后 `$!` 归属会变，判活用 `pgrep -f 'ruoyi-admin.jar'`，别用 `kill -0 $!`。
+- **PID**：`setsid` 后 `$!` 归属会变，判活用 `pgrep -f '^java.*ruoyi-admin.jar'`，别用 `kill -0 $!`。
 
 #### 2.4 等待就绪（单行 ssh，最多 180s）
 
 ```bash
-ssh qxx 'for i in $(seq 1 180); do code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/login -X POST -H "Content-Type: application/json" -d "{}" 2>/dev/null); if [ "$code" != "000" ] && [ -n "$code" ]; then echo "✅ 后端就绪 HTTP $code (${i}s)"; break; fi; if ! pgrep -f ruoyi-admin.jar >/dev/null; then echo "❌ 进程退出 (${i}s)"; tail -50 /tmp/qxx-backend.log; exit 1; fi; sleep 1; done'
+ssh qxx 'for i in $(seq 1 180); do code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/login -X POST -H "Content-Type: application/json" -d "{}" 2>/dev/null); if [ "$code" != "000" ] && [ -n "$code" ]; then echo "✅ 后端就绪 HTTP $code (${i}s)"; break; fi; if ! pgrep -f "^java.*ruoyi-admin.jar" >/dev/null; then echo "❌ 进程退出 (${i}s)"; tail -50 /tmp/qxx-backend.log; exit 1; fi; sleep 1; done'
 ```
 
 期望：`✅ 后端就绪 HTTP 200 (10~40s)`。若报 `❌ 进程退出`，末尾会打印日志尾部帮定位（Flyway checksum 冲突/SQL 错/端口占用等）。
@@ -199,9 +201,10 @@ ssh qxx 'rm -rf /var/www/qixiaoxia-mes/app/dist && mv /var/www/qixiaoxia-mes/app
 | 现象 | 原因 | 解决 |
 |------|------|------|
 | 后端启动后立即退出 | Docker 容器未启动 | `docker start qxx-mysql qxx-redis qxx-minio` |
-| 后端启动瞬间被 Killed，日志空、dmesg 无新 OOM | ssh heredoc 里 `nohup ... &` 收到 SSH session 结束的 SIGHUP/SIGKILL，JVM 还没输出就被杀 | 启动命令必须是 `setsid nohup java ... </dev/null > log 2>&1 &` + 显式 `disown`（见步骤 2.3）；判活用 `pgrep -f 'ruoyi-admin.jar'` 而不是 `kill -0 $!`（setsid 后 $! 归属已变） |
+| 后端启动瞬间被 Killed，日志空、dmesg 无新 OOM | ssh heredoc 里 `nohup ... &` 收到 SSH session 结束的 SIGHUP/SIGKILL，JVM 还没输出就被杀 | 启动命令必须是 `setsid nohup java ... </dev/null > log 2>&1 &` + 显式 `disown`（见步骤 2.3）；判活用 `pgrep -f '^java.*ruoyi-admin.jar'` 而不是 `kill -0 $!`（setsid 后 $! 归属已变） |
+| 停旧进程时 SSH 返回 255，后续 `kill`/`sleep` 没执行 | 单行 ssh 里 `pkill -f 'ruoyi-admin.jar'` 把执行命令的 `bash -c` 自身也匹配杀掉（其命令行含该字样） | `pkill/pgrep -f` 模式一律用 `^java` 锚定开头，如 `pkill -9 -f '^java.*ruoyi-admin.jar'`（见步骤 2.2） |
 | heredoc 内启动命令"消失"：`ps` 无进程、`/tmp/qxx-backend.log` 0 字节、无任何报错 | 未定位透彻的 heredoc + `setsid & disown` 交互问题（2026-07-27 本机连续复现 2 次），像整段启动指令被 shell 跳过 | **不要把启动 JVM 放进 heredoc**。按步骤 2.2 / 2.3 / 2.4 拆成 3 条独立单行 ssh 命令执行，每条都能立刻看到输出。git pull + mvn 保留在 heredoc 稳定 |
-| 后端进程被 Killed（OOM） | JVM 总虚拟内存超物理内存被 OOM Killer 杀（**仅 `-Xmx` 不够**，Metaspace/DirectMemory 会让总内存飙到 ~3.8GB） | 启动前按步骤 2.2 `pkill -f classworlds` 清 Maven 残留；启动命令按步骤 2.3 同时限制 `-Xmx512m -XX:MaxMetaspaceSize=256m -XX:MaxDirectMemorySize=128m`；等 `free -m` available > 800MB 再启；查 `dmesg -T \| grep -i oom` 确认是否 OOM |
+| 后端进程被 Killed（OOM） | JVM 总虚拟内存超物理内存被 OOM Killer 杀（**仅 `-Xmx` 不够**，Metaspace/DirectMemory 会让总内存飙到 ~3.8GB） | 启动前按步骤 2.2 `pkill -f '^java.*classworlds...'` 清 Maven 残留；启动命令按步骤 2.3 同时限制 `-Xmx512m -XX:MaxMetaspaceSize=256m -XX:MaxDirectMemorySize=128m`；等 `free -m` available > 800MB 再启；查 `dmesg -T \| grep -i oom` 确认是否 OOM |
 | `scp -r dist/*` 中途 `Connection closed by remote host`（退出码 255） | scp 建大量小连接超出服务器 SSH 限制 | 改用步骤 3 的 tar 管道方案（单连接一次性传完），并先 `rm -rf dist/*` 清残留 |
 | Nginx 502 | 后端未就绪 | 等 `curl :8081` 返回 200 后再重载 |
 | 前端 404 | dist/ 未上传或路径错误 | 确认 scp 目标路径 `/var/www/qixiaoxia-mes/frontend/dist/` |

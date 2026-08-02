@@ -109,6 +109,8 @@
         <el-row><el-col :span="12"><el-form-item label="产品尺寸"><el-input v-model="form.productSize" placeholder="如254*127*330mm" :disabled="optType==='view'" /></el-form-item></el-col><el-col :span="12"><el-form-item label="绳料规格"><el-input v-model="form.ropeSpec" placeholder="纸袋专用" :disabled="optType==='view'" /></el-form-item></el-col></el-row>
         <el-row><el-col :span="24"><el-form-item label="印刷要求"><el-input v-model="form.printingReq" placeholder="如1色满版黑印刷" :disabled="optType==='view'" /></el-form-item></el-col></el-row>
         <el-row><el-col :span="24"><el-form-item label="包装要求"><el-input v-model="form.packageReq" placeholder="如250个/箱,贴唛头" :disabled="optType==='view'" /></el-form-item></el-col></el-row>
+        <el-divider content-position="left">扩展属性（分类驱动）</el-divider>
+        <ExtAttrForm ref="extAttrFormRef" :schema="effAttrSchema" v-model="form.lineAttrs" :readonly="optType==='view'" />
       </el-form>
 
       <!-- Step 2: 工序明细（按工序分组显示BOM + 参数） -->
@@ -303,12 +305,15 @@ import { listRoute } from '@/api/mes/pro/proroute'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import ItemSelect from '@/components/itemSelect/single.vue'
 import WorkstationSelect from '@/components/workstationSelect/single.vue'
+import ExtAttrForm from '@/components/ExtAttrForm/index.vue'
 import KitDashboard from './KitDashboard.vue'
 import { listAllProcess } from '@/api/mes/pro/process'
+import { getItem } from '@/api/mes/md/item'
+import { getEffAttrSchema } from '@/api/mes/md/attr'
 
 export default {
   name: 'Workorder',
-  components: { ItemSelect, WorkstationSelect, KitDashboard },
+  components: { ItemSelect, WorkstationSelect, ExtAttrForm, KitDashboard },
   data() {
     return {
       autoGenFlag: false, optType: undefined, step: 1, prorouteId: null,
@@ -335,6 +340,7 @@ export default {
       // SKU变体对话框
       skuDialogOpen: false, skuChoice: '', skuCode: '', skuName: '', skuDeviationList: [],
       queryParams: { pageNum: 1, pageSize: 10, workorderCode: null, productName: null, status: null },
+      effAttrSchema: [],
       form: {},
       rules: {
         workorderCode: [{ required: true, message: '编码不能为空', trigger: 'blur' }],
@@ -387,7 +393,7 @@ export default {
   methods: {
     getList() { this.loading=true; listWorkorder(this.queryParams).then(r=>{ this.workorderList=r.rows; this.total=r.total; this.loading=false }) },
     cancel() { this.open=false; this.reset() },
-    reset() { this.form={ workorderId:null, workorderCode:null, workorderName:null, workorderType:'SELF', orderSource:'MANUAL', productId:null, productCode:null, productName:null, productSpc:null, unitOfMeasure:'PCS', unitName:'个', quantity:1, status:'PREPARE', clientOrderCode:null, orderType:'NEW', productSize:null, ropeSpec:null, printingReq:null, packageReq:null, requestDate:null, remark:null }; this.autoGenFlag=false; this.step=1; this.prorouteId=null; this.bomList=[]; this.paramList=[]; this.routeProcesses=[]; this.routeOptions=[]; this.showProcessSelector=false },
+    reset() { this.form={ workorderId:null, workorderCode:null, workorderName:null, workorderType:'SELF', orderSource:'MANUAL', productId:null, productCode:null, productName:null, productSpc:null, unitOfMeasure:'PCS', unitName:'个', quantity:1, status:'PREPARE', clientOrderCode:null, orderType:'NEW', productSize:null, ropeSpec:null, printingReq:null, packageReq:null, lineAttrs:{}, requestDate:null, remark:null }; this.effAttrSchema=[]; this.autoGenFlag=false; this.step=1; this.prorouteId=null; this.bomList=[]; this.paramList=[]; this.routeProcesses=[]; this.routeOptions=[]; this.showProcessSelector=false },
     handleQuery() { this.queryParams.pageNum=1; this.getList() },
     resetQuery() { this.$refs.queryForm?.resetFields(); this.handleQuery() },
     handleSelectionChange(sel) { this.ids=sel.map(i=>i.workorderId); this.single=sel.length!==1; this.multiple=!sel.length },
@@ -401,12 +407,26 @@ export default {
       return getWorkorderDetail(workorderId).then(r => {
         const { workorder, bomList, paramList, routeProcesses, routeOptions } = r.data
         this.form = workorder
+        if (!this.form.lineAttrs) this.form.lineAttrs = {}
         this.bomList = (bomList || []).map(b => ({ ...b, _processId: b.processId, _processName: b.processName }))
         this.paramList = paramList || []   // 后端已富化
         this.routeProcesses = routeProcesses || []
         this.routeOptions = routeOptions || []
         this.prorouteId = workorder.routeProductId
+        // 按产品分类拉取扩展属性 schema（含继承）
+        this.loadEffSchemaByProduct(workorder.productId)
         return r.data
+      })
+    },
+    /** 按物料 id 拉取分类的有效属性 schema */
+    loadEffSchemaByProduct(productId) {
+      this.effAttrSchema = []
+      if (!productId) return
+      getItem(productId).then(r => {
+        const item = r.data
+        if (item && item.itemTypeId) {
+          getEffAttrSchema(item.itemTypeId).then(s => { this.effAttrSchema = s.data || [] })
+        }
       })
     },
     handleAutoGenChange(f) {
@@ -421,6 +441,8 @@ export default {
       this.form.productId=row.itemId; this.form.productCode=row.itemCode; this.form.productName=row.itemName
       this.form.productSpc=row.specification; this.form.unitOfMeasure=row.unitOfMeasure; this.form.unitName=row.unitName
       this.prorouteId=null; this.routeOptions=[]
+      // 按所选产品的分类拉取扩展属性 schema
+      this.loadEffSchemaByProduct(row.itemId)
       // Load route products for this item, then enrich with route names
       listRouteProduct({ itemId: row.itemId, pageSize: 100 }).then(r=>{
         if(r.rows&&r.rows.length>0){
@@ -517,8 +539,18 @@ export default {
       this.bomEditOpen=false
     },
     // Step navigation
-    nextStep() {
-      if(this.step===1) { this.$refs.form.validate(v=>{ if(v){ if(!this.prorouteId&&!this.form.workorderId){ this.$modal.msgWarning('请选择工艺路线'); return } this.step=2 } }) }
+    async nextStep() {
+      if(this.step===1) {
+        const valid = await new Promise(resolve => this.$refs.form.validate(resolve))
+        if (!valid) return
+        // 扩展属性必填校验
+        if (this.$refs.extAttrFormRef) {
+          try { await this.$refs.extAttrFormRef.validate() }
+          catch (e) { this.$modal.msgError(e.message || '扩展属性校验失败'); return }
+        }
+        if(!this.prorouteId&&!this.form.workorderId){ this.$modal.msgWarning('请选择工艺路线'); return }
+        this.step=2
+      }
     },
     submitForm() {
       // 两次请求：① 后端偏离检测 → ② 弹窗确认 → ③ 提交

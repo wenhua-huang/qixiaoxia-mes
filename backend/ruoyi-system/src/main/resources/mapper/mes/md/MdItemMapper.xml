@@ -28,6 +28,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="maxStock"        column="max_stock"        />
         <result property="alertStock"      column="alert_stock"      />
         <result property="highValue"       column="high_value"       />
+        <result property="extAttrs"        column="ext_attrs"
+                typeHandler="com.ruoyi.common.core.handler.JsonMapTypeHandler" />
         <result property="batchFlag"       column="batch_flag"       />
         <result property="remark"          column="remark"           />
         <result property="createBy"        column="create_by"        />
@@ -43,7 +45,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                coalesce(nullif(i.item_type_name, ''), t.item_type_name) as item_type_name,
                i.parent_id, i.product_size, i.package_spec, i.printing_req,
                i.enable_flag, i.safe_stock_flag, i.min_stock, i.max_stock, i.alert_stock,
-               i.high_value, i.batch_flag, i.remark, i.create_by, i.create_time, i.update_by, i.update_time
+               i.high_value, i.ext_attrs, i.batch_flag, i.remark, i.create_by, i.create_time, i.update_by, i.update_time
         from qxx_md_item i
         left join qxx_md_item_type t on i.item_type_id = t.item_type_id
     </sql>
@@ -53,6 +55,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <where>
             <if test="itemCode != null and itemCode != ''"> and i.item_code like concat('%', #{itemCode}, '%')</if>
             <if test="itemName != null and itemName != ''"> and i.item_name like concat('%', #{itemName}, '%')</if>
+            <if test="itemTypeIds != null and itemTypeIds.size() > 0"> and i.item_type_id in
+                <foreach item="id" collection="itemTypeIds" open="(" separator="," close=")">
+                    #{id}
+                </foreach>
+            </if>
             <if test="itemTypeId != null and itemTypeId != 0"> and i.item_type_id = #{itemTypeId}</if>
             <if test="specification != null and specification != ''"> and i.specification like concat('%', #{specification}, '%')</if>
             <if test="enableFlag != null and enableFlag != ''"> and i.enable_flag = #{enableFlag}</if>
@@ -94,6 +101,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="maxStock != null">max_stock,</if>
             <if test="alertStock != null">alert_stock,</if>
             <if test="highValue != null">high_value,</if>
+            <if test="extAttrs != null">ext_attrs,</if>
             <if test="batchFlag != null">batch_flag,</if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null">create_by,</if>
@@ -122,6 +130,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="maxStock != null">#{maxStock},</if>
             <if test="alertStock != null">#{alertStock},</if>
             <if test="highValue != null">#{highValue},</if>
+            <if test="extAttrs != null">#{extAttrs, typeHandler=com.ruoyi.common.core.handler.JsonMapTypeHandler},</if>
             <if test="batchFlag != null">#{batchFlag},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
@@ -155,6 +164,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="maxStock != null">max_stock = #{maxStock},</if>
             <if test="alertStock != null">alert_stock = #{alertStock},</if>
             <if test="highValue != null">high_value = #{highValue},</if>
+            <if test="extAttrs != null">ext_attrs = #{extAttrs, typeHandler=com.ruoyi.common.core.handler.JsonMapTypeHandler},</if>
             <if test="batchFlag != null">batch_flag = #{batchFlag},</if>
             <if test="remark != null">remark = #{remark},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>

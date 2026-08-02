@@ -53,6 +53,8 @@ export interface SalOrderLine extends BaseEntity {
   packageReq?: string;
   shippingReq?: string;
   requestDate?: string;
+  /** 扩展属性(扁平JSON {attrCode:value})，分类驱动的动态属性快照 */
+  lineAttrs?: Record<string, any>;
   /** 已转工单数量(后端计算) */
   quantityProduced?: number;
   /** 可转数量(后端计算) */

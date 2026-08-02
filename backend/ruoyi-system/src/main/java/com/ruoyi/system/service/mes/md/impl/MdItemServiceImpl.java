@@ -1,17 +1,13 @@
 package com.ruoyi.system.service.mes.md.impl;
 
+import java.util.Collections;
 import java.util.List;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.domain.mes.md.MdItem;
-import com.ruoyi.system.domain.mes.md.MdItemAttrGiftBox;
-import com.ruoyi.system.domain.mes.md.MdItemAttrPaper;
-import com.ruoyi.system.domain.mes.md.MdItemAttrPaperBag;
-import com.ruoyi.system.mapper.mes.md.MdItemAttrGiftBoxMapper;
-import com.ruoyi.system.mapper.mes.md.MdItemAttrPaperBagMapper;
-import com.ruoyi.system.mapper.mes.md.MdItemAttrPaperMapper;
 import com.ruoyi.system.mapper.mes.md.MdItemMapper;
+import com.ruoyi.system.mapper.mes.md.MdItemTypeMapper;
 import com.ruoyi.system.service.mes.md.IMdItemService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,6 +17,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 物料产品Service业务层处理（factory_id 由 FactoryIdInterceptor 自动注入）
+ *
+ * <p>扩展属性（纸张/纸袋/礼品盒等）已从原三张行业子表迁移为分类驱动的动态属性，
+ * 存于 {@code qxx_md_item.ext_attrs}（JSON 扁平 {attrCode:value}），随主表 insert/update 一并持久化，
+ * 不再需要子表联动的增删改。SPU 变体继承父物料的 ext_attrs。
  *
  * @author qixiaoxia
  * @date 2026-06-10
@@ -33,13 +33,7 @@ public class MdItemServiceImpl implements IMdItemService
     @Autowired
     private MdItemMapper mdItemMapper;
     @Autowired
-    private MdItemAttrPaperMapper attrPaperMapper;
-    @Autowired
-    private MdItemAttrPaperBagMapper attrPaperBagMapper;
-    @Autowired
-    private MdItemAttrGiftBoxMapper attrGiftBoxMapper;
-    @Autowired
-    private com.ruoyi.system.mapper.mes.md.MdItemTypeMapper itemTypeMapper;
+    private MdItemTypeMapper itemTypeMapper;
 
     @Override
     public List<MdItem> selectMdItemAllEnabled()
@@ -52,21 +46,23 @@ public class MdItemServiceImpl implements IMdItemService
     @Override
     public List<MdItem> selectMdItemList(MdItem mdItem)
     {
+        // 点击父分类时，展开为「自身+所有子分类」ID 列表，使子分类下的物料也能被查出
+        if (mdItem.getItemTypeId() != null && mdItem.getItemTypeId() != 0)
+        {
+            List<Long> descendantIds = itemTypeMapper.selectDescendantIds(mdItem.getItemTypeId());
+            // CTE 返回空说明该分类ID不存在，塞入-1使 IN(-1) 不命中任何记录（主键永不为负）
+            mdItem.setItemTypeIds(descendantIds.isEmpty()
+                ? Collections.singletonList(-1L) : descendantIds);
+            mdItem.setItemTypeId(null);
+        }
         return mdItemMapper.selectMdItemList(mdItem);
     }
 
     @Override
     public MdItem selectMdItemById(Long itemId)
     {
-        MdItem item = mdItemMapper.selectMdItemById(itemId);
-        if (item != null)
-        {
-            // JOIN 行业子表数据
-            item.setAttrPaper(attrPaperMapper.selectByItemId(itemId));
-            item.setAttrPaperBag(attrPaperBagMapper.selectByItemId(itemId));
-            item.setAttrGiftBox(attrGiftBoxMapper.selectByItemId(itemId));
-        }
-        return item;
+        // ext_attrs 作为主表 JSON 列，由 MdItemMapper 的 resultMap + JsonMapTypeHandler 自动带出，无需手动 JOIN
+        return mdItemMapper.selectMdItemById(itemId);
     }
 
     @Override
@@ -90,7 +86,7 @@ public class MdItemServiceImpl implements IMdItemService
         // 兜底：根据 itemTypeCode 查询 itemTypeId（前端可能只传了 code，没传 id）
         resolveItemTypeId(mdItem);
 
-        // SPU/变体继承逻辑：如果是变体（parentId>0），从父产品继承 itemType 信息
+        // SPU/变体继承逻辑：如果是变体（parentId>0），从父产品继承 itemType 信息 + 扩展属性
         // 注意：SPU 自身（parentId=0）即标准，不在此自动创建冗余"标准变体"
         if (mdItem.getParentId() != null && mdItem.getParentId() > 0)
         {
@@ -109,21 +105,13 @@ public class MdItemServiceImpl implements IMdItemService
                     mdItem.setUnitOfMeasure(parent.getUnitOfMeasure());
                 if (StringUtils.isEmpty(mdItem.getUnitName()))
                     mdItem.setUnitName(parent.getUnitName());
+                // 继承扩展属性（ext_attrs 已随 selectMdItemById 自动带出）
+                if (mdItem.getExtAttrs() == null)
+                    mdItem.setExtAttrs(parent.getExtAttrs());
             }
         }
 
-        int rows = mdItemMapper.insertMdItem(mdItem);
-
-        // 方案A：变体创建时，复制父产品的行业子表行到新 itemId
-        if (mdItem.getParentId() != null && mdItem.getParentId() > 0 && mdItem.getItemId() != null)
-        {
-            copyParentAttrsToNewItem(mdItem.getParentId(), mdItem.getItemId());
-        }
-
-        // 行业子表联动：根据 item_type 判断，INSERT 对应子表
-        handleSubTableInsert(mdItem);
-
-        return rows;
+        return mdItemMapper.insertMdItem(mdItem);
     }
 
     /** 根据 itemTypeCode 查表补全 itemTypeId（前端可能只传了 code 没传 id） */
@@ -144,115 +132,20 @@ public class MdItemServiceImpl implements IMdItemService
         }
     }
 
-    /** 复制父产品子表行到新变体 itemId */
-    private void copyParentAttrsToNewItem(Long parentId, Long newItemId)
-    {
-        MdItemAttrPaper pPaper = attrPaperMapper.selectByItemId(parentId);
-        if (pPaper != null)
-        {
-            pPaper.setAttrId(null);
-            pPaper.setItemId(newItemId);
-            attrPaperMapper.insert(pPaper);
-        }
-        MdItemAttrPaperBag pBag = attrPaperBagMapper.selectByItemId(parentId);
-        if (pBag != null)
-        {
-            pBag.setAttrId(null);
-            pBag.setItemId(newItemId);
-            attrPaperBagMapper.insert(pBag);
-        }
-        MdItemAttrGiftBox pBox = attrGiftBoxMapper.selectByItemId(parentId);
-        if (pBox != null)
-        {
-            pBox.setAttrId(null);
-            pBox.setItemId(newItemId);
-            attrGiftBoxMapper.insert(pBox);
-        }
-    }
-
-    /** 根据前端传入的属性对象，插入对应的行业子表（所有分类均开放，用户自行填写） */
-    private void handleSubTableInsert(MdItem item)
-    {
-        Long itemId = item.getItemId();
-
-        if (item.getAttrPaper() != null)
-        {
-            MdItemAttrPaper paper = item.getAttrPaper();
-            paper.setItemId(itemId);
-            paper.setCreateTime(DateUtils.getNowDate());
-            attrPaperMapper.insert(paper);
-        }
-        if (item.getAttrPaperBag() != null)
-        {
-            MdItemAttrPaperBag bag = item.getAttrPaperBag();
-            bag.setItemId(itemId);
-            bag.setCreateTime(DateUtils.getNowDate());
-            attrPaperBagMapper.insert(bag);
-        }
-        if (item.getAttrGiftBox() != null)
-        {
-            MdItemAttrGiftBox box = item.getAttrGiftBox();
-            box.setItemId(itemId);
-            box.setCreateTime(DateUtils.getNowDate());
-            attrGiftBoxMapper.insert(box);
-        }
-    }
-
     @Override
     @Transactional
     public int updateMdItem(MdItem mdItem)
     {
         resolveItemTypeId(mdItem);
         mdItem.setUpdateTime(DateUtils.getNowDate());
-        int rows = mdItemMapper.updateMdItem(mdItem);
-
-        // 行业子表联动：upsert 对应子表
-        handleSubTableUpsert(mdItem);
-
-        return rows;
-    }
-
-    private void handleSubTableUpsert(MdItem item)
-    {
-        Long itemId = item.getItemId();
-
-        if (item.getAttrPaper() != null)
-        {
-            MdItemAttrPaper paper = item.getAttrPaper();
-            paper.setItemId(itemId);
-            paper.setUpdateTime(DateUtils.getNowDate());
-            MdItemAttrPaper exist = attrPaperMapper.selectByItemId(itemId);
-            if (exist != null) attrPaperMapper.updateByItemId(paper);
-            else { paper.setCreateTime(DateUtils.getNowDate()); attrPaperMapper.insert(paper); }
-        }
-        if (item.getAttrPaperBag() != null)
-        {
-            MdItemAttrPaperBag bag = item.getAttrPaperBag();
-            bag.setItemId(itemId);
-            bag.setUpdateTime(DateUtils.getNowDate());
-            MdItemAttrPaperBag exist = attrPaperBagMapper.selectByItemId(itemId);
-            if (exist != null) attrPaperBagMapper.updateByItemId(bag);
-            else { bag.setCreateTime(DateUtils.getNowDate()); attrPaperBagMapper.insert(bag); }
-        }
-        if (item.getAttrGiftBox() != null)
-        {
-            MdItemAttrGiftBox box = item.getAttrGiftBox();
-            box.setItemId(itemId);
-            box.setUpdateTime(DateUtils.getNowDate());
-            MdItemAttrGiftBox exist = attrGiftBoxMapper.selectByItemId(itemId);
-            if (exist != null) attrGiftBoxMapper.updateByItemId(box);
-            else { box.setCreateTime(DateUtils.getNowDate()); attrGiftBoxMapper.insert(box); }
-        }
+        return mdItemMapper.updateMdItem(mdItem);
     }
 
     @Override
     @Transactional
     public int deleteMdItemById(Long itemId)
     {
-        // 级联删除子表行
-        attrPaperMapper.deleteByItemId(itemId);
-        attrPaperBagMapper.deleteByItemId(itemId);
-        attrGiftBoxMapper.deleteByItemId(itemId);
+        // ext_attrs 在主表，主表删即全删，无需级联清理子表
         return mdItemMapper.deleteMdItemById(itemId);
     }
 
@@ -260,12 +153,6 @@ public class MdItemServiceImpl implements IMdItemService
     @Transactional
     public int deleteMdItemByIds(Long[] itemIds)
     {
-        for (Long id : itemIds)
-        {
-            attrPaperMapper.deleteByItemId(id);
-            attrPaperBagMapper.deleteByItemId(id);
-            attrGiftBoxMapper.deleteByItemId(id);
-        }
         return mdItemMapper.deleteMdItemByIds(itemIds);
     }
 

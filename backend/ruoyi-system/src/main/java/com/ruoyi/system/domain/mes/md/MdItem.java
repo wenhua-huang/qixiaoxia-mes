@@ -1,6 +1,8 @@
 package com.ruoyi.system.domain.mes.md;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import com.ruoyi.common.annotation.Excel;
@@ -70,6 +72,9 @@ public class MdItem extends BaseEntity
     /** 产品类型筛选(spu=标准/variant=变体，仅查询参数用，非DB字段) */
     private String parentIdFilter;
 
+    /** 物料类型ID列表(含子分类，仅查询参数用，非DB字段) */
+    private List<Long> itemTypeIds;
+
     /** 产品尺寸 */
     @Excel(name = "产品尺寸")
     private String productSize;
@@ -104,15 +109,9 @@ public class MdItem extends BaseEntity
     /** 是否启用批次管理 */
     private String batchFlag;
 
-    // ---- 行业子表关联字段（非DB列，GET时JOIN填充） ----
-    /** 纸张属性 */
-    private MdItemAttrPaper attrPaper;
-
-    /** 纸袋属性 */
-    private MdItemAttrPaperBag attrPaperBag;
-
-    /** 礼品盒属性 */
-    private MdItemAttrGiftBox attrGiftBox;
+    // ---- 扩展属性（分类驱动的动态属性，扁平 JSON {attrCode:value}） ----
+    /** 扩展属性 JSON */
+    private Map<String, Object> extAttrs;
 
     public Long getItemId() { return itemId; }
     public void setItemId(Long itemId) { this.itemId = itemId; }
@@ -158,6 +157,9 @@ public class MdItem extends BaseEntity
     public String getParentIdFilter() { return parentIdFilter; }
     public void setParentIdFilter(String parentIdFilter) { this.parentIdFilter = parentIdFilter; }
 
+    public List<Long> getItemTypeIds() { return itemTypeIds; }
+    public void setItemTypeIds(List<Long> itemTypeIds) { this.itemTypeIds = itemTypeIds; }
+
     public String getProductSize() { return productSize; }
     public void setProductSize(String productSize) { this.productSize = productSize; }
 
@@ -188,14 +190,8 @@ public class MdItem extends BaseEntity
     public String getBatchFlag() { return batchFlag; }
     public void setBatchFlag(String batchFlag) { this.batchFlag = batchFlag; }
 
-    public MdItemAttrPaper getAttrPaper() { return attrPaper; }
-    public void setAttrPaper(MdItemAttrPaper attrPaper) { this.attrPaper = attrPaper; }
-
-    public MdItemAttrPaperBag getAttrPaperBag() { return attrPaperBag; }
-    public void setAttrPaperBag(MdItemAttrPaperBag attrPaperBag) { this.attrPaperBag = attrPaperBag; }
-
-    public MdItemAttrGiftBox getAttrGiftBox() { return attrGiftBox; }
-    public void setAttrGiftBox(MdItemAttrGiftBox attrGiftBox) { this.attrGiftBox = attrGiftBox; }
+    public Map<String, Object> getExtAttrs() { return extAttrs; }
+    public void setExtAttrs(Map<String, Object> extAttrs) { this.extAttrs = extAttrs; }
 
     @Override
     public String toString() {

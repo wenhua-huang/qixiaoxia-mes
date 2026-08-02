@@ -261,6 +261,8 @@ public class SalOrderServiceImpl implements ISalOrderService
         wo.setRopeSpec(line.getRopeSpec());
         wo.setPackageReq(line.getPackageReq());
         wo.setShippingReq(line.getShippingReq());
+        // 扩展属性（分类驱动的动态属性）从销售明细继承到工单（深拷贝避免共享引用）
+        wo.setLineAttrs(line.getLineAttrs() == null ? null : new java.util.HashMap<>(line.getLineAttrs()));
         wo.setOrderType(StringUtils.isNotEmpty(order.getOrderType()) ? order.getOrderType() : "NEW");
         wo.setRequestDate(req.getRequestDate() != null ? req.getRequestDate()
                 : (line.getRequestDate() != null ? line.getRequestDate() : order.getRequestDate()));

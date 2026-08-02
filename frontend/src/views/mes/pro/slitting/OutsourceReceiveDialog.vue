@@ -27,7 +27,7 @@
             <el-input v-model="receiveWarehouseName" placeholder="点击右侧按钮选择" readonly>
               <template #append>
                 <el-button icon="Search" @click="whSelectRef?.open()" />
-              </el-button>
+              </template>
             </el-input>
           </el-form-item>
         </el-col>
@@ -36,7 +36,7 @@
             <el-input v-model="edgeItemName" placeholder="可选，点击右侧按钮选择" readonly>
               <template #append>
                 <el-button icon="Search" @click="edgeItemSelectRef?.open()" />
-              </el-button>
+              </template>
             </el-input>
           </el-form-item>
         </el-col>

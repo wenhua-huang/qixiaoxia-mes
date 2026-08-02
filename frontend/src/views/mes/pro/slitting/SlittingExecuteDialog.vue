@@ -1,5 +1,63 @@
 <template>
   <el-dialog v-model="visible" title="执行分切" width="900px" :close-on-click-modal="false" append-to-body @close="cancel">
+    <!-- 顶部模式切换 -->
+    <el-form-item label="分切模式" label-width="90px" class="mb8">
+      <el-radio-group v-model="form.slitMode" @change="onModeChange">
+        <el-radio-button value="INTERNAL">厂内分切</el-radio-button>
+        <el-radio-button value="OUTSOURCE">外协分切</el-radio-button>
+      </el-radio-group>
+    </el-form-item>
+
+    <!-- 外协模式：选母卷 + 厂商，直接发料 -->
+    <div v-if="form.slitMode === 'OUTSOURCE'">
+      <el-form label-width="100px">
+        <el-row>
+          <el-col :span="12">
+            <el-form-item label="外协厂商" required>
+              <el-select v-model="form.vendorId" placeholder="请选择外协厂商" filterable style="width: 100%" @change="onVendorChange">
+                <el-option v-for="v in vendorOptions" :key="v.vendorId" :label="v.vendorName" :value="v.vendorId" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="生产工单">
+              <el-input v-model="form.workorderCode" placeholder="可选，点击右侧按钮选择" readonly>
+                <template #append>
+                  <el-button icon="Search" @click="woSelectRef?.open()" />
+                </template>
+              </el-input>
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-form-item label="发料母卷" required>
+          <el-button type="primary" plain icon="Plus" size="small" @click="rollSelectRefOpen()">添加母卷</el-button>
+          <span class="ml8" style="color:#909399;font-size:12px">可多选，每个母卷生成一张独立分切单</span>
+        </el-form-item>
+
+        <el-table :data="selectedParentRolls" border size="small" max-height="280" class="mb8">
+          <el-table-column label="卷号" prop="rollCode" width="140" align="center" />
+          <el-table-column label="物料" prop="itemName" min-width="140" show-overflow-tooltip align="center" />
+          <el-table-column label="门幅(mm)" prop="actualWidth" width="90" align="center" />
+          <el-table-column label="克重(g)" prop="actualWeightGsm" width="90" align="center" />
+          <el-table-column label="在库重量(吨)" prop="actualWeight" width="120" align="center" />
+          <el-table-column label="仓库" prop="warehouseName" min-width="100" align="center" />
+          <el-table-column label="操作" width="70" align="center">
+            <template #default="{ $index }">
+              <el-button link type="danger" size="small" icon="Delete" @click="removeParentRoll($index)" />
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <el-alert v-if="selectedParentRolls.length > 0" type="info" :closable="false" show-icon>
+          将向「{{ form.vendorName || '未选厂商' }}」发出 {{ selectedParentRolls.length }} 个母卷，共计 {{ parentRollsTotalWeight }} 吨。
+          发料后母卷状态变为「外协中」，等待厂商录结果后我方收货。
+        </el-alert>
+      </el-form>
+    </div>
+
+    <!-- 厂内模式：3步向导 -->
+    <div v-else>
     <el-steps :active="step" align-center class="mb16">
       <el-step title="领料出库" description="选物料·查库存·填领料量" />
       <el-step title="分切方案" description="录子卷规格" />
@@ -146,19 +204,49 @@
     <ItemSelect ref="edgeItemSelectRef" @onSelected="onEdgeItemSelected" />
     <WorkorderSelect ref="woSelectRef" @onSelected="onWorkorderSelected" />
     <WorkstationSelect ref="wsSelectRef" @onSelected="onWorkstationSelected" />
+    <!-- 母卷选择弹窗（外协发料） -->
+    <el-dialog v-model="rollSelectVisible" title="选择发料母卷" width="780px" append-to-body>
+      <el-form :inline="true" class="mb8">
+        <el-form-item label="物料筛选">
+          <el-select v-model="rollFilterItemId" placeholder="全部物料" clearable filterable style="width:240px" @change="loadParentRolls">
+            <el-option v-for="i in rollItemOptions" :key="i.itemId" :label="i.itemName" :value="i.itemId" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <el-table :data="parentRollOptions" border size="small" max-height="360" @selection-change="onRollSelectChange" :row-key="(r:any)=>r.rollId">
+        <el-table-column type="selection" width="50" :reserve-selection="true" align="center" />
+        <el-table-column label="卷号" prop="rollCode" width="140" align="center" />
+        <el-table-column label="物料" prop="itemName" min-width="140" show-overflow-tooltip align="center" />
+        <el-table-column label="门幅(mm)" prop="actualWidth" width="90" align="center" />
+        <el-table-column label="克重(g)" prop="actualWeightGsm" width="90" align="center" />
+        <el-table-column label="在库重量(吨)" prop="actualWeight" width="120" align="center" />
+        <el-table-column label="仓库" prop="warehouseName" min-width="100" align="center" />
+      </el-table>
+      <template #footer>
+        <el-button @click="rollSelectVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmRollSelect">确认添加({{ tempSelectedRolls.length }})</el-button>
+      </template>
+    </el-dialog>
+    </div><!-- 厂内模式 div 结束 -->
     <template #footer>
       <el-button @click="cancel">取消</el-button>
-      <el-button v-if="step > 0" @click="step--">上一步</el-button>
-      <el-button v-if="step < 2" type="primary" :disabled="!canNext" @click="next">下一步</el-button>
-      <el-button v-if="step === 2" type="primary" :loading="submitting" :disabled="!weightValid" @click="submit">确认分切</el-button>
+      <template v-if="form.slitMode === 'OUTSOURCE'">
+        <el-button type="primary" :loading="submitting" :disabled="!canSubmitOutsource" @click="submit">确认发料</el-button>
+      </template>
+      <template v-else>
+        <el-button v-if="step > 0" @click="step--">上一步</el-button>
+        <el-button v-if="step < 2" type="primary" :disabled="!canNext" @click="next">下一步</el-button>
+        <el-button v-if="step === 2" type="primary" :loading="submitting" :disabled="!weightValid" @click="submit">确认分切</el-button>
+      </template>
     </template>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, computed, getCurrentInstance } from 'vue'
-import { executeSlitting, listAvailableStock } from '@/api/mes/pro/slitting'
+import { executeSlitting, listAvailableStock, listAvailableParentRolls } from '@/api/mes/pro/slitting'
 import { listAllProcess } from '@/api/mes/pro/process'
+import { listAllVendor } from '@/api/mes/md/vendor'
 import WorkorderSelect from '@/components/workorderSelect/single.vue'
 import WorkstationSelect from '@/components/workstationSelect/single.vue'
 import ItemSelect from '@/components/itemSelect/single.vue'
@@ -177,8 +265,17 @@ const stockList = ref<any[]>([])
 const selectedStockId = ref<number>()
 const selectedStock = ref<any>(null)
 const processOptions = ref<any[]>([])
+// 外协相关
+const vendorOptions = ref<any[]>([])
+const selectedParentRolls = ref<any[]>([])
+const rollSelectVisible = ref(false)
+const parentRollOptions = ref<any[]>([])
+const tempSelectedRolls = ref<any[]>([])
+const rollFilterItemId = ref<number | undefined>(undefined)
+const rollItemOptions = ref<any[]>([])
 
 const form = reactive<any>({
+  slitMode: 'INTERNAL',
   workorderId: null, workorderCode: '', processId: null, processCode: '', processName: '',
   cardId: null, routeId: null, workstationId: null, workstationCode: '', workstationName: '',
   sourceItemId: null, sourceItemCode: '', sourceItemName: '',
@@ -186,12 +283,21 @@ const form = reactive<any>({
   sourceBatchId: null, sourceBatchCode: '',
   pickQty: 0,
   childRolls: [], edgeItemId: null, edgeItemCode: '', edgeItemName: '', edgeWeight: 0,
+  vendorId: null, vendorCode: '', vendorName: '', parentRollIds: [],
   remark: ''
 })
 
 const maxPickQty = computed(() => {
   const v = selectedStock.value?.quantityAvailable
   return v != null ? Number(v) : undefined
+})
+
+// ---- 外协模式 ----
+const parentRollsTotalWeight = computed(() => {
+  return selectedParentRolls.value.reduce((sum: number, r: any) => sum + Number(r.actualWeight || 0), 0)
+})
+const canSubmitOutsource = computed(() => {
+  return form.vendorId != null && selectedParentRolls.value.length > 0
 })
 
 const childTotalWeight = computed(() => {
@@ -243,10 +349,16 @@ async function open() {
     const res = await listAllProcess()
     processOptions.value = res.data || []
   }
+  // 懒加载外协厂商下拉
+  if (vendorOptions.value.length === 0) {
+    const res = await listAllVendor()
+    vendorOptions.value = (res.data || []).filter((v: any) => v.vendorType === 'OUTSOURCE' || v.vendorType === 'BOTH')
+  }
 }
 
 function resetForm() {
   Object.assign(form, {
+    slitMode: 'INTERNAL',
     workorderId: null, workorderCode: '', processId: null, processCode: '', processName: '',
     cardId: null, routeId: null, workstationId: null, workstationCode: '', workstationName: '',
     sourceItemId: null, sourceItemCode: '', sourceItemName: '',
@@ -254,11 +366,70 @@ function resetForm() {
     sourceBatchId: null, sourceBatchCode: '',
     pickQty: 0,
     childRolls: [], edgeItemId: null, edgeItemCode: '', edgeItemName: '', edgeWeight: 0,
+    vendorId: null, vendorCode: '', vendorName: '', parentRollIds: [],
     remark: ''
   })
   stockList.value = []
   selectedStockId.value = undefined
   selectedStock.value = null
+  selectedParentRolls.value = []
+}
+
+function onModeChange() {
+  // 切换模式时重置对方的数据
+  if (form.slitMode === 'OUTSOURCE') {
+    selectedStock.value = null
+    selectedStockId.value = undefined
+    form.pickQty = 0
+    form.childRolls = []
+  } else {
+    selectedParentRolls.value = []
+    form.vendorId = null
+    form.vendorName = ''
+  }
+}
+
+function onVendorChange(vendorId: number) {
+  const v = vendorOptions.value.find((x: any) => x.vendorId === vendorId)
+  if (v) {
+    form.vendorCode = v.vendorCode
+    form.vendorName = v.vendorName
+  }
+}
+
+// 打开母卷选择弹窗
+async function rollSelectRefOpen() {
+  rollSelectVisible.value = true
+  await loadParentRolls()
+}
+
+async function loadParentRolls() {
+  const res = await listAvailableParentRolls(rollFilterItemId.value)
+  parentRollOptions.value = res.data || []
+  // 从母卷列表中提取去重物料，供筛选下拉
+  const map = new Map<number, any>()
+  parentRollOptions.value.forEach((r: any) => {
+    if (r.itemId && !map.has(r.itemId)) map.set(r.itemId, { itemId: r.itemId, itemName: r.itemName })
+  })
+  rollItemOptions.value = Array.from(map.values())
+}
+
+function onRollSelectChange(rows: any[]) {
+  tempSelectedRolls.value = rows
+}
+
+function confirmRollSelect() {
+  // 去重合并到已选母卷
+  const existIds = new Set(selectedParentRolls.value.map((r: any) => r.rollId))
+  tempSelectedRolls.value.forEach((r: any) => {
+    if (!existIds.has(r.rollId)) selectedParentRolls.value.push(r)
+  })
+  tempSelectedRolls.value = []
+  rollSelectVisible.value = false
+}
+
+function removeParentRoll(index: number) {
+  selectedParentRolls.value.splice(index, 1)
 }
 
 async function onSourceItemSelected(row: any) {
@@ -343,6 +514,9 @@ function removeChild(index: number) {
 }
 
 async function submit() {
+  if (form.slitMode === 'OUTSOURCE') {
+    return submitOutsource()
+  }
   if (!form.childRolls || form.childRolls.length === 0) {
     proxy.$modal.msgWarning('请至少添加一条子卷规格')
     return
@@ -369,6 +543,37 @@ function cancel() {
   resetForm()
 }
 
+async function submitOutsource() {
+  if (!form.vendorId) {
+    proxy.$modal.msgWarning('请选择外协厂商')
+    return
+  }
+  if (selectedParentRolls.value.length === 0) {
+    proxy.$modal.msgWarning('请至少添加一个发料母卷')
+    return
+  }
+  const payload = {
+    slitMode: 'OUTSOURCE',
+    vendorId: form.vendorId,
+    vendorCode: form.vendorCode,
+    vendorName: form.vendorName,
+    workorderId: form.workorderId,
+    workorderCode: form.workorderCode,
+    parentRollIds: selectedParentRolls.value.map((r: any) => r.rollId)
+  }
+  submitting.value = true
+  try {
+    await executeSlitting(payload)
+    proxy.$modal.msgSuccess(`已向「${form.vendorName}」发出 ${selectedParentRolls.value.length} 个母卷`)
+    visible.value = false
+    emit('success')
+  } catch (e) {
+    // request 拦截器已处理错误提示
+  } finally {
+    submitting.value = false
+  }
+}
+
 defineExpose({ open })
 </script>
 
@@ -376,4 +581,5 @@ defineExpose({ open })
 .mt8 { margin-top: 8px; }
 .mb8 { margin-bottom: 8px; }
 .mb16 { margin-bottom: 16px; }
+.ml8 { margin-left: 8px; }
 </style>

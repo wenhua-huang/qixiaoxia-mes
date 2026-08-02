@@ -43,6 +43,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="workstationId" column="workstation_id" />
         <result property="slitTime" column="slit_time" />
         <result property="status" column="status" />
+        <result property="slitMode" column="slit_mode" />
+        <result property="vendorId" column="vendor_id" />
+        <result property="vendorCode" column="vendor_code" />
+        <result property="vendorName" column="vendor_name" />
         <result property="remark" column="remark" />
         <result property="createBy" column="create_by" />
         <result property="createTime" column="create_time" />
@@ -61,6 +65,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                parent_width, parent_weight, child_count, child_total_weight,
                edge_item_id, edge_item_code, edge_item_name, edge_weight,
                loss_weight, loss_rate, operator, workstation_id, slit_time, status,
+               slit_mode, vendor_id, vendor_code, vendor_name,
                remark, create_by, create_time, update_by, update_time
         from qxx_pro_slitting_record
     </sql>
@@ -75,6 +80,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="parentItemName != null and parentItemName != ''"> and parent_item_name like concat('%', #{parentItemName}, '%')</if>
             <if test="processId != null"> and process_id = #{processId}</if>
             <if test="status != null and status != ''"> and status = #{status}</if>
+            <if test="slitMode != null and slitMode != ''"> and slit_mode = #{slitMode}</if>
+            <if test="vendorId != null"> and vendor_id = #{vendorId}</if>
+            <if test="vendorName != null and vendorName != ''"> and vendor_name like concat('%', #{vendorName}, '%')</if>
             <if test="operator != null and operator != ''"> and operator like concat('%', #{operator}, '%')</if>
         </where>
         order by create_time desc
@@ -124,6 +132,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="workstationId != null">workstation_id,</if>
             <if test="slitTime != null">slit_time,</if>
             <if test="status != null">status,</if>
+            <if test="slitMode != null">slit_mode,</if>
+            <if test="vendorId != null">vendor_id,</if>
+            <if test="vendorCode != null">vendor_code,</if>
+            <if test="vendorName != null">vendor_name,</if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
@@ -165,6 +177,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="workstationId != null">#{workstationId},</if>
             <if test="slitTime != null">#{slitTime},</if>
             <if test="status != null">#{status},</if>
+            <if test="slitMode != null">#{slitMode},</if>
+            <if test="vendorId != null">#{vendorId},</if>
+            <if test="vendorCode != null">#{vendorCode},</if>
+            <if test="vendorName != null">#{vendorName},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
@@ -201,6 +217,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="workstationId != null">workstation_id = #{workstationId},</if>
             <if test="slitTime != null">slit_time = #{slitTime},</if>
             <if test="status != null">status = #{status},</if>
+            <if test="slitMode != null">slit_mode = #{slitMode},</if>
+            <if test="vendorId != null">vendor_id = #{vendorId},</if>
+            <if test="vendorCode != null">vendor_code = #{vendorCode},</if>
+            <if test="vendorName != null">vendor_name = #{vendorName},</if>
             <if test="remark != null">remark = #{remark},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="updateTime != null">update_time = #{updateTime},</if>

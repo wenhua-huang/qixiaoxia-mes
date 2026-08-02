@@ -19,3 +19,18 @@ export function executeSlitting(data: any) {
 export function listAvailableStock(itemId: number) {
   return request({ url: '/mes/pro/slitting/availableStock', method: 'get', params: { itemId } })
 }
+
+// 查询可发料母卷（外协发料时按物料筛选在库纸卷）
+export function listAvailableParentRolls(itemId?: number) {
+  return request({ url: '/mes/pro/slitting/availableParentRolls', method: 'get', params: { itemId } })
+}
+
+// 外协厂商录分切结果（建子卷，状态 ISSUED→SLITTING）
+export function recordOutsourceResult(slitId: number, data: { childRolls: any[] }) {
+  return request({ url: `/mes/pro/slitting/${slitId}/result`, method: 'post', data })
+}
+
+// 我方外协收货（子卷入库 + 母卷消耗 + 报工 + 追溯，状态 SLITTING→RECEIVED）
+export function receiveOutsource(slitId: number, data: any) {
+  return request({ url: `/mes/pro/slitting/${slitId}/receive`, method: 'post', data })
+}

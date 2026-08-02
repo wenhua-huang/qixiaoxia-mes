@@ -14,13 +14,29 @@
           </el-form-item>
         </el-col>
         <el-col :span="8">
-          <el-form-item label="领料物料" prop="sourceItemName">
-            <el-input v-model="queryParams.sourceItemName" placeholder="请输入领料物料名称" clearable @keyup.enter="handleQuery" />
+          <el-form-item label="分切模式" prop="slitMode">
+            <el-select v-model="queryParams.slitMode" placeholder="全部" clearable style="width: 100%">
+              <el-option v-for="d in mes_pro_slitting_mode" :key="d.value" :label="d.label" :value="d.value" />
+            </el-select>
           </el-form-item>
         </el-col>
+      </el-row>
+      <el-row>
         <el-col :span="8">
           <el-form-item label="母卷号" prop="parentRollCode">
             <el-input v-model="queryParams.parentRollCode" placeholder="请输入母卷号" clearable @keyup.enter="handleQuery" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="8">
+          <el-form-item label="外协厂商" prop="vendorName">
+            <el-input v-model="queryParams.vendorName" placeholder="请输入厂商名称" clearable @keyup.enter="handleQuery" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="8">
+          <el-form-item label="状态" prop="status">
+            <el-select v-model="queryParams.status" placeholder="全部" clearable style="width: 100%">
+              <el-option v-for="d in mes_pro_slitting_status" :key="d.value" :label="d.label" :value="d.value" />
+            </el-select>
           </el-form-item>
         </el-col>
       </el-row>
@@ -50,9 +66,17 @@
     <!-- 列表 -->
     <el-table v-loading="loading" :data="list" border>
       <el-table-column label="分切批次号" align="center" prop="slitBatchNo" width="160" />
+      <el-table-column label="分切模式" align="center" prop="slitMode" width="90">
+        <template #default="{ row }">
+          <el-tag :type="row.slitMode === 'OUTSOURCE' ? 'warning' : ''" size="small">
+            {{ row.slitMode === 'OUTSOURCE' ? '外协' : '厂内' }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="外协厂商" align="center" prop="vendorName" width="100">
+        <template #default="{ row }">{{ row.vendorName || '-' }}</template>
+      </el-table-column>
       <el-table-column label="工单编码" align="center" prop="workorderCode" width="140" />
-      <el-table-column label="领料物料" align="center" prop="sourceItemName" min-width="120" show-overflow-tooltip />
-      <el-table-column label="领料量(吨)" align="center" prop="pickQty" width="100" />
       <el-table-column label="母卷号" align="center" prop="parentRollCode" width="160" />
       <el-table-column label="子卷数" align="center" prop="childCount" width="70" />
       <el-table-column label="子卷总重" align="center" prop="childTotalWeight" width="100">
@@ -68,16 +92,15 @@
       </el-table-column>
       <el-table-column label="操作人" align="center" prop="operator" width="80" />
       <el-table-column label="分切时间" align="center" prop="slitTime" width="160" />
-      <el-table-column label="状态" align="center" prop="status" width="80">
+      <el-table-column label="状态" align="center" prop="status" width="90">
         <template #default="{ row }">
-          <el-tag :type="row.status === 'EXECUTED' ? 'success' : 'info'" size="small">
-            {{ row.status === 'EXECUTED' ? '已执行' : row.status }}
-          </el-tag>
+          <dict-tag :options="mes_pro_slitting_status" :value="row.status" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="80" fixed="right">
+      <el-table-column label="操作" align="center" width="140" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" size="small" @click="handleDetail(row)">详情</el-button>
+          <el-button v-if="row.status === 'SLITTING'" link type="success" size="small" @click="handleReceive(row)">收货</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -87,17 +110,26 @@
     <!-- 执行分切弹窗 -->
     <SlittingExecuteDialog ref="executeDialogRef" @success="getList" />
 
+    <!-- 外协收货弹窗 -->
+    <OutsourceReceiveDialog ref="receiveDialogRef" @success="getList" />
+
     <!-- 详情弹窗 -->
     <el-dialog v-model="detailVisible" title="分切详情" width="800px" append-to-body>
       <el-descriptions v-if="detail" :column="3" border size="small">
         <el-descriptions-item label="分切批次号">{{ detail.slitBatchNo }}</el-descriptions-item>
+        <el-descriptions-item label="分切模式">
+          <el-tag :type="detail.slitMode === 'OUTSOURCE' ? 'warning' : ''" size="small">
+            {{ detail.slitMode === 'OUTSOURCE' ? '外协' : '厂内' }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="外协厂商">{{ detail.vendorName || '-' }}</el-descriptions-item>
         <el-descriptions-item label="工单编码">{{ detail.workorderCode || '-' }}</el-descriptions-item>
         <el-descriptions-item label="工序">{{ detail.processName || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="领料物料">{{ detail.sourceItemName }}</el-descriptions-item>
-        <el-descriptions-item label="领料量">{{ detail.pickQty }}吨</el-descriptions-item>
         <el-descriptions-item label="领料仓库">{{ detail.sourceWarehouseName || '-' }}</el-descriptions-item>
         <el-descriptions-item label="母卷号">{{ detail.parentRollCode }}</el-descriptions-item>
         <el-descriptions-item label="母卷物料">{{ detail.parentItemName }}</el-descriptions-item>
+        <el-descriptions-item label="母卷门幅">{{ detail.parentWidth || '-' }}mm</el-descriptions-item>
+        <el-descriptions-item label="母卷重量">{{ detail.parentWeight }}吨</el-descriptions-item>
         <el-descriptions-item label="子卷数">{{ detail.childCount }}</el-descriptions-item>
         <el-descriptions-item label="子卷总重">{{ detail.childTotalWeight }}吨</el-descriptions-item>
         <el-descriptions-item label="纸边重量">{{ detail.edgeWeight ? detail.edgeWeight + 'kg' : '-' }}</el-descriptions-item>
@@ -105,7 +137,7 @@
         <el-descriptions-item label="损耗率">{{ detail.lossRate }}%</el-descriptions-item>
         <el-descriptions-item label="操作人">{{ detail.operator }}</el-descriptions-item>
         <el-descriptions-item label="分切时间">{{ detail.slitTime }}</el-descriptions-item>
-        <el-descriptions-item label="状态">{{ detail.status === 'EXECUTED' ? '已执行' : detail.status }}</el-descriptions-item>
+        <el-descriptions-item label="状态"><dict-tag :options="mes_pro_slitting_status" :value="detail.status" /></el-descriptions-item>
       </el-descriptions>
       <el-divider content-position="left">子卷明细</el-divider>
       <el-table :data="detail?.childRolls || []" border size="small">
@@ -125,21 +157,24 @@
 import { ref, reactive, onMounted, getCurrentInstance } from 'vue'
 import { listSlitting, getSlitting } from '@/api/mes/pro/slitting'
 import SlittingExecuteDialog from './SlittingExecuteDialog.vue'
+import OutsourceReceiveDialog from './OutsourceReceiveDialog.vue'
 
 const { proxy } = getCurrentInstance() as any
+const { mes_pro_slitting_mode, mes_pro_slitting_status } = proxy.useDict('mes_pro_slitting_mode', 'mes_pro_slitting_status')
 const queryFormRef = ref()
 const loading = ref(false)
 const showSearch = ref(true)
 const list = ref<any[]>([])
 const total = ref(0)
 const executeDialogRef = ref()
+const receiveDialogRef = ref()
 const detailVisible = ref(false)
 const detail = ref<any>(null)
 
 const queryParams = reactive<any>({
   pageNum: 1, pageSize: 10,
   slitBatchNo: '', workorderCode: '', parentRollCode: '',
-  sourceItemName: '', operator: ''
+  slitMode: '', vendorName: '', status: '', operator: ''
 })
 
 function getList() {
@@ -158,6 +193,8 @@ function resetQuery() {
 }
 
 function handleExecute() { executeDialogRef.value?.open() }
+
+function handleReceive(row: any) { receiveDialogRef.value?.open(row) }
 
 async function handleDetail(row: any) {
   const res = await getSlitting(row.slitId)

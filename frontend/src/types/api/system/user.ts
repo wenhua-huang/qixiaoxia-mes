@@ -60,6 +60,8 @@ export interface SysUser extends BaseEntity {
   employeeType?: string;
   /** 入职日期 */
   hireDate?: string;
+  /** 关联厂商ID（外协厂商员工账号绑定 qxx_md_vendor；我方员工为 null/undefined） */
+  vendorId?: number;
   /** 部门对象 */
   dept?: SysDept;
   /** 角色对象 */

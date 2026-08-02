@@ -26,6 +26,19 @@ public class SlittingRequest
     /** 工艺路线ID（可选，用于判断末工序） */
     private Long routeId;
 
+    /** 分切模式:INTERNAL-厂内(默认),OUTSOURCE-外协 */
+    private String slitMode;
+    /** 外协厂商ID（OUTSOURCE 模式必填） */
+    private Long vendorId;
+    private String vendorCode;
+    private String vendorName;
+    /** 外协发料：选定的在库母卷卷ID列表（OUTSOURCE 建单时必填，一卷一单） */
+    private List<Long> parentRollIds;
+    /** 外协收货：子卷入库仓库ID（不填默认回母卷原仓库） */
+    private Long receiveWarehouseId;
+    private String receiveWarehouseCode;
+    private String receiveWarehouseName;
+
     // ── 领料（库存驱动）──
     /** 领料母卷物料ID（必填，从 material_stock 扣减） */
     private Long sourceItemId;
@@ -104,6 +117,22 @@ public class SlittingRequest
     public void setCardId(Long v) { this.cardId = v; }
     public Long getRouteId() { return routeId; }
     public void setRouteId(Long v) { this.routeId = v; }
+    public String getSlitMode() { return slitMode; }
+    public void setSlitMode(String v) { this.slitMode = v; }
+    public Long getVendorId() { return vendorId; }
+    public void setVendorId(Long v) { this.vendorId = v; }
+    public String getVendorCode() { return vendorCode; }
+    public void setVendorCode(String v) { this.vendorCode = v; }
+    public String getVendorName() { return vendorName; }
+    public void setVendorName(String v) { this.vendorName = v; }
+    public List<Long> getParentRollIds() { return parentRollIds; }
+    public void setParentRollIds(List<Long> v) { this.parentRollIds = v; }
+    public Long getReceiveWarehouseId() { return receiveWarehouseId; }
+    public void setReceiveWarehouseId(Long v) { this.receiveWarehouseId = v; }
+    public String getReceiveWarehouseCode() { return receiveWarehouseCode; }
+    public void setReceiveWarehouseCode(String v) { this.receiveWarehouseCode = v; }
+    public String getReceiveWarehouseName() { return receiveWarehouseName; }
+    public void setReceiveWarehouseName(String v) { this.receiveWarehouseName = v; }
     public Long getSourceItemId() { return sourceItemId; }
     public void setSourceItemId(Long v) { this.sourceItemId = v; }
     public String getSourceItemCode() { return sourceItemCode; }

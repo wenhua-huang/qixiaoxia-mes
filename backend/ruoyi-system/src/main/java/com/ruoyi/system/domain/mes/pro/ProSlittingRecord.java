@@ -97,6 +97,19 @@ public class ProSlittingRecord extends BaseEntity
     @Excel(name = "状态")
     private String status;
 
+    /** 分切模式:INTERNAL-厂内,OUTSOURCE-外协 */
+    @Excel(name = "分切模式")
+    private String slitMode;
+    /** 外协厂商ID（OUTSOURCE 模式必填） */
+    private Long vendorId;
+    private String vendorCode;
+    @Excel(name = "外协厂商")
+    private String vendorName;
+
+    /** 母卷列表（外协多卷发料时填充，详情查询用；不入库） */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private List<WmRollDetail> parentRolls;
+
     /** 子卷明细列表（详情查询时填充，不入库） */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private List<WmRollDetail> childRolls;
@@ -206,6 +219,21 @@ public class ProSlittingRecord extends BaseEntity
 
     public String getStatus() { return status; }
     public void setStatus(String v) { this.status = v; }
+
+    public String getSlitMode() { return slitMode; }
+    public void setSlitMode(String v) { this.slitMode = v; }
+
+    public Long getVendorId() { return vendorId; }
+    public void setVendorId(Long v) { this.vendorId = v; }
+
+    public String getVendorCode() { return vendorCode; }
+    public void setVendorCode(String v) { this.vendorCode = v; }
+
+    public String getVendorName() { return vendorName; }
+    public void setVendorName(String v) { this.vendorName = v; }
+
+    public List<WmRollDetail> getParentRolls() { return parentRolls; }
+    public void setParentRolls(List<WmRollDetail> v) { this.parentRolls = v; }
 
     public List<WmRollDetail> getChildRolls() { return childRolls; }
     public void setChildRolls(List<WmRollDetail> v) { this.childRolls = v; }

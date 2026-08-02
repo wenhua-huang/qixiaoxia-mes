@@ -128,30 +128,6 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="门幅(mm)" prop="paperWidth">
-        <el-input
-          v-model="queryParams.paperWidth"
-          placeholder="请输入门幅要求(mm),如925mm"
-          clearable
-          @keyup.enter="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="克重(g)" prop="paperWeight">
-        <el-input
-          v-model="queryParams.paperWeight"
-          placeholder="请输入克重要求(g),如120g"
-          clearable
-          @keyup.enter="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="卷数" prop="rollCount">
-        <el-input
-          v-model="queryParams.rollCount"
-          placeholder="请输入预计卷数(纸张行业用，其他行业=0)"
-          clearable
-          @keyup.enter="handleQuery"
-        />
-      </el-form-item>
       <el-form-item label="客户订单号" prop="sourceOrderCode">
         <el-input
           v-model="queryParams.sourceOrderCode"
@@ -247,10 +223,10 @@
       <el-table-column label="单价" align="center" prop="unitPrice" />
       <el-table-column label="行金额" align="center" prop="amount" />
       <el-table-column label="税率" align="center" prop="taxRate" />
-      <el-table-column label="门幅(mm)" align="center" prop="paperWidth" />
-      <el-table-column label="克重(g)" align="center" prop="paperWeight" />
-      <el-table-column label="纸张种类" align="center" prop="paperType" />
-      <el-table-column label="卷数" align="center" prop="rollCount" />
+      <el-table-column label="门幅(mm)" align="center"><template #default="scope">{{ getAttr(scope.row, 'PAPER_WIDTH') }}</template></el-table-column>
+      <el-table-column label="克重(g)" align="center"><template #default="scope">{{ getAttr(scope.row, 'PAPER_WEIGHT') }}</template></el-table-column>
+      <el-table-column label="纸张种类" align="center"><template #default="scope">{{ getAttr(scope.row, 'PAPER_TYPE') }}</template></el-table-column>
+      <el-table-column label="卷数" align="center"><template #default="scope">{{ getAttr(scope.row, 'PAPER_ROLL_COUNT') }}</template></el-table-column>
       <el-table-column label="客户订单号" align="center" prop="sourceOrderCode" />
       <el-table-column label="预计到货日期" align="center" prop="expectedDate" width="180">
         <template #default="scope">
@@ -383,18 +359,18 @@
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="门幅(mm)" prop="paperWidth">
-              <el-input v-model="form.paperWidth" placeholder="请输入门幅要求(mm),如925mm" />
+            <el-form-item label="门幅(mm)" prop="PAPER_WIDTH">
+              <el-input v-model="form.lineAttrs.PAPER_WIDTH" placeholder="门幅(扩展属性)" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="克重(g)" prop="paperWeight">
-              <el-input v-model="form.paperWeight" placeholder="请输入克重要求(g),如120g" />
+            <el-form-item label="克重(g)" prop="PAPER_WEIGHT">
+              <el-input v-model="form.lineAttrs.PAPER_WEIGHT" placeholder="克重(扩展属性)" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="卷数" prop="rollCount">
-              <el-input v-model="form.rollCount" placeholder="请输入预计卷数(纸张行业用，其他行业=0)" />
+            <el-form-item label="卷数" prop="PAPER_ROLL_COUNT">
+              <el-input v-model="form.lineAttrs.PAPER_ROLL_COUNT" placeholder="预计卷数(扩展属性)" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -482,10 +458,7 @@ export default {
         unitPrice: null,
         amount: null,
         taxRate: null,
-        paperWidth: null,
-        paperWeight: null,
-        paperType: null,
-        rollCount: null,
+        lineAttrs: {},
         sourceOrderCode: null,
         expectedDate: null,
         arrivalNoticeId: null,
@@ -519,6 +492,10 @@ export default {
     this.getList()
   },
   methods: {
+    /** 从扩展属性 lineAttrs(扁平 {attrCode:value}) 中取值 */
+    getAttr(row, code) {
+      return row && row.lineAttrs ? (row.lineAttrs[code] ?? '') : ''
+    },
     /** 查询采购订单行列表 */
     getList() {
       this.loading = true
@@ -553,10 +530,7 @@ export default {
         unitPrice: null,
         amount: null,
         taxRate: null,
-        paperWidth: null,
-        paperWeight: null,
-        paperType: null,
-        rollCount: null,
+        lineAttrs: {},
         sourceOrderCode: null,
         expectedDate: null,
         arrivalNoticeId: null,

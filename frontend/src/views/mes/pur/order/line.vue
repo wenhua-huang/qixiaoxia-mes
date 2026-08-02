@@ -78,6 +78,11 @@
                   <el-input-number v-model="form.taxRate" :min="0" :max="100" :precision="2" style="width:100%" placeholder="税率" />
                 </el-form-item>
               </el-col>
+              <el-col :span="12">
+                <el-form-item label="预计卷数">
+                  <el-input-number v-model="form.lineAttrs.PAPER_ROLL_COUNT" :min="0" :precision="0" style="width:100%" placeholder="纸张采购预计卷数" />
+                </el-form-item>
+              </el-col>
             </el-row>
             <el-row>
               <el-col :span="24">
@@ -89,86 +94,10 @@
           </el-form>
         </el-tab-pane>
 
-        <!-- 产品属性 Tab -->
-        <el-tab-pane label="产品属性" name="product">
+        <!-- 扩展属性 Tab（分类驱动，动态渲染） -->
+        <el-tab-pane label="扩展属性" name="extAttr">
           <el-alert title="以下属性从物料主数据带出，修改仅影响本次采购。如需长期变更规格，请前往物料管理新建物料变体。" type="info" show-icon :closable="false" style="margin-bottom:12px" />
-          <el-form ref="productFormRef" :model="form.lineAttrs?.product || {}" label-width="100px">
-            <el-row>
-              <el-col :span="12">
-                <el-form-item label="产品尺寸">
-                  <el-input v-model="form.lineAttrs.product.size" placeholder="如254*127*330mm" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item label="装箱规格">
-                  <el-input v-model="form.lineAttrs.product.packageSpec" placeholder="如250个/箱" />
-                </el-form-item>
-              </el-col>
-            </el-row>
-            <el-form-item label="印刷要求">
-              <el-input v-model="form.lineAttrs.product.printingReq" type="textarea" placeholder="如1色满版黑印刷" />
-            </el-form-item>
-          </el-form>
-        </el-tab-pane>
-
-        <!-- 纸张属性 Tab -->
-        <el-tab-pane label="纸张属性" name="paper">
-          <el-alert title="以下属性从物料主数据带出，修改仅影响本次采购。如需长期变更规格，请前往物料管理新建物料变体。" type="info" show-icon :closable="false" style="margin-bottom:12px" />
-          <el-form ref="paperFormRef" :model="form.lineAttrs?.paper || {}" label-width="100px">
-            <el-row>
-              <el-col :span="12">
-                <el-form-item label="门幅(mm)">
-                  <el-input v-model="form.lineAttrs.paper.width" placeholder="如 925" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item label="克重(g)">
-                  <el-input v-model="form.lineAttrs.paper.weight" placeholder="如 120" />
-                </el-form-item>
-              </el-col>
-            </el-row>
-            <el-row>
-              <el-col :span="12">
-                <el-form-item label="来源/品牌">
-                  <el-input v-model="form.lineAttrs.paper.source" placeholder="如联盛A2" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item label="种类">
-                  <el-input v-model="form.lineAttrs.paper.type" placeholder="如箱板纸" />
-                </el-form-item>
-              </el-col>
-            </el-row>
-            <el-row>
-              <el-col :span="12">
-                <el-form-item label="预计卷数">
-                  <el-input-number v-model="form.lineAttrs.paper.rollCount" :min="0" :precision="0" style="width:100%" placeholder="卷数" />
-                </el-form-item>
-              </el-col>
-            </el-row>
-          </el-form>
-        </el-tab-pane>
-
-        <!-- 纸袋属性 Tab -->
-        <el-tab-pane label="纸袋属性" name="paperBag">
-          <el-alert title="以下属性从物料主数据带出，修改仅影响本次采购。如需长期变更规格，请前往物料管理新建物料变体。" type="info" show-icon :closable="false" style="margin-bottom:12px" />
-          <el-form ref="paperBagFormRef" :model="form.lineAttrs?.paperBag || {}" label-width="100px">
-            <el-row>
-              <el-col :span="12">
-                <el-form-item label="绳料规格">
-                  <el-input v-model="form.lineAttrs.paperBag.ropeSpec" placeholder="如7.5cm黄牛皮圆纸绳" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item label="口部提拔">
-                  <el-input v-model="form.lineAttrs.paperBag.mouthType" placeholder="锯齿口/平口/翻口" />
-                </el-form-item>
-              </el-col>
-            </el-row>
-            <el-form-item label="底板类型">
-              <el-input v-model="form.lineAttrs.paperBag.bottomType" placeholder="无/灰底白板/加强底板" />
-            </el-form-item>
-          </el-form>
+          <ExtAttrForm ref="extAttrFormRef" :schema="effAttrSchema" v-model="form.lineAttrs" />
         </el-tab-pane>
       </el-tabs>
 
@@ -199,11 +128,13 @@
 import { listLine, delLine, addLine, updateLine } from "@/api/mes/pur/order-line"
 import { cancelLine, terminateLine } from "@/api/mes/pur/order"
 import ItemSelect from "@/components/itemSelect/single.vue"
+import ExtAttrForm from "@/components/ExtAttrForm/index.vue"
 import { getItem } from "@/api/mes/md/item"
+import { getEffAttrSchema } from "@/api/mes/md/attr"
 
 export default {
   name: "PurOrderLine",
-  components: { ItemSelect },
+  components: { ItemSelect, ExtAttrForm },
   setup() {
     const { mes_order_status, mes_cancel_reason } = useDict("mes_order_status", "mes_cancel_reason")
     return { mes_order_status, mes_cancel_reason }
@@ -215,6 +146,7 @@ export default {
       loading: false, lineList: [], ids: [], single: true, multiple: true,
       open: false, title: "新增采购订单行",
       activeTab: "basic",
+      effAttrSchema: [],
       form: {},
       // 取消/终止行
       lineActionOpen: false,
@@ -249,12 +181,13 @@ export default {
     },
     reset() {
       this.activeTab = "basic"
+      this.effAttrSchema = []
       this.form = {
         itemId: null, itemCode: null, itemName: null, specification: null,
         unitOfMeasure: null, unitName: null,
         quantityOrdered: 0, unitPrice: 0, amount: 0, taxRate: 0,
-        // 行状态不前端硬编码，由后端按订单头状态自动设置（行跟随头）
-        lineAttrs: { paper: {}, paperBag: {}, product: {} }
+        // 扩展属性扁平 {attrCode:value}；预计卷数 PAPER_ROLL_COUNT 为采购业务字段
+        lineAttrs: {}
       }
     },
     handleSelectionChange(s) { this.ids = s.map(i => i.lineId); this.single = s.length !== 1; this.multiple = !s.length },
@@ -268,42 +201,21 @@ export default {
       this.form.unitOfMeasure = row.unitOfMeasure || ""
       this.form.unitName = row.unitName || ""
 
-      // 获取物料完整属性（含行业子表），回填到 lineAttrs
+      // 获取物料扩展属性（扁平 {attrCode:value}），快照到 lineAttrs
       if (row.itemId) {
         getItem(row.itemId).then(r => {
           const item = r.data
           if (!item) return
-
-          // 初始化 lineAttrs 各分组
-          if (!this.form.lineAttrs) {
-            this.form.lineAttrs = { paper: {}, paperBag: {}, product: {} }
-          }
-
-          // 纸张属性回填
-          if (item.attrPaper) {
-            this.form.lineAttrs.paper = {
-              width: item.attrPaper.paperWidth || "",
-              weight: item.attrPaper.paperWeight || "",
-              source: item.attrPaper.paperSource || "",
-              type: item.attrPaper.paperType || "",
-              rollCount: null
-            }
-          }
-
-          // 纸袋属性回填
-          if (item.attrPaperBag) {
-            this.form.lineAttrs.paperBag = {
-              ropeSpec: item.attrPaperBag.ropeSpec || "",
-              mouthType: item.attrPaperBag.mouthType || "",
-              bottomType: item.attrPaperBag.bottomType || ""
-            }
-          }
-
-          // 产品属性回填（从物料主表字段）
-          this.form.lineAttrs.product = {
-            size: item.productSize || "",
-            packageSpec: item.packageSpec || "",
-            printingReq: item.printingReq || ""
+          // 扩展属性整体快照（扁平结构，与物料 extAttrs 一致）
+          // 预计卷数 PAPER_ROLL_COUNT 是采购业务字段，改选物料时不随物料扩展属性覆盖丢失
+          const prevRollCount = this.form.lineAttrs && this.form.lineAttrs.PAPER_ROLL_COUNT
+          this.form.lineAttrs = { ...(item.extAttrs || {}) }
+          if (prevRollCount != null) this.form.lineAttrs.PAPER_ROLL_COUNT = prevRollCount
+          // 按物料分类拉取有效属性 schema（含继承）用于扩展属性 tab 动态渲染
+          if (item.itemTypeId) {
+            getEffAttrSchema(item.itemTypeId).then(s => { this.effAttrSchema = s.data || [] })
+          } else {
+            this.effAttrSchema = []
           }
         })
       }
@@ -313,26 +225,36 @@ export default {
       this.reset()
       // 深拷贝，确保 lineAttrs 不引用同一对象
       this.form = JSON.parse(JSON.stringify(row))
-      // 确保 lineAttrs 结构完整（旧数据可能没有 JSON 列）
-      if (!this.form.lineAttrs) {
-        this.form.lineAttrs = { paper: {}, paperBag: {}, product: {} }
+      // lineAttrs 扁平兜底（旧数据可能没有或为历史分组结构）
+      if (!this.form.lineAttrs || typeof this.form.lineAttrs !== 'object') {
+        this.form.lineAttrs = {}
       }
-      if (!this.form.lineAttrs.paper) this.form.lineAttrs.paper = {}
-      if (!this.form.lineAttrs.paperBag) this.form.lineAttrs.paperBag = {}
-      if (!this.form.lineAttrs.product) this.form.lineAttrs.product = {}
+      // 按物料分类拉 schema（编辑时回显扩展属性）
+      if (this.form.itemId) {
+        getItem(this.form.itemId).then(r => {
+          const item = r.data
+          if (item && item.itemTypeId) {
+            getEffAttrSchema(item.itemTypeId).then(s => { this.effAttrSchema = s.data || [] })
+          }
+        })
+      }
       this.open = true; this.title = "修改采购订单行"
     },
-    submitForm() {
-      this.$refs.formRef.validate(valid => {
-        if (!valid) return
-        this.form.orderId = this.orderId
-        this.form.amount = (this.form.unitPrice || 0) * (this.form.quantityOrdered || 0)
-        if (this.form.lineId) {
-          updateLine(this.form).then(() => { this.$modal.msgSuccess("修改成功"); this.open = false; this.getList(); this.$emit('change') })
-        } else {
-          addLine(this.form).then(() => { this.$modal.msgSuccess("新增成功"); this.open = false; this.getList(); this.$emit('change') })
-        }
-      })
+    async submitForm() {
+      const valid = await new Promise(resolve => this.$refs.formRef.validate(resolve))
+      if (!valid) return
+      // 扩展属性必填校验
+      if (this.$refs.extAttrFormRef) {
+        try { await this.$refs.extAttrFormRef.validate() }
+        catch (e) { this.$modal.msgError(e.message || '扩展属性校验失败'); return }
+      }
+      this.form.orderId = this.orderId
+      this.form.amount = (this.form.unitPrice || 0) * (this.form.quantityOrdered || 0)
+      if (this.form.lineId) {
+        updateLine(this.form).then(() => { this.$modal.msgSuccess("修改成功"); this.open = false; this.getList(); this.$emit('change') })
+      } else {
+        addLine(this.form).then(() => { this.$modal.msgSuccess("新增成功"); this.open = false; this.getList(); this.$emit('change') })
+      }
     },
     /** 行是否可取消：ORDERED/RECEIVING 且已收数量为0 */
     canCancelLine(row) {

@@ -94,7 +94,7 @@ public class PurOrderLine extends BaseEntity
     @Excel(name = "税率(%)")
     private BigDecimal taxRate;
 
-    /** 行业属性(JSON): {paper:{width,weight,source,type,rollCount}, paperBag:{ropeSpec,mouthType,bottomType}, product:{size,packageSpec,printingReq}} */
+    /** 扩展属性(扁平JSON {attrCode:value}),如 {PAPER_WIDTH:925,PAPER_ROLL_COUNT:5,BAG_ROPE_SPEC:...}; V90 由分组结构扁平化 */
     private Map<String, Object> lineAttrs;
 
     /** 关联客户订单号 */
@@ -310,51 +310,9 @@ public class PurOrderLine extends BaseEntity
         this.taxRate = taxRate;
     }
 
-    public BigDecimal getTaxRate() 
+    public BigDecimal getTaxRate()
     {
         return taxRate;
-    }
-
-    public void setPaperWidth(String paperWidth)
-    {
-        // Deprecated: paperWidth migrated to lineAttrs.paper.width (V73)
-    }
-
-    public String getPaperWidth()
-    {
-        return getLineAttr("paper", "width");
-    }
-
-    public void setPaperWeight(String paperWeight)
-    {
-        // Deprecated: paperWeight migrated to lineAttrs.paper.weight (V73)
-    }
-
-    public String getPaperWeight()
-    {
-        return getLineAttr("paper", "weight");
-    }
-
-    public void setPaperType(String paperType)
-    {
-        // Deprecated: paperType migrated to lineAttrs.paper.type (V73)
-    }
-
-    public String getPaperType()
-    {
-        return getLineAttr("paper", "type");
-    }
-
-    public void setRollCount(Long rollCount)
-    {
-        // Deprecated: rollCount migrated to lineAttrs.paper.rollCount (V73)
-    }
-
-    public Long getRollCount()
-    {
-        String val = getLineAttr("paper", "rollCount");
-        if (val == null || val.isEmpty()) return null;
-        return Long.valueOf(val);
     }
 
     public Map<String, Object> getLineAttrs()
@@ -367,18 +325,7 @@ public class PurOrderLine extends BaseEntity
         this.lineAttrs = lineAttrs;
     }
 
-    /** 从 lineAttrs 中按分组+属性名取字符串值 */
-    @SuppressWarnings("unchecked")
-    private String getLineAttr(String group, String key)
-    {
-        if (lineAttrs == null) return null;
-        Object groupObj = lineAttrs.get(group);
-        if (!(groupObj instanceof Map)) return null;
-        Object val = ((Map<String, Object>) groupObj).get(key);
-        return val != null ? val.toString() : null;
-    }
-
-    public void setSourceOrderCode(String sourceOrderCode) 
+    public void setSourceOrderCode(String sourceOrderCode)
     {
         this.sourceOrderCode = sourceOrderCode;
     }

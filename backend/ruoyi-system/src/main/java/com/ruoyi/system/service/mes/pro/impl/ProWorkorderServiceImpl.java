@@ -1264,11 +1264,16 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
                 workorder.getPrintingReq() != null ? workorder.getPrintingReq() : parentItem.getPrintingReq());
         skuItem.setPackageSpec(parentItem.getPackageSpec());
 
+        // 扩展属性：工单带入的 lineAttrs 优先，否则继承父物料 extAttrs
+        skuItem.setExtAttrs(workorder.getLineAttrs() != null
+                ? new java.util.HashMap<>(workorder.getLineAttrs())
+                : (parentItem.getExtAttrs() != null ? new java.util.HashMap<>(parentItem.getExtAttrs()) : null));
+
         // 默认启用
         skuItem.setEnableFlag("1");
         skuItem.setBatchFlag(parentItem.getBatchFlag());
 
-        // insertMdItem 会自动处理：类型继承 + 行业子表复制
+        // insertMdItem 会自动处理：类型继承 + 扩展属性继承(parentId>0 时)
         mdItemService.insertMdItem(skuItem);
         Long skuItemId = skuItem.getItemId();
         if (skuItemId == null)

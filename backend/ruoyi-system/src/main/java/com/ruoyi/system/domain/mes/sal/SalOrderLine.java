@@ -2,6 +2,7 @@ package com.ruoyi.system.domain.mes.sal;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.annotation.Excel;
 import com.ruoyi.common.core.domain.BaseEntity;
@@ -52,6 +53,9 @@ public class SalOrderLine extends BaseEntity
     @JsonFormat(pattern = "yyyy-MM-dd")
     private Date requestDate;
 
+    /** 扩展属性(扁平JSON {attrCode:value}),分类驱动的动态属性快照,与订单业务字段平铺列并存 */
+    private Map<String, Object> lineAttrs;
+
     /** 已转工单数量(查询时聚合 qxx_pro_workorder,非DB字段) */
     private transient BigDecimal quantityProduced;
 
@@ -98,6 +102,8 @@ public class SalOrderLine extends BaseEntity
     public void setShippingReq(String v) { this.shippingReq = v; }
     public Date getRequestDate() { return requestDate; }
     public void setRequestDate(Date v) { this.requestDate = v; }
+    public Map<String, Object> getLineAttrs() { return lineAttrs; }
+    public void setLineAttrs(Map<String, Object> v) { this.lineAttrs = v; }
     public BigDecimal getQuantityProduced() { return quantityProduced; }
     public void setQuantityProduced(BigDecimal v) { this.quantityProduced = v; }
     public BigDecimal getQuantityConvertible() { return quantityConvertible; }

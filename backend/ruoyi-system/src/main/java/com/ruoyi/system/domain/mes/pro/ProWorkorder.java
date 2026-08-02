@@ -3,6 +3,7 @@ package com.ruoyi.system.domain.mes.pro;
 import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
@@ -47,6 +48,8 @@ public class ProWorkorder extends BaseEntity
     @Excel(name = "绳料规格") private String ropeSpec;
     @Excel(name = "包装要求") private String packageReq;
     @Excel(name = "发货要求") private String shippingReq;
+    /** 扩展属性(扁平JSON {attrCode:value}),从销售明细继承的分类动态属性；订单业务字段仍用上方平铺列(见设计文档12.2) */
+    private Map<String, Object> lineAttrs;
     @Excel(name = "订单类型") private String orderType;
     @Excel(name = "外协供应商ID") private Long vendorId;
     @Excel(name = "外协供应商编码") private String vendorCode;
@@ -132,6 +135,8 @@ public class ProWorkorder extends BaseEntity
     public void setPackageReq(String v) { this.packageReq = v; }
     public String getShippingReq() { return shippingReq; }
     public void setShippingReq(String v) { this.shippingReq = v; }
+    public Map<String, Object> getLineAttrs() { return lineAttrs; }
+    public void setLineAttrs(Map<String, Object> v) { this.lineAttrs = v; }
     public String getOrderType() { return orderType; }
     public void setOrderType(String v) { this.orderType = v; }
     public Long getVendorId() { return vendorId; }

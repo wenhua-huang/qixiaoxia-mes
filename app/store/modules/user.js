@@ -17,6 +17,7 @@ export const useUserStore = defineStore('user', () => {
   const avatar = ref(storage.get(constant.avatar))
   const roles = ref(storage.get(constant.roles))
   const permissions = ref(storage.get(constant.permissions))
+  const vendorId = ref(storage.get(constant.vendorId))
 
   const SET_TOKEN = (val) => {
     token.value = val
@@ -24,6 +25,10 @@ export const useUserStore = defineStore('user', () => {
   const SET_ID = (val) => {
     id.value = val
     storage.set(constant.id, val)
+  }
+  const SET_VENDOR_ID = (val) => {
+    vendorId.value = val
+    storage.set(constant.vendorId, val)
   }
   const SET_NAME = (val) => {
     name.value = val
@@ -79,6 +84,9 @@ export const useUserStore = defineStore('user', () => {
 		SET_ID(userid)
         SET_NAME(username)
         SET_AVATAR(avatar)
+        // 外协厂商员工账号绑定 vendorId（我方员工为 null/空）
+        const vId = (isEmpty(user) || isEmpty(user.vendorId)) ? null : user.vendorId
+        SET_VENDOR_ID(vId)
         resolve(res)
       }).catch(error => {
         reject(error)
@@ -109,6 +117,7 @@ export const useUserStore = defineStore('user', () => {
     avatar,
     roles,
     permissions,
+    vendorId,
     SET_AVATAR,
     login: loginAction,
     getInfo: getInfoAction,

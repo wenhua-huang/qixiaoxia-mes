@@ -23,6 +23,48 @@ description: Use to publish this project to the production server (115.29.234.20
 
 不问就默认走 1-4。
 
+## nginx 配置
+
+生产 nginx 配置权威副本存在仓库里：`.agents/skills/deploy/nginx.conf`（相对本 skill 目录就是 `./nginx.conf`）。
+
+服务器落地路径：`/etc/nginx/conf.d/qixiaoxia-mes.conf`。
+
+**location 关键点（改前必看）**：
+- `/app/prod-api/` → 剥前缀反代后端，**必须存在** —— uni-app H5 的 `<image src="/prod-api/xxx">` 会被自动加 `/app/` 前缀变 `/app/prod-api/xxx`，没这条 app 图片全裂
+- `/app/` → app dist 静态 alias + SPA fallback
+- `/prod-api/` → PC 端 API 代理
+- `/` → PC dist 静态 + SPA fallback
+
+**每次发布前的漂移检测**（30 秒，比事后 debug 图片裂开省心）：
+
+```bash
+diff <(ssh qxx 'cat /etc/nginx/conf.d/qixiaoxia-mes.conf') \
+     <(grep -v '^##' /Users/huangwenhua/company/self/qixiaoxia-mes/.agents/skills/deploy/nginx.conf) \
+  && echo "✅ nginx 配置一致" || echo "⚠️ nginx 配置漂移，看上面 diff 决定谁是权威"
+```
+
+（仓库副本首尾有 `##` 开头的说明注释，diff 时过滤掉；服务器实际配置不带这些注释。）
+
+**同步到服务器**（发现漂移或初次装机时用）：
+
+```bash
+# 1. 服务器上先备份现有配置
+ssh qxx 'cp /etc/nginx/conf.d/qixiaoxia-mes.conf /etc/nginx/conf.d/qixiaoxia-mes.conf.bak.$(date +%s)'
+
+# 2. 上传新配置（用仓库副本，先剥掉 ## 注释行）
+grep -v '^##' /Users/huangwenhua/company/self/qixiaoxia-mes/.agents/skills/deploy/nginx.conf \
+  | ssh qxx 'cat > /etc/nginx/conf.d/qixiaoxia-mes.conf'
+
+# 3. 语法校验 + reload
+ssh qxx 'nginx -t && nginx -s reload && echo "✅ nginx reloaded"'
+```
+
+**回滚**：
+```bash
+ssh qxx 'ls /etc/nginx/conf.d/qixiaoxia-mes.conf.bak.* | tail -1'  # 找到最近备份
+ssh qxx 'cp /etc/nginx/conf.d/qixiaoxia-mes.conf.bak.<timestamp> /etc/nginx/conf.d/qixiaoxia-mes.conf && nginx -t && nginx -s reload'
+```
+
 ## 发布步骤
 
 ### 1. 本机构建前端
@@ -33,40 +75,54 @@ cd /Users/huangwenhua/company/self/qixiaoxia-mes/frontend && npx vite build
 
 ### 2. 服务器端：拉代码 → 编译 → 重启后端
 
+> ⚠️ **不要把「启动 JVM」放进 heredoc**。实测多次 heredoc 内 `setsid nohup java ... & disown` 会静默无效果（`ps` 无进程、日志文件 0 字节），像整段命令被跳过。原因未彻底定位（疑似 heredoc 内 `&`/`disown` 与 ssh 分配的 pty/session 行为交互出问题），已在本机 2026-07-27 复现两次。
+> **稳定做法**：git pull + mvn build 保留 heredoc；**停旧进程、启动 JVM、轮询就绪** 拆成 3 条独立单行 ssh 命令。单行 ssh 每次稳定生效。
+
+#### 2.1 拉代码 + 编译（heredoc OK）
+
 ```bash
 ssh qxx << 'EOF'
+set -e
 cd /var/www/qixiaoxia-mes && git pull origin main
 
 # 编译（必须用 JDK 17）— Flyway 在应用启动时自动执行 db/migration/*.sql
 export JAVA_HOME=/usr/lib/jvm/java-17-alibaba-dragonwell-17.0.9.0.10.9-1.al8.x86_64
 export PATH=$JAVA_HOME/bin:$PATH
 cd backend && mvn clean package -pl ruoyi-admin -am -DskipTests -Dcheckstyle.skip=true -q
-
-# 重启（⚠️ 双重坑：内存 + SSH 信号传导，两条都要防住）
-# 坑 1: 服务器仅 1.8GB 内存，必须限制全部 JVM 内存区（仅 -Xmx 不够！Metaspace + DirectMemory + 线程栈会让总虚拟内存飙到 3.8GB）
-# 坑 2: `nohup ... &` 在 ssh heredoc 里会被 SSH session 结束的 SIGHUP/SIGKILL 波及（实测：JVM 启动瞬间被 Killed，日志空、dmesg 无 OOM）
-#       → 必须用 `setsid ... </dev/null ... & disown` 让 JVM 彻底脱离 SSH 会话
-pkill -f 'org.codehaus.plexus.classworlds.launcher.Launcher' 2>/dev/null  # 清 Maven 残留进程
-pkill -9 -f 'ruoyi-admin.jar' 2>/dev/null
-sleep 2
-kill $(lsof -ti :8081) 2>/dev/null; sleep 2
-
-setsid nohup java -Xms256m -Xmx512m -XX:MaxMetaspaceSize=256m -XX:MaxDirectMemorySize=128m -XX:+UseG1GC \
-  -jar /var/www/qixiaoxia-mes/backend/ruoyi-admin/target/ruoyi-admin.jar \
-  --server.port=8081 --ruoyi.profile=/var/www/qixiaoxia-mes/uploadPath \
-  </dev/null > /tmp/qxx-backend.log 2>&1 &
-disown
-
-# 等待就绪（最多 180s，Flyway 迁移 + Spring 启动约需 20-40s）
-# ⚠️ 不能用 `kill -0 $!`，setsid 后 $! 归属已变；改用 pgrep 判断进程是否还在
-for i in $(seq 1 180); do
-  code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/login -X POST -H "Content-Type: application/json" -d '{}' 2>/dev/null)
-  if [ "$code" != "000" ] && [ -n "$code" ]; then echo "✅ 后端就绪 HTTP $code (${i}s)"; break; fi
-  if ! pgrep -f 'ruoyi-admin.jar' >/dev/null; then echo "❌ 进程退出（查 /tmp/qxx-backend.log）"; tail -30 /tmp/qxx-backend.log; exit 1; fi
-  sleep 1
-done
+ls -la /var/www/qixiaoxia-mes/backend/ruoyi-admin/target/ruoyi-admin.jar
 EOF
 ```
+
+#### 2.2 停旧进程（单行 ssh，避免 heredoc）
+
+> ⚠️ **`pkill/pgrep -f` 的模式必须用 `^java` 锚定开头**。单行 ssh 时远端是 `bash -c '<整串命令>'`，其命令行里就含 `ruoyi-admin.jar` 字样；若写成 `pkill -f 'ruoyi-admin.jar'`，会把执行命令的 bash 自身也匹配上杀掉，导致 SSH 返回 255（旧 java 虽已被杀，但脚本中途死掉，后续 kill 端口/sleep 都不执行）。用 `^java.*ruoyi-admin.jar` 只匹配以 `java` 开头的真正 JVM 进程。
+
+```bash
+ssh qxx "pkill -f '^java.*classworlds.launcher.Launcher' 2>/dev/null; pkill -9 -f '^java.*ruoyi-admin.jar' 2>/dev/null; sleep 2; kill \$(lsof -ti :8081) 2>/dev/null; sleep 2; echo '残留 java:'; pgrep -af '^java'; echo '8081 占用:'; lsof -ti :8081; echo done"
+```
+
+期望：`残留 java:` 和 `8081 占用:` 两行后面均无输出，最后是 `done`（无残留 JVM、8081 空闲）。`pkill` 没匹配到进程时返回非 0 是正常的（分号连接、无 `set -e`，不会中断）。
+
+#### 2.3 启动 JVM（单行 ssh，关键）
+
+```bash
+ssh qxx 'setsid nohup java -Xms256m -Xmx512m -XX:MaxMetaspaceSize=256m -XX:MaxDirectMemorySize=128m -XX:+UseG1GC -jar /var/www/qixiaoxia-mes/backend/ruoyi-admin/target/ruoyi-admin.jar --server.port=8081 --ruoyi.profile=/var/www/qixiaoxia-mes/uploadPath </dev/null > /tmp/qxx-backend.log 2>&1 & disown; sleep 3; echo "java 进程:"; pgrep -af "^java.*ruoyi-admin.jar"'
+```
+
+期望：输出一行 `<pid> java -Xms256m ... ruoyi-admin.jar ...`，表示 JVM 已起。`pgrep` 同样用 `^java` 锚定，避免把当前 `bash -c` 自身列出来干扰判断。
+
+**坑位备忘**：
+- **内存**：仅 `-Xmx512m` 不够（Metaspace + DirectMemory 会让总虚拟内存飙到 ~3.8GB 触发 OOM Killer），必须同时 `-XX:MaxMetaspaceSize=256m -XX:MaxDirectMemorySize=128m`。
+- **信号**：`nohup ... &` 单独不够，SSH session 结束的 SIGHUP 仍可能波及新进程；必须 `setsid ... </dev/null > log 2>&1 & disown` 彻底脱离控制终端与作业表。
+- **PID**：`setsid` 后 `$!` 归属会变，判活用 `pgrep -f '^java.*ruoyi-admin.jar'`，别用 `kill -0 $!`。
+
+#### 2.4 等待就绪（单行 ssh，最多 180s）
+
+```bash
+ssh qxx 'for i in $(seq 1 180); do code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/login -X POST -H "Content-Type: application/json" -d "{}" 2>/dev/null); if [ "$code" != "000" ] && [ -n "$code" ]; then echo "✅ 后端就绪 HTTP $code (${i}s)"; break; fi; if ! pgrep -f "^java.*ruoyi-admin.jar" >/dev/null; then echo "❌ 进程退出 (${i}s)"; tail -50 /tmp/qxx-backend.log; exit 1; fi; sleep 1; done'
+```
+
+期望：`✅ 后端就绪 HTTP 200 (10~40s)`。若报 `❌ 进程退出`，末尾会打印日志尾部帮定位（Flyway checksum 冲突/SQL 错/端口占用等）。
 
 ### 3. 本机上传前端 + 重载 Nginx
 
@@ -145,8 +201,10 @@ ssh qxx 'rm -rf /var/www/qixiaoxia-mes/app/dist && mv /var/www/qixiaoxia-mes/app
 | 现象 | 原因 | 解决 |
 |------|------|------|
 | 后端启动后立即退出 | Docker 容器未启动 | `docker start qxx-mysql qxx-redis qxx-minio` |
-| 后端启动瞬间被 Killed，日志空、dmesg 无新 OOM | ssh heredoc 里 `nohup ... &` 收到 SSH session 结束的 SIGHUP/SIGKILL，JVM 还没输出就被杀 | 启动命令必须是 `setsid nohup java ... </dev/null > log 2>&1 &` + 显式 `disown`（见步骤 2）；判活用 `pgrep -f 'ruoyi-admin.jar'` 而不是 `kill -0 $!`（setsid 后 $! 归属已变） |
-| 后端进程被 Killed（OOM） | JVM 总虚拟内存超物理内存被 OOM Killer 杀（**仅 `-Xmx` 不够**，Metaspace/DirectMemory 会让总内存飙到 ~3.8GB） | 启动前 `pkill -f classworlds` 清 Maven 残留；启动命令必须同时限制 `-Xmx512m -XX:MaxMetaspaceSize=256m -XX:MaxDirectMemorySize=128m`（见步骤 2）；等 `free -m` available > 800MB 再启；查 `dmesg -T \| grep -i oom` 确认是否 OOM |
+| 后端启动瞬间被 Killed，日志空、dmesg 无新 OOM | ssh heredoc 里 `nohup ... &` 收到 SSH session 结束的 SIGHUP/SIGKILL，JVM 还没输出就被杀 | 启动命令必须是 `setsid nohup java ... </dev/null > log 2>&1 &` + 显式 `disown`（见步骤 2.3）；判活用 `pgrep -f '^java.*ruoyi-admin.jar'` 而不是 `kill -0 $!`（setsid 后 $! 归属已变） |
+| 停旧进程时 SSH 返回 255，后续 `kill`/`sleep` 没执行 | 单行 ssh 里 `pkill -f 'ruoyi-admin.jar'` 把执行命令的 `bash -c` 自身也匹配杀掉（其命令行含该字样） | `pkill/pgrep -f` 模式一律用 `^java` 锚定开头，如 `pkill -9 -f '^java.*ruoyi-admin.jar'`（见步骤 2.2） |
+| heredoc 内启动命令"消失"：`ps` 无进程、`/tmp/qxx-backend.log` 0 字节、无任何报错 | 未定位透彻的 heredoc + `setsid & disown` 交互问题（2026-07-27 本机连续复现 2 次），像整段启动指令被 shell 跳过 | **不要把启动 JVM 放进 heredoc**。按步骤 2.2 / 2.3 / 2.4 拆成 3 条独立单行 ssh 命令执行，每条都能立刻看到输出。git pull + mvn 保留在 heredoc 稳定 |
+| 后端进程被 Killed（OOM） | JVM 总虚拟内存超物理内存被 OOM Killer 杀（**仅 `-Xmx` 不够**，Metaspace/DirectMemory 会让总内存飙到 ~3.8GB） | 启动前按步骤 2.2 `pkill -f '^java.*classworlds...'` 清 Maven 残留；启动命令按步骤 2.3 同时限制 `-Xmx512m -XX:MaxMetaspaceSize=256m -XX:MaxDirectMemorySize=128m`；等 `free -m` available > 800MB 再启；查 `dmesg -T \| grep -i oom` 确认是否 OOM |
 | `scp -r dist/*` 中途 `Connection closed by remote host`（退出码 255） | scp 建大量小连接超出服务器 SSH 限制 | 改用步骤 3 的 tar 管道方案（单连接一次性传完），并先 `rm -rf dist/*` 清残留 |
 | Nginx 502 | 后端未就绪 | 等 `curl :8081` 返回 200 后再重载 |
 | 前端 404 | dist/ 未上传或路径错误 | 确认 scp 目标路径 `/var/www/qixiaoxia-mes/frontend/dist/` |
@@ -154,4 +212,5 @@ ssh qxx 'rm -rf /var/www/qixiaoxia-mes/app/dist && mv /var/www/qixiaoxia-mes/app
 | app `/app/` 404 | scp 路径写错（常见错：传到 `app/unpackage/dist/build/web/` 而非 `app/dist/`） | 确认服务器 `app/dist/index.html` 存在；nginx location 是 `alias /var/www/qixiaoxia-mes/app/dist/` |
 | app `/app/` 白屏 | HBuilder 输出后没 reload nginx，或浏览器缓存 | `ssh qxx 'nginx -s reload'`；强制刷新（Cmd+Shift+R） |
 | app 接口跨域 | app 走相对路径 `/prod-api/`，但访问路径带了 `/app/` 前缀 | 检查 `app/config.js` 的 `baseUrl` 配置是否相对路径，nginx 是否正确代理 `/app/prod-api/` |
+| app 里图片裂开（HTML 而非图片）| uni-app H5 把 `<image src="/prod-api/xxx">` 自动前缀化为 `/app/prod-api/xxx`，nginx 若无对应 location 就走 SPA fallback 返回 `app/dist/index.html`（Content-Type: text/html，几百字节）| 服务器 `/etc/nginx/conf.d/qixiaoxia-mes.conf` 必须有 `location /app/prod-api/ { proxy_pass http://127.0.0.1:8081/; ... }`；对比 `./nginx.conf` 权威副本，缺就用本 skill "nginx 配置"章节同步 |
 | 步骤 5 找不到本机 web 包 | HBuilder 未发行 | 用户先在 HBuilder 点"发行 → 网站"，看到 `项目 app 导出Web成功` 再跑步骤 5 |

@@ -1,6 +1,7 @@
 package com.ruoyi.system.service.mes.wm;
 
 import java.util.List;
+import java.util.Map;
 import com.ruoyi.system.domain.mes.wm.WmIssueDetail;
 import com.ruoyi.system.domain.mes.wm.WmIssueHeader;
 
@@ -48,8 +49,21 @@ public interface IWmIssueHeaderService
     /** 提交审核：DRAFT → PENDING */
     public int submitForApprove(Long issueId);
 
+    /**
+     * 批量提交审核：逐张执行单条 {@link #submitForApprove}，尽力执行，
+     * 单张失败（状态不符/无明细）不中断，返回成功/失败明细。
+     * @return total/successCount/failedCount/failures[{issueId,issueCode,issueName,reason}]
+     */
+    public Map<String, Object> batchSubmitForApprove(Long[] issueIds);
+
     /** 审核通过：PENDING → APPROVED */
     public int approve(Long issueId);
+
+    /**
+     * 批量审核通过：逐张执行单条 {@link #approve}，尽力执行，
+     * 单张失败不中断，返回成功/失败明细（结构同 {@link #batchSubmitForApprove}）。
+     */
+    public Map<String, Object> batchApprove(Long[] issueIds);
 
     /** 审核退回：PENDING → DRAFT */
     public int reject(Long issueId);
@@ -59,6 +73,12 @@ public interface IWmIssueHeaderService
      * 兼容旧接口名 confirmIssue（DRAFT → ALLOCATED 直达，供历史调用方使用）。
      */
     public int confirmIssue(Long issueId);
+
+    /**
+     * 批量预占库存：逐张执行单条 {@link #confirmIssue}，尽力执行，
+     * 单张失败（状态不符/库存不足）不中断，返回成功/失败明细（结构同 {@link #batchSubmitForApprove}）。
+     */
+    public Map<String, Object> batchConfirmIssue(Long[] issueIds);
 
     /** 释放预占库存：ALLOCATED → APPROVED，恢复 quantityAvailable */
     public int releaseAllocation(Long issueId);

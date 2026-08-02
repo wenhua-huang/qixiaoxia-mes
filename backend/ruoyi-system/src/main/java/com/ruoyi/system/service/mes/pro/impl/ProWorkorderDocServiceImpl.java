@@ -299,7 +299,7 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
                 }
                 if (request.isGenerateReceipt()) {
                     // 批量入口无 feedbackId → 走手动补录语义 (未入库差额)
-                    result.setReceipts(generateReceiptDocuments(workorderId, null, batch));
+                    result.setReceipts(generateReceiptDocuments(workorderId, null, null, batch));
                 }
 
                 StringBuilder msg = new StringBuilder();
@@ -597,7 +597,7 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
      *       靠应用层 + Redis 锁串行；Index A 对 NULL 值不去重，DB 不兜底 (锁保证串行)。
      * </ul>
      */
-    private List<Map<String, Object>> generateReceiptDocuments(Long workorderId, Long feedbackId, String batch)
+    private List<Map<String, Object>> generateReceiptDocuments(Long workorderId, Long feedbackId, java.math.BigDecimal producedResolved, String batch)
     {
         // 先做幂等检查 (Fix Finding #10：命中时避免无用工单/仓库查询)。
         // 【Fix #5】用 buildExistingRecptInfo 结果非空判定 (已过滤 CANCEL)，允许对已取消单据重新生成。
@@ -612,7 +612,12 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
         }
 
         BigDecimal planned = wo.getQuantity() != null ? wo.getQuantity() : BigDecimal.ZERO;
-        BigDecimal produced = wo.getQuantityProduced() != null ? wo.getQuantityProduced() : BigDecimal.ZERO;
+        // 自动路径 (feedbackId != null)：使用外层事务读出的 producedResolved，避免 REQUIRES_NEW
+        // 在 MySQL REPEATABLE READ 下读不到外层未提交的 addQuantityProduced 值。
+        // 手动路径 (feedbackId == null)：仍读 workorder 当前已提交值。
+        BigDecimal produced = (feedbackId != null && producedResolved != null)
+                ? producedResolved
+                : (wo.getQuantityProduced() != null ? wo.getQuantityProduced() : BigDecimal.ZERO);
         BigDecimal alreadyRecpt = sumReceiptedQty(workorderId);
 
         BigDecimal qtyToRecpt;
@@ -620,7 +625,8 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
             // 自动路径：cap = min(本次合格数, 已生产量-已入库)
             // 用 produced 替代 planned 做上限：允许超产成品（produced > planned）正常入库，
             // 避免"账外物料"（产出存在但系统无入库凭证）；同时防止入库量超过实际产出（防重复计数）。
-            // produced 在外层事务已由 addQuantityProduced 累加提交，REQUIRES_NEW 下可读到最新值。
+            // produced 由外层 auditFeedback 在 addQuantityProduced 后同事务读出并传入，
+            // 绕开 REQUIRES_NEW 子事务读不到外层未提交值的事务隔离问题。
             ProFeedback fb = proFeedbackMapper.selectProFeedbackByRecordId(feedbackId);
             if (fb == null || fb.getQuantityQualified() == null) return new ArrayList<>();
             BigDecimal qualified = fb.getQuantityQualified();
@@ -870,7 +876,7 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
             return tt.execute(status -> {
                 String batch = UUID.randomUUID().toString();
                 // Controller 手动入口 (前端"生成入库单"按钮) 无 feedbackId → 手动补录语义
-                List<Map<String, Object>> recpts = generateReceiptDocuments(workorderId, null, batch);
+                List<Map<String, Object>> recpts = generateReceiptDocuments(workorderId, null, null, batch);
                 if (recpts.isEmpty()) return null;
                 Long recptId = (Long) recpts.get(0).get("recptId");
                 return wmProductRecptService.selectWmProductRecptByRecptId(recptId);
@@ -897,7 +903,7 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
     // ---- 报工审核后自动触发 ----
 
     @Override
-    public List<Map<String, Object>> onFeedbackAudited(Long feedbackId)
+    public List<Map<String, Object>> onFeedbackAudited(Long feedbackId, java.math.BigDecimal producedAfterDelta)
     {
         ProFeedback fb = proFeedbackMapper.selectProFeedbackByRecordId(feedbackId);
         if (fb == null) return new ArrayList<>();
@@ -913,7 +919,12 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
         //    避免外层 addQuantityProduced 与本内层 updateProWorkorder 争 workorder 行锁 (InnoDB 死锁)。
         //  - 本方法用 REQUIRES_NEW 独立事务：单据生成失败时只回滚单据，不影响外层审核提交。
         //  - 内层完全不写 workorder，故无死锁；单据生成全程幂等 (feedback 级 + Index A)。
+        //  - producedAfterDelta 由调用方在**外层事务**读出 addQuantityProduced 后的 quantity_produced 传入：
+        //    REQUIRES_NEW 新事务在 MySQL REPEATABLE READ 下读不到外层未提交值，必须显式传入。
         final Long wid = fb.getWorkorderId();
+        final java.math.BigDecimal producedResolved = producedAfterDelta != null
+                ? producedAfterDelta
+                : (fb.getQuantityQualified() != null ? fb.getQuantityQualified() : java.math.BigDecimal.ZERO);
         return lockTemplate.execute("pro:workorder:doc-gen:" + wid, () -> {
             TransactionTemplate tt = new TransactionTemplate(txManager);
             tt.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -921,7 +932,7 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
             return tt.execute(status -> {
                 String batch = UUID.randomUUID().toString();
                 List<Map<String, Object>> result = new ArrayList<>();
-                result.addAll(generateReceiptDocuments(wid, feedbackId, batch));
+                result.addAll(generateReceiptDocuments(wid, feedbackId, producedResolved, batch));
                 result.addAll(generateReturnDocuments(wid, batch));
                 return result;
             });

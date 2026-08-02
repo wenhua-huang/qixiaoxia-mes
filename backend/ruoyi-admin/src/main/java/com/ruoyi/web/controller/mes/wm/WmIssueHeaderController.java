@@ -150,6 +150,13 @@ public class WmIssueHeaderController extends BaseController
     public AjaxResult confirm(@PathVariable Long issueId)
     { return toAjax(wmIssueHeaderService.confirmIssue(issueId)); }
 
+    /** 批量预占库存：APPROVED → ALLOCATED，扣减可用库存，尽力执行，返回成功/失败明细 */
+    @PreAuthorize("@ss.hasPermi('mes:wm:issue:edit')")
+    @Log(title = "领料单批量预占库存", businessType = BusinessType.UPDATE)
+    @PutMapping("/batchConfirm")
+    public AjaxResult batchConfirm(@RequestBody(required = false) List<Long> issueIds)
+    { return success(wmIssueHeaderService.batchConfirmIssue(toIdArray(issueIds))); }
+
     /** 释放预占：ALLOCATED → DRAFT，恢复可用库存（反确认） */
     @PreAuthorize("@ss.hasPermi('mes:wm:issue:edit')")
     @Log(title = "领料单释放预占", businessType = BusinessType.UPDATE)
@@ -175,12 +182,30 @@ public class WmIssueHeaderController extends BaseController
     public AjaxResult submit(@PathVariable Long issueId)
     { return toAjax(wmIssueHeaderService.submitForApprove(issueId)); }
 
+    /** 批量提交审核：DRAFT → PENDING，尽力执行，返回成功/失败明细 */
+    @PreAuthorize("@ss.hasPermi('mes:wm:issue:submit')")
+    @Log(title = "领料单批量提交审核", businessType = BusinessType.UPDATE)
+    @PutMapping("/batchSubmit")
+    public AjaxResult batchSubmit(@RequestBody(required = false) List<Long> issueIds)
+    { return success(wmIssueHeaderService.batchSubmitForApprove(toIdArray(issueIds))); }
+
     /** 审核通过：PENDING → APPROVED */
     @PreAuthorize("@ss.hasPermi('mes:wm:issue:approve')")
     @Log(title = "领料单审核通过", businessType = BusinessType.UPDATE)
     @PutMapping("/approve/{issueId}")
     public AjaxResult approve(@PathVariable Long issueId)
     { return toAjax(wmIssueHeaderService.approve(issueId)); }
+
+    /** 批量审核通过：PENDING → APPROVED，尽力执行，返回成功/失败明细 */
+    @PreAuthorize("@ss.hasPermi('mes:wm:issue:approve')")
+    @Log(title = "领料单批量审核", businessType = BusinessType.UPDATE)
+    @PutMapping("/batchApprove")
+    public AjaxResult batchApprove(@RequestBody(required = false) List<Long> issueIds)
+    { return success(wmIssueHeaderService.batchApprove(toIdArray(issueIds))); }
+
+    /** RequestBody 空 body/null 兜底：转空数组交由 service 抛「未选择领料单」，避免 NPE 返回 500 */
+    private static Long[] toIdArray(List<Long> ids)
+    { return ids == null ? new Long[0] : ids.toArray(Long[]::new); }
 
     /** 审核退回：PENDING → DRAFT */
     @PreAuthorize("@ss.hasPermi('mes:wm:issue:approve')")

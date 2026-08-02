@@ -47,7 +47,9 @@
       </view>
       <view class="batch-row">
         <text class="batch-label">批次：</text>
-        <uni-easyinput v-model="d.batchCode" placeholder="可选，输入批次编码" clearable />
+        <view class="batch-pick" @click="openBatchPicker(idx)">
+          <text :class="d.batchCode ? 'batch-val' : 'batch-ph'">{{ d._batchDisplay || d.batchCode || '按预占发料（点选指定批次）' }}</text>
+        </view>
       </view>
     </view>
     <view v-if="issueList.length === 0" class="empty-tip">请扫码添加物料</view>
@@ -62,9 +64,8 @@
 <script setup>
 import { ref, computed, getCurrentInstance } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { getIssueDetail, issueOut } from '@/api/mes/wm/issue'
+import { getIssueDetail, issueOut, availableBatches } from '@/api/mes/wm/issue'
 // 显式引入 uni-ui 组件（绕过 HBuilderX 发行 H5 时 easycom 失效）
-import UniEasyInput from '@/uni_modules/uni-easyinput/components/uni-easyinput/uni-easyinput.vue'
 import UniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue'
 import UniNumberBox from '@/uni_modules/uni-number-box/components/uni-number-box/uni-number-box.vue'
 
@@ -148,9 +149,79 @@ function matchItem(code) {
     quantityIssue: matched.quantityIssue,
     remain: remain,
     quantity: remain,  // 默认发料全部未发量
-    batchCode: ''
+    batchId: null,
+    materialStockId: null,
+    batchCode: '',
+    _batchDisplay: '',
+    warehouseId: header.value.warehouseId,
+    _batchOptions: []
   })
+  // 预加载该物料的可选批次
+  loadBatchOptions(issueList.value.length - 1)
   proxy.$modal.msgSuccess('已添加：' + matched.itemName)
+}
+
+// 加载可选批次列表：不传 warehouseId，返回该物料所有仓所有批次
+async function loadBatchOptions(idx) {
+  const d = issueList.value[idx]
+  if (!d?.itemId) return
+  try {
+    // 跨仓拉全所有可用批次（不传 warehouseId），后端按 create_time 升序
+    const res = await availableBatches(d.itemId, null)
+    if (issueList.value[idx]) issueList.value[idx]._batchOptions = res.data || []
+  } catch (e) {
+    if (issueList.value[idx]) issueList.value[idx]._batchOptions = []
+  }
+}
+
+// 打开批次选择（action sheet）
+function openBatchPicker(idx) {
+  const d = issueList.value[idx]
+  if (!d) return
+  const opts = d._batchOptions || []
+  if (!opts.length) {
+    proxy.$modal.msgError('该物料暂无可用批次，将按预占发料')
+    return
+  }
+  // 选项文案：批次号 · 仓库名 (可用X/Y)；空批次显示"无批次"
+  const items = [
+    '按预占发料（清除选择）',
+    ...opts.map(b => {
+      const bc = b.batchCode || '无批次'
+      const wh = b.warehouseName || `仓${b.warehouseId}`
+      return `${bc} · ${wh} (可用${b.quantityAvailable}/${b.quantityOnhand})`
+    })
+  ]
+  uni.showActionSheet({
+    itemList: items,
+    success: (r) => {
+      const row = issueList.value[idx]
+      if (!row) return
+      if (r.tapIndex === 0) {
+        // 清除：按预占发料
+        row.batchId = null
+        row.materialStockId = null
+        row.batchCode = ''
+        row.warehouseId = header.value.warehouseId  // 恢复表头默认仓
+        row._batchDisplay = ''
+      } else {
+        const b = opts[r.tapIndex - 1]
+        row.batchId = b.batchId
+        row.materialStockId = b.materialStockId
+        // batchCode 存原始值（可能为空字符串），"无批次" 只用于展示，勿写入提交字段
+        row.batchCode = b.batchCode || ''
+        if (b.warehouseId) row.warehouseId = b.warehouseId
+        // 展示用：批次 · 仓库
+        const batchLabel = b.batchCode || '无批次'
+        row._batchDisplay = `${batchLabel} · ${b.warehouseName || ('仓' + b.warehouseId)}`
+      }
+      // 强制触发数组更新（uni-app H5 端响应式兜底）
+      issueList.value.splice(idx, 1, { ...row })
+    },
+    fail: (err) => {
+      console.log('[batch picker] cancelled or failed:', err)
+    }
+  })
 }
 
 async function handleSubmit() {
@@ -172,8 +243,11 @@ async function handleSubmit() {
         const details = valid.map(d => ({
           lineId: d.lineId, itemId: d.itemId, itemCode: d.itemCode, itemName: d.itemName,
           unitOfMeasure: d.unitOfMeasure, unitName: d.unitName,
-          quantity: d.quantity, batchCode: d.batchCode || null,
-          batchId: null, warehouseId: header.value.warehouseId
+          quantity: d.quantity,
+          batchId: d.batchId ?? null,           // 选了批次则传真实 batchId（含 0 表示无批次库存），触发精确释放+重占
+          batchCode: d.batchCode || null,
+          materialStockId: d.materialStockId ?? null,
+          warehouseId: d.warehouseId || header.value.warehouseId
         }))
         await issueOut(issueId.value, details)
         proxy.$modal.msgSuccess('发料成功')
@@ -233,6 +307,12 @@ onLoad((options) => {
   .qty-row, .batch-row { display: flex; align-items: center; gap: 12rpx; margin-top: 8rpx;
     .qty-label, .batch-label { font-size: 26rpx; color: #606266; width: 140rpx; flex-shrink: 0; }
     .qty-unit { font-size: 24rpx; color: #909399; }
+  }
+  .batch-pick {
+    flex: 1; background: #f5f6f7; border-radius: 8rpx; padding: 12rpx 20rpx; min-height: 56rpx;
+    display: flex; align-items: center;
+    .batch-val { font-size: 26rpx; color: #303133; }
+    .batch-ph { font-size: 24rpx; color: #909399; }
   }
 }
 .st-DRAFT, .st-PENDING { background: #fdf6ec; color: #e6a23c; }

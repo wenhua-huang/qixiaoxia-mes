@@ -2,10 +2,13 @@ package com.ruoyi.system.service.mes.wm.impl;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import com.ruoyi.common.enums.WmIssueConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
@@ -33,6 +36,8 @@ import com.ruoyi.system.domain.mes.wm.WmTransaction;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderBom;
 import com.ruoyi.system.domain.mes.pro.ProMaterialTrace;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
+import com.ruoyi.system.domain.mes.pro.ProCard;
+import com.ruoyi.system.mapper.mes.pro.ProCardMapper;
 import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
 import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 import com.ruoyi.system.service.mes.wm.IWmIssueHeaderService;
@@ -68,6 +73,9 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
     private ProMaterialTraceMapper proMaterialTraceMapper;
 
     @Autowired
+    private ProCardMapper proCardMapper;
+
+    @Autowired
     private AutoCodeGenerator autoCodeGenerator;
 
     @Autowired
@@ -81,10 +89,31 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
 
     private TransactionTemplate txTemplate;
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(WmIssueHeaderServiceImpl.class);
+
     @PostConstruct
     void initTx() {
         this.txTemplate = new TransactionTemplate(transactionManager);
         this.txTemplate.setTimeout(30);
+    }
+
+    /**
+     * 解析领料对应的流转卡ID：
+     * 领料单填了 card_id → 直接用；否则按工单查活跃卡取第一张。
+     */
+    private Long resolveCardId(WmIssueHeader header) {
+        if (header.getCardId() != null && header.getCardId() > 0) return header.getCardId();
+        if (header.getWorkorderId() == null) return null;
+        try {
+            ProCard q = new ProCard();
+            q.setWorkorderId(header.getWorkorderId());
+            q.setStatus("ACTIVE");
+            List<ProCard> cards = proCardMapper.selectProCardList(q);
+            return (cards != null && !cards.isEmpty()) ? cards.get(0).getCardId() : null;
+        } catch (Exception e) {
+            log.warn("领料-流转卡解析失败, workorderId={}", header.getWorkorderId(), e);
+            return null;
+        }
     }
 
     @Override
@@ -110,18 +139,27 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
         if (StringUtils.isEmpty(e.getIssueCode())) {
             e.setIssueCode(autoCodeGenerator.genSerialCode(WmIssueConstants.CODE_RULE_ISSUE, ""));
         }
-        // 查重：生产领料同一工单不允许存在多张非终态领料单（防止重复生成造成多扣库存）
+        // 查重：生产领料同工单+同工序任务(task)不允许存在多张非终态领料单
+        //   - 一个工单允许按 taskId(工序) 拆多张领料单（generateIssueDocuments 按 processId 分组循环创建）
+        //   - taskId 为空时（手工整单模式），退化为按工单维度防重
         if (e.getWorkorderId() != null && WmIssueConstants.TYPE_PRODUCE.equals(e.getIssueType())) {
             WmIssueHeader q = new WmIssueHeader();
             q.setWorkorderId(e.getWorkorderId());
             q.setIssueType(WmIssueConstants.TYPE_PRODUCE);
+            if (e.getTaskId() != null) {
+                q.setTaskId(e.getTaskId());
+            }
             List<WmIssueHeader> existings = wmIssueHeaderMapper.selectWmIssueHeaderList(q);
             if (existings != null) {
                 for (WmIssueHeader ex : existings) {
-                    if (!WmIssueConstants.isTerminal(ex.getStatus())) {
-                        throw new ServiceException("工单[" + e.getWorkorderCode()
-                                + "]已有进行中的领料单[" + ex.getIssueCode() + "]，请勿重复生成");
+                    if (WmIssueConstants.isTerminal(ex.getStatus())) continue;
+                    // taskId 为空时上面已按 workorderId 全表匹配；不为空时 SQL 已限定，此处无需再过滤
+                    if (e.getTaskId() == null && ex.getTaskId() != null) {
+                        // 新单是"整单模式"（无 task）,已存在的是"按工序拆分单"→ 视为不冲突
+                        continue;
                     }
+                    throw new ServiceException("工单[" + e.getWorkorderCode()
+                            + "]已有进行中的领料单[" + ex.getIssueCode() + "]，请勿重复生成");
                 }
             }
         }
@@ -466,12 +504,121 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
         header.setUpdateBy(SecurityUtils.getUsername());
         wmIssueHeaderMapper.updateWmIssueHeader(header);
 
+        // 外协发料：写 OUTSOURCE_ISSUE trace（原料→供应商）
+        if ("OUTSOURCE".equals(header.getIssueType()) && header.getVendorId() != null) {
+            for (WmIssueLine line : lines) {
+                try {
+                    writeOutsourceIssueTrace(header, line);
+                } catch (Exception e) {
+                    log.error("外协发料追溯写入失败, issueId={}, lineId={}", issueId, line.getLineId(), e);
+                }
+            }
+        }
+
         return issueId;
+    }
+
+    /**
+     * 写入外协发料 OUTSOURCE_ISSUE 追溯（原料发给供应商加工）。
+     * parent = MATERIAL_STOCK（具体扣减的库存行），child = VENDOR（供应商）。
+     * 按本 line 已写入的 ISSUE_OUT 事务逐 stockId 拆分，与真实扣减记录一一对应，避免 parentId=0 造成断链。
+     */
+    private void writeOutsourceIssueTrace(WmIssueHeader header, WmIssueLine line) {
+        // 汇总本 line 所有 ISSUE_OUT 的量（qty 为负），按 materialStockId 分组
+        WmTransaction q = new WmTransaction();
+        q.setSourceDocType(WmIssueConstants.SOURCE_ISSUE);
+        q.setSourceDocId(header.getIssueId());
+        q.setSourceLineId(line.getLineId());
+        q.setTransactionType(WmIssueConstants.TX_ISSUE_OUT);
+        List<WmTransaction> txs = wmTransactionMapper.selectWmTransactionList(q);
+        Map<Long, BigDecimal> byStock = new HashMap<>();
+        for (WmTransaction tx : txs) {
+            if (tx.getMaterialStockId() == null || tx.getQuantity() == null) continue;
+            byStock.merge(tx.getMaterialStockId(), tx.getQuantity().abs(), BigDecimal::add);
+        }
+        if (byStock.isEmpty()) {
+            log.warn("外协发料追溯：line {} 未找到 ISSUE_OUT 事务，跳过 trace 写入", line.getLineId());
+            return;
+        }
+        for (Map.Entry<Long, BigDecimal> e : byStock.entrySet()) {
+            ProMaterialTrace trace = new ProMaterialTrace();
+            trace.setTraceType("OUTSOURCE_ISSUE");
+            trace.setParentType("MATERIAL_STOCK");
+            trace.setParentId(e.getKey());
+            trace.setChildType("VENDOR");
+            trace.setChildId(header.getVendorId());
+            trace.setQuantity(e.getValue());
+            trace.setUnitOfMeasure(line.getUnitOfMeasure());
+            trace.setWorkorderId(header.getWorkorderId());
+            trace.setIssueId(header.getIssueId());
+            trace.setVendorId(header.getVendorId());
+            trace.setProcessId(line.getProcessId());
+            trace.setTraceTime(DateUtils.getNowDate());
+            trace.setCreateTime(DateUtils.getNowDate());
+            trace.setCreateBy(SecurityUtils.getUsername());
+            proMaterialTraceMapper.insertProMaterialTrace(trace);
+        }
     }
 
     // ════════════════════════════════════════════════════════════════
     // Phase 2：完整生命周期方法（submit/approve/reject/issueOut/close/cancel）
     // ════════════════════════════════════════════════════════════════
+
+    /**
+     * 批量执行通用骨架：逐张调用单条动作，尽力执行，失败收集到 failures 列表。
+     * 单条方法各自加锁/事务/幂等，单张失败不影响其他张。
+     * @param action 单条流转动作（submitForApprove / approve / confirmIssue 方法引用）
+     * @return total/successCount/failedCount/failures[{issueId,issueCode,issueName,reason}]
+     */
+    private Map<String, Object> executeBatch(Long[] issueIds, java.util.function.Consumer<Long> action) {
+        if (issueIds == null || issueIds.length == 0) {
+            throw new ServiceException("未选择领料单");
+        }
+        int success = 0;
+        List<Map<String, Object>> failures = new ArrayList<>();
+        for (Long id : issueIds) {
+            try {
+                action.accept(id);
+                success++;
+            } catch (Exception e) {
+                // ServiceException 是预期业务失败（状态不符/库存不足），仅收集原因；
+                // 非 ServiceException 属于系统异常，需 warn 级日志留痕便于排查
+                if (!(e instanceof ServiceException)) {
+                    log.warn("批量流转失败(非业务异常), issueId={}", id, e);
+                }
+                WmIssueHeader h = wmIssueHeaderMapper.selectWmIssueHeaderByIssueId(id);
+                Map<String, Object> f = new HashMap<>();
+                f.put("issueId", id);
+                f.put("issueCode", h != null ? h.getIssueCode() : null);
+                f.put("issueName", h != null ? h.getIssueName() : null);
+                // message 可能为 null（如 NPE），给前端友好兜底
+                String msg = e.getMessage();
+                f.put("reason", (msg != null && !msg.isEmpty()) ? msg : e.getClass().getSimpleName());
+                failures.add(f);
+            }
+        }
+        Map<String, Object> r = new HashMap<>();
+        r.put("total", issueIds.length);
+        r.put("successCount", success);
+        r.put("failedCount", failures.size());
+        r.put("failures", failures);
+        return r;
+    }
+
+    @Override
+    public Map<String, Object> batchSubmitForApprove(Long[] issueIds) {
+        return executeBatch(issueIds, this::submitForApprove);
+    }
+
+    @Override
+    public Map<String, Object> batchApprove(Long[] issueIds) {
+        return executeBatch(issueIds, this::approve);
+    }
+
+    @Override
+    public Map<String, Object> batchConfirmIssue(Long[] issueIds) {
+        return executeBatch(issueIds, this::confirmIssue);
+    }
 
     /** 提交审核：DRAFT → PENDING */
     @Override
@@ -564,6 +711,16 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
             throw new ServiceException("只有已预占/部分发料状态的领料单才能发料，当前状态：" + st);
         }
 
+        // 发料出库前校验工单必须已开工：未开工则无流转卡，投料 trace 会断链
+        // 正确流程：开工（建卡）→ 预占 → 发料出库（物料挂载到流转卡）
+        if (header.getWorkorderId() != null) {
+            ProWorkorder wo = proWorkorderMapper.selectProWorkorderByWorkorderId(header.getWorkorderId());
+            if (wo != null && !"PRODUCING".equals(wo.getStatus())) {
+                throw new ServiceException("工单[" + wo.getWorkorderCode() + "]尚未开工（当前状态：" + wo.getStatus()
+                        + "），请先在工单管理页面点击「开工」后再发料出库");
+            }
+        }
+
         // 加载所有行，构建 lineId→line 映射，便于累加 quantityIssued
         WmIssueLine lineQuery = new WmIssueLine();
         lineQuery.setIssueId(issueId);
@@ -579,13 +736,85 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
             WmIssueLine line = lineMap.get(d.getLineId());
 
             if (d.getBatchId() != null) {
-                // 指定批次：精确匹配扣 onhand
-                Long wh = d.getWarehouseId() != null ? d.getWarehouseId()
-                        : (line != null && line.getWarehouseId() != null ? line.getWarehouseId() : header.getWarehouseId());
-                WmMaterialStock existing = loadStockForUpdate(d.getItemId(), d.getBatchId(), wh);
-                if (existing == null) {
-                    throw new ServiceException("物料[" + d.getItemCode() + "]库存记录不存在，无法发料");
+                // 指定批次发料：优先用 materialStockId 精确定位（前端批次下拉选中即带此 id，不受 vendor_id 约束）；
+                // 无 materialStockId 时按 6 字段（item+batch+wh+vendor=0+workorder=0+quality=NORMAL）无锁探测。
+                // 这里只做只读探测（校验存在/物料一致），行锁统一在下面按 stockId 升序 for update，避免死锁。
+                WmMaterialStock probe;
+                if (d.getMaterialStockId() != null) {
+                    probe = wmMaterialStockMapper.selectWmMaterialStockByMaterialStockId(d.getMaterialStockId());
+                } else {
+                    Long wh = d.getWarehouseId() != null ? d.getWarehouseId()
+                            : (line != null && line.getWarehouseId() != null ? line.getWarehouseId() : header.getWarehouseId());
+                    // 无 stockId 时按 6 字段做只读探测（不加锁），拿到 stockId 后统一升序重锁
+                    WmMaterialStock qs = new WmMaterialStock();
+                    qs.setItemId(d.getItemId());
+                    qs.setBatchId(d.getBatchId() != null ? d.getBatchId() : 0L);
+                    qs.setWarehouseId(wh);
+                    qs.setVendorId(0L);
+                    qs.setWorkorderId(0L);
+                    qs.setQualityStatus(WmIssueConstants.QUALITY_NORMAL);
+                    probe = wmMaterialStockMapper.loadMaterialStock(qs);
                 }
+                if (probe == null) {
+                    throw new ServiceException("物料[" + d.getItemCode() + "]批次[" + d.getBatchCode() + "]库存记录不存在，无法发料");
+                }
+                // 校验物料一致（防误传 materialStockId）
+                if (!probe.getItemId().equals(d.getItemId())) {
+                    throw new ServiceException("物料[" + d.getItemCode() + "]所选批次记录与物料不符，无法发料");
+                }
+                // 回填 detail 的实际批次信息（按命中记录）
+                d.setBatchId(probe.getBatchId());
+                d.setBatchCode(probe.getBatchCode());
+                d.setWarehouseId(probe.getWarehouseId());
+                // 本批次已被预占的量（净预占），本次发料中由已有预占覆盖的部分无需释放/重占
+                Map<Long, BigDecimal> netAlloc = computeNetAllocation(issueId, d.getLineId());
+                BigDecimal newBatchAllocated = netAlloc.getOrDefault(probe.getMaterialStockId(), BigDecimal.ZERO);
+                BigDecimal coveredByExistingAlloc = newBatchAllocated.min(qty);
+                // 需要从旧批次释放并占用到新批次的量
+                BigDecimal toSwap = qty.subtract(coveredByExistingAlloc);
+
+                // ★ 统一按 stockId 升序对本次涉及的所有库存加行锁（含新批次+需释放的旧批次），杜绝 A↔B 交换类死锁
+                Set<Long> stockIdsToLock = new TreeSet<>();
+                stockIdsToLock.add(probe.getMaterialStockId());
+                if (toSwap.compareTo(BigDecimal.ZERO) > 0) {
+                    for (Long sid : netAlloc.keySet()) {
+                        if (!sid.equals(probe.getMaterialStockId())) stockIdsToLock.add(sid);
+                    }
+                }
+                Map<Long, WmMaterialStock> lockedStocks = new HashMap<>();
+                for (Long sid : stockIdsToLock) {
+                    WmMaterialStock locked = wmMaterialStockMapper.selectMaterialStockForUpdateById(sid);
+                    if (locked != null) lockedStocks.put(sid, locked);
+                }
+                WmMaterialStock existing = lockedStocks.get(probe.getMaterialStockId());
+                if (existing == null) {
+                    throw new ServiceException("物料[" + d.getItemCode() + "]批次[" + d.getBatchCode() + "]库存记录锁定失败");
+                }
+
+                if (toSwap.compareTo(BigDecimal.ZERO) > 0) {
+                    // 1. 精确释放旧批次的 toSwap 量（跳过本批次，行已在上面按升序锁完，直接扣减写事务即可）
+                    BigDecimal unreleased = toSwap;
+                    if (line != null) {
+                        unreleased = releaseFromLockedStocks(header, line, toSwap, netAlloc,
+                                existing.getMaterialStockId(), lockedStocks);
+                    }
+                    if (unreleased.compareTo(BigDecimal.ZERO) > 0) {
+                        throw new ServiceException("物料[" + d.getItemCode() + "]预占不足以支持指定批次["
+                                + d.getBatchCode() + "]发料 " + qty + "，仍需从旧批次释放 " + unreleased
+                                + "（可能预占已被消费或未分配，请先补预占或按预占发料）");
+                    }
+                    // 2. 占用本批次 available（校验可用量充足）
+                    BigDecimal newAvail = existing.getQuantityAvailable() != null ? existing.getQuantityAvailable() : BigDecimal.ZERO;
+                    if (newAvail.compareTo(toSwap) < 0) {
+                        throw new ServiceException("物料[" + d.getItemCode() + "]批次[" + d.getBatchCode()
+                                + "]可用库存不足！可用：" + newAvail + "，需占用：" + toSwap);
+                    }
+                    deductAvailable(existing, toSwap);
+                    if (line != null) {
+                        writeIssueTransaction(line, header, toSwap.negate(), WmIssueConstants.TX_ALLOCATE, existing);
+                    }
+                }
+                // 3. 扣 onhand 发料
                 issueOutSingleBatch(header, d, qty, existing);
             } else {
                 // 未指定批次：按预占记录扣 onhand（预占哪个批次就发哪个，不重新 FIFO）
@@ -736,6 +965,36 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
         return result;
     }
 
+    /**
+     * 从已锁定的库存映射中精确释放指定量的旧预占（发料指定批次时，先把旧批次的等量预占归还再占用新批次）。
+     * 跳过 excludeStockId（新发料批次）；按 materialStockId 升序遍历（与 lockedStocks 加锁顺序一致），
+     * 逐批次归还 available 并写 RELEASE 事务。锁在调用方一次性完成，本方法只负责扣减+事务。
+     * 返回未能释放的余量（≥0）：调用方可将其作为"追加占用"（超过原预占的新占用）继续处理。
+     */
+    private BigDecimal releaseFromLockedStocks(WmIssueHeader header, WmIssueLine line, BigDecimal need,
+                                                Map<Long, BigDecimal> netAlloc, Long excludeStockId,
+                                                Map<Long, WmMaterialStock> lockedStocks) {
+        BigDecimal remaining = need;
+        List<Long> stockIds = new ArrayList<>(netAlloc.keySet());
+        Collections.sort(stockIds);
+        for (Long stockId : stockIds) {
+            if (remaining.compareTo(BigDecimal.ZERO) <= 0) break;
+            if (stockId.equals(excludeStockId)) continue;
+            BigDecimal allocQty = netAlloc.get(stockId);
+            if (allocQty == null || allocQty.compareTo(BigDecimal.ZERO) <= 0) continue;
+            BigDecimal releaseQty = allocQty.compareTo(remaining) <= 0 ? allocQty : remaining;
+            WmMaterialStock stock = lockedStocks.get(stockId);
+            if (stock == null) continue;  // 未锁到（如已被删除），跳过
+            BigDecimal oldAvail = stock.getQuantityAvailable() != null ? stock.getQuantityAvailable() : BigDecimal.ZERO;
+            stock.setQuantityAvailable(oldAvail.add(releaseQty));
+            stock.setUpdateTime(new Date());
+            wmMaterialStockMapper.updateWmMaterialStock(stock);
+            writeIssueTransaction(line, header, releaseQty, WmIssueConstants.TX_RELEASE, stock);
+            remaining = remaining.subtract(releaseQty);
+        }
+        return remaining;
+    }
+
     /** 出库后钳制 available ≤ onhand：消费预占时不变（min 取原值），无预占/超发时随 onhand 下降 */
     private static BigDecimal clampAvailableToOnhand(BigDecimal oldAvailable, BigDecimal newOnhand) {
         BigDecimal avail = oldAvailable != null ? oldAvailable : BigDecimal.ZERO;
@@ -757,14 +1016,22 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
         writeIssueTransaction(line, header, qty.negate(), WmIssueConstants.TX_ISSUE_OUT, stock);
 
         ProMaterialTrace trace = new ProMaterialTrace();
+        Long cardId = resolveCardId(header);
         trace.setTraceType("ISSUE");
         trace.setParentType("MATERIAL_STOCK");
         trace.setParentId(stock.getMaterialStockId());
-        trace.setChildType("CARD");
-        trace.setChildId(0L);
+        // 无流转卡的工单（工单级生产），投料去向记为工单本身，避免无效的 CARD:0 断链
+        if (cardId != null) {
+            trace.setChildType("CARD");
+            trace.setChildId(cardId);
+        } else {
+            trace.setChildType("WORKORDER");
+            trace.setChildId(header.getWorkorderId() != null ? header.getWorkorderId() : 0L);
+        }
         trace.setQuantity(qty);
         trace.setUnitOfMeasure(line.getUnitOfMeasure());
         trace.setWorkorderId(header.getWorkorderId());
+        trace.setCardId(cardId);
         trace.setIssueId(header.getIssueId());
         trace.setIssueDetailId(line.getLineId());
         trace.setProcessId(line.getProcessId());
@@ -848,14 +1115,22 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
         wmTransactionMapper.insertWmTransaction(tx);
 
         ProMaterialTrace trace = new ProMaterialTrace();
+        Long cardId = resolveCardId(header);
         trace.setTraceType("ISSUE");
         trace.setParentType("MATERIAL_STOCK");
         trace.setParentId(stock.getMaterialStockId());
-        trace.setChildType("CARD");
-        trace.setChildId(0L);
+        // 无流转卡的工单（工单级生产），投料去向记为工单本身，避免无效的 CARD:0 断链
+        if (cardId != null) {
+            trace.setChildType("CARD");
+            trace.setChildId(cardId);
+        } else {
+            trace.setChildType("WORKORDER");
+            trace.setChildId(header.getWorkorderId() != null ? header.getWorkorderId() : 0L);
+        }
         trace.setQuantity(qty);
         trace.setUnitOfMeasure(d.getUnitOfMeasure());
         trace.setWorkorderId(header.getWorkorderId());
+        trace.setCardId(cardId);
         trace.setIssueId(header.getIssueId());
         trace.setIssueDetailId(d.getLineId());
         trace.setTransactionId(tx.getTransactionId());

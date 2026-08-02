@@ -481,11 +481,11 @@ public class WmRtIssueServiceImpl implements IWmRtIssueService
             tx.setCreateBy(SecurityUtils.getUsername());
             wmTransactionMapper.insertWmTransaction(tx);
 
-            // 4. 写物料追溯 (RETURN)
+            // 4. 写物料追溯 (RETURN) —— 退料来源记为工单（退料单无 cardId，工单级生产用 WORKORDER 节点）
             ProMaterialTrace trace = new ProMaterialTrace();
             trace.setTraceType("RETURN");
-            trace.setParentType("CARD");
-            trace.setParentId(0L);
+            trace.setParentType("WORKORDER");
+            trace.setParentId(header.getWorkorderId() != null ? header.getWorkorderId() : 0L);
             trace.setChildType("MATERIAL_STOCK");
             trace.setChildId(existing.getMaterialStockId());
             trace.setQuantity(line.getQuantityRt());

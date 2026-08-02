@@ -13,11 +13,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="workorderId"          column="workorder_id"          />
         <result property="workorderCode"        column="workorder_code"        />
         <result property="workorderName"        column="workorder_name"        />
+        <result property="cardId"               column="card_id"               />
+        <result property="cardCode"             column="card_code"             />
         <result property="taskId"               column="task_id"               />
         <result property="taskCode"             column="task_code"             />
         <result property="workstationId"        column="workstation_id"        />
         <result property="workstationCode"      column="workstation_code"      />
         <result property="workstationName"      column="workstation_name"      />
+        <result property="vendorId"              column="vendor_id"              />
+        <result property="vendorCode"            column="vendor_code"            />
         <result property="warehouseId"          column="warehouse_id"          />
         <result property="warehouseCode"        column="warehouse_code"        />
         <result property="warehouseName"        column="warehouse_name"        />
@@ -46,7 +50,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <sql id="selectWmIssueHeaderVo">
         select issue_id, factory_id, issue_code, issue_name, issue_type,
                workorder_id, workorder_code, workorder_name,
+               card_id, card_code,
                task_id, task_code, workstation_id, workstation_code, workstation_name,
+               vendor_id, vendor_code,
                warehouse_id, warehouse_code, warehouse_name,
                location_id, location_code, location_name,
                area_id, area_code, area_name,
@@ -88,11 +94,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="workorderId != null">workorder_id,</if>
             <if test="workorderCode != null and workorderCode != ''">workorder_code,</if>
             <if test="workorderName != null and workorderName != ''">workorder_name,</if>
+            <if test="cardId != null">card_id,</if>
+            <if test="cardCode != null and cardCode != ''">card_code,</if>
             <if test="taskId != null">task_id,</if>
             <if test="taskCode != null and taskCode != ''">task_code,</if>
             <if test="workstationId != null">workstation_id,</if>
             <if test="workstationCode != null and workstationCode != ''">workstation_code,</if>
             <if test="workstationName != null and workstationName != ''">workstation_name,</if>
+            <if test="vendorId != null">vendor_id,</if>
+            <if test="vendorCode != null and vendorCode != ''">vendor_code,</if>
             <if test="warehouseId != null">warehouse_id,</if>
             <if test="warehouseCode != null and warehouseCode != ''">warehouse_code,</if>
             <if test="warehouseName != null and warehouseName != ''">warehouse_name,</if>
@@ -122,6 +132,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="workorderId != null">#{workorderId},</if>
             <if test="workorderCode != null and workorderCode != ''">#{workorderCode},</if>
             <if test="workorderName != null and workorderName != ''">#{workorderName},</if>
+            <if test="cardId != null">#{cardId},</if>
+            <if test="cardCode != null and cardCode != ''">#{cardCode},</if>
             <if test="taskId != null">#{taskId},</if>
             <if test="taskCode != null and taskCode != ''">#{taskCode},</if>
             <if test="workstationId != null">#{workstationId},</if>
@@ -161,11 +173,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="workorderId != null">workorder_id = #{workorderId},</if>
             <if test="workorderCode != null and workorderCode != ''">workorder_code = #{workorderCode},</if>
             <if test="workorderName != null and workorderName != ''">workorder_name = #{workorderName},</if>
+            <if test="cardId != null">card_id = #{cardId},</if>
+            <if test="cardCode != null and cardCode != ''">card_code = #{cardCode},</if>
             <if test="taskId != null">task_id = #{taskId},</if>
             <if test="taskCode != null and taskCode != ''">task_code = #{taskCode},</if>
             <if test="workstationId != null">workstation_id = #{workstationId},</if>
             <if test="workstationCode != null and workstationCode != ''">workstation_code = #{workstationCode},</if>
             <if test="workstationName != null and workstationName != ''">workstation_name = #{workstationName},</if>
+            <if test="vendorId != null">vendor_id = #{vendorId},</if>
+            <if test="vendorCode != null and vendorCode != ''">vendor_code = #{vendorCode},</if>
             <if test="warehouseId != null">warehouse_id = #{warehouseId},</if>
             <if test="warehouseCode != null and warehouseCode != ''">warehouse_code = #{warehouseCode},</if>
             <if test="warehouseName != null and warehouseName != ''">warehouse_name = #{warehouseName},</if>

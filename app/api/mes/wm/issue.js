@@ -34,3 +34,11 @@ export function closeIssue(issueId) {
 export function getItemStock(itemCode, warehouseId) {
   return request({ url: '/mes/wm/materialstock/list', method: 'get', params: { itemCode, warehouseId } })
 }
+
+// 查可用批次列表（发料选批次用）：按 itemId 查所有 available>0 的批次记录
+// 不传 warehouseId 或传 null 时跨仓返回；返回项含 warehouseName 供前端分辨仓库
+export function availableBatches(itemId, warehouseId) {
+  const params = { itemId }
+  if (warehouseId != null) params.warehouseId = warehouseId
+  return request({ url: '/mes/wm/material_stock/availableBatches', method: 'get', params })
+}

@@ -26,6 +26,12 @@ import com.ruoyi.system.service.mes.wm.IWmBatchService;
 import com.ruoyi.system.service.mes.wm.IWmItemRecptLineService;
 import com.ruoyi.system.service.mes.wm.IWmItemRecptService;
 import com.ruoyi.system.service.mes.wm.IWmStorageCoreService;
+import com.ruoyi.system.domain.mes.pro.ProMaterialTrace;
+import com.ruoyi.system.mapper.mes.pro.ProMaterialTraceMapper;
+import com.ruoyi.system.domain.mes.wm.WmTransaction;
+import com.ruoyi.system.mapper.mes.wm.WmTransactionMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class WmItemRecptServiceImpl implements IWmItemRecptService
@@ -50,6 +56,14 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
 
     @Autowired
     private IWmBatchService wmBatchService;
+
+    @Autowired
+    private ProMaterialTraceMapper proMaterialTraceMapper;
+
+    @Autowired
+    private WmTransactionMapper wmTransactionMapper;
+
+    private static final Logger log = LoggerFactory.getLogger(WmItemRecptServiceImpl.class);
 
     @Override
     public List<WmItemRecpt> selectWmItemRecptList(WmItemRecpt entity) {
@@ -194,13 +208,70 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
         // 1. 更新库存（内部使用 Redisson 锁 + TransactionTemplate）
         storageCoreService.processItemRecpt(txBeans);
 
-        // 2. 确认收货状态
+        // 2. 写入物料追溯 RECEIPT（采购入库→原料库存，追溯链起点）
+        for (WmItemRecptLine line : lines) {
+            try {
+                writeReceiptTrace(header, line);
+            } catch (Exception e) {
+                log.error("入库追溯写入失败, recptId={}, lineId={}", recptId, line.getLineId(), e);
+            }
+        }
+
+        // 3. 确认收货状态
         header.setStatus("CONFIRMED");
         header.setUpdateTime(DateUtils.getNowDate());
         wmItemRecptMapper.updateWmItemRecpt(header);
 
-        // 3. 回写 PO（采购入库时）
+        // 4. 回写 PO（采购入库时）
         writebackPoOnConfirm(header);
+    }
+
+    /**
+     * 写入采购入库 RECEIPT 追溯记录（原料从哪里来 — 追溯链起点）。
+     * parent = 采购订单(有PO时) 或 供应商(无PO时)，child = 库存记录(MATERIAL_STOCK)。
+     */
+    private void writeReceiptTrace(WmItemRecpt header, WmItemRecptLine line) {
+        // 查刚写入的 wm_transaction 获取 materialStockId + transactionId
+        WmTransaction txQ = new WmTransaction();
+        txQ.setSourceDocType("wm_item_recpt");
+        txQ.setSourceDocId(header.getRecptId());
+        txQ.setSourceLineId(line.getLineId());
+        List<WmTransaction> txs = wmTransactionMapper.selectWmTransactionList(txQ);
+        if (txs == null || txs.isEmpty()) {
+            log.warn("入库追溯-未找到对应transaction, recptId={}, lineId={}", header.getRecptId(), line.getLineId());
+            return;
+        }
+        WmTransaction tx = txs.get(0);
+        if (tx.getMaterialStockId() == null) return;
+
+        // 确定 trace_type 和 parent 节点
+        ProMaterialTrace trace = new ProMaterialTrace();
+        boolean isOutsource = "OUTSOURCE".equals(header.getRecptType());
+        trace.setTraceType(isOutsource ? "OUTSOURCE_RECPT" : "RECEIPT");
+        if (isOutsource) {
+            // 外协入库：parent = VENDOR（加工完从供应商拉回）
+            trace.setParentType("VENDOR");
+            trace.setParentId(header.getVendorId() != null ? header.getVendorId() : 0L);
+        } else if (header.getPurOrderId() != null && header.getPurOrderId() > 0) {
+            trace.setParentType("PUR_ORDER");
+            trace.setParentId(header.getPurOrderId());
+        } else if (header.getVendorId() != null && header.getVendorId() > 0) {
+            trace.setParentType("VENDOR");
+            trace.setParentId(header.getVendorId());
+        } else {
+            trace.setParentType("NONE");
+            trace.setParentId(0L);
+        }
+        trace.setChildType("MATERIAL_STOCK");
+        trace.setChildId(tx.getMaterialStockId());
+        trace.setQuantity(line.getQuantityRecpt());
+        trace.setUnitOfMeasure(line.getUnitOfMeasure());
+        trace.setVendorId(header.getVendorId());
+        trace.setTransactionId(tx.getTransactionId());
+        trace.setTraceTime(new Date());
+        trace.setCreateTime(DateUtils.getNowDate());
+        trace.setCreateBy(SecurityUtils.getUsername());
+        proMaterialTraceMapper.insertProMaterialTrace(trace);
     }
 
     /**

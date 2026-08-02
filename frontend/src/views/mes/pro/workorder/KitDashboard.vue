@@ -22,7 +22,12 @@
       <el-button type="primary" @click="handleGenerateAll" :loading="genLoading">
         一键全部生成
       </el-button>
-      <el-button @click="handleGenerateIssue" :loading="genLoading" :disabled="!hasMaterialShortage">
+      <el-button
+        @click="handleGenerateIssue"
+        :loading="genLoading"
+        :disabled="issueDisabled"
+        :title="issueDisabled ? issueDisabledReason : ''"
+      >
         仅生成领料单
       </el-button>
       <el-button @click="handleGeneratePurOrder" :loading="genLoading" :disabled="!canGenPurOrder">
@@ -275,19 +280,45 @@ const receiptStatusLabel = computed(() => {
   return '暂无'
 })
 
-const hasMaterialShortage = computed(() => dashboard.value && !dashboard.value?.allSufficient)
 const canGenPurOrder = computed(() => dashboard.value?.hasPurchaseRecommend)
+
+// 「仅生成领料单」禁用条件：无物料需求 或 已存在领料单（齐套时也允许生成）
+const issueDisabled = computed(() => {
+  if (!dashboard.value) return true
+  const rows = dashboard.value?.materialRows ?? []
+  if (rows.length === 0) return true
+  if (dashboard.value?.hasIssueDocs) return true
+  return false
+})
+const issueDisabledReason = computed(() => {
+  if (!dashboard.value) return ''
+  const rows = dashboard.value?.materialRows ?? []
+  if (rows.length === 0) return '本工单无物料需求'
+  if (dashboard.value?.hasIssueDocs) return '已存在领料单，无需重复生成'
+  return ''
+})
 
 function handleGenerateAll() {
   if (!props.workorderId) return
+  // 各子项按当前工单状态自适应,避免调后端重复生成校验(会 500)
+  const genIssue = !dashboard.value?.hasIssueDocs
+  const genPurOrder = dashboard.value?.hasPurchaseRecommend ?? false
+  const genReturn = isCompleted.value
+  const genReceipt = isCompleted.value && !dashboard.value?.receiptRecommend?.alreadyHasReceipt
+
+  if (!genIssue && !genPurOrder && !genReturn && !genReceipt) {
+    ElMessage.info('当前工单无需生成任何单据')
+    return
+  }
+
   genLoading.value = true
   genMsg.value = '正在生成...'
   generateDocs({
     workorderId: props.workorderId,
-    generateIssue: true,
-    generatePurOrder: dashboard.value?.hasPurchaseRecommend ?? false,
-    generateReturn: isCompleted.value,
-    generateReceipt: isCompleted.value && !dashboard.value?.receiptRecommend?.alreadyHasReceipt
+    generateIssue: genIssue,
+    generatePurOrder: genPurOrder,
+    generateReturn: genReturn,
+    generateReceipt: genReceipt
   }).then(r => {
     genMsg.value = r.data?.message || '生成完成'
     ElMessage.success('一键生成完成')

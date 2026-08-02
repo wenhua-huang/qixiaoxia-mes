@@ -131,7 +131,7 @@ CREATE TABLE IF NOT EXISTS qxx_md_item (
   product_size      varchar(100)    default null               comment '产品尺寸(长*宽*高mm),如254*127*330mm',
   package_spec      varchar(100)    default null               comment '装箱规格(XX个/箱),如250个/箱',
   printing_req      varchar(500)    default null               comment '印刷要求描述,如1色满版黑印刷',
-  -- 行业专用属性见子表: qxx_md_item_attr_paper / _paper_bag / _gift_box
+  ext_attrs         json            default null               comment '扩展属性(扁平JSON {attrCode:value}),分类驱动的动态属性',
   -- 库存控制字段
   enable_flag       char(1)         default '1' not null       comment '是否启用(1-是,0-否)',
   safe_stock_flag   char(1)         default '0' not null       comment '是否设置安全库存(1-是,0-否)',
@@ -391,6 +391,7 @@ CREATE TABLE IF NOT EXISTS qxx_pur_order_line (
   unit_price        decimal(14,4)   default 0.0000             comment '单价(元/主单位)',
   amount            decimal(14,2)   default 0.00               comment '行金额(不含税)',
   tax_rate          decimal(5,2)    default 0.00               comment '税率(%)',
+  line_attrs        json            default null               comment '扩展属性(扁平JSON {attrCode:value}),分类驱动动态属性',
   paper_width       varchar(20)     default null               comment '门幅要求(mm)',
   paper_weight      varchar(20)     default null               comment '克重要求(g)',
   paper_type        varchar(50)     default null               comment '纸张种类',
@@ -407,4 +408,42 @@ CREATE TABLE IF NOT EXISTS qxx_pur_order_line (
   key idx_factory_id (factory_id),
   primary key (line_id)
 ) engine=innodb auto_increment=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment = '采购订单行表';
+
+-- 物料扩展属性字典（全局，factory_id 恒为 0）
+CREATE TABLE IF NOT EXISTS qxx_md_attr_def (
+  attr_id        bigint       not null auto_increment comment '属性ID',
+  factory_id     bigint       not null default 0      comment '工厂ID(恒为0,全局共享)',
+  attr_code      varchar(64)  not null                comment '属性编码(唯一)',
+  attr_name      varchar(100) not null                comment '属性显示名',
+  attr_type      varchar(20)  not null default 'TEXT' comment '类型:TEXT/NUMBER/SELECT/BOOL/DATE',
+  attr_unit      varchar(20)  default null            comment '单位',
+  options_json   json         default null            comment 'SELECT可选值(JSON数组)',
+  sort_order     int          default 0               comment '排序号',
+  enable_flag    char(1)      default '1' not null    comment '是否启用(1-是,0-否)',
+  remark         varchar(500) default ''              comment '备注',
+  create_by      varchar(64)  default ''              comment '创建者',
+  create_time    datetime     default current_timestamp comment '创建时间',
+  update_by      varchar(64)  default ''              comment '更新者',
+  update_time    datetime     default current_timestamp on update current_timestamp comment '更新时间',
+  primary key (attr_id),
+  unique key uk_factory_code (factory_id, attr_code)
+) engine=innodb DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment='物料扩展属性字典(全局)';
+
+-- 分类-属性绑定（实现继承：子类查祖先链聚合有效属性集）
+CREATE TABLE IF NOT EXISTS qxx_md_item_type_attr (
+  id             bigint       not null auto_increment comment '主键',
+  factory_id     bigint       not null                comment '工厂ID',
+  item_type_id   bigint       not null                comment '分类ID',
+  attr_id        bigint       not null                comment '属性ID',
+  required       char(1)      default '0' not null    comment '是否必填(1-是,0-否)',
+  sort_order     int          default 0               comment '本分类内排序',
+  enable_flag    char(1)      default '1' not null    comment '是否启用(1-是,0-否)',
+  create_by      varchar(64)  default ''              comment '创建者',
+  create_time    datetime     default current_timestamp comment '创建时间',
+  update_by      varchar(64)  default ''              comment '更新者',
+  update_time    datetime     default current_timestamp on update current_timestamp comment '更新时间',
+  primary key (id),
+  unique key uk_type_attr (item_type_id, attr_id),
+  key idx_factory_type (factory_id, item_type_id)
+) engine=innodb DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci comment='物料分类-扩展属性绑定(实现继承)';
 

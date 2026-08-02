@@ -33,6 +33,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="ropeSpec"    column="rope_spec"    />
         <result property="packageReq"    column="package_req"    />
         <result property="shippingReq"    column="shipping_req"    />
+        <result property="lineAttrs"      column="line_attrs"
+                typeHandler="com.ruoyi.common.core.handler.JsonMapTypeHandler" />
         <result property="orderType"    column="order_type"    />
         <result property="vendorId"    column="vendor_id"    />
         <result property="vendorCode"    column="vendor_code"    />
@@ -52,7 +54,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectProWorkorderVo">
-        select workorder_id, factory_id, workorder_code, workorder_name, workorder_type, order_source, source_code, sales_order_line_id, product_id, product_code, product_name, product_spc, route_product_id, unit_of_measure, unit_name, quantity, quantity_produced, quantity_changed, quantity_scheduled, client_id, client_code, client_name, client_order_code, product_size, printing_req, rope_spec, package_req, shipping_req, order_type, vendor_id, vendor_code, vendor_name, outsource_factory_id, batch_code, request_date, cancel_date, finish_date, status, remark, create_by, create_time, update_by, update_time
+        select workorder_id, factory_id, workorder_code, workorder_name, workorder_type, order_source, source_code, sales_order_line_id, product_id, product_code, product_name, product_spc, route_product_id, unit_of_measure, unit_name, quantity, quantity_produced, quantity_changed, quantity_scheduled, client_id, client_code, client_name, client_order_code, product_size, printing_req, rope_spec, package_req, shipping_req, line_attrs, order_type, vendor_id, vendor_code, vendor_name, outsource_factory_id, batch_code, request_date, cancel_date, finish_date, status, remark, create_by, create_time, update_by, update_time
         <!-- 已入库量子查询：JOIN ON 关联 + CASE WHEN 过滤状态，刻意不写 WHERE，避开 FactoryIdInterceptor 误判 -->
         ,(SELECT IFNULL(SUM(CASE WHEN r.status IN ('DRAFT','CONFIRMED','POSTED') THEN r.total_quantity ELSE 0 END),0)
           FROM qxx_wm_product_recpt r
@@ -118,6 +120,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="ropeSpec != null">rope_spec,</if>
             <if test="packageReq != null">package_req,</if>
             <if test="shippingReq != null">shipping_req,</if>
+            <if test="lineAttrs != null">line_attrs,</if>
             <if test="orderType != null">order_type,</if>
             <if test="vendorId != null">vendor_id,</if>
             <if test="vendorCode != null">vendor_code,</if>
@@ -159,6 +162,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="ropeSpec != null">#{ropeSpec},</if>
             <if test="packageReq != null">#{packageReq},</if>
             <if test="shippingReq != null">#{shippingReq},</if>
+            <if test="lineAttrs != null">#{lineAttrs, typeHandler=com.ruoyi.common.core.handler.JsonMapTypeHandler},</if>
             <if test="orderType != null">#{orderType},</if>
             <if test="vendorId != null">#{vendorId},</if>
             <if test="vendorCode != null">#{vendorCode},</if>
@@ -204,6 +208,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="ropeSpec != null">rope_spec = #{ropeSpec},</if>
             <if test="packageReq != null">package_req = #{packageReq},</if>
             <if test="shippingReq != null">shipping_req = #{shippingReq},</if>
+            <if test="lineAttrs != null">line_attrs = #{lineAttrs, typeHandler=com.ruoyi.common.core.handler.JsonMapTypeHandler},</if>
             <if test="orderType != null">order_type = #{orderType},</if>
             <if test="vendorId != null">vendor_id = #{vendorId},</if>
             <if test="vendorCode != null">vendor_code = #{vendorCode},</if>

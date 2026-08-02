@@ -180,29 +180,9 @@
           </el-form>
         </el-tab-pane>
 
-        <!-- 纸张属性 tab -->
-        <el-tab-pane label="纸张属性" name="paper">
-          <el-form :model="form.attrPaper" label-width="100px">
-            <el-row>
-              <el-col :span="12"><el-form-item label="门幅"><el-input v-model="form.attrPaper!.paperWidth" placeholder="如925mm" /></el-form-item></el-col>
-              <el-col :span="12"><el-form-item label="克重"><el-input v-model="form.attrPaper!.paperWeight" placeholder="如120g" /></el-form-item></el-col>
-            </el-row>
-            <el-row>
-              <el-col :span="12"><el-form-item label="来源/品牌"><el-input v-model="form.attrPaper!.paperSource" placeholder="如联盛A2" /></el-form-item></el-col>
-              <el-col :span="12"><el-form-item label="种类"><el-input v-model="form.attrPaper!.paperType" placeholder="如箱板纸" /></el-form-item></el-col>
-            </el-row>
-          </el-form>
-        </el-tab-pane>
-
-        <!-- 纸袋属性 tab -->
-        <el-tab-pane label="纸袋属性" name="paperBag">
-          <el-form :model="form.attrPaperBag" label-width="100px">
-            <el-row>
-              <el-col :span="12"><el-form-item label="绳料规格"><el-input v-model="form.attrPaperBag!.ropeSpec" placeholder="如7.5cm黄牛皮纸绳" /></el-form-item></el-col>
-              <el-col :span="12"><el-form-item label="口部提拔"><el-input v-model="form.attrPaperBag!.mouthType" placeholder="锯齿口/平口/翻口" /></el-form-item></el-col>
-            </el-row>
-            <el-form-item label="底板类型"><el-input v-model="form.attrPaperBag!.bottomType" placeholder="无/灰底白板/加强底板" /></el-form-item>
-          </el-form>
+        <!-- 扩展属性 tab（分类驱动，动态渲染） -->
+        <el-tab-pane label="扩展属性" name="extAttr">
+          <ExtAttrForm ref="extAttrFormRef" :schema="effAttrSchema" v-model="form.extAttrs" />
         </el-tab-pane>
 
         <!-- BOM组成 tab (编辑时显示) -->
@@ -228,13 +208,16 @@
 import { ref, reactive, toRefs, computed, watch, nextTick } from 'vue'
 import { getCurrentInstance } from 'vue'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
-import type { MdItem, ItemQueryParams, MdItemAttrPaper, MdItemAttrPaperBag } from '@/types/api/mes/md/item'
+import type { MdItem, ItemQueryParams } from '@/types/api/mes/md/item'
+import type { MdItemTypeAttr } from '@/types/api/mes/md/attr'
 import type { TreeSelect } from '@/types/api/common'
 import { listItem, getItem, delItem, addItem, updateItem } from '@/api/mes/md/item'
 import { treeselect, getItemtype } from '@/api/mes/md/itemtype'
+import { getEffAttrSchema } from '@/api/mes/md/attr'
 import { listAllUnitmeasure } from '@/api/mes/md/unitmeasure'
 import BatchConfig from './components/BatchConfig.vue'
 import ItemBom from './components/ItemBom.vue'
+import ExtAttrForm from '@/components/ExtAttrForm/index.vue'
 
 const { proxy } = getCurrentInstance() as any
 const { sys_yes_no } = useDict('sys_yes_no')
@@ -258,6 +241,8 @@ const filterText = ref<string>('')
 const treeRef = ref<any>(null)
 const batchConfigRef = ref<any>(null)
 const itemBomRef = ref<any>(null)
+const effAttrSchema = ref<MdItemTypeAttr[]>([])
+const extAttrFormRef = ref<any>(null)
 
 const data = reactive({
   form: {
@@ -311,7 +296,16 @@ function syncItemTypeName() {
       form.value.itemTypeName = node.label
       // 同时根据分类名称推断 itemTypeCode（取节点 label 匹配？不，等后端 resolveItemTypeId 兜底）
     }
+    // 拉取该分类的有效属性 schema（含继承），供扩展属性 tab 动态渲染
+    loadEffAttrSchema(form.value.itemTypeId)
   }
+}
+
+/** 加载分类有效属性 schema */
+function loadEffAttrSchema(typeId: number) {
+  getEffAttrSchema(typeId).then(res => {
+    effAttrSchema.value = res.data || []
+  }).catch(() => { effAttrSchema.value = [] })
 }
 
 function handleNodeClick(data: any) {
@@ -353,7 +347,8 @@ function reset() {
   optType.value = undefined
   autoGenFlag.value = false
   form.value = { enableFlag: '1', batchFlag: '1', safeStockFlag: '0', highValue: '0', conversionRate: 1.0, parentId: 0,
-    attrPaper: {} as MdItemAttrPaper, attrPaperBag: {} as MdItemAttrPaperBag } as MdItem
+    extAttrs: {} } as MdItem
+  effAttrSchema.value = []
   activeTab.value = 'basic'
   proxy?.resetForm('formRef')
 }
@@ -383,25 +378,31 @@ function handleUpdate(row?: MdItem) {
   loadTree().then(() => {
     getItem(itemId).then(r => {
       form.value = { ...r.data }
-      if (!form.value.attrPaper) form.value.attrPaper = {} as MdItemAttrPaper
-      if (!form.value.attrPaperBag) form.value.attrPaperBag = {} as MdItemAttrPaperBag
+      if (!form.value.extAttrs) form.value.extAttrs = {}
+      // 编辑时按物料分类拉取有效属性 schema（含继承）
+      if (form.value.itemTypeId) loadEffAttrSchema(form.value.itemTypeId)
       open.value = true; title.value = '修改物料'
       nextTick(() => { if (batchConfigRef.value) batchConfigRef.value.load(itemId); if (itemBomRef.value) itemBomRef.value.load() })
     })
   })
 }
 
-function submitForm() {
-  proxy.$refs['formRef'].validate((valid: boolean) => {
-    if (valid) {
-      syncItemTypeName()
-      if (form.value.itemId != undefined) {
-        updateItem(form.value).then(() => { proxy.$modal.msgSuccess('修改成功'); open.value = false; getList() })
-      } else {
-        addItem(form.value).then(() => { proxy.$modal.msgSuccess('新增成功'); open.value = false; getList() })
-      }
-    }
-  })
+async function submitForm() {
+  const valid = await new Promise<boolean>(resolve =>
+    proxy.$refs['formRef'].validate((v: boolean) => resolve(v))
+  )
+  if (!valid) return
+  // 扩展属性必填校验（ExtAttrForm 内部按 schema.required 校验）
+  if (extAttrFormRef.value) {
+    try { await extAttrFormRef.value.validate() }
+    catch (e: any) { proxy.$modal.msgError(e.message || '扩展属性校验失败'); return }
+  }
+  syncItemTypeName()
+  if (form.value.itemId != undefined) {
+    updateItem(form.value).then(() => { proxy.$modal.msgSuccess('修改成功'); open.value = false; getList() })
+  } else {
+    addItem(form.value).then(() => { proxy.$modal.msgSuccess('新增成功'); open.value = false; getList() })
+  }
 }
 
 function handleEnableChange(row: any) {

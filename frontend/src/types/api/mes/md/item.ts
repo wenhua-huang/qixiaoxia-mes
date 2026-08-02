@@ -11,34 +11,6 @@ export interface ItemQueryParams extends PageDomain {
   parentIdFilter?: string;
 }
 
-/** 物料纸张属性 */
-export interface MdItemAttrPaper {
-  attrId?: number;
-  factoryId?: number;
-  itemId?: number;
-  paperWidth?: string;
-  paperWeight?: string;
-  paperSource?: string;
-  paperType?: string;
-}
-
-/** 物料纸袋属性 */
-export interface MdItemAttrPaperBag {
-  attrId?: number;
-  factoryId?: number;
-  itemId?: number;
-  ropeSpec?: string;
-  mouthType?: string;
-  bottomType?: string;
-}
-
-/** 物料礼品盒属性 */
-export interface MdItemAttrGiftBox {
-  attrId?: number;
-  factoryId?: number;
-  itemId?: number;
-}
-
 /** 物料产品信息 */
 export interface MdItem extends BaseEntity {
   itemId?: number;
@@ -69,8 +41,6 @@ export interface MdItem extends BaseEntity {
   alertStock?: number;
   highValue?: string;
   batchFlag?: string;
-  /** 行业子表关联（GET时填充） */
-  attrPaper?: MdItemAttrPaper;
-  attrPaperBag?: MdItemAttrPaperBag;
-  attrGiftBox?: MdItemAttrGiftBox;
+  /** 扩展属性(扁平JSON {attrCode:value})，分类驱动的动态属性 */
+  extAttrs?: Record<string, any>;
 }

@@ -30,6 +30,7 @@ export * from "./tool/gen";
 
 // MES 模块
 export * from "./mes/md/unitmeasure";
+export * from "./mes/md/attr";
 export * from "./mes/dv/machinerytype";
 export * from "./mes/dv/machinery";
 

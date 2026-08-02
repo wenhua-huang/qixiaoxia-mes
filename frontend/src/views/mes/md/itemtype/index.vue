@@ -50,10 +50,11 @@
           <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="200" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="280" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:md:itemtype:edit']">修改</el-button>
           <el-button v-if="scope.row.parentTypeId" link type="primary" icon="Plus" @click="handleAdd(scope.row)" v-hasPermi="['mes:md:itemtype:add']">新增</el-button>
+          <el-button link type="primary" icon="Setting" @click="handleAttrBind(scope.row)" v-hasPermi="['mes:md:itemtype:attr']">扩展属性</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -109,6 +110,98 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 扩展属性配置对话框 -->
+    <el-dialog :title="'扩展属性配置 - ' + (attrBindRow?.itemTypeName || '')" v-model="attrBindOpen" width="680px" append-to-body>
+      <el-alert type="info" :closable="false" style="margin-bottom: 12px">
+        为本分类勾选需要填写的扩展属性。父分类已绑定的属性子类会自动继承，通常只需在大类配置。
+      </el-alert>
+      <el-table :data="attrBindList" v-loading="attrBindLoading" border size="small">
+        <el-table-column label="属性编码" prop="attrCode" width="160" />
+        <el-table-column label="属性名称" prop="attrName" width="140" />
+        <el-table-column label="类型" prop="attrType" width="90" align="center" />
+        <el-table-column label="必填" width="70" align="center">
+          <template #default="scope">
+            <el-checkbox v-model="scope.row.checked" true-value="1" false-value="0" :disabled="scope.row.inheritFromParent" />
+          </template>
+        </el-table-column>
+        <el-table-column label="启用" width="70" align="center">
+          <template #default="scope">
+            <el-checkbox v-model="scope.row.enableFlag" true-value="1" false-value="0" :disabled="scope.row.inheritFromParent" />
+          </template>
+        </el-table-column>
+        <el-table-column label="来源" width="90" align="center">
+          <template #default="scope">
+            <el-tag v-if="scope.row.inheritFromParent" type="warning" size="small">继承</el-tag>
+            <el-tag v-else type="success" size="small">本类</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="80" align="center">
+          <template #default="scope">
+            <el-button v-if="!scope.row.inheritFromParent" link type="danger" size="small" @click="removeAttrFromBind(scope.$index)">移除</el-button>
+            <span v-else style="color:#bbb;font-size:12px">—</span>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div style="margin-top:12px">
+        <span style="font-size:13px;color:#606266">添加已有属性：</span>
+        <el-select v-model="addAttrId" placeholder="选择后自动加入列表（记得点保存）" size="small" style="width:300px" filterable @change="addAttrToBind">
+          <el-option v-for="a in attrDefOptions" :key="a.attrId" :label="`${a.attrName}(${a.attrCode})`" :value="a.attrId" />
+        </el-select>
+        <el-button type="success" plain size="small" style="margin-left:16px" @click="toggleNewAttrForm">{{ newAttrOpen ? '收起新建' : '+ 新建属性' }}</el-button>
+      </div>
+
+      <!-- 新建属性内联表单 -->
+      <el-card v-if="newAttrOpen" shadow="never" style="margin-top:12px">
+        <template #header><span style="font-weight:600">新建属性（提交后自动绑定到当前分类）</span></template>
+        <el-form :model="newAttrForm" label-width="90px" size="small">
+          <el-row :gutter="12">
+            <el-col :span="10">
+              <el-form-item label="属性编码" required>
+                <el-input v-model="newAttrForm.attrCode" placeholder="大写+下划线，如 PRESSURE" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="10">
+              <el-form-item label="属性名称" required>
+                <el-input v-model="newAttrForm.attrName" placeholder="如 抗压强度" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="12">
+            <el-col :span="6">
+              <el-form-item label="类型">
+                <el-select v-model="newAttrForm.attrType" style="width:100%">
+                  <el-option label="文本" value="TEXT" />
+                  <el-option label="数字" value="NUMBER" />
+                  <el-option label="下拉" value="SELECT" />
+                  <el-option label="开关" value="BOOL" />
+                  <el-option label="日期" value="DATE" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="单位"><el-input v-model="newAttrForm.attrUnit" placeholder="如 MPa" /></el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="必填"><el-switch v-model="newAttrForm.required" /></el-form-item>
+            </el-col>
+          </el-row>
+          <el-form-item v-if="newAttrForm.attrType === 'SELECT'" label="下拉选项">
+            <el-input v-model="newAttrForm.optionsInput" type="textarea" :rows="2" placeholder="逗号分隔，如 优,良,差" />
+          </el-form-item>
+          <div style="text-align:right">
+            <el-button size="small" @click="toggleNewAttrForm">取消</el-button>
+            <el-button type="primary" size="small" :loading="newAttrSubmitting" @click="submitNewAttr">创建并绑定</el-button>
+          </div>
+        </el-form>
+      </el-card>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button type="primary" @click="saveAttrBindForm">保 存</el-button>
+          <el-button @click="attrBindOpen = false">取 消</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -117,7 +210,9 @@ import { ref, reactive, toRefs, computed } from 'vue'
 import { getCurrentInstance } from 'vue'
 import type { MdItemType, ItemTypeQueryParams } from '@/types/api/mes/md/itemtype'
 import type { TreeSelect } from '@/types/api/common'
+import type { MdAttrDef, MdItemTypeAttr } from '@/types/api/mes/md/attr'
 import { listItemtype, treeselect, listExcludeChild, getItemtype, delItemtype, addItemtype, updateItemtype } from '@/api/mes/md/itemtype'
+import { listAttrDef, getAttrBind, saveAttrBind, getEffAttrSchema, createAttrAndBind } from '@/api/mes/md/attr'
 import { handleTree } from '@/utils/ruoyi'
 
 const { proxy } = getCurrentInstance() as any
@@ -235,6 +330,144 @@ function handleEnableChange(row: any) {
 
 function handleDelete(row: MdItemType) {
   proxy.$modal.confirm('是否确认删除名称为"' + row.itemTypeName + '"的分类？').then(() => delItemtype(row.itemTypeId!)).then(() => { getList(); proxy.$modal.msgSuccess('删除成功') }).catch(() => {})
+}
+
+// ==================== 扩展属性配置 ====================
+const attrBindOpen = ref(false)
+const attrBindRow = ref<MdItemType | null>(null)
+const attrBindLoading = ref(false)
+/** 绑定列表（合并本类绑定 + 继承属性，继承项标记 inheritFromParent 不可编辑） */
+const attrBindList = ref<Array<MdItemTypeAttr & { checked?: string; inheritFromParent?: boolean }>>([])
+const attrDefOptions = ref<MdAttrDef[]>([])
+const addAttrId = ref<number | undefined>(undefined)
+// 新建属性内联表单
+const newAttrOpen = ref(false)
+const newAttrSubmitting = ref(false)
+const newAttrForm = reactive<{ attrCode: string; attrName: string; attrType: string; attrUnit: string; required: boolean; optionsInput: string }>({
+  attrCode: '', attrName: '', attrType: 'TEXT', attrUnit: '', required: false, optionsInput: ''
+})
+
+function handleAttrBind(row: MdItemType) {
+  attrBindRow.value = row
+  attrBindOpen.value = true
+  attrBindLoading.value = true
+  addAttrId.value = undefined
+  attrBindList.value = []
+  // 加载属性字典（用于"添加属性"下拉）
+  listAttrDef({ enableFlag: '1' }).then(res => {
+    attrDefOptions.value = (res as any).rows || []
+  })
+  // 加载本类直接绑定 + 有效属性(含继承)，合并展示
+  Promise.all([
+    getAttrBind(row.itemTypeId!),
+    getEffAttrSchema(row.itemTypeId!)
+  ]).then(([bindRes, effRes]) => {
+    const binds = bindRes.data || []
+    const effs = effRes.data || []
+    const bindCodes = new Set(binds.map(b => b.attrCode))
+    const merged: Array<MdItemTypeAttr & { checked?: string; inheritFromParent?: boolean }> = []
+    // 本类绑定项
+    for (const b of binds) {
+      merged.push({ ...b, checked: b.required || '0', enableFlag: b.enableFlag || '1', inheritFromParent: false })
+    }
+    // 继承项（在 effSchema 但不在本类 binds 中的）
+    for (const e of effs) {
+      if (!bindCodes.has(e.attrCode) && e.inheritDepth && e.inheritDepth > 0) {
+        merged.push({ ...e, checked: e.required || '0', enableFlag: e.enableFlag || '1', inheritFromParent: true })
+      }
+    }
+    attrBindList.value = merged
+    attrBindLoading.value = false
+  })
+}
+
+/** 从字典添加一个属性到本类绑定（立即落库，所见即所得） */
+function addAttrToBind() {
+  if (!addAttrId.value) return
+  const def = attrDefOptions.value.find(a => a.attrId === addAttrId.value)
+  if (!def) return
+  if (attrBindList.value.some(b => b.attrId === def.attrId)) {
+    proxy.$modal.msgWarning('该属性已在列表中')
+    return
+  }
+  attrBindList.value.push({
+    attrId: def.attrId!, attrCode: def.attrCode, attrName: def.attrName, attrType: def.attrType,
+    attrUnit: def.attrUnit, optionsJson: def.optionsJson,
+    checked: '0', enableFlag: '1', inheritFromParent: false
+  })
+  addAttrId.value = undefined
+}
+
+/** 从列表移除一个本类属性（继承项不可移除；保存时生效） */
+function removeAttrFromBind(index: number) {
+  attrBindList.value.splice(index, 1)
+}
+
+/** 将当前列表全量保存到后端（统一落库，避免加属性后忘点保存丢失） */
+function persistBinds(msg = '保存成功') {
+  if (!attrBindRow.value) return
+  const binds = attrBindList.value
+    .filter(b => !b.inheritFromParent && b.enableFlag === '1')
+    .map(b => ({ attrId: b.attrId, required: b.checked || '0', sortOrder: b.sortOrder || 0, enableFlag: b.enableFlag || '1' }))
+  return saveAttrBind({ typeId: attrBindRow.value.itemTypeId!, binds }).then(() => {
+    proxy.$modal.msgSuccess(msg)
+  })
+}
+
+function saveAttrBindForm() {
+  persistBinds().then(() => { attrBindOpen.value = false })
+}
+
+/** 展开/收起新建属性内联表单 */
+function toggleNewAttrForm() {
+  newAttrOpen.value = !newAttrOpen.value
+  if (newAttrOpen.value) {
+    newAttrForm.attrCode = ''
+    newAttrForm.attrName = ''
+    newAttrForm.attrType = 'TEXT'
+    newAttrForm.attrUnit = ''
+    newAttrForm.required = false
+    newAttrForm.optionsInput = ''
+  }
+}
+
+/** 提交新建属性：调 createAttrAndBind（隐式字典，attr_code 存在则复用） */
+function submitNewAttr() {
+  if (!attrBindRow.value) return
+  const code = newAttrForm.attrCode.trim().toUpperCase()
+  const name = newAttrForm.attrName.trim()
+  if (!code) { proxy.$modal.msgWarning('属性编码不能为空'); return }
+  if (!/^[A-Z][A-Z0-9_]*$/.test(code)) { proxy.$modal.msgWarning('属性编码须大写字母开头，仅含大写字母/数字/下划线'); return }
+  if (!name) { proxy.$modal.msgWarning('属性名称不能为空'); return }
+  // 同名校验：提示已有同名属性，避免重复
+  const dup = attrDefOptions.value.find(a => a.attrCode === code)
+  if (dup) { proxy.$modal.msgWarning(`属性编码 ${code} 已存在（${dup.attrName}），将复用该字典记录`); }
+
+  // SELECT 选项转 JSON 数组字符串
+  let optionsJson: string | undefined
+  if (newAttrForm.attrType === 'SELECT') {
+    const opts = newAttrForm.optionsInput.split(/[,，]/).map(s => s.trim()).filter(Boolean)
+    if (!opts.length) { proxy.$modal.msgWarning('下拉类型需填写选项'); return }
+    optionsJson = JSON.stringify(opts)
+  }
+
+  newAttrSubmitting.value = true
+  createAttrAndBind({
+    typeId: attrBindRow.value.itemTypeId!,
+    attrDef: { attrCode: code, attrName: name, attrType: newAttrForm.attrType, attrUnit: newAttrForm.attrUnit || undefined, optionsJson },
+    required: newAttrForm.required
+  }).then(r => {
+    proxy.$modal.msgSuccess('属性已创建并绑定')
+    // 追加到绑定列表
+    attrBindList.value.push({
+      ...(r.data as any), checked: (r.data as any)?.required || '0', enableFlag: '1', inheritFromParent: false
+    })
+    // 同步到字典下拉选项
+    if (!attrDefOptions.value.some(a => a.attrCode === code)) {
+      attrDefOptions.value.push({ attrId: (r.data as any)?.attrId, attrCode: code, attrName: name, attrType: newAttrForm.attrType, attrUnit: newAttrForm.attrUnit, optionsJson })
+    }
+    toggleNewAttrForm()
+  }).finally(() => { newAttrSubmitting.value = false })
 }
 
 getList()

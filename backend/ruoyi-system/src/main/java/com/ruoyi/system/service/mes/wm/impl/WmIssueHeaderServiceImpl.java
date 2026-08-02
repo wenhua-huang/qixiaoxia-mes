@@ -141,25 +141,22 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
         }
         // 查重：生产领料同工单+同工序任务(task)不允许存在多张非终态领料单
         //   - 一个工单允许按 taskId(工序) 拆多张领料单（generateIssueDocuments 按 processId 分组循环创建）
-        //   - taskId 为空时（手工整单模式），退化为按工单维度防重
-        if (e.getWorkorderId() != null && WmIssueConstants.TYPE_PRODUCE.equals(e.getIssueType())) {
+        //   - 仅当本单带 taskId 时才在此处查重（精确到工序）；
+        //     无 taskId（工单未排产/手工整单）时由上层 generateIssueDocuments 的幂等检查负责，
+        //     避免多工序工单（各单 taskId 均为 null）互相误判为重复。
+        if (e.getWorkorderId() != null && WmIssueConstants.TYPE_PRODUCE.equals(e.getIssueType())
+                && e.getTaskId() != null) {
             WmIssueHeader q = new WmIssueHeader();
             q.setWorkorderId(e.getWorkorderId());
             q.setIssueType(WmIssueConstants.TYPE_PRODUCE);
-            if (e.getTaskId() != null) {
-                q.setTaskId(e.getTaskId());
-            }
+            q.setTaskId(e.getTaskId());
             List<WmIssueHeader> existings = wmIssueHeaderMapper.selectWmIssueHeaderList(q);
             if (existings != null) {
                 for (WmIssueHeader ex : existings) {
-                    if (WmIssueConstants.isTerminal(ex.getStatus())) continue;
-                    // taskId 为空时上面已按 workorderId 全表匹配；不为空时 SQL 已限定，此处无需再过滤
-                    if (e.getTaskId() == null && ex.getTaskId() != null) {
-                        // 新单是"整单模式"（无 task）,已存在的是"按工序拆分单"→ 视为不冲突
-                        continue;
+                    if (!WmIssueConstants.isTerminal(ex.getStatus())) {
+                        throw new ServiceException("工单[" + e.getWorkorderCode()
+                                + "]该工序已有进行中的领料单[" + ex.getIssueCode() + "]，请勿重复生成");
                     }
-                    throw new ServiceException("工单[" + e.getWorkorderCode()
-                            + "]已有进行中的领料单[" + ex.getIssueCode() + "]，请勿重复生成");
                 }
             }
         }

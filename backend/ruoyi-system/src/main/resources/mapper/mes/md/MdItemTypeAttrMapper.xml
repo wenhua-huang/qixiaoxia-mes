@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.md.MdItemTypeAttrMapper">
+
+    <!-- 含关联 attr_def 字段（attrCode/attrName/attrType/attrUnit/optionsJson）+ inheritDepth -->
+    <resultMap type="com.ruoyi.system.domain.mes.md.MdItemTypeAttr" id="ItemTypeAttrResult">
+        <result property="id"            column="id"             />
+        <result property="factoryId"     column="factory_id"     />
+        <result property="itemTypeId"    column="item_type_id"   />
+        <result property="attrId"        column="attr_id"        />
+        <result property="required"      column="required"       />
+        <result property="sortOrder"     column="sort_order"     />
+        <result property="enableFlag"    column="enable_flag"    />
+        <result property="attrCode"      column="attr_code"      />
+        <result property="attrName"      column="attr_name"      />
+        <result property="attrType"      column="attr_type"      />
+        <result property="attrUnit"      column="attr_unit"      />
+        <result property="optionsJson"   column="options_json_str" />
+        <result property="inheritDepth"  column="inherit_depth"  />
+    </resultMap>
+
+    <!-- 查某分类直接绑定的属性（不含继承，配置页展示用）。@SkipFactoryId，显式按 factory_id 隔离 -->
+    <select id="selectBindByTypeId" parameterType="com.ruoyi.system.domain.mes.md.MdItemTypeAttr" resultMap="ItemTypeAttrResult">
+        select ta.id, ta.factory_id, ta.item_type_id, ta.attr_id, ta.required, ta.sort_order, ta.enable_flag,
+               d.attr_code, d.attr_name, d.attr_type, d.attr_unit, CAST(d.options_json AS CHAR) as options_json_str,
+               0 as inherit_depth
+          from qxx_md_item_type_attr ta
+          join qxx_md_attr_def d on d.attr_id = ta.attr_id
+         where ta.factory_id = #{factoryId}
+           and ta.item_type_id = #{itemTypeId}
+           and ta.enable_flag = '1'
+         order by ta.sort_order, ta.id
+    </select>
+
+    <!--
+      查某分类有效属性（含继承）：沿 parent_type_id 递归向上聚合所有祖先绑定。
+      方法标注 @SkipFactoryId，由本 SQL 三处显式 factory_id 自行隔离（设计文档 6.3）。
+      同一 attr 多层绑定时，外层按 attr_id 去重保留 inherit_depth 最小（最近本类）的一条。
+    -->
+    <select id="selectEffAttrSchema" parameterType="com.ruoyi.system.domain.mes.md.MdItemTypeAttr" resultMap="ItemTypeAttrResult">
+        with recursive ancestor_types as (
+            select item_type_id, parent_type_id, 0 as depth
+              from qxx_md_item_type
+             where item_type_id = #{itemTypeId}
+               and factory_id = #{factoryId}
+            union all
+            select t.item_type_id, t.parent_type_id, a.depth + 1
+              from qxx_md_item_type t
+              join ancestor_types a on t.item_type_id = a.parent_type_id
+             where t.factory_id = #{factoryId}
+        )
+        select merged.id, merged.factory_id, merged.item_type_id, merged.attr_id, merged.required,
+               merged.sort_order, merged.enable_flag, merged.attr_code, merged.attr_name, merged.attr_type,
+               merged.attr_unit, merged.options_json_str, merged.inherit_depth
+        from (
+            select ta.id, ta.factory_id, ta.item_type_id, ta.attr_id, ta.required, ta.sort_order, ta.enable_flag,
+                   d.attr_code, d.attr_name, d.attr_type, d.attr_unit, CAST(d.options_json AS CHAR) as options_json_str,
+                   a.depth as inherit_depth,
+                   row_number() over (partition by ta.attr_id order by a.depth asc) as rn
+              from qxx_md_item_type_attr ta
+              join ancestor_types a on a.item_type_id = ta.item_type_id
+              join qxx_md_attr_def d on d.attr_id = ta.attr_id
+             where ta.factory_id = #{factoryId}
+               and ta.enable_flag = '1'
+        ) merged
+        where merged.rn = 1
+        order by merged.inherit_depth desc, merged.sort_order, merged.id
+    </select>
+
+    <!-- @SkipFactoryId：factory_id 显式写入列，不依赖拦截器注入 -->
+    <insert id="insertItemTypeAttr" parameterType="com.ruoyi.system.domain.mes.md.MdItemTypeAttr">
+        insert into qxx_md_item_type_attr (factory_id, item_type_id, attr_id, required, sort_order, enable_flag, create_by, create_time)
+        values (#{factoryId}, #{itemTypeId}, #{attrId}, #{required}, #{sortOrder}, #{enableFlag}, #{createBy}, sysdate())
+    </insert>
+
+    <delete id="deleteItemTypeAttrById" parameterType="Long">
+        delete from qxx_md_item_type_attr where id = #{id}
+    </delete>
+
+    <!-- @SkipFactoryId：显式按 factory_id 隔离，防跨厂删除 -->
+    <delete id="deleteBindByTypeId" parameterType="com.ruoyi.system.domain.mes.md.MdItemTypeAttr">
+        delete from qxx_md_item_type_attr where factory_id = #{factoryId} and item_type_id = #{itemTypeId}
+    </delete>
+
+</mapper>

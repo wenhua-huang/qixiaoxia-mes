@@ -217,11 +217,12 @@
       <el-alert :title="weightCheckText" :type="weightCheckType" show-icon :closable="false" />
     </div>
 
+    </div><!-- 厂内模式 div 结束 -->
+    <!-- 以下选择器组件须在模式 div 外，两种模式共用 -->
     <ItemSelect ref="sourceItemSelectRef" @onSelected="onSourceItemSelected" />
     <ItemSelect ref="edgeItemSelectRef" @onSelected="onEdgeItemSelected" />
     <WorkorderSelect ref="woSelectRef" @onSelected="onWorkorderSelected" />
     <WorkstationSelect ref="wsSelectRef" @onSelected="onWorkstationSelected" />
-    </div><!-- 厂内模式 div 结束 -->
     <!-- 母卷选择弹窗（外协发料，须在模式 div 外，否则外协模式下不渲染） -->
     <el-dialog v-model="rollSelectVisible" title="选择发料母卷" width="780px" append-to-body>
       <el-form :inline="true" class="mb8">

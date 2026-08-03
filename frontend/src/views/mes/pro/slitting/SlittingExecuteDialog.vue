@@ -204,7 +204,8 @@
     <ItemSelect ref="edgeItemSelectRef" @onSelected="onEdgeItemSelected" />
     <WorkorderSelect ref="woSelectRef" @onSelected="onWorkorderSelected" />
     <WorkstationSelect ref="wsSelectRef" @onSelected="onWorkstationSelected" />
-    <!-- 母卷选择弹窗（外协发料） -->
+    </div><!-- 厂内模式 div 结束 -->
+    <!-- 母卷选择弹窗（外协发料，须在模式 div 外，否则外协模式下不渲染） -->
     <el-dialog v-model="rollSelectVisible" title="选择发料母卷" width="780px" append-to-body>
       <el-form :inline="true" class="mb8">
         <el-form-item label="物料筛选">
@@ -227,7 +228,6 @@
         <el-button type="primary" @click="confirmRollSelect">确认添加({{ tempSelectedRolls.length }})</el-button>
       </template>
     </el-dialog>
-    </div><!-- 厂内模式 div 结束 -->
     <template #footer>
       <el-button @click="cancel">取消</el-button>
       <template v-if="form.slitMode === 'OUTSOURCE'">

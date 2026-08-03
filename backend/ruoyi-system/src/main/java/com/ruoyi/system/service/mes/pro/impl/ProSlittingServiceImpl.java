@@ -461,6 +461,9 @@ public class ProSlittingServiceImpl implements IProSlittingService {
                     BigDecimal planned = nvl(card.getQuantityTransfered());
                     if (produced.compareTo(planned) >= 0) cardUpd.setStatus("COMPLETED");
                 }
+            } else {
+                // 收货：外协完成，恢复流转中（发料时置的 OUTSOURCING 在此恢复）
+                cardUpd.setStatus("ACTIVE");
             }
             cardUpd.setUpdateBy(SecurityUtils.getUsername());
             cardUpd.setUpdateTime(DateUtils.getNowDate());
@@ -586,7 +589,29 @@ public class ProSlittingServiceImpl implements IProSlittingService {
         parent.setUpdateTime(DateUtils.getNowDate());
         parent.setUpdateBy(operator);
         rollDetailMapper.updateWmRollDetail(parent);
+
+        // 流转卡状态 → OUTSOURCING（外协进行中），让流转卡列表/看板体现"正在外协"
+        markCardOutsourcing(record);
         return record;
+    }
+
+    /** 发料时把关联的流转卡置为外协中，当前工序指向分切工序 */
+    private void markCardOutsourcing(ProSlittingRecord record) {
+        if (record.getCardId() == null) return;
+        try {
+            com.ruoyi.system.domain.mes.pro.ProCard cardUpd = new com.ruoyi.system.domain.mes.pro.ProCard();
+            cardUpd.setCardId(record.getCardId());
+            cardUpd.setStatus("OUTSOURCING");
+            if (record.getProcessId() != null) {
+                cardUpd.setCurrentProcessId(record.getProcessId());
+                cardUpd.setCurrentProcessName(record.getProcessName());
+            }
+            cardUpd.setUpdateBy(SecurityUtils.getUsername());
+            cardUpd.setUpdateTime(DateUtils.getNowDate());
+            cardMapper.updateProCard(cardUpd);
+        } catch (Exception e) {
+            log.error("流转卡标记外协中失败, cardId={}", record.getCardId(), e);
+        }
     }
 
     private ProSlittingRecord buildOutsourceIssueRecord(SlittingRequest req, WmRollDetail parent,
@@ -599,6 +624,7 @@ public class ProSlittingServiceImpl implements IProSlittingService {
         record.setSlitBatchNo(slitBatchNo);
         record.setWorkorderId(req.getWorkorderId());
         record.setWorkorderCode(req.getWorkorderCode());
+        record.setRouteId(req.getRouteId());
         record.setProcessId(req.getProcessId());
         record.setProcessCode(req.getProcessCode());
         record.setProcessName(req.getProcessName());
@@ -852,6 +878,7 @@ public class ProSlittingServiceImpl implements IProSlittingService {
         SlittingRequest reqStub = new SlittingRequest();
         reqStub.setWorkorderId(record.getWorkorderId());
         reqStub.setWorkorderCode(record.getWorkorderCode());
+        reqStub.setRouteId(record.getRouteId());
         reqStub.setProcessId(record.getProcessId());
         reqStub.setProcessCode(record.getProcessCode());
         reqStub.setProcessName(record.getProcessName());

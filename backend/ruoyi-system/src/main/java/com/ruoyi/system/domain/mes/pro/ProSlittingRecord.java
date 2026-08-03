@@ -37,6 +37,8 @@ public class ProSlittingRecord extends BaseEntity
     private Long workorderId;
     private String workorderCode;
 
+    private Long routeId;
+
     private Long processId;
     private String processCode;
     @Excel(name = "工序名称")
@@ -131,6 +133,9 @@ public class ProSlittingRecord extends BaseEntity
 
     public String getWorkorderCode() { return workorderCode; }
     public void setWorkorderCode(String v) { this.workorderCode = v; }
+
+    public Long getRouteId() { return routeId; }
+    public void setRouteId(Long v) { this.routeId = v; }
 
     public Long getProcessId() { return processId; }
     public void setProcessId(Long v) { this.processId = v; }

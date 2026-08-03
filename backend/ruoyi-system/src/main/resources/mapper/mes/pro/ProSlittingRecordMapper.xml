@@ -11,6 +11,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="feedbackId" column="feedback_id" />
         <result property="workorderId" column="workorder_id" />
         <result property="workorderCode" column="workorder_code" />
+        <result property="routeId" column="route_id" />
         <result property="processId" column="process_id" />
         <result property="processCode" column="process_code" />
         <result property="processName" column="process_name" />
@@ -56,6 +57,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <sql id="selectProSlittingRecordVo">
         select slit_id, factory_id, slit_batch_no, feedback_id, workorder_id, workorder_code,
+               route_id,
                process_id, process_code, process_name, card_id,
                parent_roll_id, parent_roll_code,
                source_item_id, source_item_code, source_item_name,
@@ -100,6 +102,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="feedbackId != null">feedback_id,</if>
             <if test="workorderId != null">workorder_id,</if>
             <if test="workorderCode != null">workorder_code,</if>
+            <if test="routeId != null">route_id,</if>
             <if test="processId != null">process_id,</if>
             <if test="processCode != null">process_code,</if>
             <if test="processName != null">process_name,</if>
@@ -145,6 +148,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="feedbackId != null">#{feedbackId},</if>
             <if test="workorderId != null">#{workorderId},</if>
             <if test="workorderCode != null">#{workorderCode},</if>
+            <if test="routeId != null">#{routeId},</if>
             <if test="processId != null">#{processId},</if>
             <if test="processCode != null">#{processCode},</if>
             <if test="processName != null">#{processName},</if>
@@ -194,6 +198,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="feedbackId != null">feedback_id = #{feedbackId},</if>
             <if test="workorderId != null">workorder_id = #{workorderId},</if>
             <if test="workorderCode != null">workorder_code = #{workorderCode},</if>
+            <if test="routeId != null">route_id = #{routeId},</if>
             <if test="processId != null">process_id = #{processId},</if>
             <if test="processCode != null">process_code = #{processCode},</if>
             <if test="processName != null">process_name = #{processName},</if>

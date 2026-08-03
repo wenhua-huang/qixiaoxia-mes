@@ -243,11 +243,12 @@ const { proxy } = getCurrentInstance() as any
 // 状态常量映射
 const statusOptions = [
   { label: '流转中', value: 'ACTIVE' },
+  { label: '外协中', value: 'OUTSOURCING' },
   { label: '已完工', value: 'COMPLETED' },
   { label: '已报废', value: 'SCRAPPED' },
 ]
-const statusLabelMap: Record<string, string> = { ACTIVE: '流转中', COMPLETED: '已完工', SCRAPPED: '已报废' }
-const statusTagMap: Record<string, string> = { ACTIVE: '', COMPLETED: 'success', SCRAPPED: 'danger' }
+const statusLabelMap: Record<string, string> = { ACTIVE: '流转中', OUTSOURCING: '外协中', COMPLETED: '已完工', SCRAPPED: '已报废' }
+const statusTagMap: Record<string, string> = { ACTIVE: '', OUTSOURCING: 'warning', COMPLETED: 'success', SCRAPPED: 'danger' }
 
 const processStatusLabelMap: Record<string, string> = { PENDING: '待加工', PROCESSING: '加工中', COMPLETED: '已完成', SKIP: '已跳过' }
 const processStatusTagMap: Record<string, string> = { PENDING: 'info', PROCESSING: 'warning', COMPLETED: 'success', SKIP: '' }

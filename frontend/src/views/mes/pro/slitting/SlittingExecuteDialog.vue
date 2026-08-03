@@ -30,6 +30,23 @@
           </el-col>
         </el-row>
 
+        <el-row v-if="form.workorderId">
+          <el-col :span="12">
+            <el-form-item label="流转卡">
+              <el-select v-model="form.cardId" placeholder="可选，选后流转卡显示外协中" filterable clearable style="width: 100%" @change="onCardChange">
+                <el-option v-for="c in cardOptions" :key="c.cardId" :label="c.cardCode" :value="c.cardId" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="分切工序">
+              <el-select v-model="form.processId" placeholder="可选" filterable clearable style="width: 100%" @change="onProcessChange">
+                <el-option v-for="p in processOptions" :key="p.processId" :label="p.processName" :value="p.processId" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+
         <el-form-item label="发料母卷" required>
           <el-button type="primary" plain icon="Plus" size="small" @click="rollSelectRefOpen()">添加母卷</el-button>
           <span class="ml8" style="color:#909399;font-size:12px">可多选，每个母卷生成一张独立分切单</span>
@@ -247,6 +264,7 @@ import { ref, reactive, computed, getCurrentInstance } from 'vue'
 import { executeSlitting, listAvailableStock, listAvailableParentRolls } from '@/api/mes/pro/slitting'
 import { listAllProcess } from '@/api/mes/pro/process'
 import { listAllVendor } from '@/api/mes/md/vendor'
+import { listProcard } from '@/api/mes/pro/procard'
 import WorkorderSelect from '@/components/workorderSelect/single.vue'
 import WorkstationSelect from '@/components/workstationSelect/single.vue'
 import ItemSelect from '@/components/itemSelect/single.vue'
@@ -267,6 +285,7 @@ const selectedStock = ref<any>(null)
 const processOptions = ref<any[]>([])
 // 外协相关
 const vendorOptions = ref<any[]>([])
+const cardOptions = ref<any[]>([])
 const selectedParentRolls = ref<any[]>([])
 const rollSelectVisible = ref(false)
 const parentRollOptions = ref<any[]>([])
@@ -465,6 +484,23 @@ function onWorkorderSelected(row: any) {
   if (!row) return
   form.workorderId = row.workorderId
   form.workorderCode = row.workorderCode
+  // 选工单后加载该工单的流转卡 + 工艺路线（外协发料关联流转卡用）
+  loadCards(row.workorderId)
+  if (row.routeId) form.routeId = row.routeId
+}
+
+async function loadCards(workorderId: number) {
+  cardOptions.value = []
+  form.cardId = null
+  try {
+    const res = await listProcard({ workorderId, status: 'ACTIVE' })
+    cardOptions.value = res.rows || []
+  } catch (e) {}
+}
+
+function onCardChange(cardId: number) {
+  const c = cardOptions.value.find((x: any) => x.cardId === cardId)
+  if (c && c.routeId) form.routeId = c.routeId
 }
 
 function onProcessChange(processId: number) {
@@ -559,6 +595,11 @@ async function submitOutsource() {
     vendorName: form.vendorName,
     workorderId: form.workorderId,
     workorderCode: form.workorderCode,
+    cardId: form.cardId,
+    routeId: form.routeId,
+    processId: form.processId,
+    processCode: form.processCode,
+    processName: form.processName,
     parentRollIds: selectedParentRolls.value.map((r: any) => r.rollId)
   }
   submitting.value = true

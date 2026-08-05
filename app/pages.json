@@ -176,6 +176,27 @@
     "style": {
       "navigationBarTitleText": "外协收货"
     }
+  }, {
+    "path": "pages/mes/wm/outsource-list",
+    "style": {
+      "navigationBarTitleText": "外协任务",
+      "enablePullDownRefresh": true
+    }
+  }, {
+    "path": "pages/mes/wm/outsource-detail",
+    "style": {
+      "navigationBarTitleText": "外协详情"
+    }
+  }, {
+    "path": "pages/mes/wm/outsource-result",
+    "style": {
+      "navigationBarTitleText": "录入加工结果"
+    }
+  }, {
+    "path": "pages/mes/wm/outsource-receive",
+    "style": {
+      "navigationBarTitleText": "外协收货"
+    }
   }],
   "tabBar": {
     "color": "#000000",

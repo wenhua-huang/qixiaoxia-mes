@@ -112,21 +112,21 @@
     </view>
     </template>
 
-    <!-- 宫格组件 — 分切作业（外协厂商） -->
+    <!-- 宫格组件 — 外协任务（外协厂商） -->
     <template v-else>
-    <uni-section title="分切作业" type="line"></uni-section>
+    <uni-section title="外协任务" type="line"></uni-section>
     <view class="grid-body">
       <uni-grid :column="4" :showBorder="false">
-        <uni-grid-item @click="goMySlitting">
+        <uni-grid-item @click="goMyOutsource">
           <view class="grid-item-box">
             <uni-icons type="scissors-filled" size="30" color="#409eff"></uni-icons>
-            <text class="text">我的分切任务</text>
+            <text class="text">我的外协任务</text>
           </view>
         </uni-grid-item>
-        <uni-grid-item @click="goSlittingHistory">
+        <uni-grid-item @click="goOutsourceHistory">
           <view class="grid-item-box">
             <uni-icons type="list" size="30" color="#67c23a"></uni-icons>
-            <text class="text">分切历史</text>
+            <text class="text">外协历史</text>
           </view>
         </uni-grid-item>
       </uni-grid>
@@ -263,11 +263,11 @@
   function goSlittingList() {
     proxy.$tab.navigateTo('/pages/mes/pro/slitting-list')
   }
-  function goMySlitting() {
-    proxy.$tab.navigateTo('/pages/mes/pro/slitting-list?role=vendor')
+  function goMyOutsource() {
+    proxy.$tab.navigateTo('/pages/mes/wm/outsource-list')
   }
-  function goSlittingHistory() {
-    proxy.$tab.navigateTo('/pages/mes/pro/slitting-list?role=vendor')
+  function goOutsourceHistory() {
+    proxy.$tab.navigateTo('/pages/mes/wm/outsource-list')
   }
   function goProductRecpt() {
     proxy.$tab.navigateTo('/pages/mes/wm/productrecpt/list')

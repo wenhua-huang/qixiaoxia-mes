@@ -200,6 +200,24 @@ public class OutsourceServiceImpl implements IOutsourceService
         WmOutsourceOrder order = loadAndCheckVendor(orderId, STATUS_ISSUED);
         String operator = SecurityUtils.getUsername();
 
+        // 加载发料行，用于自动继承物料/仓库信息（厂商前端可只填数量）
+        List<WmOutsourceIssueLine> issueLines = lineMapper.selectIssueLinesByOrderId(orderId);
+        WmOutsourceIssueLine firstIssue = (issueLines != null && !issueLines.isEmpty()) ? issueLines.get(0) : null;
+
+        // 自动补全每条收货行缺失的物料/仓库（从发料行继承）
+        for (WmOutsourceRecptLine line : resultLines)
+        {
+            if (firstIssue != null)
+            {
+                if (line.getItemId() == null) { line.setItemId(firstIssue.getItemId()); line.setItemCode(firstIssue.getItemCode()); line.setItemName(firstIssue.getItemName()); }
+                if (line.getUnitOfMeasure() == null) { line.setUnitOfMeasure(firstIssue.getUnitOfMeasure()); line.setUnitName(firstIssue.getUnitName()); }
+                if (line.getWarehouseId() == null) { line.setWarehouseId(firstIssue.getWarehouseId()); line.setWarehouseCode(firstIssue.getWarehouseCode()); line.setWarehouseName(firstIssue.getWarehouseName()); }
+                if (line.getBatchId() == null) { line.setBatchId(firstIssue.getBatchId()); line.setBatchCode(firstIssue.getBatchCode()); }
+            }
+        }
+        // 把发料行挂到 order 上，供 strategy 读取（如分切需要母卷信息）
+        order.setIssueLines(issueLines);
+
         // 回调 strategy（分切建子卷等）
         OutsourceResultStrategy strategy = strategyMap.get(order.getSourceType());
         List<WmOutsourceRecptLine> processedLines = strategy != null

@@ -64,7 +64,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="8"><el-form-item label="客户PO号" prop="clientOrderCode"><el-input v-model="form.clientOrderCode" placeholder="客户PO号" /></el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="业务员" prop="salesperson"><el-input v-model="form.salesperson" placeholder="业务员" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="业务员" prop="salesperson"><el-select v-model="form.salesperson" placeholder="请选择业务员" clearable filterable style="width:100%"><el-option v-for="u in userOptions" :key="u.userName" :label="u.nickName || u.userName" :value="u.nickName || u.userName" /></el-select></el-form-item></el-col>
         </el-row>
         <el-row>
           <el-col :span="6"><el-form-item label="业务线" prop="businessLine"><el-select v-model="form.businessLine" placeholder="请选择" style="width:100%"><el-option label="内贸" value="DOMESTIC" /><el-option label="外贸" value="FOREIGN" /><el-option label="现货" value="SPOT" /></el-select></el-form-item></el-col>
@@ -241,6 +241,7 @@ import { listRouteProductBomByRouteId } from '@/api/mes/pro/routeproductbom'
 import { listRouteProcessParamByRouteProductId } from '@/api/mes/pro/routeprocessparam'
 import { listParamTemplate } from '@/api/mes/pro/paramtemplate'
 import { checkDeviation } from '@/api/mes/pro/workorder'
+import { listUser } from '@/api/system/user'
 import ClientSelect from '@/components/clientSelect/single.vue'
 import LineEdit from './LineEdit.vue'
 
@@ -251,6 +252,8 @@ export default {
     return {
       loading: true, ids: [], single: true, multiple: true, showSearch: true, total: 0,
       orderList: [], title: '', open: false, optType: undefined, autoGenFlag: true,
+      // 业务员选项列表(SysUser,存展示用姓名 nickName,与客户/成品销售的 salesperson 口径一致)
+      userOptions: [],
       queryParams: { pageNum: 1, pageSize: 10, orderCode: null, orderName: null, clientName: null, clientOrderCode: null, businessLine: null, status: null },
       form: {}, lineList: [],
       lineEditOpen: false, editingLine: null,
@@ -268,8 +271,19 @@ export default {
       }
     }
   },
-  created() { this.getList() },
+  created() { this.loadUserOptions(); this.getList() },
   methods: {
+    /** 业务员下拉数据源：按展示名去重(重复 value 会导致 el-select 的 filterable 过滤失效) */
+    loadUserOptions() {
+      listUser({ pageSize: 999 }).then(r => {
+        const seen = new Set()
+        this.userOptions = (r.rows || []).filter(u => {
+          const name = u.nickName || u.userName
+          if (!name || seen.has(name)) return false
+          seen.add(name); return true
+        })
+      })
+    },
     getList() { this.loading = true; listOrder(this.queryParams).then(r => { this.orderList = r.rows; this.total = r.total; this.loading = false }).catch(() => { this.loading = false }) },
     statusText(s) { return { PREPARE: '待确认', CONFIRMED: '已确认', CLOSED: '已关闭', CANCEL: '已取消' }[s] || s },
     statusTag(s) { return { PREPARE: 'info', CONFIRMED: 'success', CLOSED: '', CANCEL: 'danger' }[s] || '' },

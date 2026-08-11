@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import com.ruoyi.common.core.redis.RedisLockTemplate;
 import com.ruoyi.system.domain.mes.md.MdWorkstation;
 import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
 import com.ruoyi.system.domain.mes.pro.ProRouteProduct;
@@ -16,6 +17,7 @@ import com.ruoyi.system.mapper.mes.pro.ProRouteProductMapper;
 import com.ruoyi.system.mapper.mes.pro.ProTaskMapper;
 import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
 import com.ruoyi.system.service.mes.cal.IWorkCalendarService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,10 +25,16 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
+import org.springframework.transaction.support.TransactionTemplate;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -51,6 +59,25 @@ class ScheduleServiceImplUnitTest
     private IWorkCalendarService calendarService;
     @Mock
     private MdWorkstationMapper workstationMapper;
+    @Mock
+    private RedisLockTemplate lockTemplate;
+    @Mock
+    private PlatformTransactionManager transactionManager;
+
+    @BeforeEach
+    void setUp() {
+        // Mock lockTemplate.executeWithResult：直接执行 Supplier（绕过 Redis 锁）
+        lenient().when(lockTemplate.executeWithResult(anyString(), anyLong(), any()))
+                .thenAnswer(inv -> {
+                    java.util.function.Supplier<?> sup = inv.getArgument(2);
+                    return sup.get();
+                });
+        // Mock 事务管理器：返回一个空状态，让 TransactionTemplate 直接执行回调
+        lenient().when(transactionManager.getTransaction(any()))
+                .thenReturn(new SimpleTransactionStatus());
+        // 手动创建 txTemplate（@PostConstruct 在 Mockito 下不触发）
+        ReflectionTestUtils.setField(service, "txTemplate", new TransactionTemplate(transactionManager));
+    }
 
     private MdWorkstation ws(long id, String code, String name) {
         MdWorkstation w = new MdWorkstation();
@@ -118,7 +145,7 @@ class ScheduleServiceImplUnitTest
         rproc.setProcessId(100L);
         rproc.setProcessName("印刷");
         rproc.setOrderNum(1);
-        rproc.setProcessType("PRINT");
+        rproc.setProcessCode("PRINT");
 
         when(workorderMapper.selectProWorkorderByWorkorderId(1L)).thenReturn(wo);
         when(routeProductMapper.selectProRouteProductByRecordId(1L)).thenReturn(rp);

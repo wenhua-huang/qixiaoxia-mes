@@ -67,6 +67,17 @@
 
 **工作流**：Plan First — 非 trivial（≥3 步或涉架构）先进 plan mode，出错立刻停重 plan。子 Agent — 搜索/探索/多文件读取用子 agent，Grep 优先于 `find \| xargs grep`。
 
+## ⚠️ 后端改动验证红线（不可跳过）
+
+改了后端 Java 代码后，**`mvn compile` 通过 ≠ 修复完成**。运行中的后端是 `java -jar ruoyi-admin/target/ruoyi-admin.jar`，必须让改动在**运行进程**中生效并实测：
+
+1. **重新打包**：`cd backend && mvn -pl ruoyi-admin -am package -DskipTests`（不是 compile）
+2. **重启进程**：`kill <旧pid>` → `nohup java -jar ruoyi-admin/target/ruoyi-admin.jar > /tmp/ruoyi-backend.log 2>&1 &`，等 `curl -s http://localhost:8081/captchaImage` 返回 200
+3. **实测接口**：用 token 调真正的接口，看到返回结果符合预期（报错被拦住 / 正常返回数据），而不是只看日志"启动成功"
+4. **对前端改动**：同样要在浏览器/小程序里实际点一次，确认页面行为正确
+
+未完成上述验证，**禁止**对用户说"修复完成/已解决"。这条规则由 `.zcode/hooks/check-backend-stale.sh` 在每次结束回合时自动兜底检查。
+
 ## 生产服务器
 
 | 项 | 值 |

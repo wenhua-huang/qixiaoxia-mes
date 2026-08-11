@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.ruoyi.common.core.redis.RedisLockTemplate;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.system.domain.mes.pro.ProFeedback;
@@ -19,6 +20,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.support.TransactionTemplate;
+
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -35,6 +42,8 @@ class ProFeedbackServiceUnitTest {
 
     @Mock private ProFeedbackMapper feedbackMapper;
     @Mock private IProFeedbackParamService feedbackParamService;
+    @Mock private RedisLockTemplate lockTemplate;
+    @Mock private PlatformTransactionManager transactionManager;
     @InjectMocks private ProFeedbackServiceImpl feedbackService;
 
     private ProFeedback testFeedback;
@@ -44,6 +53,13 @@ class ProFeedbackServiceUnitTest {
     void setUp() {
         securityUtilsMock = mockStatic(SecurityUtils.class);
         securityUtilsMock.when(SecurityUtils::getUsername).thenReturn("admin");
+
+        // 锁直接执行 Supplier；事务模板用 mock 事务管理器（Mockito 不触发 @PostConstruct，手动注入）
+        lenient().when(lockTemplate.executeWithResult(anyString(), anyLong(), any()))
+                .thenAnswer(inv -> inv.getArgument(2, Supplier.class).get());
+        lenient().when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
+        ReflectionTestUtils.setField(feedbackService, "txTemplate", txTemplate);
 
         testFeedback = new ProFeedback();
         testFeedback.setRecordId(1L);

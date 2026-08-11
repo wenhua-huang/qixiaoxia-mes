@@ -1,6 +1,7 @@
 package com.ruoyi.system.service.mes.pro;
 
 import java.util.List;
+import com.ruoyi.system.domain.mes.pro.ProOutsourceWorkorderInfoVO;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderBom;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderDetailVO;
@@ -136,6 +137,15 @@ public interface IProWorkorderService
      * @return 生产工单详情VO
      */
     public ProWorkorderDetailVO getWorkorderDetail(Long workorderId);
+
+    /**
+     * 查询工单外协发料信息（App"外协按工单发料"入口）：返回该工单所有外协工序
+     * (is_outsource=1)及其 BOM 发料行、默认厂商、是否已存在外协单（防重复建单）。
+     *
+     * @param workorderCode 工单编码
+     * @return 外协发料信息 VO
+     */
+    public ProOutsourceWorkorderInfoVO getOutsourceInfoByCode(String workorderCode);
 
     /**
      * 修改生产工单（含BOM和工序参数）

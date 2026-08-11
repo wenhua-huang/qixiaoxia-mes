@@ -27,6 +27,11 @@ public class ProConstants
     /** 已结束、不再占用工作站的终态（空闲判定时排除） */
     public static final String[] TASK_STATUS_INACTIVE = {TASK_STATUS_COMPLETED, TASK_STATUS_CANCEL};
 
+    /** 工单状态 */
+    public static final String WORKORDER_STATUS_PREPARE = "PREPARE";       // 待生产/未开工
+    public static final String WORKORDER_STATUS_PRODUCING = "PRODUCING";   // 生产中/已开工
+    public static final String WORKORDER_STATUS_COMPLETED = "COMPLETED";   // 已完工
+
     /** 排产默认值 */
     public static final int DEFAULT_DURATION_MINUTES = 60;
     public static final int DEFAULT_SETUP_MINUTES = 0;
@@ -42,4 +47,11 @@ public class ProConstants
     public static final int CALENDAR_MAX_LOOPS = 1000;
     public static final int CALENDAR_PROBE_DAYS = 7;
     public static final int NEAREST_WORKING_DAY_MAX = 7;
+
+    /** 虚拟工作站：未分配真实工作站时的占位 ID */
+    public static final Long WS_VIRTUAL_ID = 0L;
+    /** 虚拟工作站编码：外协工序（任务挂厂商，不占厂内工作站） */
+    public static final String WS_CODE_VENDOR = "VENDOR";
+    /** 虚拟工作站编码：待自动分配（排产时尚未匹配到工作站） */
+    public static final String WS_CODE_AUTO = "AUTO";
 }

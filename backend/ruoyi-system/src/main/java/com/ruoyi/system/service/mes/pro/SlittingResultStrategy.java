@@ -2,7 +2,9 @@ package com.ruoyi.system.service.mes.pro;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,15 +65,13 @@ public class SlittingResultStrategy implements OutsourceResultStrategy
                                                      List<WmOutsourceRecptLine> resultLines)
     {
         String operator = SecurityUtils.getUsername();
-        // 从发料行获取母卷信息
-        WmOutsourceRecptLine firstIssue = mapIssueToRecpt(order);
 
         List<WmOutsourceRecptLine> processed = new ArrayList<>();
         for (WmOutsourceRecptLine line : resultLines)
         {
             // 建子卷
             WmRollDetail child = new WmRollDetail();
-            child.setRollCode(autoCodeGenerator.genSerialCode("ROLL_CODE", null));
+            child.setRollCode(genRollCode());
             child.setItemId(line.getItemId());
             child.setItemCode(line.getItemCode());
             child.setItemName(line.getItemName());
@@ -86,6 +86,9 @@ public class SlittingResultStrategy implements OutsourceResultStrategy
             child.setWarehouseName(line.getWarehouseName());
             child.setStatus("OUTSOURCED");
             child.setSlitBatchNo(order.getOrderCode());
+            // 关联母卷：分切外协建单时 sourceRefId 指向母卷 rollId，
+            // 不设会导致子卷 parentRollId 为空，追溯断链（无法从子卷反查母卷）
+            if (order.getSourceRefId() != null) child.setParentRollId(order.getSourceRefId());
             child.setCreateBy(operator);
             child.setCreateTime(DateUtils.getNowDate());
             rollDetailMapper.insertWmRollDetail(child);
@@ -100,12 +103,15 @@ public class SlittingResultStrategy implements OutsourceResultStrategy
     }
 
     /**
-     * 收货时：子卷状态 OUTSOURCED → IN_STOCK。
+     * 收货时：子卷状态 OUTSOURCED → IN_STOCK，并回写收货时解析出的成品批次
+     * （录结果时 batchId 为空，批次在收货环节按厂商填写的 lot/produceDate 生成）。
      */
     @Override
-    public void onReceive(WmOutsourceOrder order, List<WmOutsourceRecptLine> recptLines, Long feedbackId)
+    public void onReceive(WmOutsourceOrder order, List<WmOutsourceRecptLine> recptLines,
+                          Long feedbackId, Map<Long, Long> stockIdByLineId)
     {
         String operator = SecurityUtils.getUsername();
+        int updated = 0;
         for (WmOutsourceRecptLine line : recptLines)
         {
             if (line.getSourceRefId() != null && "ROLL".equals(line.getSourceRefType()))
@@ -114,19 +120,39 @@ public class SlittingResultStrategy implements OutsourceResultStrategy
                 if (child != null)
                 {
                     child.setStatus("IN_STOCK");
+                    // 回写成品批次（收货环节 resolveRecptBatch 生成）
+                    if (line.getBatchId() != null) child.setBatchId(line.getBatchId());
+                    if (line.getBatchCode() != null) child.setBatchCode(line.getBatchCode());
+                    // 回填库存ID（入库事务生成），持久化避免追溯断链
+                    Long stockId = stockIdByLineId != null ? stockIdByLineId.get(line.getLineId()) : null;
+                    if (stockId != null) child.setMaterialStockId(stockId);
                     child.setUpdateBy(operator);
                     child.setUpdateTime(DateUtils.getNowDate());
                     rollDetailMapper.updateWmRollDetail(child);
+                    updated++;
                 }
             }
         }
-        log.info("分切策略-收货: orderId={}, 子卷入库", order.getOrderId());
+        log.info("分切策略-收货: orderId={}, 子卷入库 {} 卷", order.getOrderId(), updated);
     }
 
-    /** 从发料行（母卷）映射出收货行的物料信息 */
-    private WmOutsourceRecptLine mapIssueToRecpt(WmOutsourceOrder order)
+    /**
+     * 生成子卷编码，自动编码规则不可用时以「RL + 时间戳 + 4 位随机数」兜底
+     * （DB 唯一约束最终兜底）。
+     */
+    private String genRollCode()
     {
-        // 简化：收货行的物料由前端传入，这里不额外处理
-        return new WmOutsourceRecptLine();
+        if (autoCodeGenerator != null)
+        {
+            try
+            {
+                String code = autoCodeGenerator.genSerialCode("ROLL_CODE", null);
+                if (code != null && !code.isEmpty()) return code;
+            }
+            catch (Exception ignored) { /* fall through to timestamp */ }
+        }
+        String ts = new java.text.SimpleDateFormat("yyyyMMddHHmmssSSS").format(new Date());
+        int rand = (int) (Math.random() * 10000);
+        return "RL" + ts + String.format("%04d", rand);
     }
 }

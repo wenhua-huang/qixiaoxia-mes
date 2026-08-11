@@ -65,8 +65,10 @@ class ProWorkorderDocServiceUnitTest {
     @Mock private IWmProductRecptService wmProductRecptService;
     @Mock private IWmProductRecptLineService wmProductRecptLineService;
     @Mock private com.ruoyi.system.mapper.mes.wm.WmProductRecptMapper wmProductRecptMapper;
+    @Mock private com.ruoyi.system.mapper.mes.wm.WmOutsourceOrderMapper wmOutsourceOrderMapper;
     @Mock private IWmMaterialStockService wmMaterialStockService;
     @Mock private IWmWarehouseService wmWarehouseService;
+    @Mock private com.ruoyi.system.service.mes.wm.OutsourceIssueHelper outsourceIssueHelper;
 
     // ====== Purchase Services ======
     @Mock private IPurOrderService purOrderService;

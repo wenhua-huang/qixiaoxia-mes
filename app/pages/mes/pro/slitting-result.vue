@@ -28,7 +28,7 @@
 
       <!-- 批量模板（同规格生成多卷） -->
       <uni-section title="批量添加（同规格）" type="line"></uni-section>
-      <view class="info-card">
+      <view class="info-card" v-if="canEdit">
         <view class="template-row">
           <view class="template-item">
             <text class="label">门幅(mm)</text>
@@ -56,35 +56,42 @@
           <view v-for="(roll, idx) in childRolls" :key="idx" class="roll-edit-row">
             <view class="roll-edit-top">
               <text class="roll-no">子卷 {{ idx + 1 }}</text>
-              <uni-icons type="close" size="18" color="#f56c6c" @click="removeChild(idx)"></uni-icons>
+              <uni-icons v-if="canEdit" type="close" size="18" color="#f56c6c" @click="removeChild(idx)"></uni-icons>
             </view>
             <view class="roll-edit-fields">
               <view class="field">
                 <text class="field-label">门幅(mm)</text>
-                <uni-easyinput v-model="roll.actualWidth" type="number" placeholder="门幅" :inputBorder="true" />
+                <uni-easyinput v-model="roll.actualWidth" type="number" placeholder="门幅" :inputBorder="true" :disabled="!canEdit" />
               </view>
               <view class="field">
                 <text class="field-label">克重(g)</text>
-                <uni-easyinput v-model="roll.actualWeightGsm" type="number" placeholder="克重" :inputBorder="true" />
+                <uni-easyinput v-model="roll.actualWeightGsm" type="number" placeholder="克重" :inputBorder="true" :disabled="!canEdit" />
               </view>
               <view class="field">
                 <text class="field-label">重量(吨)</text>
-                <uni-easyinput v-model="roll.actualWeight" type="digit" placeholder="重量" :inputBorder="true" />
+                <uni-easyinput v-model="roll.actualWeight" type="digit" placeholder="重量" :inputBorder="true" :disabled="!canEdit" />
               </view>
             </view>
           </view>
         </view>
-        <button class="cu-btn line-blue sm full-btn" @click="addChild">+ 单独添加</button>
+        <button v-if="canEdit" class="cu-btn line-blue sm full-btn" @click="addChild">+ 单独添加</button>
+      </view>
+
+      <!-- 已提交提示 -->
+      <view v-if="!canEdit" class="already-tip">
+        <uni-icons type="checkmarkempty" size="16" color="#67c23a"></uni-icons>
+        <text>已提交分切结果，不可修改</text>
       </view>
 
       <!-- 重量校验 -->
-      <view class="weight-bar" :class="weightValid ? 'ok' : 'err'">
+      <view class="weight-bar" :class="!weightValid ? 'err' : (lossExcessive ? 'warn' : 'ok')">
         <text>子卷总重：{{ childTotalWeight }}吨 / 母卷 {{ record.parentWeight }}吨</text>
         <text class="weight-loss">损耗率：{{ lossRate }}%</text>
       </view>
+      <view v-if="lossExcessive" class="loss-tip">损耗率超过 3%，请确认边料重量；我方收货时将复核</view>
 
       <!-- 底部提交 -->
-      <view class="footer-bar">
+      <view class="footer-bar" v-if="canEdit">
         <button class="cu-btn bg-blue lg" :disabled="!canSubmit || submitting" @click="submit">
           {{ submitting ? '提交中...' : '提交分切结果' }}
         </button>
@@ -118,9 +125,14 @@ const lossRate = computed(() => {
 const weightValid = computed(() => {
   if (childRolls.value.length === 0) return false
   const loss = parentWeight.value - Number(childTotalWeight.value)
-  return loss >= 0 && Number(lossRate.value) <= 3
+  // 仅硬挡「子卷总重超过母卷」(loss<0)；损耗率>3% 不阻断厂商录入，
+  // 3% 阈值由我方收货阶段结合边料重量校验，此处仅提示
+  return loss >= 0
 })
-const canSubmit = computed(() => weightValid.value)
+const lossExcessive = computed(() => Number(lossRate.value) > 3)
+// 仅 ISSUED 状态可录入结果；已提交（SLITTING/RECEIVED）只读
+const canEdit = computed(() => record.value?.status === 'ISSUED')
+const canSubmit = computed(() => weightValid.value && canEdit.value)
 
 function batchAdd() {
   if (!tpl.width || !tpl.count) {
@@ -128,7 +140,7 @@ function batchAdd() {
     return
   }
   const count = parseInt(tpl.count)
-  if (count <= 0 || count > 50) {
+  if (isNaN(count) || count <= 0 || count > 50) {
     proxy.$modal.msg('条数需在 1~50 之间')
     return
   }
@@ -151,6 +163,7 @@ function removeChild(idx) {
 }
 
 async function submit() {
+  if (!canEdit.value) { proxy.$modal.msgError('当前状态不可修改'); return }
   if (childRolls.value.length === 0) { proxy.$modal.msg('请添加子卷'); return }
   // 校验每条都有重量
   const missing = childRolls.value.some(r => !r.actualWeight || !r.actualWidth)
@@ -238,7 +251,10 @@ page { background-color: #f5f6f7; min-height: 100%; padding-bottom: 200rpx; }
 }
 .weight-bar.ok { background: #f0f9eb; color: #67c23a; }
 .weight-bar.err { background: #fef0f0; color: #f56c6c; }
+.weight-bar.warn { background: #fdf6ec; color: #e6a23c; }
 .weight-loss { font-weight: 600; }
+.loss-tip { margin: 0 24rpx 16rpx; font-size: 22rpx; color: #e6a23c; }
+.already-tip { display: flex; align-items: center; justify-content: center; gap: 8rpx; margin: 16rpx 24rpx; padding: 24rpx; background: #f0f9eb; border-radius: 12rpx; font-size: 26rpx; color: #67c23a; }
 
 .footer-bar {
   position: fixed; left: 0; right: 0; bottom: 0;

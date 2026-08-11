@@ -121,7 +121,7 @@
             </el-row>
             <el-row>
               <el-col :span="16">
-                <el-form-item label="生产工单" prop="workorderName">
+                <el-form-item label="生产工单" prop="workorderId">
                   <el-input v-model="form.workorderName" placeholder="请选择生产工单" readonly :disabled="optType === 'view'">
                     <template #append v-if="optType !== 'view'">
                       <el-button icon="Search" @click="handleWorkorderSelect" />

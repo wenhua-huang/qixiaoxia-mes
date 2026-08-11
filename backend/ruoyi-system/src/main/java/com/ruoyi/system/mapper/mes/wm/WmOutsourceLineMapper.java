@@ -14,7 +14,12 @@ public interface WmOutsourceLineMapper
 
     int insertIssueLine(WmOutsourceIssueLine line);
 
+    int deleteIssueLinesByOrderId(Long orderId);
+
     List<WmOutsourceRecptLine> selectRecptLinesByOrderId(Long orderId);
 
     int insertRecptLine(WmOutsourceRecptLine line);
+
+    /** 写回收货行批次信息（收货时生成成品批次后回写） */
+    int updateRecptLine(WmOutsourceRecptLine line);
 }

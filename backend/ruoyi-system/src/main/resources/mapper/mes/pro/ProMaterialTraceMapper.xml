@@ -48,6 +48,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                    WHEN 'FEEDBACK'       THEN CONCAT('报工 ', IFNULL(fb_p.feedback_code, CONCAT('#', t.parent_id)), IFNULL(CONCAT(' · ', fb_p.process_name),''))
                    WHEN 'WORKORDER'      THEN CONCAT('工单 ', IFNULL(wo_p.workorder_code, CONCAT('#', t.parent_id)), IFNULL(CONCAT(' · ', wo_p.product_name),''))
                    WHEN 'ROLL'           THEN CONCAT('纸卷 ', IFNULL(r_p.roll_code, CONCAT('#', t.parent_id)), IFNULL(CONCAT(' · ', r_p.item_name),''))
+                   WHEN 'OUTSOURCE_ORDER' THEN CONCAT('外协单 ', IFNULL(oo_p.order_code, CONCAT('#', t.parent_id)), IFNULL(CONCAT(' · ', oo_p.vendor_name), ''))
                    WHEN 'NONE'           THEN '无'
                    ELSE CONCAT(t.parent_type, ' #', t.parent_id)
                END AS parent_desc,
@@ -58,6 +59,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                    WHEN 'FEEDBACK'       THEN CONCAT('报工 ', IFNULL(fb_c.feedback_code, CONCAT('#', t.child_id)), IFNULL(CONCAT(' · ', fb_c.process_name),''))
                    WHEN 'WORKORDER'      THEN CONCAT('工单 ', IFNULL(wo_c.workorder_code, CONCAT('#', t.child_id)), IFNULL(CONCAT(' · ', wo_c.product_name),''))
                    WHEN 'ROLL'           THEN CONCAT('纸卷 ', IFNULL(r_c.roll_code, CONCAT('#', t.child_id)), IFNULL(CONCAT(' · ', r_c.item_name),''))
+                   WHEN 'OUTSOURCE_ORDER' THEN CONCAT('外协单 ', IFNULL(oo_c.order_code, CONCAT('#', t.child_id)), IFNULL(CONCAT(' · ', oo_c.vendor_name), ''))
                    WHEN 'SALES_OUT'      THEN CONCAT('销售单 #', t.child_id)
                    ELSE CONCAT(t.child_type, ' #', t.child_id)
                END AS child_desc,
@@ -73,12 +75,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         left join qxx_pro_feedback fb_p     on t.parent_type = 'FEEDBACK'       and fb_p.record_id = t.parent_id
         left join qxx_pro_workorder wo_p    on t.parent_type = 'WORKORDER'      and wo_p.workorder_id = t.parent_id
         left join qxx_wm_roll_detail r_p    on t.parent_type = 'ROLL'           and r_p.roll_id = t.parent_id
+        left join qxx_wm_outsource_order oo_p on t.parent_type = 'OUTSOURCE_ORDER' and oo_p.order_id = t.parent_id
         left join qxx_wm_material_stock ms_c on t.child_type = 'MATERIAL_STOCK' and ms_c.material_stock_id = t.child_id
         left join qxx_pro_card c_c          on t.child_type = 'CARD'            and c_c.card_id = t.child_id
         left join qxx_pro_workorder wo_c    on t.child_type = 'WORKORDER'       and wo_c.workorder_id = t.child_id
         left join qxx_md_vendor v_c         on t.child_type = 'VENDOR'          and v_c.vendor_id = t.child_id
         left join qxx_pro_feedback fb_c     on t.child_type = 'FEEDBACK'        and fb_c.record_id = t.child_id
         left join qxx_wm_roll_detail r_c    on t.child_type = 'ROLL'           and r_c.roll_id = t.child_id
+        left join qxx_wm_outsource_order oo_c on t.child_type = 'OUTSOURCE_ORDER' and oo_c.order_id = t.child_id
     </sql>
 
     <select id="selectProMaterialTraceList" parameterType="ProMaterialTrace" resultMap="ProMaterialTraceResult">

@@ -256,9 +256,9 @@
   function goClockHistory() {
     proxy.$tab.navigateTo('/pages/mes/pro/clock-history')
   }
-  // 分切作业入口
+  // 外协发料入口（按工单选外协工序+BOM发料，工厂员工用）
   function goSlittingCreate() {
-    proxy.$tab.navigateTo('/pages/mes/pro/slitting-create')
+    proxy.$tab.navigateTo('/pages/mes/wm/outsource-create')
   }
   function goSlittingList() {
     proxy.$tab.navigateTo('/pages/mes/pro/slitting-list')

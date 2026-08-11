@@ -44,9 +44,14 @@
         <result property="extAttrs" column="ext_attrs" />
         <result property="sourceRefType" column="source_ref_type" />
         <result property="sourceRefId" column="source_ref_id" />
+        <result property="produceDate" column="produce_date" />
+        <result property="expireDate" column="expire_date" />
+        <result property="lotNumber" column="lot_number" />
         <result property="remark" column="remark" />
         <result property="createBy" column="create_by" />
         <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
     </resultMap>
 
     <select id="selectIssueLinesByOrderId" parameterType="Long" resultMap="IssueLineResult">
@@ -78,6 +83,7 @@
             <if test="sourceRefId != null">source_ref_id,</if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null">create_by,</if>
+            create_time,
         </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="factoryId != null">#{factoryId},</if>
@@ -98,14 +104,21 @@
             <if test="sourceRefId != null">#{sourceRefId},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
+            NOW(),
         </trim>
     </insert>
+
+    <delete id="deleteIssueLinesByOrderId" parameterType="Long">
+        delete from qxx_wm_outsource_issue_line where order_id = #{orderId}
+    </delete>
 
     <select id="selectRecptLinesByOrderId" parameterType="Long" resultMap="RecptLineResult">
         select line_id, factory_id, order_id, item_id, item_code, item_name, specification,
                unit_of_measure, unit_name, quantity, batch_id, batch_code,
                warehouse_id, warehouse_code, warehouse_name,
-               ext_attrs, source_ref_type, source_ref_id, remark, create_by, create_time
+               ext_attrs, source_ref_type, source_ref_id,
+               produce_date, expire_date, lot_number,
+               remark, create_by, create_time, update_by, update_time
         from qxx_wm_outsource_recpt_line where order_id = #{orderId}
     </select>
 
@@ -129,8 +142,12 @@
             <if test="extAttrs != null">ext_attrs,</if>
             <if test="sourceRefType != null">source_ref_type,</if>
             <if test="sourceRefId != null">source_ref_id,</if>
+            <if test="produceDate != null">produce_date,</if>
+            <if test="expireDate != null">expire_date,</if>
+            <if test="lotNumber != null">lot_number,</if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null">create_by,</if>
+            create_time,
         </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="factoryId != null">#{factoryId},</if>
@@ -150,9 +167,27 @@
             <if test="extAttrs != null">#{extAttrs},</if>
             <if test="sourceRefType != null">#{sourceRefType},</if>
             <if test="sourceRefId != null">#{sourceRefId},</if>
+            <if test="produceDate != null">#{produceDate},</if>
+            <if test="expireDate != null">#{expireDate},</if>
+            <if test="lotNumber != null">#{lotNumber},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
+            NOW(),
         </trim>
     </insert>
+
+    <update id="updateRecptLine" parameterType="com.ruoyi.system.domain.mes.wm.WmOutsourceRecptLine">
+        update qxx_wm_outsource_recpt_line
+        <set>
+            <if test="batchId != null">batch_id = #{batchId},</if>
+            <if test="batchCode != null">batch_code = #{batchCode},</if>
+            <if test="produceDate != null">produce_date = #{produceDate},</if>
+            <if test="expireDate != null">expire_date = #{expireDate},</if>
+            <if test="lotNumber != null">lot_number = #{lotNumber},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            update_time = NOW(),
+        </set>
+        where line_id = #{lineId}
+    </update>
 
 </mapper>

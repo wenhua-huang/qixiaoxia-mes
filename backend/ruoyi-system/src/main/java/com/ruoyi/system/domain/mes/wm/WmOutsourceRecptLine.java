@@ -1,6 +1,8 @@
 package com.ruoyi.system.domain.mes.wm;
 
 import java.math.BigDecimal;
+import java.util.Date;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.domain.BaseEntity;
 
 /**
@@ -32,6 +34,14 @@ public class WmOutsourceRecptLine extends BaseEntity
     private String sourceRefType;
     /** 产出对象ID（如子卷 roll_id） */
     private Long sourceRefId;
+    /** 生产日期（厂商录入，用于生成独立成品批次） */
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private Date produceDate;
+    /** 有效期至 */
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private Date expireDate;
+    /** 生产批号 */
+    private String lotNumber;
 
     public Long getLineId() { return lineId; }
     public void setLineId(Long v) { this.lineId = v; }
@@ -69,4 +79,10 @@ public class WmOutsourceRecptLine extends BaseEntity
     public void setSourceRefType(String v) { this.sourceRefType = v; }
     public Long getSourceRefId() { return sourceRefId; }
     public void setSourceRefId(Long v) { this.sourceRefId = v; }
+    public Date getProduceDate() { return produceDate; }
+    public void setProduceDate(Date v) { this.produceDate = v; }
+    public Date getExpireDate() { return expireDate; }
+    public void setExpireDate(Date v) { this.expireDate = v; }
+    public String getLotNumber() { return lotNumber; }
+    public void setLotNumber(String v) { this.lotNumber = v; }
 }

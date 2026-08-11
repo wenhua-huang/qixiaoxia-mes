@@ -76,6 +76,9 @@ public class ProTask extends BaseEntity
     private Long snapshotId;
     private Integer ganttSort;
 
+    /** 该任务待审核(PREPARE)报工数（非持久化，由 feedbackEntry 回填，供前端展示状态） */
+    private Integer pendingFeedbackCount;
+
     public Long getTaskId() { return taskId; }
     public void setTaskId(Long v) { this.taskId = v; }
     public Long getFactoryId() { return factoryId; }
@@ -172,6 +175,9 @@ public class ProTask extends BaseEntity
     public void setSnapshotId(Long v) { this.snapshotId = v; }
     public Integer getGanttSort() { return ganttSort; }
     public void setGanttSort(Integer v) { this.ganttSort = v; }
+
+    public Integer getPendingFeedbackCount() { return pendingFeedbackCount; }
+    public void setPendingFeedbackCount(Integer v) { this.pendingFeedbackCount = v; }
 
     @Override
     public String toString() {

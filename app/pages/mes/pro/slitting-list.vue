@@ -75,7 +75,7 @@
 
 <script setup>
 import { ref, reactive, computed, getCurrentInstance } from 'vue'
-import { onLoad, onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
+import { onLoad, onShow, onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
 import { useUserStore } from '@/store'
 import { listSlitting } from '@/api/mes/pro/slitting'
 
@@ -131,13 +131,13 @@ function loadData() {
   }).catch(() => { loading.value = false })
 }
 
-onPullDownRefresh(() => {
+onPullDownRefresh(async () => {
   queryParams.pageNum = 1
-  loadData()
+  await loadData()
   uni.stopPullDownRefresh()
 })
 onReachBottom(() => {
-  if (loadMoreStatus.value === 'noMore') return
+  if (loading.value || loadMoreStatus.value === 'noMore' || loadMoreStatus.value === 'loading') return
   queryParams.pageNum++
   loadMoreStatus.value = 'loading'
   listSlitting(queryParams).then(res => {
@@ -157,8 +157,13 @@ function goReceive(item) {
   proxy.$tab.navigateTo('/pages/mes/pro/slitting-receive?slitId=' + item.slitId)
 }
 
-onLoad((options) => {
+onLoad(() => {
   // ?role=vendor 标记厂商视角，后端已自动按 vendorId 过滤
+})
+// 从详情/录结果/收货页返回时自动刷新列表
+onShow(() => {
+  queryParams.pageNum = 1
+  list.value = []
   loadData()
 })
 </script>

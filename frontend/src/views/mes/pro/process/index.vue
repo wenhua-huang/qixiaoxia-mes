@@ -54,11 +54,6 @@
           <el-button link @click="handleView(scope.row)" v-hasPermi="['mes:pro:process:query']">{{ scope.row.processName }}</el-button>
         </template>
       </el-table-column>
-      <el-table-column label="工序类型" align="center" prop="processType" width="100">
-        <template #default="scope">
-          <span>{{ processTypeMap[scope.row.processType] || scope.row.processType }}</span>
-        </template>
-      </el-table-column>
       <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
       <el-table-column label="创建时间" align="center" prop="createTime" width="160">
         <template #default="scope">
@@ -99,13 +94,6 @@
           <el-col :span="12">
             <el-form-item label="工序名称" prop="processName">
               <el-input v-model="form.processName" placeholder="请输入" :disabled="optType === 'view'" maxlength="255" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="工序类型" prop="processType">
-              <el-select v-model="form.processType" placeholder="请选择" style="width:100%" :disabled="optType === 'view'">
-                <el-option v-for="d in processTypeOptions" :key="d.value" :label="d.label" :value="d.value" />
-              </el-select>
             </el-form-item>
           </el-col>
         </el-row>
@@ -359,12 +347,6 @@ export default {
         { label: '是', value: '1' },
         { label: '否', value: '0' }
       ],
-      processTypeOptions: [
-        { label: '自制工序', value: 'INTERNAL' },
-        { label: '外发工序', value: 'OUTSOURCE' },
-        { label: '分切工序', value: 'SLITTING' }
-      ],
-      processTypeMap: { INTERNAL: '自制', OUTSOURCE: '外发', SLITTING: '分切' },
       queryParams: {
         pageNum: 1,
         pageSize: 10,
@@ -437,7 +419,6 @@ export default {
         processId: null,
         processCode: null,
         processName: null,
-        processType: 'INTERNAL',
         attention: null,
         enableFlag: '1',
         remark: null

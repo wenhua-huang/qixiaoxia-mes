@@ -2,6 +2,7 @@ package com.ruoyi.system.service.mes.wm.impl;
 
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.ruoyi.common.utils.DateUtils;
@@ -87,7 +88,14 @@ public class WmBatchServiceImpl implements IWmBatchService
         params.setBatchCode(code);
         params.setStatus("ACTIVE");
         params.setCreateTime(DateUtils.getNowDate());
-        wmBatchMapper.insertWmBatch(params);
+        try {
+            wmBatchMapper.insertWmBatch(params);
+        } catch (DuplicateKeyException dup) {
+            // 并发：另一事务已插入相同 (item,vendor,date,lot) 批次，重查返回已存在的
+            WmBatch concurrent = wmBatchMapper.selectBatchByAttributes(params);
+            if (concurrent != null) return concurrent;
+            throw dup;
+        }
         return params;
     }
 }

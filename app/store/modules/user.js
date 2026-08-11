@@ -101,6 +101,12 @@ export const useUserStore = defineStore('user', () => {
         SET_TOKEN('')
         SET_ROLES([])
         SET_PERMISSIONS([])
+        // 同步清空内存中的用户/厂商绑定（storage.clean 只清持久化，ref 不会重置），
+        // 否则退出后切换账号仍会残留上一个厂商的 vendorId，导致列表/权限错串
+        SET_VENDOR_ID(null)
+        SET_ID('')
+        SET_NAME('')
+        SET_AVATAR('')
         removeToken()
         storage.clean()
         resolve()

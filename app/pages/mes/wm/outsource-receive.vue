@@ -42,10 +42,13 @@
       </view>
 
       <!-- 底部提交 -->
-      <view class="footer-bar">
+      <view v-if="canReceive" class="footer-bar">
         <button class="cu-btn bg-green lg" :disabled="submitting" @click="submit">
           {{ submitting ? '提交中...' : '确认收货' }}
         </button>
+      </view>
+      <view v-else class="footer-bar readonly-tip">
+        <text>当前状态（{{ statusText(record.status) }}）不可收货，需厂商发货后才能操作</text>
       </view>
     </template>
   </view>
@@ -62,15 +65,25 @@ const loading = ref(true)
 const submitting = ref(false)
 
 const firstUnit = computed(() => (record.value?.recptLines || [])[0]?.unitName || '吨')
+const canReceive = computed(() => record.value?.status === 'SHIPPED')
 
-const STATUS_MAP = { ISSUED: '已发料', PROCESSING: '加工中', RECEIVED: '已收货' }
+const STATUS_MAP = { DRAFT: '草稿', ISSUED: '已发料', VENDOR_RCVD: '厂商已收', PROCESSING: '加工中', FINISHED: '加工完成', SHIPPED: '已发货', RECEIVED: '已收货', CLOSED: '已关闭' }
 function statusText(s) { return STATUS_MAP[s] || s || '' }
 function statusTagType(s) {
-  const m = { ISSUED: 'warning', PROCESSING: 'primary', RECEIVED: 'success' }
+  const m = { DRAFT: 'info', ISSUED: 'warning', VENDOR_RCVD: 'warning', PROCESSING: 'primary', FINISHED: 'primary', SHIPPED: 'primary', RECEIVED: 'success', CLOSED: 'success' }
   return m[s] || 'default'
 }
 
 async function submit() {
+  if (!canReceive.value) { proxy.$modal.msgError('当前状态不可收货'); return }
+  const confirmed = await new Promise(resolve => {
+    uni.showModal({
+      title: '确认收货',
+      content: '确认将该外协物料收货入库？收货后单据将关闭，不可修改。',
+      success: r => resolve(r.confirm)
+    })
+  })
+  if (!confirmed) return
   submitting.value = true
   try {
     await receiveOutsource(record.value.orderId)
@@ -111,4 +124,5 @@ page { background-color: #f5f6f7; min-height: 100%; padding-bottom: 200rpx; }
 .cu-btn.lg { width: 100%; font-size: 30rpx; height: 88rpx; line-height: 88rpx; }
 .bg-green { background: #67c23a; color: #fff; }
 .cu-btn[disabled] { opacity: 0.5; }
+.readonly-tip { text-align: center; color: #999; font-size: 26rpx; padding: 24rpx; }
 </style>

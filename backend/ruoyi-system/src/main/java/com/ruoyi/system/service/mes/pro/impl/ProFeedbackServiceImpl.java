@@ -2,6 +2,7 @@ package com.ruoyi.system.service.mes.pro.impl;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -12,10 +13,14 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.core.redis.RedisLockTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.stereotype.Service;
+import jakarta.annotation.PostConstruct;
 import com.ruoyi.system.mapper.mes.pro.ProFeedbackMapper;
 import com.ruoyi.system.mapper.mes.pro.ProTaskMapper;
 import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
@@ -55,7 +60,19 @@ import com.ruoyi.system.service.mes.pro.IProWorkorderDocService;
 @Service
 public class ProFeedbackServiceImpl implements IProFeedbackService {
 
+    /** 工序编码：纸张分切（厂内分切工序，产出半成品由 SlittingService 处理库存，不报工入库） */
+    private static final String PROCESS_CODE_SLIT = "PRC-SLIT";
+
     @Autowired private RedisLockTemplate lockTemplate;
+    @Autowired private PlatformTransactionManager transactionManager;
+    @Autowired(required = false) private com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator autoCodeGenerator;
+    private TransactionTemplate txTemplate;
+
+    @PostConstruct
+    void initTx() {
+        this.txTemplate = new TransactionTemplate(transactionManager);
+        this.txTemplate.setTimeout(30);
+    }
     @Autowired private ProFeedbackMapper qxxProFeedbackMapper;
     @Autowired private ProFeedbackConsumeMapper consumeMapper;
     @Autowired private ProFeedbackParamMapper feedbackParamMapper;
@@ -110,13 +127,17 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
                     if (fb.getItemId() == null) fb.setItemId(wo.getProductId());
                     if (fb.getItemName() == null) fb.setItemName(wo.getProductName());
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                throw new ServiceException("加载工单信息失败: " + e.getMessage());
+            }
         }
         if (fb.getProcessId() != null && fb.getProcessCode() == null) {
             try {
                 ProProcess proc = proProcessMapper.selectProProcessByProcessId(fb.getProcessId());
                 if (proc != null && fb.getProcessCode() == null) fb.setProcessCode(proc.getProcessCode());
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                throw new ServiceException("加载工序信息失败: " + e.getMessage());
+            }
         }
         if (fb.getTaskId() != null) {
             try {
@@ -139,7 +160,9 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
                     if (fb.getUnitOfMeasure() == null) fb.setUnitOfMeasure(task.getUnitOfMeasure());
                     if (fb.getUnitName() == null) fb.setUnitName(task.getUnitName());
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                throw new ServiceException("加载任务信息失败: " + e.getMessage());
+            }
         }
         if (fb.getItemId() != null && fb.getItemCode() == null) {
             try {
@@ -151,13 +174,14 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
                     if (fb.getUnitName() == null) fb.setUnitName(item.getUnitName());
                     if (fb.getSpecification() == null) fb.setSpecification(item.getSpecification());
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                throw new ServiceException("加载物料信息失败: " + e.getMessage());
+            }
         }
-        if (fb.getItemCode() == null || fb.getItemCode().isEmpty()) fb.setItemCode("-");
-        if (fb.getWorkorderCode() == null || fb.getWorkorderCode().isEmpty()) fb.setWorkorderCode("-");
-        if (fb.getProcessCode() == null || fb.getProcessCode().isEmpty()) fb.setProcessCode("-");
-        if (fb.getTaskCode() == null || fb.getTaskCode().isEmpty()) fb.setTaskCode("-");
-        if (fb.getUnitOfMeasure() == null || fb.getUnitOfMeasure().isEmpty()) fb.setUnitOfMeasure("PCS");
+        // 单位兜底（不破坏追溯：不存 "-"，仅数量类字段兜底为 0）
+        if (fb.getUnitOfMeasure() == null || fb.getUnitOfMeasure().isEmpty()) {
+            fb.setUnitOfMeasure(ProConstants.DEFAULT_UNIT);
+        }
         if (fb.getQuantity() == null) fb.setQuantity(BigDecimal.ZERO);
         if (fb.getQuantityFeedback() == null) fb.setQuantityFeedback(BigDecimal.ZERO);
         if (fb.getQuantityQualified() == null) fb.setQuantityQualified(BigDecimal.ZERO);
@@ -168,13 +192,55 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
         if (fb.getQuantityOtherScrap() == null) fb.setQuantityOtherScrap(BigDecimal.ZERO);
     }
 
+    /**
+     * 生成或校验报工编码：优先用 AutoCodeGenerator；失败/未配置则用 "FB"+yyyyMMddHHmmss+4位随机。
+     * DB 唯一约束 uk_feedback_code 是最终防线，冲突时抛 ServiceException。
+     */
+    private void ensureFeedbackCode(ProFeedback fb) {
+        if (fb.getFeedbackCode() != null && !fb.getFeedbackCode().isEmpty()) return;
+        if (autoCodeGenerator != null) {
+            try {
+                String code = autoCodeGenerator.genSerialCode("FEEDBACK_CODE", null);
+                if (code != null && !code.isEmpty()) {
+                    fb.setFeedbackCode(code);
+                    return;
+                }
+            } catch (Exception ignored) { /* fall through to timestamp */ }
+        }
+        // 时间戳 + 4 位随机数，同毫秒并发也极低概率碰撞（DB 唯一约束兜底）
+        String ts = new java.text.SimpleDateFormat("yyyyMMddHHmmssSSS").format(new Date());
+        int rand = (int) (Math.random() * 10000);
+        fb.setFeedbackCode("FB" + ts + String.format("%04d", rand));
+    }
+
     @Override
-    @Transactional
     public int insertProFeedback(ProFeedback proFeedback) {
+        // 先锁后事务：按流转卡(或工单)加分布式锁，防止两人同时报同卡首工序双写
+        Long lockScopeId = proFeedback.getCardId() != null
+                ? proFeedback.getCardId() : proFeedback.getWorkorderId();
+        if (lockScopeId == null) {
+            try {
+                return txTemplate.execute(status -> doInsertProFeedback(proFeedback));
+            } catch (DuplicateKeyException dup) {
+                throw new ServiceException("报工编码已存在，请刷新重试");
+            }
+        }
+        String lockKey = "pro:feedback:insert:" + lockScopeId;
+        try {
+            return lockTemplate.executeWithResult(lockKey, 10,
+                    () -> txTemplate.execute(status -> doInsertProFeedback(proFeedback)));
+        } catch (DuplicateKeyException dup) {
+            throw new ServiceException("报工编码已存在，请刷新重试");
+        }
+    }
+
+    private int doInsertProFeedback(ProFeedback proFeedback) {
         proFeedback.setCreateTime(DateUtils.getNowDate());
         proFeedback.setCreateBy(SecurityUtils.getUsername());
         if (proFeedback.getStatus() == null) proFeedback.setStatus("PREPARE");
         if (proFeedback.getFeedbackTime() == null) proFeedback.setFeedbackTime(DateUtils.getNowDate());
+        // 报工编码：服务端权威生成（DB 唯一约束兜底）
+        ensureFeedbackCode(proFeedback);
         // 自动填充报工人（当前登录用户），前端不传时由后端兜底
         if (proFeedback.getUserName() == null || proFeedback.getUserName().isEmpty()) {
             proFeedback.setUserName(SecurityUtils.getUsername());
@@ -183,14 +249,21 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
             } catch (Exception ignored) {}
         }
         autoFillCodes(proFeedback);
+        // 外协工序(is_outsource=1)禁止内部报工：走外协收货回写，避免厂内重复报工
+        if ("INTERNAL".equals(proFeedback.getFeedbackType())
+                && isOutsourceRouteProcess(proFeedback.getRouteId(), proFeedback.getProcessId())) {
+            throw new ServiceException("该工序为外发工序，不可内部报工，请走外协收货回写");
+        }
         // 自动关联流转卡：用户没传 cardId 时，按工单查活跃卡取第一张
         if (proFeedback.getCardId() == null && proFeedback.getWorkorderId() != null) {
             proFeedback.setCardId(resolveActiveCardId(proFeedback.getWorkorderId()));
         }
+        // 工序顺序校验：严格串行推进，拦跳序+拦倒序（仅纯串行 SS 路线生效）
+        validateProcessSequence(proFeedback.getCardId(), proFeedback.getRouteId(), proFeedback.getProcessId());
         // 物料消耗默认值：若未传 consumeList 但有工单ID，从工单BOM自动填充
         if ((proFeedback.getConsumeList() == null || proFeedback.getConsumeList().isEmpty())
                 && proFeedback.getWorkorderId() != null) {
-            proFeedback.setConsumeList(buildConsumeFromBom(proFeedback.getWorkorderId()));
+            proFeedback.setConsumeList(getDefaultConsume(proFeedback.getWorkorderId()));
         }
         int rows = qxxProFeedbackMapper.insertProFeedback(proFeedback);
         // 持久化物料消耗
@@ -254,11 +327,11 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
     }
 
     /** 从工单BOM构建默认物料消耗列表，batch_code 反查该工单最近领料的真实批次 */
-    private List<ProFeedbackConsume> buildConsumeFromBom(Long workorderId) {
+    @Override
+    public List<ProFeedbackConsume> getDefaultConsume(Long workorderId) {
         try {
             List<ProWorkorderBom> boms = proWorkorderBomMapper.selectProWorkorderBomByWorkorderId(workorderId);
-            if (boms == null || boms.isEmpty()) return null;
-            // 预查该工单所有领料明细（按 detail_id desc，取最近的批次）
+            if (boms == null || boms.isEmpty()) return new ArrayList<>();
             Map<Long, String> itemBatchMap = loadLatestIssueBatchByWorkorder(workorderId);
             return boms.stream().map(bom -> {
                 ProFeedbackConsume c = new ProFeedbackConsume();
@@ -271,31 +344,32 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
                 return c;
             }).collect(java.util.stream.Collectors.toList());
         } catch (Exception e) {
-            return null;
+            log.warn("构建工单默认物料消耗失败, workorderId={}", workorderId, e);
+            return new ArrayList<>();
         }
     }
 
     /**
      * 加载工单下各物料最近一次领料的批次号（workorder→issue_header→issue_detail）。
+     * 一次批量查明细，消除 N+1。
      * @return itemId → batchCode 映射
      */
     private Map<Long, String> loadLatestIssueBatchByWorkorder(Long workorderId) {
-        Map<Long, String> result = new java.util.HashMap<>();
+        Map<Long, String> result = new HashMap<>();
         try {
             com.ruoyi.system.domain.mes.wm.WmIssueHeader hq = new com.ruoyi.system.domain.mes.wm.WmIssueHeader();
             hq.setWorkorderId(workorderId);
             List<com.ruoyi.system.domain.mes.wm.WmIssueHeader> headers = wmIssueHeaderMapper.selectWmIssueHeaderList(hq);
             if (headers == null || headers.isEmpty()) return result;
-            for (com.ruoyi.system.domain.mes.wm.WmIssueHeader h : headers) {
-                com.ruoyi.system.domain.mes.wm.WmIssueDetail dq = new com.ruoyi.system.domain.mes.wm.WmIssueDetail();
-                dq.setIssueId(h.getIssueId());
-                List<com.ruoyi.system.domain.mes.wm.WmIssueDetail> details = wmIssueDetailMapper.selectWmIssueDetailList(dq);
-                if (details == null) continue;
-                for (com.ruoyi.system.domain.mes.wm.WmIssueDetail d : details) {
-                    // detail_id desc 已排序，putIfAbsent 保留最近（最大 detail_id）的批次
-                    if (d.getItemId() != null && d.getBatchCode() != null && !d.getBatchCode().isEmpty()) {
-                        result.putIfAbsent(d.getItemId(), d.getBatchCode());
-                    }
+            List<Long> issueIds = new ArrayList<>();
+            for (com.ruoyi.system.domain.mes.wm.WmIssueHeader h : headers) issueIds.add(h.getIssueId());
+            // 一次批量查明细（按 detail_id desc 排序）
+            List<com.ruoyi.system.domain.mes.wm.WmIssueDetail> all = wmIssueDetailMapper.selectByIssueIds(issueIds);
+            if (all == null) return result;
+            for (com.ruoyi.system.domain.mes.wm.WmIssueDetail d : all) {
+                // 已按 detail_id desc 排序，putIfAbsent 保留最近（最大 detail_id）的批次
+                if (d.getItemId() != null && d.getBatchCode() != null && !d.getBatchCode().isEmpty()) {
+                    result.putIfAbsent(d.getItemId(), d.getBatchCode());
                 }
             }
         } catch (Exception e) {
@@ -322,9 +396,10 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
 
     /**
      * 写入工序追溯：每道工序报工都写一条 CARD→FEEDBACK 边，保证全工序可追溯。
-     * trace_type 统一策略（不硬编码 process_type 映射，适配工序类型可扩展）：
+     * trace_type 统一策略：
      *   - 末工序 = PRODUCE（成品产出）
-     *   - 外协工序 = OUTSOURCE_PROCESS
+     *   - 外协工序 = OUTSOURCE_PROCESS（看路线工序 is_outsource，非工序类型）
+     *   - 分切工序 = SLIT（按工序编码 PRC-SLIT 判定）
      *   - 其余工序 = PROCESS
      * parent=CARD（投料/产出的枢纽），child=报工记录（工序产出标识）。
      */
@@ -337,9 +412,9 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
             String traceType;
             if (isLast) {
                 traceType = "PRODUCE";
-            } else if (proc != null && "OUTSOURCE".equals(proc.getProcessType())) {
+            } else if (fb.getRouteId() != null && isOutsourceRouteProcess(fb.getRouteId(), fb.getProcessId())) {
                 traceType = "OUTSOURCE_PROCESS";
-            } else if (proc != null && "SLITTING".equals(proc.getProcessType())) {
+            } else if (proc != null && PROCESS_CODE_SLIT.equals(proc.getProcessCode())) {
                 traceType = "SLIT";
             } else {
                 traceType = "PROCESS";
@@ -408,75 +483,77 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ProFeedbackServiceImpl.class);
 
     @Override
-    @Transactional
     public void auditFeedback(Long recordId) {
-        // Redis 分布式锁 + DB 行级锁，双重防并发重复审核
-        lockTemplate.execute("feedback:audit:" + recordId, () -> {
-            ProFeedback fb = qxxProFeedbackMapper.selectProFeedbackByRecordIdForUpdate(recordId);
-            if (fb == null) throw new ServiceException("报工记录不存在");
-            if (!"CONFIRMED".equals(fb.getStatus())) throw new ServiceException("只有已确认状态的报工才能审核");
+        // 先锁后事务：Redis 锁在外、DB 事务在内，避免等锁期间长占 DB 连接
+        lockTemplate.execute("feedback:audit:" + recordId, () ->
+            txTemplate.execute(status -> {
+                ProFeedback fb = qxxProFeedbackMapper.selectProFeedbackByRecordIdForUpdate(recordId);
+                if (fb == null) throw new ServiceException("报工记录不存在");
+                if (!"CONFIRMED".equals(fb.getStatus())) throw new ServiceException("只有已确认状态的报工才能审核");
 
-            // 更新报工状态
-            fb.setStatus("AUDITED");
-            fb.setUpdateTime(DateUtils.getNowDate());
-            fb.setUpdateBy(SecurityUtils.getUsername());
-            qxxProFeedbackMapper.updateProFeedback(fb);
+                // 更新报工状态
+                fb.setStatus("AUDITED");
+                fb.setUpdateTime(DateUtils.getNowDate());
+                fb.setUpdateBy(SecurityUtils.getUsername());
+                qxxProFeedbackMapper.updateProFeedback(fb);
 
-            // 增量更新排产任务已生产数量
-            if (fb.getTaskId() != null) {
-                BigDecimal deltaProduced = nvl(fb.getQuantityFeedback());
-                BigDecimal deltaQualified = nvl(fb.getQuantityQualified());
-                BigDecimal deltaUnqualified = nvl(fb.getQuantityUnqualified());
-                proTaskMapper.addQuantityProduced(fb.getTaskId(), deltaProduced, deltaQualified, deltaUnqualified);
-                // 任务已生产 ≥ 计划量 → 自动标记 COMPLETED（否则任务永远停在 PRODUCING）
-                tryAutoCompleteTask(fb.getTaskId());
-            }
-
-            // 增量更新生产工单已生产数量（末工序法：仅工艺路线最后一道工序报工才累加，避免多工序重复计数）
-            if (fb.getWorkorderId() != null) {
-                BigDecimal deltaProduced = nvl(fb.getQuantityFeedback());
-                if (fb.getRouteId() != null && fb.getProcessId() != null) {
-                    // 查工序类型（用于判断分切工序：分切不触发产品入库，库存由 SlittingService 处理）
-                    ProProcess proc = proProcessMapper.selectProProcessByProcessId(fb.getProcessId());
-                    boolean isSlitting = proc != null && "SLITTING".equals(proc.getProcessType());
-                    // 有工艺路线信息：仅末工序报工才更新工单已生产数
-                    if (isLastProcessOfRoute(fb.getRouteId(), fb.getProcessId())) {
-                        // 【Fix #1/#2/#4】末工序场景：quantity_produced 更新 + 完工判定 都在外层本事务完成，
-                        // 与单据生成 (REQUIRES_NEW) 解耦 -- 单据失败回滚不影响 quantity_produced / 审核提交。
-                        proWorkorderMapper.addQuantityProduced(fb.getWorkorderId(), deltaProduced);
-                        // 完工判定先于单据生成：若 autoComplete 失败，外层事务整体回滚，避免
-                        // REQUIRES_NEW 已提交的入库单成孤儿 (autoComplete 失败时 onFeedbackAudited 未执行)。
-                        proWorkorderDocService.autoCompleteWorkorderIfQualified(fb.getWorkorderId());
-                        // 分切工序不生成产品入库单（产出是半成品原料，库存由 SlittingService 的 SPLIT/ITEM_RECPT 事务处理）
-                        if (!isSlitting) {
-                            // 【Fix REQUIRES_NEW 可见性】同事务重读 workorder 拿到 addQuantityProduced 后的
-                            // quantity_produced（InnoDB 同事务内可见自己未提交的写），传给 onFeedbackAudited。
-                            // 不传的话 REQUIRES_NEW 子事务在 MySQL REPEATABLE READ 下读到的是旧值（produced=0），
-                            // 会导致 qtyToRecpt=min(合格数, produced-alreadyRecpt)=0，跳过入库单生成。
-                            ProWorkorder woAfter = proWorkorderMapper.selectProWorkorderByWorkorderId(fb.getWorkorderId());
-                            BigDecimal producedAfter = woAfter != null && woAfter.getQuantityProduced() != null
-                                    ? woAfter.getQuantityProduced() : BigDecimal.ZERO;
-                            // 末工序报工审核后：自动生成入库单 + 退料单 (独立事务, 失败不影响审核)
-                            try {
-                                proWorkorderDocService.onFeedbackAudited(recordId, producedAfter);
-                            } catch (Exception e) {
-                                // 单据生成失败：审核仍提交，用户需手动补录入库单
-                                log.warn("自动生成入库单/退料单失败, 需手动补录. feedbackId={}, workorderId={}, err={}",
-                                        recordId, fb.getWorkorderId(), e.getMessage());
-                            }
-                        }
-                        // 推进流转卡：末工序完工 -> 卡置 COMPLETED
-                        advanceCardStatus(fb, true);
-                    } else {
-                        // 中间工序报工审核 -> 更新流转卡当前工序（status 保持 ACTIVE）
-                        advanceCardStatus(fb, false);
-                    }
-                } else {
-                    // 无工艺路线信息（直接从工单报工，不绑定具体工序）：保持原有逻辑
-                    proWorkorderMapper.addQuantityProduced(fb.getWorkorderId(), deltaProduced);
+                // 增量更新排产任务已生产数量
+                if (fb.getTaskId() != null) {
+                    BigDecimal deltaProduced = nvl(fb.getQuantityFeedback());
+                    BigDecimal deltaQualified = nvl(fb.getQuantityQualified());
+                    BigDecimal deltaUnqualified = nvl(fb.getQuantityUnqualified());
+                    proTaskMapper.addQuantityProduced(fb.getTaskId(), deltaProduced, deltaQualified, deltaUnqualified);
+                    // 任务已生产 ≥ 计划量 → 自动标记 COMPLETED（否则任务永远停在 PRODUCING）
+                    tryAutoCompleteTask(fb.getTaskId());
                 }
-            }
-        });
+
+                // 增量更新生产工单已生产数量（末工序法：仅工艺路线最后一道工序报工才累加，避免多工序重复计数）
+                if (fb.getWorkorderId() != null) {
+                    BigDecimal deltaProduced = nvl(fb.getQuantityFeedback());
+                    if (fb.getRouteId() != null && fb.getProcessId() != null) {
+                        // 查工序编码（用于判断分切工序：分切不触发产品入库，库存由 SlittingService 处理）
+                        ProProcess proc = proProcessMapper.selectProProcessByProcessId(fb.getProcessId());
+                        boolean isSlitting = proc != null && PROCESS_CODE_SLIT.equals(proc.getProcessCode());
+                        // 有工艺路线信息：仅末工序报工才更新工单已生产数
+                        if (isLastProcessOfRoute(fb.getRouteId(), fb.getProcessId())) {
+                            // 【Fix #1/#2/#4】末工序场景：quantity_produced 更新 + 完工判定 都在外层本事务完成，
+                            // 与单据生成 (REQUIRES_NEW) 解耦 -- 单据失败回滚不影响 quantity_produced / 审核提交。
+                            proWorkorderMapper.addQuantityProduced(fb.getWorkorderId(), deltaProduced);
+                            // 完工判定先于单据生成：若 autoComplete 失败，外层事务整体回滚，避免
+                            // REQUIRES_NEW 已提交的入库单成孤儿 (autoComplete 失败时 onFeedbackAudited 未执行)。
+                            proWorkorderDocService.autoCompleteWorkorderIfQualified(fb.getWorkorderId());
+                            // 分切工序不生成产品入库单（产出是半成品原料，库存由 SlittingService 的 SPLIT/ITEM_RECPT 事务处理）
+                            if (!isSlitting) {
+                                // 【Fix REQUIRES_NEW 可见性】同事务重读 workorder 拿到 addQuantityProduced 后的
+                                // quantity_produced（InnoDB 同事务内可见自己未提交的写），传给 onFeedbackAudited。
+                                // 不传的话 REQUIRES_NEW 子事务在 MySQL REPEATABLE READ 下读到的是旧值（produced=0），
+                                // 会导致 qtyToRecpt=min(合格数, produced-alreadyRecpt)=0，跳过入库单生成。
+                                ProWorkorder woAfter = proWorkorderMapper.selectProWorkorderByWorkorderId(fb.getWorkorderId());
+                                BigDecimal producedAfter = woAfter != null && woAfter.getQuantityProduced() != null
+                                        ? woAfter.getQuantityProduced() : BigDecimal.ZERO;
+                                // 末工序报工审核后：自动生成入库单 + 退料单 (独立事务, 失败不影响审核)
+                                try {
+                                    proWorkorderDocService.onFeedbackAudited(recordId, producedAfter);
+                                } catch (Exception e) {
+                                    // 单据生成失败：审核仍提交，用户需手动补录入库单
+                                    log.warn("自动生成入库单/退料单失败, 需手动补录. feedbackId={}, workorderId={}, err={}",
+                                            recordId, fb.getWorkorderId(), e.getMessage());
+                                }
+                            }
+                            // 推进流转卡：末工序完工 -> 卡置 COMPLETED
+                            advanceCardStatus(fb, true);
+                        } else {
+                            // 中间工序报工审核 -> 更新流转卡当前工序（status 保持 ACTIVE）
+                            advanceCardStatus(fb, false);
+                        }
+                    } else {
+                        // 无工艺路线信息（直接从工单报工，不绑定具体工序）：保持原有逻辑
+                        proWorkorderMapper.addQuantityProduced(fb.getWorkorderId(), deltaProduced);
+                    }
+                }
+                return null;
+            })
+        );
     }
 
     /**
@@ -491,9 +568,9 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
             cardUpd.setCurrentProcessId(fb.getProcessId());
             cardUpd.setCurrentProcessName(fb.getProcessName());
             if (isLastProcess) {
-                // 末工序完工判定：累计审核合格量 >= 计划量才置 COMPLETED（对齐 autoCompleteWorkorderIfQualified 的工单完工逻辑）
-                // 避免多批次末工序审核时，首批就把卡误判完工（破坏 resolveActiveCardId 的 ACTIVE 过滤 + 状态一致性）
-                ProCard card = proCardMapper.selectProCardByCardId(fb.getCardId());
+                // 末工序完工判定：SELECT ... FOR UPDATE 锁卡行直到事务提交，
+                // 串行化同卡多条末次报工的并发审核，避免都读到 produced < planned
+                ProCard card = proCardMapper.selectProCardByCardIdForUpdate(fb.getCardId());
                 if (card != null) {
                     BigDecimal produced = nvl(qxxProFeedbackMapper.sumAuditedQualifiedByCardAndProcess(
                             fb.getCardId(), fb.getProcessId()));
@@ -519,6 +596,86 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
     private boolean isLastProcessOfRoute(Long routeId, Long processId) {
         ProRouteProcess lastProcess = proRouteProcessMapper.selectLastProcessByRouteId(routeId);
         return lastProcess != null && lastProcess.getProcessId().equals(processId);
+    }
+
+    /**
+     * 判断路线工序节点是否为外协工序（V102 后外发判定读 route_process.is_outsource，不再读 process_type）。
+     * 同一道工序在不同路线可能内做也可能外发，故按 routeId+processId 精确定位节点。
+     */
+    private boolean isOutsourceRouteProcess(Long routeId, Long processId) {
+        if (routeId == null || processId == null) return false;
+        List<ProRouteProcess> nodes = proRouteProcessMapper.selectProRouteProcessByRouteId(routeId);
+        if (nodes == null) return false;
+        return nodes.stream().filter(n -> processId.equals(n.getProcessId()))
+                .anyMatch(n -> "1".equals(n.getIsOutsource()));
+    }
+
+    /**
+     * 工序顺序校验：严格串行推进，拦跳序+拦倒序（仅纯串行 SS 路线生效）。
+     * 进度位置 = max(流转卡 currentProcessId 位置, 最后已报工位置)。报工工序必须 ≤ 进度+1。
+     * currentProcessId 只在审核时更新，未审核报工靠 getLastReportedPos 兜底。
+     * 含并行工序(FS)的路线无法用单值追踪，整体放行。
+     */
+    private void validateProcessSequence(Long cardId, Long routeId, Long processId) {
+        if (cardId == null || routeId == null || processId == null) return;
+        List<ProRouteProcess> rps = proRouteProcessMapper.selectProRouteProcessByRouteId(routeId);
+        if (rps == null || rps.isEmpty()) return;
+        // 含并行工序的路线无法用单值 currentProcessId 追踪，整体放行
+        boolean hasParallel = rps.stream().anyMatch(rp -> ProConstants.LINK_TYPE_FS.equals(rp.getLinkType()));
+        if (hasParallel) return;
+        // processId → 列表位置（列表已按 order_num asc 排序）
+        Map<Long, Integer> posById = new HashMap<>();
+        for (int i = 0; i < rps.size(); i++) posById.put(rps.get(i).getProcessId(), i);
+        Integer reportPos = posById.get(processId);
+        if (reportPos == null) return; // 工序不在路线中，无法判定，放行
+        ProCard card = proCardMapper.selectProCardByCardId(cardId);
+        if (card == null) return;
+        // 进度位置：流转卡推进位置（审核后更新）与最后报工位置（含未审核）取最大值
+        int effectivePos = -1;
+        if (card.getCurrentProcessId() != null) {
+            Integer currentPos = posById.get(card.getCurrentProcessId());
+            if (currentPos != null) effectivePos = currentPos;
+        }
+        effectivePos = Math.max(effectivePos, getLastReportedPos(cardId, posById));
+        if (effectivePos < 0) {
+            // 新卡（无推进、无报工）：只能从首道工序开始
+            if (reportPos != 0) {
+                throw new ServiceException("流转卡尚未开工，首道工序为[" + orderLabel(rps.get(0)) + "]，请先报首道");
+            }
+            return;
+        }
+        if (reportPos <= effectivePos) return; // 同工序/倒序多批次报工，合法
+        if (reportPos > effectivePos + 1) {
+            String nextLabel = effectivePos + 1 < rps.size() ? orderLabel(rps.get(effectivePos + 1)) : "未知";
+            throw new ServiceException("跳序报工：当前进度为[" + orderLabel(rps.get(effectivePos)) + "]，下一道应为["
+                    + nextLabel + "]，不可直接跳至[" + orderLabel(rps.get(reportPos)) + "]");
+        }
+        // reportPos == effectivePos + 1：正常推进，放行
+    }
+
+    /**
+     * 查该流转卡下报工记录（含未审核）中工序位置的最大值。
+     * 用于工序顺序校验兜底：currentProcessId 只在审核后推进，未审核报工靠此补全。
+     */
+    private int getLastReportedPos(Long cardId, Map<Long, Integer> posById) {
+        try {
+            List<Long> processIds = qxxProFeedbackMapper.selectProcessIdsByCardId(cardId);
+            if (processIds == null || processIds.isEmpty()) return -1;
+            int maxPos = -1;
+            for (Long pid : processIds) {
+                Integer pos = pid != null ? posById.get(pid) : null;
+                if (pos != null && pos > maxPos) maxPos = pos;
+            }
+            return maxPos;
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
+    /** 工序标签：orderNum + processName，用于报错提示 */
+    private String orderLabel(ProRouteProcess rp) {
+        if (rp == null) return "未知工序";
+        return (rp.getOrderNum() != null ? rp.getOrderNum() + " " : "") + (rp.getProcessName() != null ? rp.getProcessName() : "");
     }
 
     @Override
@@ -595,5 +752,17 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
     @Override
     public Map<String, Object> batchAuditFeedback(Long[] recordIds) {
         return executeBatch(recordIds, self::auditFeedback);
+    }
+
+    @Override
+    public Map<Long, Integer> countPendingByTaskIds(Collection<Long> taskIds) {
+        Map<Long, Integer> countMap = new HashMap<>();
+        if (taskIds == null || taskIds.isEmpty()) return countMap;
+        List<Long> pendingTaskIds = qxxProFeedbackMapper.selectPendingTaskIds(taskIds);
+        if (pendingTaskIds == null) return countMap;
+        for (Long tid : pendingTaskIds) {
+            countMap.merge(tid, 1, Integer::sum);
+        }
+        return countMap;
     }
 }

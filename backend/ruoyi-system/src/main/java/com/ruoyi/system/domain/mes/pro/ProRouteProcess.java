@@ -38,10 +38,6 @@ public class ProRouteProcess extends BaseEntity
     @Excel(name = "工序名称")
     private String processName;
 
-    /** 工序类型 */
-    @Excel(name = "工序类型")
-    private String processType;
-
     /** 工序序号 */
     @Excel(name = "工序序号")
     private Integer orderNum;
@@ -160,16 +156,6 @@ public class ProRouteProcess extends BaseEntity
     public String getProcessName()
     {
         return processName;
-    }
-
-    public void setProcessType(String processType)
-    {
-        this.processType = processType;
-    }
-
-    public String getProcessType()
-    {
-        return processType;
     }
 
     public void setOrderNum(Integer orderNum)
@@ -331,7 +317,6 @@ public class ProRouteProcess extends BaseEntity
             .append("processId", getProcessId())
             .append("processCode", getProcessCode())
             .append("processName", getProcessName())
-            .append("processType", getProcessType())
             .append("orderNum", getOrderNum())
             .append("nextProcessId", getNextProcessId())
             .append("nextProcessCode", getNextProcessCode())

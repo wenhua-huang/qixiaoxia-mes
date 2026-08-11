@@ -183,6 +183,16 @@
       "enablePullDownRefresh": true
     }
   }, {
+    "path": "pages/mes/wm/outsource-create",
+    "style": {
+      "navigationBarTitleText": "外协发料"
+    }
+  }, {
+    "path": "pages/mes/wm/outsource-execute",
+    "style": {
+      "navigationBarTitleText": "执行发料"
+    }
+  }, {
     "path": "pages/mes/wm/outsource-detail",
     "style": {
       "navigationBarTitleText": "外协详情"

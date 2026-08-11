@@ -154,11 +154,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </foreach>
     </delete>
 
-    <!-- 按批次属性查重 -->
+    <!--
+      按批次属性查重。
+      vendorId：原料/外协入库必传；产出入库无供应商（自产），不传则不按供应商过滤。
+      workorderId：产出入库传，使同工单分批入库复用同一成品批次，不同工单不串批。
+    -->
     <select id="selectBatchByAttributes" parameterType="WmBatch" resultMap="WmBatchResult">
         <include refid="selectWmBatchVo"/>
         where item_id = #{itemId}
-          and vendor_id = #{vendorId}
+          <if test="vendorId != null"> and vendor_id = #{vendorId}</if>
+          <if test="workorderId != null"> and workorder_id = #{workorderId}</if>
           <if test="produceDate != null"> and produce_date = #{produceDate}</if>
           <if test="expireDate != null"> and expire_date = #{expireDate}</if>
           <if test="lotNumber != null and lotNumber != ''"> and lot_number = #{lotNumber}</if>

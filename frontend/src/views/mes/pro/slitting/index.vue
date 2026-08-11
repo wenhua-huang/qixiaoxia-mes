@@ -80,14 +80,15 @@
       <el-table-column label="母卷号" align="center" prop="parentRollCode" width="160" />
       <el-table-column label="子卷数" align="center" prop="childCount" width="70" />
       <el-table-column label="子卷总重" align="center" prop="childTotalWeight" width="100">
-        <template #default="{ row }">{{ row.childTotalWeight }}吨</template>
+        <template #default="{ row }">{{ row.childTotalWeight != null ? row.childTotalWeight + '吨' : '-' }}</template>
       </el-table-column>
       <el-table-column label="纸边重量" align="center" prop="edgeWeight" width="90">
         <template #default="{ row }">{{ row.edgeWeight ? row.edgeWeight + 'kg' : '-' }}</template>
       </el-table-column>
       <el-table-column label="损耗率" align="center" prop="lossRate" width="80">
         <template #default="{ row }">
-          <el-tag :type="row.lossRate > 3 ? 'danger' : 'success'" size="small">{{ row.lossRate }}%</el-tag>
+          <el-tag v-if="row.lossRate != null" :type="row.lossRate > 3 ? 'danger' : 'success'" size="small">{{ row.lossRate }}%</el-tag>
+          <span v-else>-</span>
         </template>
       </el-table-column>
       <el-table-column label="操作人" align="center" prop="operator" width="80" />
@@ -100,7 +101,7 @@
       <el-table-column label="操作" align="center" width="140" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" size="small" @click="handleDetail(row)">详情</el-button>
-          <el-button v-if="row.status === 'SLITTING'" link type="success" size="small" @click="handleReceive(row)">收货</el-button>
+          <el-button v-if="row.status === 'SLITTING'" link type="success" size="small" @click="handleReceive(row)" v-hasPermi="['mes:pro:slitting:add']">收货</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -129,12 +130,12 @@
         <el-descriptions-item label="母卷号">{{ detail.parentRollCode }}</el-descriptions-item>
         <el-descriptions-item label="母卷物料">{{ detail.parentItemName }}</el-descriptions-item>
         <el-descriptions-item label="母卷门幅">{{ detail.parentWidth || '-' }}mm</el-descriptions-item>
-        <el-descriptions-item label="母卷重量">{{ detail.parentWeight }}吨</el-descriptions-item>
-        <el-descriptions-item label="子卷数">{{ detail.childCount }}</el-descriptions-item>
-        <el-descriptions-item label="子卷总重">{{ detail.childTotalWeight }}吨</el-descriptions-item>
+        <el-descriptions-item label="母卷重量">{{ detail.parentWeight != null ? detail.parentWeight + '吨' : '-' }}</el-descriptions-item>
+        <el-descriptions-item label="子卷数">{{ detail.childCount != null ? detail.childCount : '-' }}</el-descriptions-item>
+        <el-descriptions-item label="子卷总重">{{ detail.childTotalWeight != null ? detail.childTotalWeight + '吨' : '-' }}</el-descriptions-item>
         <el-descriptions-item label="纸边重量">{{ detail.edgeWeight ? detail.edgeWeight + 'kg' : '-' }}</el-descriptions-item>
-        <el-descriptions-item label="损耗重量">{{ detail.lossWeight }}吨</el-descriptions-item>
-        <el-descriptions-item label="损耗率">{{ detail.lossRate }}%</el-descriptions-item>
+        <el-descriptions-item label="损耗重量">{{ detail.lossWeight != null ? detail.lossWeight + '吨' : '-' }}</el-descriptions-item>
+        <el-descriptions-item label="损耗率">{{ detail.lossRate != null ? detail.lossRate + '%' : '-' }}</el-descriptions-item>
         <el-descriptions-item label="操作人">{{ detail.operator }}</el-descriptions-item>
         <el-descriptions-item label="分切时间">{{ detail.slitTime }}</el-descriptions-item>
         <el-descriptions-item label="状态"><dict-tag :options="mes_pro_slitting_status" :value="detail.status" /></el-descriptions-item>

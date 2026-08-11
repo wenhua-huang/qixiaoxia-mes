@@ -1,7 +1,6 @@
 package com.ruoyi.web.controller.mes.pro;
 
 import java.util.List;
-import java.util.stream.Collectors;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,9 +17,6 @@ import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.system.domain.mes.pro.ProFeedback;
-import com.ruoyi.system.domain.mes.pro.ProFeedbackConsume;
-import com.ruoyi.system.domain.mes.pro.ProWorkorderBom;
-import com.ruoyi.system.mapper.mes.pro.ProWorkorderBomMapper;
 import com.ruoyi.system.service.mes.pro.IProFeedbackService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.page.TableDataInfo;
@@ -38,9 +34,6 @@ public class ProFeedbackController extends BaseController
     @Autowired
     private IProFeedbackService proFeedbackService;
 
-    @Autowired
-    private ProWorkorderBomMapper proWorkorderBomMapper;
-
     @Autowired(required = false)
     private com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator autoCodeGenerator;
 
@@ -51,18 +44,7 @@ public class ProFeedbackController extends BaseController
     @GetMapping("/consumeDefaults/{workorderId}")
     public AjaxResult consumeDefaults(@PathVariable Long workorderId)
     {
-        List<ProWorkorderBom> boms = proWorkorderBomMapper.selectProWorkorderBomByWorkorderId(workorderId);
-        List<ProFeedbackConsume> list = boms.stream().map(bom -> {
-            ProFeedbackConsume c = new ProFeedbackConsume();
-            c.setWorkorderId(workorderId);
-            c.setItemId(bom.getItemId());
-            c.setItemCode(bom.getItemCode());
-            c.setItemName(bom.getItemName());
-            c.setQuantity(bom.getTotalQuantity() != null ? bom.getTotalQuantity() : bom.getQuantity());
-            c.setBatchCode("");
-            return c;
-        }).collect(Collectors.toList());
-        return success(list);
+        return success(proFeedbackService.getDefaultConsume(workorderId));
     }
 
     /**
@@ -119,16 +101,7 @@ public class ProFeedbackController extends BaseController
     @PostMapping
     public AjaxResult add(@RequestBody ProFeedback proFeedback)
     {
-        // feedbackCode 为空时自动生成（移动端不传编码，PC端已通过 genSerialCode 生成）
-        if (proFeedback.getFeedbackCode() == null || proFeedback.getFeedbackCode().isEmpty()) {
-            if (autoCodeGenerator != null) {
-                try { proFeedback.setFeedbackCode(autoCodeGenerator.genSerialCode("FEEDBACK_CODE", null)); }
-                catch (Exception e) { /* 自动编码失败则由 checkFeedbackCodeUnique 兜底校验 */ }
-            }
-            if (proFeedback.getFeedbackCode() == null || proFeedback.getFeedbackCode().isEmpty()) {
-                proFeedback.setFeedbackCode("FB" + System.currentTimeMillis());
-            }
-        }
+        // 编码由服务端权威生成（AutoCodeGenerator + DB 唯一约束兜底），客户端可传但非必需
         proFeedbackService.checkFeedbackCodeUnique(proFeedback);
         proFeedbackService.insertProFeedback(proFeedback);
         return success(proFeedback);

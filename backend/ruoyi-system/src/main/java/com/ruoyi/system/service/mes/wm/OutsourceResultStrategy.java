@@ -1,6 +1,7 @@
 package com.ruoyi.system.service.mes.wm;
 
 import java.util.List;
+import java.util.Map;
 import com.ruoyi.system.domain.mes.wm.WmOutsourceOrder;
 import com.ruoyi.system.domain.mes.wm.WmOutsourceRecptLine;
 
@@ -31,11 +32,13 @@ public interface OutsourceResultStrategy
 
     /**
      * 收货时回调（订单 PROCESSING→RECEIVED）。
-     * 业务方可在此做领域特定的入库前处理（如子卷状态→IN_STOCK）。
+     * 业务方可在此做领域特定的入库后处理（如子卷状态→IN_STOCK、回填库存ID）。
      *
-     * @param order      外协订单
-     * @param recptLines 收货行
-     * @param feedbackId 刚建的报工ID
+     * @param order            外协订单
+     * @param recptLines       收货行
+     * @param feedbackId       刚建的报工ID
+     * @param stockIdByLineId  收货行 lineId → 入库后生成的 materialStockId（可用于回填领域对象库存关联）
      */
-    void onReceive(WmOutsourceOrder order, List<WmOutsourceRecptLine> recptLines, Long feedbackId);
+    void onReceive(WmOutsourceOrder order, List<WmOutsourceRecptLine> recptLines,
+                   Long feedbackId, Map<Long, Long> stockIdByLineId);
 }

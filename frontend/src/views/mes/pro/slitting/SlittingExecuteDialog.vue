@@ -232,8 +232,8 @@
           </el-select>
         </el-form-item>
       </el-form>
-      <el-table :data="parentRollOptions" border size="small" max-height="360" @selection-change="onRollSelectChange" :row-key="(r:any)=>r.rollId">
-        <el-table-column type="selection" width="50" :reserve-selection="true" align="center" />
+      <el-table ref="rollTableRef" :data="parentRollOptions" border size="small" max-height="360" @selection-change="onRollSelectChange" :row-key="(r:any)=>r.rollId">
+        <el-table-column type="selection" width="50" align="center" />
         <el-table-column label="卷号" prop="rollCode" width="140" align="center" />
         <el-table-column label="物料" prop="itemName" min-width="140" show-overflow-tooltip align="center" />
         <el-table-column label="门幅(mm)" prop="actualWidth" width="90" align="center" />
@@ -289,6 +289,7 @@ const vendorOptions = ref<any[]>([])
 const cardOptions = ref<any[]>([])
 const selectedParentRolls = ref<any[]>([])
 const rollSelectVisible = ref(false)
+const rollTableRef = ref()
 const parentRollOptions = ref<any[]>([])
 const tempSelectedRolls = ref<any[]>([])
 const rollFilterItemId = ref<number | undefined>(undefined)
@@ -396,16 +397,36 @@ function resetForm() {
 }
 
 function onModeChange() {
-  // 切换模式时重置对方的数据
+  step.value = 0
+  // 切换模式时彻底重置对方的数据，避免字段残留到 submit payload
   if (form.slitMode === 'OUTSOURCE') {
     selectedStock.value = null
     selectedStockId.value = undefined
+    form.sourceItemId = null
+    form.sourceItemCode = ''
+    form.sourceItemName = ''
+    form.sourceWarehouseId = null
+    form.sourceWarehouseCode = ''
+    form.sourceWarehouseName = ''
+    form.sourceBatchId = null
+    form.sourceBatchCode = ''
     form.pickQty = 0
     form.childRolls = []
+    form.edgeItemId = null
+    form.edgeItemCode = ''
+    form.edgeItemName = ''
+    form.edgeWeight = 0
+    form.workstationId = null
+    form.workstationCode = ''
+    form.workstationName = ''
+    stockList.value = []
   } else {
     selectedParentRolls.value = []
     form.vendorId = null
+    form.vendorCode = ''
     form.vendorName = ''
+    form.parentRollIds = []
+    form.cardId = null
   }
 }
 
@@ -420,7 +441,11 @@ function onVendorChange(vendorId: number) {
 // 打开母卷选择弹窗
 async function rollSelectRefOpen() {
   rollSelectVisible.value = true
+  rollFilterItemId.value = undefined
   await loadParentRolls()
+  // 每次打开清空上次的勾选状态，避免 reserve-selection 残留导致误选
+  rollTableRef.value?.clearSelection()
+  tempSelectedRolls.value = []
 }
 
 async function loadParentRolls() {
@@ -485,9 +510,14 @@ function onWorkorderSelected(row: any) {
   if (!row) return
   form.workorderId = row.workorderId
   form.workorderCode = row.workorderCode
-  // 选工单后加载该工单的流转卡 + 工艺路线（外协发料关联流转卡用）
+  // 切换工单时清空工艺路线/工序/流转卡，避免上一张工单的残留
+  form.routeId = row.routeId || null
+  form.processId = null
+  form.processCode = ''
+  form.processName = ''
+  form.cardId = null
+  // 选工单后加载该工单的流转卡（外协发料关联流转卡用）
   loadCards(row.workorderId)
-  if (row.routeId) form.routeId = row.routeId
 }
 
 async function loadCards(workorderId: number) {

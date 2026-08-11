@@ -227,8 +227,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
  		where user_id = #{userId}
 	</update>
 	
-	<update id="updateUserStatus" parameterType="SysUser">
+ 	<update id="updateUserStatus" parameterType="SysUser">
  		update sys_user set status = #{status}, update_time = sysdate() where user_id = #{userId}
+	</update>
+
+	<update id="clearVendorId">
+ 		update sys_user set vendor_id = null, update_time = sysdate() where user_id = #{userId}
 	</update>
 	
 	<update id="updateUserAvatar" parameterType="SysUser">

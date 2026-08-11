@@ -27,6 +27,11 @@ export default {
       uni.showToast({ title: text, icon: 'success' })
     }
   },
+  // 警告消息（uni 无 warning icon，长文本用 none 避免截断）
+  msgWarning(content) {
+    const text = content == null ? '' : String(content)
+    uni.showToast({ title: text, icon: 'none', duration: 2500 })
+  },
   // 隐藏消息
   hideMsg(content) {
     uni.hideToast()
@@ -39,7 +44,7 @@ export default {
       showCancel: false
     })
   },
-  // 确认窗体
+  // 确认窗体：确认 resolve(true)，取消 reject(false)（调用方 .catch 处理取消）
   confirm(content, title) {
     return new Promise((resolve, reject) => {
       uni.showModal({
@@ -49,8 +54,13 @@ export default {
         confirmText: '确定',
         success: function(res) {
           if (res.confirm) {
-            resolve(res.confirm)
+            resolve(true)
+          } else {
+            reject(false)
           }
+        },
+        fail: function() {
+          reject(false)
         }
       })
     })

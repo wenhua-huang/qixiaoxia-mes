@@ -222,6 +222,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         delete from qxx_wm_roll_detail where roll_id = #{rollId}
     </delete>
 
+    <update id="markOutsourcedIfInStock">
+        update qxx_wm_roll_detail
+        set status = 'OUTSOURCED',
+            remaining_quantity = 0,
+            update_by = #{operator},
+            update_time = #{now}
+        where roll_id = #{rollId}
+          and status = 'IN_STOCK'
+    </update>
+
     <delete id="deleteWmRollDetailByRollIds" parameterType="String">
         delete from qxx_wm_roll_detail where roll_id in
         <foreach item="rollId" collection="array" open="(" separator="," close=")">

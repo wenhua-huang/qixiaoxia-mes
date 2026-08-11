@@ -164,6 +164,14 @@ async function submit() {
     proxy.$modal.alert('重量校验未通过，请检查数据')
     return
   }
+  const confirmed = await new Promise(resolve => {
+    uni.showModal({
+      title: '确认收货',
+      content: '确认收货入库？子卷将入库、母卷将消耗并生成报工，不可撤销。',
+      success: r => resolve(r.confirm)
+    })
+  })
+  if (!confirmed) return
   submitting.value = true
   try {
     await receiveOutsource(record.value.slitId, {

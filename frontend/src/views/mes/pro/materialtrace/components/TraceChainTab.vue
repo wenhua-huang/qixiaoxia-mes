@@ -70,15 +70,15 @@
               </marker>
             </defs>
             <g class="dag-edges">
-              <path v-for="(edge, i) in dagEdges" :key="'e' + i" :d="edge.path" stroke="#C0C4CC" stroke-width="1.5" fill="none" marker-end="url(#arrow)" />
+              <path v-for="(edge, i) in dagEdges" :key="'e' + i" :d="edge.path" :stroke="edge.traceType === 'SLIT' ? '#409EFF' : '#C0C4CC'" :stroke-width="edge.traceType === 'SLIT' ? 2 : 1.5" :stroke-dasharray="edge.traceType === 'SLIT' ? '6 3' : 'none'" fill="none" marker-end="url(#arrow)" />
               <g v-for="(edge, i) in dagEdges" :key="'el' + i">
-                <rect :x="edge.labelX - 28" :y="edge.labelY - 9" width="56" height="18" rx="9" fill="#F4F4F5" stroke="#DCDFE6" stroke-width="0.5" />
-                <text :x="edge.labelX" :y="edge.labelY + 4" text-anchor="middle" font-size="10" fill="#606266">{{ edge.quantity }}{{ edge.unit || '' }}</text>
+                <rect :x="edge.labelX - 28" :y="edge.labelY - 9" width="56" height="18" rx="9" :fill="edge.traceType === 'SLIT' ? '#ECF5FF' : '#F4F4F5'" :stroke="edge.traceType === 'SLIT' ? '#409EFF' : '#DCDFE6'" stroke-width="0.5" />
+                <text :x="edge.labelX" :y="edge.labelY + 4" text-anchor="middle" font-size="10" :fill="edge.traceType === 'SLIT' ? '#409EFF' : '#606266'">{{ edge.quantity }}{{ edge.unit || '' }}</text>
               </g>
             </g>
-            <g v-for="(node, i) in dagNodes" :key="'n' + i" :transform="`translate(${node.x}, ${node.y})`" class="dag-node" :class="{ 'dag-node-cycle': node.cycle }" @click="onNodeClick(node)">
+            <g v-for="(node, i) in dagNodes" :key="'n' + i" :transform="`translate(${node.x}, ${node.y})`" class="dag-node" :class="{ 'dag-node-cycle': node.cycle, 'dag-node-ref': node.reference, 'dag-node-flash': highlightKey === node.nodeKey && node.firstOccurrence }" :data-node-key="node.nodeKey" @click="node.reference ? onRefNodeClick(node) : onNodeClick(node)">
               <rect x="0" y="0" width="4" :height="node.height" :fill="nodeColor(node)" rx="2" />
-              <rect x="4" y="0" :width="node.width - 4" :height="node.height" rx="6" fill="#FFFFFF" :stroke="node.cycle ? '#F56C6C' : '#DCDFE6'" :stroke-width="node.cycle ? 2 : 1" :stroke-dasharray="node.cycle ? '4 2' : 'none'" />
+              <rect class="dag-node-body" x="4" y="0" :width="node.width - 4" :height="node.height" rx="6" fill="#FFFFFF" :stroke="node.cycle ? '#F56C6C' : (node.reference ? '#909399' : '#DCDFE6')" :stroke-width="node.cycle ? 2 : 1" :stroke-dasharray="(node.cycle || node.reference) ? '4 2' : 'none'" />
               <text x="16" y="22" font-size="16">{{ nodeIcon(node.nodeType) }}</text>
               <text x="38" y="18" font-size="11" font-weight="600" :fill="nodeColor(node)">{{ node.label }}</text>
               <text x="38" y="34" font-size="11" fill="#303133">{{ truncate(node.title, 16) }}</text>
@@ -86,7 +86,14 @@
                 <tspan v-if="node.quantity">{{ node.quantity }}{{ node.unit || '' }}</tspan>
                 <tspan v-if="node.event"> · {{ node.event }}</tspan>
                 <tspan v-if="node.cycle"> · 🔁 循环</tspan>
+                <tspan v-if="node.reference"> · 🔗 同源</tspan>
               </text>
+              <text v-if="node.reference && node.refToBranch" class="ref-subtitle" x="38" y="65" font-size="9" fill="#909399">首现于「{{ truncate(node.refToBranch, 14) }}」</text>
+              <g v-if="node.refCount > 0 && node.firstOccurrence" class="ref-badge">
+                <title>另有 {{ node.refCount }} 处同源关联</title>
+                <circle :cx="node.width - 14" cy="14" r="10" fill="#409EFF" />
+                <text :x="node.width - 14" y="18" text-anchor="middle" font-size="10" fill="#FFFFFF" font-weight="700">{{ node.refCount }}</text>
+              </g>
             </g>
           </svg>
         </div>
@@ -98,9 +105,11 @@
           v-for="(node, idx) in chainNodes"
           :key="idx"
           class="tree-node-row"
-          :class="{ 'tree-node-cycle': node.cycle, 'tree-node-root': node.depth === 0 }"
+          :class="{ 'tree-node-cycle': node.cycle, 'tree-node-ref': node.reference, 'tree-node-root': node.depth === 0 }"
           :style="{ marginLeft: node.depth * 28 + 'px' }"
-          @click="onTreeNodeClick(node)"
+          :data-uid="node._uid"
+          :data-node-key="node.nodeKey"
+          @click="node.reference ? onTreeRefClick(node) : onTreeNodeClick(node)"
         >
           <span class="tree-indent-line" v-if="node.depth > 0"></span>
           <div class="tree-node-card" :class="`card-${node.type}`">
@@ -110,6 +119,8 @@
               <span class="tree-node-title">{{ node.title }}</span>
               <el-tag v-if="node.depth === 0" type="info" size="small" effect="plain" class="root-tag">起点</el-tag>
               <el-tag v-if="node.cycle" type="danger" size="small" effect="plain">🔁 循环</el-tag>
+              <el-tag v-if="node.reference" type="info" size="small" effect="plain">🔗 同源</el-tag>
+              <el-tag v-if="node.refCount > 0 && !node.reference" type="primary" size="small" effect="plain">🔗 {{ node.refCount }} 处关联</el-tag>
               <el-tag v-if="node.branchCount > 1" type="warning" size="small" effect="plain">分叉 {{ node.branchCount }} 路</el-tag>
             </div>
             <div class="tree-node-body" v-if="hasDetails(node)">
@@ -118,6 +129,7 @@
               <span v-if="node.itemName" class="meta-item"><span class="meta-key">物料</span>{{ node.itemName }}</span>
               <span v-if="node.batchCode" class="meta-item"><span class="meta-key">批次</span>{{ node.batchCode }}</span>
             </div>
+            <div v-if="node.reference && node.refToBranch" class="ref-hint">首现于「{{ node.refToBranch }}」分支 · 点击跳转</div>
           </div>
         </div>
       </div>
@@ -145,6 +157,12 @@
         <el-descriptions-item label="分支数">{{ selectedNode.childCount ?? 0 }} 个下游</el-descriptions-item>
         <el-descriptions-item v-if="selectedNode.cycle" label="循环" :span="2">
           <el-tag type="danger" size="small">🔁 循环引用节点（已停止展开）</el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item v-if="selectedNode.reference" label="同源" :span="2">
+          <el-tag type="info" size="small">🔗 同源节点，首现于「{{ selectedNode.refToBranch || '—' }}」分支</el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item v-if="selectedNode.refCount > 0 && !selectedNode.reference" label="关联" :span="2">
+          <el-tag type="primary" size="small">🔗 另有 {{ selectedNode.refCount }} 处分支引用同一节点</el-tag>
         </el-descriptions-item>
       </el-descriptions>
       <template #footer>
@@ -188,6 +206,9 @@ const dagHeight = ref(600)
 const dagScale = ref(1)
 const dagOffsetX = ref(40)
 const dagOffsetY = ref(40)
+// 同源跳转：当前高亮闪烁的首现节点 key
+const highlightKey = ref('')
+let flashTimer: any = null
 let dragging = false, dragStartX = 0, dragStartY = 0, offStartX = 0, offStartY = 0
 
 // ── 节点标签（来自字典）/ 图标/颜色（纯展示函数，基于 dict value）──
@@ -195,15 +216,15 @@ function nodeLabel(type: string): string {
   return nodeTypeDict.value?.find((d: any) => d.value === type)?.label || type
 }
 function nodeIcon(type: string): string {
-  const map: Record<string, string> = { PUR_ORDER: '🛒', VENDOR: '🏭', MATERIAL_STOCK: '📦', BATCH: '🏷️', CARD: '📋', FEEDBACK: '✅', WORKORDER: '🔧', SALES_OUT: '🚚', NONE: '❓' }
+  const map: Record<string, string> = { PUR_ORDER: '🛒', VENDOR: '🏭', MATERIAL_STOCK: '📦', BATCH: '🏷️', CARD: '📋', FEEDBACK: '✅', WORKORDER: '🔧', SALES_OUT: '🚚', ROLL: '🧻', OUTSOURCE_ORDER: '🤝', NONE: '❓' }
   return map[type] || '📌'
 }
 function nodeColor(node: any): string {
-  const map: Record<string, string> = { PUR_ORDER: '#909399', VENDOR: '#909399', MATERIAL_STOCK: '#409EFF', BATCH: '#409EFF', CARD: '#E6A23C', FEEDBACK: '#67C23A', WORKORDER: '#E6A23C', SALES_OUT: '#F56C6C' }
+  const map: Record<string, string> = { PUR_ORDER: '#909399', VENDOR: '#909399', MATERIAL_STOCK: '#409EFF', BATCH: '#409EFF', CARD: '#E6A23C', FEEDBACK: '#67C23A', WORKORDER: '#E6A23C', SALES_OUT: '#F56C6C', ROLL: '#409EFF', OUTSOURCE_ORDER: '#9B59B6' }
   return map[node.nodeType] || '#409EFF'
 }
 function nodeTagType(type: string): string {
-  const map: Record<string, string> = { PUR_ORDER: 'info', VENDOR: 'info', MATERIAL_STOCK: '', BATCH: '', CARD: 'warning', FEEDBACK: 'success', WORKORDER: 'warning', SALES_OUT: 'danger' }
+  const map: Record<string, string> = { PUR_ORDER: 'info', VENDOR: 'info', MATERIAL_STOCK: '', BATCH: '', CARD: 'warning', FEEDBACK: 'success', WORKORDER: 'warning', SALES_OUT: 'danger', ROLL: '', OUTSOURCE_ORDER: 'warning' }
   return map[type] || 'info'
 }
 function truncate(s: string, max: number): string { return !s ? '' : (s.length > max ? s.slice(0, max) + '…' : s) }
@@ -238,16 +259,21 @@ async function handleTrace() {
 /** 完整扁平化树（DFS，带 depth），供树形列表视图用——分叉节点并列展示 */
 function deriveLegacyFromTree(tree: any) {
   const nodes: any[] = []
+  let uid = 0
   const walk = (n: any, depth: number) => {
+    const nodeKey = `${n.nodeType}:${n.nodeId}`
     nodes.push({
-      nodeType: n.nodeType, nodeId: n.nodeId, type: n.nodeType, id: n.nodeId,
+      _uid: `tnode-${uid++}`,
+      nodeType: n.nodeType, nodeId: n.nodeId, nodeKey, type: n.nodeType, id: n.nodeId,
       label: nodeLabel(n.nodeType), icon: nodeIcon(n.nodeType),
       title: n.nodeDesc || `${n.nodeType} #${n.nodeId}`,
       itemName: n.itemName, batchCode: n.batchCode, quantity: n.quantity, unit: n.unitName,
       event: n.traceType ? (traceTypeDict.value?.find((d: any) => d.value === n.traceType)?.label || n.traceType) : '',
-      traceType: n.traceType, cycle: n.cycle, depth, branchCount: n.children?.length || 0, childCount: n.children?.length || 0
+      traceType: n.traceType, cycle: n.cycle, reference: n.reference,
+      refToBranch: n.refToBranch, refCount: n.refCount || 0,
+      depth, branchCount: n.children?.length || 0, childCount: n.children?.length || 0
     })
-    if (n.children && !n.cycle) { for (const c of n.children) walk(c, depth + 1) }
+    if (n.children && !n.cycle && !n.reference) { for (const c of n.children) walk(c, depth + 1) }
   }
   walk(tree, 0)
   chainNodes.value = nodes
@@ -259,20 +285,23 @@ function countTreeNodes(node: any): number { if (!node) return 0; let c = 1; if 
 function countBranches(node: any): number { if (!node || !node.children) return 0; let c = Math.max(0, node.children.length - 1); for (const x of node.children) c += countBranches(x); return c }
 
 // ══ DAG 布局（Reingold-Tilford 横向树）══
-const NODE_W = 200, NODE_H = 60, COL_GAP = 80, ROW_GAP = 16
+const NODE_W = 200, NODE_H = 60, NODE_H_REF = 74, COL_GAP = 80, ROW_GAP = 16
+function nodeHeight(n: any): number { return n.reference ? NODE_H_REF : NODE_H }
 function computeDagLayout(root: any) {
   const nodes: any[] = []; const edges: any[] = []; let leafCursor = 0
   const layout = (n: any, depth: number): { top: number; bottom: number } => {
     const x = depth * (NODE_W + COL_GAP)
-    if (!n.children || n.children.length === 0 || n.cycle) {
+    const h = nodeHeight(n)
+    const isLeaf = !n.children || n.children.length === 0 || n.cycle || n.reference
+    if (isLeaf) {
       const y = leafCursor * (NODE_H + ROW_GAP); leafCursor++
-      nodes.push({ ...buildNodeRender(n, depth), x, y, height: NODE_H, width: NODE_W, _ref: n })
-      return { top: y, bottom: y + NODE_H }
+      nodes.push({ ...buildNodeRender(n, depth), x, y, height: h, width: NODE_W, _ref: n })
+      return { top: y, bottom: y + h }
     }
     const ranges: any[] = []
     for (const c of n.children) ranges.push(layout(c, depth + 1))
-    const top = ranges[0].top, bottom = ranges[ranges.length - 1].bottom, y = (top + bottom) / 2 - NODE_H / 2
-    nodes.push({ ...buildNodeRender(n, depth), x, y, height: NODE_H, width: NODE_W, _ref: n })
+    const top = ranges[0].top, bottom = ranges[ranges.length - 1].bottom, y = (top + bottom) / 2 - h / 2
+    nodes.push({ ...buildNodeRender(n, depth), x, y, height: h, width: NODE_W, _ref: n })
     return { top, bottom }
   }
   layout(root, 0)
@@ -282,7 +311,7 @@ function computeDagLayout(root: any) {
       const child = nodes.find(n => n._ref === childRef)
       if (!child) continue
       const x1 = parent.x + parent.width, y1 = parent.y + parent.height / 2, x2 = child.x, y2 = child.y + child.height / 2, mx = (x1 + x2) / 2
-      edges.push({ path: `M ${x1},${y1} C ${mx},${y1} ${mx},${y2} ${x2},${y2}`, quantity: childRef.quantity, unit: childRef.unitName, labelX: mx, labelY: (y1 + y2) / 2 })
+      edges.push({ path: `M ${x1},${y1} C ${mx},${y1} ${mx},${y2} ${x2},${y2}`, quantity: childRef.quantity, unit: childRef.unitName, traceType: childRef.traceType, labelX: mx, labelY: (y1 + y2) / 2 })
     }
   }
   const maxX = nodes.length ? Math.max(...nodes.map(n => n.x + n.width)) : 800
@@ -292,15 +321,58 @@ function computeDagLayout(root: any) {
   dagScale.value = 1; dagOffsetX.value = 40; dagOffsetY.value = 40
 }
 function buildNodeRender(n: any, depth?: number) {
+  const refCount = n.refCount || 0
   return {
-    nodeType: n.nodeType, nodeId: n.nodeId, label: nodeLabel(n.nodeType), icon: nodeIcon(n.nodeType),
+    nodeType: n.nodeType, nodeId: n.nodeId, nodeKey: `${n.nodeType}:${n.nodeId}`,
+    label: nodeLabel(n.nodeType), icon: nodeIcon(n.nodeType),
     title: n.nodeDesc || `${n.nodeType} #${n.nodeId}`, itemName: n.itemName, batchCode: n.batchCode,
     quantity: n.quantity, unit: n.unitName, event: n.traceType ? (traceTypeDict.value?.find((d: any) => d.value === n.traceType)?.label || n.traceType) : '',
-    cycle: n.cycle, depth: depth ?? n.depth ?? 0, childCount: n.children?.length || 0
+    traceType: n.traceType, cycle: n.cycle, reference: n.reference, refToBranch: n.refToBranch, refCount,
+    firstOccurrence: !n.reference && !n.cycle && refCount > 0,
+    depth: depth ?? n.depth ?? 0, childCount: n.children?.length || 0
   }
 }
 
 function onNodeClick(node: any) { selectedNode.value = node; nodeDetailOpen.value = true }
+
+/** 流向图：点击同源引用节点 → 平移到首现节点并闪烁 */
+function onRefNodeClick(node: any) { jumpToFirst(node) }
+function jumpToFirst(node: any) {
+  const key = node.nodeKey
+  const first = dagNodes.value.find(n => n.nodeKey === key && !n.reference && !n.cycle)
+  if (!first) { onNodeClick(node); return }
+  const vp = document.querySelector('.dag-viewport') as HTMLElement | null
+  const vw = vp?.clientWidth || 1000, vh = vp?.clientHeight || 560
+  dagOffsetX.value = vw / 2 - (first.x + first.width / 2) * dagScale.value
+  dagOffsetY.value = vh / 2 - (first.y + first.height / 2) * dagScale.value
+  flashKey(key)
+}
+
+/** 树形列表：点击同源引用行 → 滚动到首现行并闪烁 */
+function onTreeRefClick(node: any) { jumpToFirstInList(node) }
+function jumpToFirstInList(node: any) {
+  const first = chainNodes.value.find(n => n.nodeKey === node.nodeKey && !n.reference && !n.cycle)
+  if (!first) return
+  const el = document.querySelector(`[data-uid="${first._uid}"]`) as HTMLElement | null
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.classList.add('tree-node-flash')
+    setTimeout(() => el.classList.remove('tree-node-flash'), 2500)
+  }
+}
+
+/** 触发首现节点高亮闪烁（流向图 + 列表同步） */
+function flashKey(key: string) {
+  highlightKey.value = key
+  if (flashTimer) clearTimeout(flashTimer)
+  flashTimer = setTimeout(() => { highlightKey.value = '' }, 2500)
+  const el = document.querySelector(`.tree-node-row[data-node-key="${CSS.escape(key)}"]:not(.tree-node-ref)`) as HTMLElement | null
+  if (el) {
+    el.classList.add('tree-node-flash')
+    setTimeout(() => el.classList.remove('tree-node-flash'), 2500)
+  }
+}
+
 function reTraceFromNode(direction: 'forward' | 'backward') {
   if (!selectedNode.value?.nodeType || !selectedNode.value?.nodeId) return
   chain.nodeType = selectedNode.value.nodeType; chain.nodeId = String(selectedNode.value.nodeId); chain.direction = direction
@@ -320,6 +392,8 @@ const chainAlertType = computed<string>(() => (chainEndedReason.value === 'LOOP'
 
 function resetChain() {
   chain.nodeId = ''; chainSearched.value = false; chainNodes.value = []; chainSummary.value = ''; chainEndedReason.value = ''; chainTree.value = null; dagNodes.value = []; dagEdges.value = []
+  highlightKey.value = ''
+  if (flashTimer) { clearTimeout(flashTimer); flashTimer = null }
 }
 
 // 父组件 traceFromRow 触发时，通过 initialQuery prop 预填并自动查询
@@ -339,12 +413,15 @@ watch(() => props.initialQuery, (q: any) => {
 .tree-node-row { position: relative; margin-bottom: 8px; cursor: pointer; transition: all 0.15s; &:hover { transform: translateX(2px); } }
 .tree-indent-line { position: absolute; left: -16px; top: 0; bottom: 0; width: 1px; background: #DCDFE6; &::before { content: ''; position: absolute; left: 0; top: 20px; width: 14px; height: 1px; background: #DCDFE6; } }
 .tree-node-card { border: 1px solid #EBEEF5; border-left: 4px solid #409EFF; border-radius: 6px; padding: 8px 14px; background: #FFFFFF; transition: box-shadow 0.2s; &:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); } }
-.card-MATERIAL_STOCK, .card-BATCH { border-left-color: #409EFF; }
+.card-MATERIAL_STOCK, .card-BATCH, .card-ROLL { border-left-color: #409EFF; }
 .card-CARD, .card-WORKORDER { border-left-color: #E6A23C; }
 .card-FEEDBACK { border-left-color: #67C23A; }
 .card-SALES_OUT { border-left-color: #F56C6C; }
+.card-OUTSOURCE_ORDER { border-left-color: #9B59B6; }
 .card-PUR_ORDER, .card-VENDOR { border-left-color: #909399; }
 .tree-node-row.tree-node-cycle .tree-node-card { border-left-color: #F56C6C; border-style: dashed; }
+.tree-node-row.tree-node-ref .tree-node-card { border: 1px dashed #909399; border-left: 4px dashed #909399; background: #FAFAFA; opacity: 0.92; }
+.ref-hint { margin-top: 6px; font-size: 12px; color: #909399; }
 .tree-node-row.tree-node-root .tree-node-card { background: linear-gradient(90deg, #F0F9EB 0%, #FFFFFF 100%); border-left-color: #67C23A; }
 .tree-node-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .tree-node-title { font-weight: 600; color: #303133; font-size: 14px; }
@@ -359,4 +436,16 @@ watch(() => props.initialQuery, (q: any) => {
 .dag-viewport { width: 100%; height: 560px; overflow: hidden; cursor: grab; background: radial-gradient(circle, #E0E0E0 1px, transparent 1px) 0 0 / 20px 20px, #FAFAFA; &:active { cursor: grabbing; } }
 .dag-node { cursor: pointer; transition: opacity 0.2s; &:hover { opacity: 0.85; } }
 .dag-node-cycle text { fill: #F56C6C; }
+.dag-node-ref text { fill: #909399; }
+.dag-node-ref .ref-subtitle { fill: #909399; }
+.dag-node-flash .dag-node-body { animation: dagFlash 0.6s ease-in-out 4; }
+@keyframes dagFlash {
+  0%, 100% { stroke: #409EFF; stroke-width: 2; }
+  50% { stroke: #409EFF; stroke-width: 4; }
+}
+.tree-node-flash .tree-node-card { animation: treeFlash 0.6s ease-in-out 4; }
+@keyframes treeFlash {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(64,158,255,0); border-color: #409EFF; }
+  50% { box-shadow: 0 0 0 4px rgba(64,158,255,0.35); border-color: #409EFF; }
+}
 </style>

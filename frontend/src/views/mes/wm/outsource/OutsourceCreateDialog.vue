@@ -168,7 +168,12 @@ function onWorkorderSelected(row: any) {
   if (!row) return
   form.workorderId = row.workorderId
   form.workorderCode = row.workorderCode
-  if (row.routeId) form.routeId = row.routeId
+  // 切换工单时清空工艺路线/工序/流转卡，避免上一张工单残留
+  form.routeId = row.routeId || null
+  form.processId = null
+  form.processCode = ''
+  form.processName = ''
+  form.cardId = null
   loadCards(row.workorderId)
 }
 
@@ -189,6 +194,7 @@ function onCardChange(cardId: number) {
 function onProcessChange(processId: number) {
   const p = processOptions.value.find((x: any) => x.processId === processId)
   if (p) { form.processCode = p.processCode; form.processName = p.processName }
+  else { form.processCode = ''; form.processName = '' }
 }
 
 function onItemSelected(row: any) {
@@ -213,7 +219,7 @@ function onWarehouseSelected(row: any) {
 }
 
 function addLine() {
-  form.issueLines.push({ itemId: null, itemCode: '', itemName: '', quantity: 0, unitOfMeasure: 'TON', unitName: '吨', batchId: 0, warehouseId: null, warehouseCode: '', warehouseName: '' })
+  form.issueLines.push({ itemId: null, itemCode: '', itemName: '', quantity: 0, unitOfMeasure: 'TON', unitName: '吨', batchId: null, warehouseId: null, warehouseCode: '', warehouseName: '' })
 }
 
 function removeLine(idx: number) {

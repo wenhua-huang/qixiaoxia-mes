@@ -12,13 +12,19 @@ import com.ruoyi.common.enums.TransactionTypeEnum;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
+import com.ruoyi.common.core.domain.model.LoginUser;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import com.ruoyi.system.domain.mes.md.MdVendor;
 import com.ruoyi.system.domain.mes.pro.OutsourceReceiveRequest;
 import com.ruoyi.system.domain.mes.pro.OutsourceResultRequest;
+import com.ruoyi.system.domain.mes.pro.ProCard;
+import com.ruoyi.system.domain.mes.pro.ProConstants;
 import com.ruoyi.system.domain.mes.pro.ProFeedback;
 import com.ruoyi.system.domain.mes.pro.ProMaterialTrace;
 import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
 import com.ruoyi.system.domain.mes.pro.ProSlittingRecord;
+import com.ruoyi.system.domain.mes.pro.ProTask;
 import com.ruoyi.system.domain.mes.pro.SlittingRequest;
 import com.ruoyi.system.domain.mes.pro.SlittingRequest.ChildRollSpec;
 import com.ruoyi.system.domain.mes.wm.WmMaterialStock;
@@ -30,10 +36,12 @@ import com.ruoyi.system.mapper.mes.pro.ProFeedbackMapper;
 import com.ruoyi.system.mapper.mes.pro.ProMaterialTraceMapper;
 import com.ruoyi.system.mapper.mes.pro.ProRouteProcessMapper;
 import com.ruoyi.system.mapper.mes.pro.ProSlittingRecordMapper;
+import com.ruoyi.system.mapper.mes.pro.ProTaskMapper;
 import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
 import com.ruoyi.system.mapper.mes.wm.WmMaterialStockMapper;
 import com.ruoyi.system.mapper.mes.wm.WmRollDetailMapper;
 import com.ruoyi.system.service.mes.pro.IProSlittingService;
+import com.ruoyi.system.service.mes.pro.IProWorkorderDocService;
 import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 import com.ruoyi.system.service.mes.wm.IWmTransactionService;
 import jakarta.annotation.PostConstruct;
@@ -75,6 +83,11 @@ public class ProSlittingServiceImpl implements IProSlittingService {
     private static final String MODE_INTERNAL = "INTERNAL";
     private static final String MODE_OUTSOURCE = "OUTSOURCE";
 
+    // 流转卡状态（qxx_pro_card.status）
+    private static final String STATUS_CARD_OUTSOURCING = "OUTSOURCING";
+    private static final String STATUS_CARD_ACTIVE = "ACTIVE";
+    private static final String STATUS_CARD_COMPLETED = "COMPLETED";
+
     @Autowired private RedisLockTemplate lockTemplate;
     @Autowired private PlatformTransactionManager transactionManager;
     @Autowired private ProSlittingRecordMapper slittingMapper;
@@ -84,10 +97,12 @@ public class ProSlittingServiceImpl implements IProSlittingService {
     @Autowired private ProWorkorderMapper workorderMapper;
     @Autowired private ProRouteProcessMapper routeProcessMapper;
     @Autowired private ProCardMapper cardMapper;
+    @Autowired private ProTaskMapper proTaskMapper;
     @Autowired private ProMaterialTraceMapper traceMapper;
     @Autowired private MdVendorMapper vendorMapper;
     @Autowired private AutoCodeGenerator autoCodeGenerator;
     @Autowired private IWmTransactionService transactionService;
+    @Autowired private IProWorkorderDocService workorderDocService;
 
     private TransactionTemplate txTemplate;
 
@@ -165,9 +180,9 @@ public class ProSlittingServiceImpl implements IProSlittingService {
         BigDecimal edgeWeightTon = edgeWeightKg.divide(new BigDecimal("1000"), 4, RoundingMode.HALF_UP);
         validateWeightBalance(pickQty, childTotal, edgeWeightTon);
 
-        String slitBatchNo = autoCodeGenerator.genSerialCode("SLITTING_CODE", null);
+        String slitBatchNo = genCodeWithFallback("SLITTING_CODE", "SL");
         WmRollDetail stubParent = buildStubParentForFeedback(req, pickQty);
-        ProFeedback fb = createAndPersistFeedback(req, stubParent, req.getChildRolls(), operator);
+        ProFeedback fb = createAndPersistFeedback(req, stubParent, req.getChildRolls(), operator, "INTERNAL");
         Long sourceDocId = fb.getRecordId();
 
         WmTransaction pickTx = buildPickTransaction(req, pickQty.negate(), slitBatchNo, sourceDocId);
@@ -220,7 +235,7 @@ public class ProSlittingServiceImpl implements IProSlittingService {
     private WmRollDetail buildParentRoll(SlittingRequest req, BigDecimal pickQty,
                                           String slitBatchNo, String operator) {
         WmRollDetail roll = new WmRollDetail();
-        roll.setRollCode(autoCodeGenerator.genSerialCode("ROLL_CODE", null));
+        roll.setRollCode(genCodeWithFallback("ROLL_CODE", "RL"));
         roll.setItemId(req.getSourceItemId());
         roll.setItemCode(req.getSourceItemCode());
         roll.setItemName(req.getSourceItemName());
@@ -267,9 +282,19 @@ public class ProSlittingServiceImpl implements IProSlittingService {
     private void processInventoryTransactions(SlittingRequest req, WmRollDetail parentRoll,
                                                List<WmRollDetail> childRolls, BigDecimal childTotalWeight,
                                                BigDecimal edgeWeightKg, String slitBatchNo, Long sourceDocId) {
-        WmRollDetail firstChild = childRolls.get(0);
-        WmTransaction recptTx = buildChildRecptTransaction(firstChild, childTotalWeight, slitBatchNo, sourceDocId);
-        transactionService.processTransaction(recptTx);
+        // 按物料聚合入库（不同子卷可能对应不同成品物料，不能全部挂到 firstChild.itemId）
+        Map<Long, List<WmRollDetail>> byItem = new LinkedHashMap<>();
+        for (WmRollDetail c : childRolls) {
+            byItem.computeIfAbsent(c.getItemId(), k -> new ArrayList<>()).add(c);
+        }
+        for (List<WmRollDetail> group : byItem.values()) {
+            WmRollDetail first = group.get(0);
+            BigDecimal groupWeight = group.stream()
+                    .map(c -> nvl(c.getActualWeight()))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            WmTransaction recptTx = buildChildRecptTransaction(first, groupWeight, slitBatchNo, sourceDocId);
+            transactionService.processTransaction(recptTx);
+        }
 
         if (req.getEdgeItemId() != null && edgeWeightKg != null && edgeWeightKg.compareTo(BigDecimal.ZERO) > 0) {
             WmTransaction edgeTx = buildEdgeTransaction(req, edgeWeightKg, parentRoll, slitBatchNo, sourceDocId);
@@ -334,7 +359,7 @@ public class ProSlittingServiceImpl implements IProSlittingService {
     private WmRollDetail buildChildRoll(ChildRollSpec spec, WmRollDetail parent,
                                         String slitBatchNo, String operator, String status) {
         WmRollDetail child = new WmRollDetail();
-        child.setRollCode(autoCodeGenerator.genSerialCode("ROLL_CODE", null));
+        child.setRollCode(genCodeWithFallback("ROLL_CODE", "RL"));
         child.setItemId(spec.getItemId() != null ? spec.getItemId() : parent.getItemId());
         child.setItemCode(spec.getItemCode() != null ? spec.getItemCode() : parent.getItemCode());
         child.setItemName(spec.getItemName() != null ? spec.getItemName() : parent.getItemName());
@@ -370,37 +395,69 @@ public class ProSlittingServiceImpl implements IProSlittingService {
                                  Long feedbackId, Long workorderId) {
         String operator = SecurityUtils.getUsername();
         for (WmRollDetail child : childRolls) {
-            try {
-                ProMaterialTrace trace = new ProMaterialTrace();
-                trace.setTraceType("SLIT");
-                trace.setParentType("ROLL");
-                trace.setParentId(parent.getRollId());
-                trace.setChildType("ROLL");
-                trace.setChildId(child.getRollId());
-                trace.setQuantity(child.getActualWeight());
-                trace.setUnitOfMeasure("TON");
-                trace.setUnitName("吨");
-                trace.setWorkorderId(workorderId);
-                trace.setFeedbackId(feedbackId);
-                trace.setTraceTime(new Date());
-                trace.setCreateTime(DateUtils.getNowDate());
-                trace.setCreateBy(operator);
-                traceMapper.insertProMaterialTrace(trace);
-            } catch (Exception e) {
-                log.error("分切追溯写入失败, parentRoll={}, childRoll={}", parent.getRollId(), child.getRollId(), e);
-            }
+            // 追溯写入失败必须向上抛出回滚收货事务，禁止静默丢边（否则母卷已收货但追溯断链）
+            ProMaterialTrace trace = new ProMaterialTrace();
+            trace.setTraceType("SLIT");
+            trace.setParentType("ROLL");
+            trace.setParentId(parent.getRollId());
+            trace.setChildType("ROLL");
+            trace.setChildId(child.getRollId());
+            trace.setQuantity(child.getActualWeight());
+            trace.setUnitOfMeasure("TON");
+            trace.setUnitName("吨");
+            trace.setWorkorderId(workorderId);
+            trace.setFeedbackId(feedbackId);
+            trace.setTraceTime(new Date());
+            trace.setCreateTime(DateUtils.getNowDate());
+            trace.setCreateBy(operator);
+            traceMapper.insertProMaterialTrace(trace);
+        }
+    }
+
+    /**
+     * 库存级分切转换追溯：MATERIAL_STOCK(母卷) ─SLIT→ MATERIAL_STOCK(子卷)。
+     * 与 ROLL→ROLL 的 writeSlitTraces 互补，让从库存维度追溯能直接看到「这卷子料是哪卷母卷切出来的」。
+     * 母卷 materialStockId 在发料时记录于 WmRollDetail；子卷 materialStockId 在收货入库后回填。
+     */
+    private void writeStockSlitTraces(WmRollDetail parent, List<WmTransaction> recptTxList,
+                                      Long feedbackId, Long workorderId) {
+        if (parent.getMaterialStockId() == null || recptTxList == null || recptTxList.isEmpty()) return;
+        String operator = SecurityUtils.getUsername();
+        for (WmTransaction tx : recptTxList) {
+            if (tx == null || tx.getMaterialStockId() == null) continue;
+            if (parent.getMaterialStockId().equals(tx.getMaterialStockId())) continue;
+            // 追溯写入失败必须向上抛出回滚收货事务，禁止静默丢边
+            ProMaterialTrace trace = new ProMaterialTrace();
+            trace.setTraceType("SLIT");
+            trace.setParentType("MATERIAL_STOCK");
+            trace.setParentId(parent.getMaterialStockId());
+            trace.setChildType("MATERIAL_STOCK");
+            trace.setChildId(tx.getMaterialStockId());
+            trace.setQuantity(tx.getQuantity());
+            trace.setUnitOfMeasure(tx.getUnitOfMeasure() != null ? tx.getUnitOfMeasure() : "TON");
+            trace.setUnitName(tx.getUnitName() != null ? tx.getUnitName() : "吨");
+            trace.setWorkorderId(workorderId);
+            trace.setFeedbackId(feedbackId);
+            trace.setTransactionId(tx.getTransactionId());
+            trace.setTraceTime(new Date());
+            trace.setCreateTime(DateUtils.getNowDate());
+            trace.setCreateBy(operator);
+            traceMapper.insertProMaterialTrace(trace);
         }
     }
 
     private ProFeedback createAndPersistFeedback(SlittingRequest req, WmRollDetail parentRoll,
-                                                  List<ChildRollSpec> childSpecs, String operator) {
-        ProFeedback fb = buildFeedback(req, parentRoll, childSpecs, operator, "INTERNAL");
+                                                  List<ChildRollSpec> childSpecs, String operator,
+                                                  String feedbackType) {
+        ProFeedback fb = buildFeedback(req, parentRoll, childSpecs, operator, feedbackType);
         feedbackMapper.insertProFeedback(fb);
         if (req.getWorkorderId() != null && isLastProcess(req)) {
             workorderMapper.addQuantityProduced(req.getWorkorderId(), nvl(fb.getQuantityFeedback()));
+            // 末道工序报工后，若累计合格量已达计划量则自动结案（与 ProFeedbackServiceImpl.auditFeedback 一致）
+            workorderDocService.autoCompleteWorkorderIfQualified(req.getWorkorderId());
         }
         if (req.getCardId() != null) {
-            advanceCard(fb, isLastProcess(req));
+            advanceCard(fb, isLastProcess(req), "OUTSOURCE".equals(feedbackType));
         }
         return fb;
     }
@@ -409,7 +466,7 @@ public class ProSlittingServiceImpl implements IProSlittingService {
                                        List<ChildRollSpec> childSpecs, String operator, String feedbackType) {
         ProFeedback fb = new ProFeedback();
         fb.setFeedbackType(feedbackType);
-        fb.setFeedbackCode(autoCodeGenerator.genSerialCode("FEEDBACK_CODE", null));
+        fb.setFeedbackCode(genCodeWithFallback("FEEDBACK_CODE", "FB"));
         fb.setWorkorderId(req.getWorkorderId() != null ? req.getWorkorderId() : 0L);
         fb.setWorkorderCode(req.getWorkorderCode());
         fb.setProcessId(req.getProcessId() != null ? req.getProcessId() : 0L);
@@ -418,15 +475,25 @@ public class ProSlittingServiceImpl implements IProSlittingService {
         fb.setCardId(req.getCardId());
         fb.setRouteId(req.getRouteId() != null ? req.getRouteId() : 0L);
         fb.setWorkstationId(req.getWorkstationId() != null ? req.getWorkstationId() : 0L);
+        // 外协分切：冗余厂商及外协厂工厂ID，与外协 8 表约定一致（多工厂报工数据隔离）
+        if ("OUTSOURCE".equals(feedbackType) && req.getVendorId() != null) {
+            fb.setVendorId(req.getVendorId());
+            fb.setVendorCode(req.getVendorCode());
+            fb.setVendorName(req.getVendorName());
+            MdVendor vendor = vendorMapper.selectMdVendorByVendorId(req.getVendorId());
+            if (vendor != null) fb.setOutsourceFactoryId(vendor.getOutsourceFactoryId());
+        }
         fb.setItemId(parentRoll.getItemId());
         fb.setItemCode(parentRoll.getItemCode());
         fb.setItemName(parentRoll.getItemName());
-        fb.setUnitOfMeasure("ROLL");
-        fb.setUnitName("卷");
-        BigDecimal childCount = new BigDecimal(childSpecs.size());
-        fb.setQuantity(childCount);
-        fb.setQuantityFeedback(childCount);
-        fb.setQuantityQualified(childCount);
+        // 统一按重量（吨）报工，与外协收货路径 createFeedback 单位一致；
+        // 否则末道工序 addQuantityProduced、卡数量判定会出现 ROLL 数 vs TON 数不可比。
+        fb.setUnitOfMeasure("TON");
+        fb.setUnitName("吨");
+        BigDecimal childTotalWeight = sumChildWeights(childSpecs);
+        fb.setQuantity(childTotalWeight);
+        fb.setQuantityFeedback(childTotalWeight);
+        fb.setQuantityQualified(childTotalWeight);
         fb.setQuantityUnqualified(BigDecimal.ZERO);
         fb.setQuantityUncheck(BigDecimal.ZERO);
         fb.setQuantityLaborScrap(BigDecimal.ZERO);
@@ -447,30 +514,26 @@ public class ProSlittingServiceImpl implements IProSlittingService {
         return last != null && last.getProcessId().equals(req.getProcessId());
     }
 
-    private void advanceCard(ProFeedback fb, boolean isLast) {
-        try {
-            com.ruoyi.system.domain.mes.pro.ProCard cardUpd = new com.ruoyi.system.domain.mes.pro.ProCard();
-            cardUpd.setCardId(fb.getCardId());
-            cardUpd.setCurrentProcessId(fb.getProcessId());
-            cardUpd.setCurrentProcessName(fb.getProcessName());
-            if (isLast) {
-                com.ruoyi.system.domain.mes.pro.ProCard card = cardMapper.selectProCardByCardId(fb.getCardId());
-                if (card != null) {
-                    BigDecimal produced = nvl(feedbackMapper.sumAuditedQualifiedByCardAndProcess(
-                            fb.getCardId(), fb.getProcessId()));
-                    BigDecimal planned = nvl(card.getQuantityTransfered());
-                    if (produced.compareTo(planned) >= 0) cardUpd.setStatus("COMPLETED");
-                }
-            } else {
-                // 收货：外协完成，恢复流转中（发料时置的 OUTSOURCING 在此恢复）
-                cardUpd.setStatus("ACTIVE");
+    private void advanceCard(ProFeedback fb, boolean isLast, boolean isOutsource) {
+        if (fb.getCardId() == null) return;
+        String targetStatus = STATUS_CARD_ACTIVE;
+        if (isLast) {
+            com.ruoyi.system.domain.mes.pro.ProCard card = cardMapper.selectProCardByCardId(fb.getCardId());
+            if (card != null) {
+                BigDecimal produced = nvl(feedbackMapper.sumAuditedQualifiedByCardAndProcess(
+                        fb.getCardId(), fb.getProcessId()));
+                BigDecimal planned = nvl(card.getQuantityTransfered());
+                if (produced.compareTo(planned) >= 0) targetStatus = STATUS_CARD_COMPLETED;
             }
-            cardUpd.setUpdateBy(SecurityUtils.getUsername());
-            cardUpd.setUpdateTime(DateUtils.getNowDate());
-            cardMapper.updateProCard(cardUpd);
-        } catch (Exception e) {
-            log.error("流转卡状态推进失败, cardId={}", fb.getCardId(), e);
         }
+        // 条件更新：厂内报工仅 ACTIVE→推进，外协收货仅 OUTSOURCING→推进，防并发丢失更新
+        String expectedStatus = isOutsource ? STATUS_CARD_OUTSOURCING : STATUS_CARD_ACTIVE;
+        int rows = cardMapper.advanceCard(
+                fb.getCardId(), fb.getProcessId(), fb.getProcessName(), targetStatus,
+                expectedStatus, SecurityUtils.getUsername());
+        if (rows == 0)
+            log.debug("流转卡推进跳过（已推进或状态不符）: cardId={}, expected={}, target={}",
+                    fb.getCardId(), expectedStatus, targetStatus);
     }
 
     private ProSlittingRecord buildSlittingRecord(SlittingRequest req, WmRollDetail parentRoll,
@@ -535,8 +598,7 @@ public class ProSlittingServiceImpl implements IProSlittingService {
         req.setVendorCode(vendor.getVendorCode());
         req.setVendorName(vendor.getVendorName());
 
-        // 预加载并校验所有母卷（在任何写操作前失败）
-        List<WmRollDetail> parents = new ArrayList<>();
+        // 预加载并校验所有母卷（快速失败，仅为用户体验；锁内仍会重新 SELECT FOR UPDATE 兜底）
         for (Long rollId : req.getParentRollIds()) {
             WmRollDetail roll = rollDetailMapper.selectWmRollDetailByRollId(rollId);
             if (roll == null) throw new ServiceException("母卷不存在: rollId=" + rollId);
@@ -546,18 +608,25 @@ public class ProSlittingServiceImpl implements IProSlittingService {
             if (roll.getActualWeight() == null || roll.getActualWeight().compareTo(BigDecimal.ZERO) <= 0) {
                 throw new ServiceException("母卷 " + roll.getRollCode() + " 重量异常");
             }
-            parents.add(roll);
         }
 
-        ProSlittingRecord first = null;
-        for (WmRollDetail parent : parents) {
-            String lockKey = "wm:slitting:outsource:" + parent.getRollId();
-            ProSlittingRecord rec = lockTemplate.executeWithResult(lockKey, 10,
-                    () -> txTemplate.execute(status -> issueOneParent(req, parent)));
-            if (first == null) first = rec;
-        }
-        log.info("外协发料完成: 厂商={}, 母卷数={}, 操作人={}", vendor.getVendorName(), parents.size(),
-                SecurityUtils.getUsername());
+        // 多母卷原子发料：所有母卷在一个事务内处理，任一失败整体回滚。
+        // 复合锁键按 rollId 升序拼接，保证同一组母卷的并发请求串行化；
+        // 不同组但有交集的并发由 issueOneParent 内的 markOutsourcedIfInStock 条件 UPDATE 兜底，
+        // 一方失败将随整个事务回滚（不会出现部分母卷已发料）。
+        List<Long> sortedIds = new ArrayList<>(req.getParentRollIds());
+        java.util.Collections.sort(sortedIds);
+        String bulkLockKey = "wm:slitting:outsource:bulk:" + sortedIds;
+        ProSlittingRecord first = lockTemplate.executeWithResult(bulkLockKey, 15,
+                () -> txTemplate.execute(status -> {
+                    ProSlittingRecord rec = null;
+                    for (Long parentId : sortedIds) {
+                        rec = issueOneParent(req, parentId);
+                    }
+                    return rec;
+                }));
+        log.info("外协发料完成: 厂商={}, 母卷数={}, 操作人={}", vendor.getVendorName(),
+                sortedIds.size(), SecurityUtils.getUsername());
         return first;
     }
 
@@ -571,9 +640,20 @@ public class ProSlittingServiceImpl implements IProSlittingService {
         }
     }
 
-    private ProSlittingRecord issueOneParent(SlittingRequest req, WmRollDetail parent) {
+    private ProSlittingRecord issueOneParent(SlittingRequest req, Long parentId) {
+        // 锁内重新查询（前置校验在锁外，存在 TOCTOU 窗口）：
+        // Redisson 串行化同一 rollId 的并发请求，事务内 SELECT 能看到前一个持锁者提交的最新状态
+        WmRollDetail parent = rollDetailMapper.selectWmRollDetailByRollId(parentId);
+        if (parent == null) throw new ServiceException("母卷不存在: rollId=" + parentId);
+        if (!"IN_STOCK".equals(parent.getStatus())) {
+            throw new ServiceException("母卷 " + parent.getRollCode() + " 状态非在库(" + parent.getStatus() + ")，不能发料");
+        }
+        if (parent.getActualWeight() == null || parent.getActualWeight().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ServiceException("母卷 " + parent.getRollCode() + " 重量异常");
+        }
+
         String operator = SecurityUtils.getUsername();
-        String slitBatchNo = autoCodeGenerator.genSerialCode("SLITTING_CODE", null);
+        String slitBatchNo = genCodeWithFallback("SLITTING_CODE", "SL");
 
         // 先建分切单（获取 slitId 作为库存事务 sourceDocId）
         ProSlittingRecord record = buildOutsourceIssueRecord(req, parent, slitBatchNo, operator);
@@ -583,35 +663,35 @@ public class ProSlittingServiceImpl implements IProSlittingService {
         WmTransaction pickTx = buildOutsourcePickTx(parent, slitBatchNo, record.getSlitId());
         transactionService.processTransaction(pickTx);
 
-        // 母卷状态 → OUTSOURCED
-        parent.setStatus("OUTSOURCED");
-        parent.setRemainingQuantity(BigDecimal.ZERO);
-        parent.setUpdateTime(DateUtils.getNowDate());
-        parent.setUpdateBy(operator);
-        rollDetailMapper.updateWmRollDetail(parent);
+        // 母卷状态 → OUTSOURCED（条件 UPDATE 兜底：仅 IN_STOCK 可跃迁，防并发重入）
+        int rows = rollDetailMapper.markOutsourcedIfInStock(parentId, operator, DateUtils.getNowDate());
+        if (rows == 0) {
+            throw new ServiceException("母卷 " + parent.getRollCode() + " 已被其他操作变更，请刷新重试");
+        }
 
         // 流转卡状态 → OUTSOURCING（外协进行中），让流转卡列表/看板体现"正在外协"
         markCardOutsourcing(record);
         return record;
     }
 
-    /** 发料时把关联的流转卡置为外协中，当前工序指向分切工序 */
+    /**
+     * 发料时把关联的流转卡置为外协中，当前工序指向分切工序。
+     * 仅 ACTIVE → OUTSOURCING：不回退已完工/已取消卡，也防并发外协单覆盖工序。
+     * 卡可能尚未建立（工单未开工）——查不存在时跳过属预期；DB 异常必须向上抛出回滚发料事务。
+     */
     private void markCardOutsourcing(ProSlittingRecord record) {
         if (record.getCardId() == null) return;
-        try {
-            com.ruoyi.system.domain.mes.pro.ProCard cardUpd = new com.ruoyi.system.domain.mes.pro.ProCard();
-            cardUpd.setCardId(record.getCardId());
-            cardUpd.setStatus("OUTSOURCING");
-            if (record.getProcessId() != null) {
-                cardUpd.setCurrentProcessId(record.getProcessId());
-                cardUpd.setCurrentProcessName(record.getProcessName());
-            }
-            cardUpd.setUpdateBy(SecurityUtils.getUsername());
-            cardUpd.setUpdateTime(DateUtils.getNowDate());
-            cardMapper.updateProCard(cardUpd);
-        } catch (Exception e) {
-            log.error("流转卡标记外协中失败, cardId={}", record.getCardId(), e);
+        ProCard existing = cardMapper.selectProCardByCardId(record.getCardId());
+        if (existing == null) {
+            log.debug("流转卡尚未建立，跳过外协标记: cardId={}", record.getCardId());
+            return;
         }
+        int rows = cardMapper.markOutsourcingIfActive(
+                record.getCardId(), record.getProcessId(), record.getProcessName(),
+                SecurityUtils.getUsername());
+        if (rows == 0)
+            log.debug("流转卡非 ACTIVE 状态，跳过外协标记（不回退已完工/已外协卡）: cardId={}, status={}",
+                    record.getCardId(), existing.getStatus());
     }
 
     private ProSlittingRecord buildOutsourceIssueRecord(SlittingRequest req, WmRollDetail parent,
@@ -761,6 +841,12 @@ public class ProSlittingServiceImpl implements IProSlittingService {
         List<WmRollDetail> children = loadOutsourceChildren(record.getSlitBatchNo(), parent.getRollId());
         if (children.isEmpty()) throw new ServiceException("未找到厂商录入的子卷，无法收货");
 
+        // 重量平衡校验前置（fail-fast）：避免入库/建报工/推进任务后才因损耗超标回滚
+        BigDecimal childTotal = children.stream().map(c -> nvl(c.getActualWeight())).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal edgeKg = request != null && request.getEdgeWeight() != null ? request.getEdgeWeight() : BigDecimal.ZERO;
+        BigDecimal edgeTon = edgeKg.divide(new BigDecimal("1000"), 4, RoundingMode.HALF_UP);
+        validateWeightBalance(nvl(record.getParentWeight()), childTotal, edgeTon);
+
         Long whId = request != null && request.getReceiveWarehouseId() != null
                 ? request.getReceiveWarehouseId() : parent.getWarehouseId();
         String whCode = request != null && request.getReceiveWarehouseCode() != null
@@ -769,7 +855,7 @@ public class ProSlittingServiceImpl implements IProSlittingService {
                 ? request.getReceiveWarehouseName() : parent.getWarehouseName();
 
         String operator = SecurityUtils.getUsername();
-        receiveChildrenIntoStock(children, whId, whCode, whName, record, operator);
+        List<WmTransaction> recptTxList = receiveChildrenIntoStock(children, whId, whCode, whName, record, operator);
         receiveEdgeIfAny(request, parent, record, operator);
 
         parent.setStatus("CONSUMED");
@@ -780,6 +866,13 @@ public class ProSlittingServiceImpl implements IProSlittingService {
 
         ProFeedback fb = createOutsourceFeedback(record, parent, children, operator);
         writeSlitTraces(parent, children, fb.getRecordId(), record.getWorkorderId());
+        // 库存级物料转换边：MATERIAL_STOCK(母卷) ─SLIT→ MATERIAL_STOCK(子卷)，
+        // 与 ROLL→ROLL 边互补，让从库存维度追溯能直接看到分切转换关系
+        writeStockSlitTraces(parent, recptTxList, fb.getRecordId(), record.getWorkorderId());
+
+        // 推进排产任务：外协收货等同于该工序产出（与通用外协 OutsourceServiceImpl.advanceTask 一致），
+        // 否则 ProTask 产量不增、状态不推进，任务看板/报表与工单结案状态不一致。
+        advanceTask(record, children, operator);
 
         finalizeReceiveRecord(record, request, parent, children, fb, operator);
         record.setChildRolls(children);
@@ -800,7 +893,7 @@ public class ProSlittingServiceImpl implements IProSlittingService {
         return outsourced;
     }
 
-    private void receiveChildrenIntoStock(List<WmRollDetail> children, Long whId, String whCode,
+    private List<WmTransaction> receiveChildrenIntoStock(List<WmRollDetail> children, Long whId, String whCode,
                                            String whName, ProSlittingRecord record, String operator) {
         // 按物料聚合入库（不同子卷物料分别入库存）
         Map<Long, List<WmRollDetail>> byItem = new LinkedHashMap<>();
@@ -815,12 +908,22 @@ public class ProSlittingServiceImpl implements IProSlittingService {
             rollDetailMapper.updateWmRollDetail(c);
             byItem.computeIfAbsent(c.getItemId(), k -> new ArrayList<>()).add(c);
         }
+        List<WmTransaction> txList = new ArrayList<>();
         for (List<WmRollDetail> group : byItem.values()) {
             WmRollDetail first = group.get(0);
             BigDecimal total = group.stream().map(c -> nvl(c.getActualWeight())).reduce(BigDecimal.ZERO, BigDecimal::add);
             WmTransaction recptTx = buildRecptTx(first, total, record.getSlitBatchNo(), record.getSlitId());
-            transactionService.processTransaction(recptTx);
+            WmTransaction processed = transactionService.processTransaction(recptTx);
+            txList.add(processed);
+            // 回填子卷的库存 ID（用于写 MATERIAL_STOCK→MATERIAL_STOCK 的 SLIT 追溯边）
+            if (processed != null && processed.getMaterialStockId() != null) {
+                for (WmRollDetail c : group) {
+                    c.setMaterialStockId(processed.getMaterialStockId());
+                    rollDetailMapper.updateWmRollDetail(c); // 持久化 material_stock_id，否则追溯断链
+                }
+            }
         }
+        return txList;
     }
 
     private WmTransaction buildRecptTx(WmRollDetail child, BigDecimal totalWeight, String slitBatchNo, Long slitId) {
@@ -883,6 +986,9 @@ public class ProSlittingServiceImpl implements IProSlittingService {
         reqStub.setProcessCode(record.getProcessCode());
         reqStub.setProcessName(record.getProcessName());
         reqStub.setCardId(record.getCardId());
+        reqStub.setVendorId(record.getVendorId());
+        reqStub.setVendorCode(record.getVendorCode());
+        reqStub.setVendorName(record.getVendorName());
         List<ChildRollSpec> specs = new ArrayList<>();
         for (WmRollDetail c : children) {
             ChildRollSpec s = new ChildRollSpec();
@@ -900,7 +1006,7 @@ public class ProSlittingServiceImpl implements IProSlittingService {
         stub.setItemCode(parent.getItemCode());
         stub.setItemName(parent.getItemName());
         stub.setActualWeight(record.getParentWeight());
-        return createAndPersistFeedback(reqStub, stub, specs, operator);
+        return createAndPersistFeedback(reqStub, stub, specs, operator, "OUTSOURCE");
     }
 
     private void finalizeReceiveRecord(ProSlittingRecord record, OutsourceReceiveRequest request,
@@ -935,6 +1041,41 @@ public class ProSlittingServiceImpl implements IProSlittingService {
         slittingMapper.updateProSlittingRecord(record);
     }
 
+    /**
+     * 收货后推进排产任务：累加合格产量，达计划量则 COMPLETED。
+     * 与通用外协 OutsourceServiceImpl.advanceTask 保持一致口径；无任务（未排产）时跳过。
+     */
+    private void advanceTask(ProSlittingRecord record, List<WmRollDetail> children, String operator) {
+        if (record.getWorkorderId() == null || record.getProcessId() == null) return;
+        ProTask query = new ProTask();
+        query.setWorkorderId(record.getWorkorderId());
+        query.setProcessId(record.getProcessId());
+        List<ProTask> tasks = proTaskMapper.selectProTaskList(query);
+        if (tasks == null || tasks.isEmpty()) return;
+        ProTask target = tasks.stream()
+                .filter(t -> ProConstants.TASK_STATUS_PRODUCING.equals(t.getStatus()))
+                .findFirst().orElse(null);
+        if (target == null) {
+            log.warn("分切外协收货未找到生产中任务: workorderId={}, processId={}",
+                    record.getWorkorderId(), record.getProcessId());
+            return;
+        }
+        BigDecimal totalQty = children.stream()
+                .map(c -> nvl(c.getActualWeight())).reduce(BigDecimal.ZERO, BigDecimal::add);
+        proTaskMapper.addQuantityProduced(target.getTaskId(), totalQty, totalQty, BigDecimal.ZERO);
+        ProTask updated = proTaskMapper.selectProTaskByTaskId(target.getTaskId());
+        if (updated != null && ProConstants.TASK_STATUS_PRODUCING.equals(updated.getStatus())) {
+            BigDecimal produced = nvl(updated.getQuantityProduced());
+            BigDecimal planned = nvl(updated.getQuantity());
+            if (planned.compareTo(BigDecimal.ZERO) > 0 && produced.compareTo(planned) >= 0) {
+                // 条件完成：仅 PRODUCING → COMPLETED，防收货与工单取消并发回退
+                int rows = proTaskMapper.completeTaskIfProducing(updated.getTaskId(), operator);
+                if (rows > 0)
+                    log.info("分切外协收货推进任务完成: taskId={}, produced={}/{}", updated.getTaskId(), produced, planned);
+            }
+        }
+    }
+
     // ════════════════════════════════════════════════════════════════
     // 厂商权限校验 + 查询
     // ════════════════════════════════════════════════════════════════
@@ -952,9 +1093,14 @@ public class ProSlittingServiceImpl implements IProSlittingService {
         return record;
     }
 
+    /**
+     * 取当前登录厂商 ID：无认证上下文（定时任务/系统调用）返回 null；
+     * 有认证但取 vendorId 失败时直接抛异常（fail-closed），避免越权看到全部数据。
+     */
     private Long currentVendorIdOrNull() {
-        try { return SecurityUtils.getVendorId(); }
-        catch (Exception e) { return null; }
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof LoginUser)) return null;
+        return SecurityUtils.getVendorId();
     }
 
     @Override
@@ -1015,6 +1161,21 @@ public class ProSlittingServiceImpl implements IProSlittingService {
             total = total.add(nvl(c.getActualWeight()));
         }
         return total;
+    }
+
+    /**
+     * 生成编码，自动编码规则不可用时以「前缀 + 时间戳 + 4 位随机数」兜底（DB 唯一约束最终兜底）。
+     */
+    private String genCodeWithFallback(String ruleName, String fallbackPrefix) {
+        if (autoCodeGenerator != null) {
+            try {
+                String code = autoCodeGenerator.genSerialCode(ruleName, null);
+                if (code != null && !code.isEmpty()) return code;
+            } catch (Exception ignored) { /* fall through to timestamp */ }
+        }
+        String ts = new java.text.SimpleDateFormat("yyyyMMddHHmmssSSS").format(new Date());
+        int rand = (int) (Math.random() * 10000);
+        return fallbackPrefix + ts + String.format("%04d", rand);
     }
 
     private BigDecimal nvl(BigDecimal v) { return v != null ? v : BigDecimal.ZERO; }

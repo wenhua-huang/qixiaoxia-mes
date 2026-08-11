@@ -5,6 +5,7 @@
     <resultMap type="com.ruoyi.system.domain.mes.wm.WmOutsourceOrder" id="WmOutsourceOrderResult">
         <id property="orderId" column="order_id" />
         <result property="factoryId" column="factory_id" />
+        <result property="outsourceFactoryId" column="outsource_factory_id" />
         <result property="orderCode" column="order_code" />
         <result property="vendorId" column="vendor_id" />
         <result property="vendorCode" column="vendor_code" />
@@ -24,6 +25,12 @@
         <result property="recptTotalQty" column="recpt_total_qty" />
         <result property="operator" column="operator" />
         <result property="issueTime" column="issue_time" />
+        <result property="vendorReceiveTime" column="vendor_receive_time" />
+        <result property="vendorReceiver" column="vendor_receiver" />
+        <result property="finishTime" column="finish_time" />
+        <result property="finishBy" column="finish_by" />
+        <result property="shipTime" column="ship_time" />
+        <result property="shipBy" column="ship_by" />
         <result property="receiveTime" column="receive_time" />
         <result property="remark" column="remark" />
         <result property="createBy" column="create_by" />
@@ -33,10 +40,12 @@
     </resultMap>
 
     <sql id="selectVo">
-        select order_id, factory_id, order_code, vendor_id, vendor_code, vendor_name,
+        select order_id, factory_id, outsource_factory_id, order_code, vendor_id, vendor_code, vendor_name,
                workorder_id, workorder_code, card_id, route_id, process_id, process_code, process_name,
                source_type, source_ref_id, status, feedback_id,
-               issue_total_qty, recpt_total_qty, operator, issue_time, receive_time,
+               issue_total_qty, recpt_total_qty, operator, issue_time,
+               vendor_receive_time, vendor_receiver, finish_time, finish_by, ship_time, ship_by,
+               receive_time,
                remark, create_by, create_time, update_by, update_time
         from qxx_wm_outsource_order
     </sql>
@@ -47,12 +56,20 @@
             <if test="orderCode != null and orderCode != ''"> and order_code like concat('%', #{orderCode}, '%')</if>
             <if test="vendorId != null"> and vendor_id = #{vendorId}</if>
             <if test="vendorName != null and vendorName != ''"> and vendor_name like concat('%', #{vendorName}, '%')</if>
+            <if test="workorderId != null"> and workorder_id = #{workorderId}</if>
             <if test="workorderCode != null and workorderCode != ''"> and workorder_code like concat('%', #{workorderCode}, '%')</if>
+            <if test="processId != null"> and process_id = #{processId}</if>
             <if test="status != null and status != ''"> and status = #{status}</if>
             <if test="sourceType != null and sourceType != ''"> and source_type = #{sourceType}</if>
             <if test="cardId != null"> and card_id = #{cardId}</if>
         </where>
         order by create_time desc
+    </select>
+
+    <select id="selectByWorkorderId" parameterType="Long" resultMap="WmOutsourceOrderResult">
+        <include refid="selectVo"/>
+        where workorder_id = #{workorderId}
+        order by order_id desc
     </select>
 
     <select id="selectOutsourceOrderByOrderId" parameterType="Long" resultMap="WmOutsourceOrderResult">
@@ -64,6 +81,7 @@
         insert into qxx_wm_outsource_order
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="factoryId != null">factory_id,</if>
+            <if test="outsourceFactoryId != null">outsource_factory_id,</if>
             <if test="orderCode != null">order_code,</if>
             <if test="vendorId != null">vendor_id,</if>
             <if test="vendorCode != null">vendor_code,</if>
@@ -82,12 +100,19 @@
             <if test="recptTotalQty != null">recpt_total_qty,</if>
             <if test="operator != null">operator,</if>
             <if test="issueTime != null">issue_time,</if>
+            <if test="vendorReceiveTime != null">vendor_receive_time,</if>
+            <if test="vendorReceiver != null">vendor_receiver,</if>
+            <if test="finishTime != null">finish_time,</if>
+            <if test="finishBy != null">finish_by,</if>
+            <if test="shipTime != null">ship_time,</if>
+            <if test="shipBy != null">ship_by,</if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
         </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="factoryId != null">#{factoryId},</if>
+            <if test="outsourceFactoryId != null">#{outsourceFactoryId},</if>
             <if test="orderCode != null">#{orderCode},</if>
             <if test="vendorId != null">#{vendorId},</if>
             <if test="vendorCode != null">#{vendorCode},</if>
@@ -106,6 +131,12 @@
             <if test="recptTotalQty != null">#{recptTotalQty},</if>
             <if test="operator != null">#{operator},</if>
             <if test="issueTime != null">#{issueTime},</if>
+            <if test="vendorReceiveTime != null">#{vendorReceiveTime},</if>
+            <if test="vendorReceiver != null">#{vendorReceiver},</if>
+            <if test="finishTime != null">#{finishTime},</if>
+            <if test="finishBy != null">#{finishBy},</if>
+            <if test="shipTime != null">#{shipTime},</if>
+            <if test="shipBy != null">#{shipBy},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
@@ -117,12 +148,26 @@
         <trim prefix="SET" suffixOverrides=",">
             <if test="status != null">status = #{status},</if>
             <if test="feedbackId != null">feedback_id = #{feedbackId},</if>
+            <if test="issueTotalQty != null">issue_total_qty = #{issueTotalQty},</if>
             <if test="recptTotalQty != null">recpt_total_qty = #{recptTotalQty},</if>
+            <if test="cardId != null">card_id = #{cardId},</if>
+            <if test="operator != null">operator = #{operator},</if>
+            <if test="issueTime != null">issue_time = #{issueTime},</if>
+            <if test="vendorReceiveTime != null">vendor_receive_time = #{vendorReceiveTime},</if>
+            <if test="vendorReceiver != null">vendor_receiver = #{vendorReceiver},</if>
+            <if test="finishTime != null">finish_time = #{finishTime},</if>
+            <if test="finishBy != null">finish_by = #{finishBy},</if>
+            <if test="shipTime != null">ship_time = #{shipTime},</if>
+            <if test="shipBy != null">ship_by = #{shipBy},</if>
             <if test="receiveTime != null">receive_time = #{receiveTime},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="updateTime != null">update_time = #{updateTime},</if>
         </trim>
         where order_id = #{orderId}
     </update>
+
+    <delete id="deleteOutsourceOrderByOrderId" parameterType="Long">
+        delete from qxx_wm_outsource_order where order_id = #{orderId}
+    </delete>
 
 </mapper>

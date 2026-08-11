@@ -13,10 +13,13 @@ import com.ruoyi.system.domain.mes.pro.ProWorkorderBom;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderParam;
 import com.ruoyi.system.domain.mes.wm.WmMaterialStock;
 import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
+import com.ruoyi.system.mapper.mes.pro.ProCardMapper;
+import com.ruoyi.system.mapper.mes.wm.WmMaterialStockMapper;
 import com.ruoyi.system.service.mes.pro.impl.ProWorkorderServiceImpl;
 import com.ruoyi.system.service.mes.wm.IWmIssueHeaderService;
 import com.ruoyi.system.service.mes.wm.IWmMaterialStockService;
 import com.ruoyi.system.service.mes.wm.IWmWarehouseService;
+import com.ruoyi.system.service.mes.wm.OutsourceIssueHelper;
 import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
 import com.ruoyi.system.domain.mes.pro.ProRouteProduct;
 import com.ruoyi.system.domain.mes.pro.ProTask;
@@ -57,6 +60,7 @@ class ProWorkorderServiceUnitTest {
     @Mock private ProWorkorderMapper workorderMapper;
     @Mock private IProWorkorderBomService workorderBomService;
     @Mock private IWmMaterialStockService materialStockService;
+    @Mock private WmMaterialStockMapper wmMaterialStockMapper;
     @Mock private IProWorkorderParamService workorderParamService;
     @Mock private IProRouteProductService proRouteProductService;
     @Mock private IProRouteProcessService proRouteProcessService;
@@ -64,6 +68,8 @@ class ProWorkorderServiceUnitTest {
     @Mock private IProWorkorderChangeService proWorkorderChangeService;
     @Mock private IWmIssueHeaderService wmIssueHeaderService;
     @Mock private IWmWarehouseService wmWarehouseService;
+    @Mock private ProCardMapper proCardMapper;
+    @Mock private OutsourceIssueHelper outsourceIssueHelper;
     @Mock private RedisLockTemplate lockTemplate;
     @Mock private PlatformTransactionManager transactionManager;
     @InjectMocks private ProWorkorderServiceImpl workorderService;
@@ -75,6 +81,18 @@ class ProWorkorderServiceUnitTest {
     void setUp() {
         securityUtilsMock = mockStatic(SecurityUtils.class);
         securityUtilsMock.when(SecurityUtils::getUsername).thenReturn("admin");
+
+        // 开工自动建卡：默认已有卡，跳过建卡（避免触发 autoCodeGenerator）
+        com.ruoyi.system.domain.mes.pro.ProCard existingCard = new com.ruoyi.system.domain.mes.pro.ProCard();
+        existingCard.setCardId(1L);
+        lenient().when(proCardMapper.selectProCardList(any()))
+                .thenReturn(List.of(existingCard));
+        // 外协工序映射：默认无外协工序，走厂内领料分支
+        lenient().when(outsourceIssueHelper.resolveOutsourceProcessMap(any()))
+                .thenReturn(new java.util.HashMap<>());
+        // Redis 锁默认透传执行 Supplier（cancelWorkorder/preStartCheck 等先锁后事务方法）
+        lenient().when(lockTemplate.execute(anyString(), any(java.util.function.Supplier.class)))
+                .thenAnswer(inv -> ((java.util.function.Supplier<?>) inv.getArgument(1)).get());
 
         testWorkorder = new ProWorkorder();
         testWorkorder.setWorkorderId(1L);
@@ -395,8 +413,9 @@ class ProWorkorderServiceUnitTest {
         bom.setTotalQuantity(new BigDecimal("10"));
         when(workorderBomService.selectProWorkorderBomByWorkorderId(1L)).thenReturn(List.of(bom));
         WmMaterialStock stock = new WmMaterialStock();
+        stock.setItemId(10L);
         stock.setQuantityAvailable(new BigDecimal("100"));
-        when(materialStockService.selectWmMaterialStockList(any(WmMaterialStock.class))).thenReturn(List.of(stock));
+        when(wmMaterialStockMapper.selectByItemIds(any())).thenReturn(List.of(stock));
         ProRouteProduct rp = new ProRouteProduct();
         rp.setRouteId(5L);
         when(proRouteProductService.selectProRouteProductByRecordId(10L)).thenReturn(rp);
@@ -452,8 +471,6 @@ class ProWorkorderServiceUnitTest {
     @Test
     @DisplayName("6. 物料齐套检查：库存不足（需要500，仅200）")
     void testMaterialAvailabilityCheck() {
-        when(workorderMapper.selectProWorkorderByWorkorderId(1L)).thenReturn(testWorkorder);
-
         ProWorkorderBom bom = new ProWorkorderBom();
         bom.setLineId(1L);
         bom.setItemId(200L);
@@ -466,10 +483,9 @@ class ProWorkorderServiceUnitTest {
         when(workorderBomService.selectProWorkorderBomByWorkorderId(1L)).thenReturn(bomList);
 
         WmMaterialStock stock = new WmMaterialStock();
+        stock.setItemId(200L);
         stock.setQuantityAvailable(new BigDecimal("200"));
-        List<WmMaterialStock> stocks = new ArrayList<>();
-        stocks.add(stock);
-        when(materialStockService.selectWmMaterialStockList(any(WmMaterialStock.class))).thenReturn(stocks);
+        when(wmMaterialStockMapper.selectByItemIds(any())).thenReturn(List.of(stock));
 
         List<Map<String, Object>> result = workorderService.checkMaterialReadiness(1L);
 
@@ -490,8 +506,6 @@ class ProWorkorderServiceUnitTest {
     @Test
     @DisplayName("7. 物料齐套检查：库存充足（需要500，有800）")
     void testMaterialAvailabilitySufficient() {
-        when(workorderMapper.selectProWorkorderByWorkorderId(1L)).thenReturn(testWorkorder);
-
         ProWorkorderBom bom = new ProWorkorderBom();
         bom.setLineId(1L);
         bom.setItemId(200L);
@@ -504,10 +518,9 @@ class ProWorkorderServiceUnitTest {
         when(workorderBomService.selectProWorkorderBomByWorkorderId(1L)).thenReturn(bomList);
 
         WmMaterialStock stock = new WmMaterialStock();
+        stock.setItemId(200L);
         stock.setQuantityAvailable(new BigDecimal("800"));
-        List<WmMaterialStock> stocks = new ArrayList<>();
-        stocks.add(stock);
-        when(materialStockService.selectWmMaterialStockList(any(WmMaterialStock.class))).thenReturn(stocks);
+        when(wmMaterialStockMapper.selectByItemIds(any())).thenReturn(List.of(stock));
 
         List<Map<String, Object>> result = workorderService.checkMaterialReadiness(1L);
 
@@ -520,7 +533,6 @@ class ProWorkorderServiceUnitTest {
     @DisplayName("7b. 物料齐套：多BOM行混合（部分充足、部分不足）")
     void testMaterialAvailabilityMixed() {
         testWorkorder.setWorkorderId(50L);
-        when(workorderMapper.selectProWorkorderByWorkorderId(50L)).thenReturn(testWorkorder);
 
         ProWorkorderBom bomA = new ProWorkorderBom();
         bomA.setLineId(1L);
@@ -543,17 +555,14 @@ class ProWorkorderServiceUnitTest {
         bomList.add(bomB);
         when(workorderBomService.selectProWorkorderBomByWorkorderId(50L)).thenReturn(bomList);
 
-        // 物料A库存仅30（不足）
+        // 物料A库存仅30（不足），物料B库存200（充足）—— 批量查询一次返回，按 itemId 聚合
         WmMaterialStock stockA = new WmMaterialStock();
+        stockA.setItemId(10L);
         stockA.setQuantityAvailable(new BigDecimal("30"));
-        when(materialStockService.selectWmMaterialStockList(argThat(s -> s != null && Long.valueOf(10L).equals(s.getItemId()))))
-                .thenReturn(List.of(stockA));
-
-        // 物料B库存200（充足）
         WmMaterialStock stockB = new WmMaterialStock();
+        stockB.setItemId(20L);
         stockB.setQuantityAvailable(new BigDecimal("200"));
-        when(materialStockService.selectWmMaterialStockList(argThat(s -> s != null && Long.valueOf(20L).equals(s.getItemId()))))
-                .thenReturn(List.of(stockB));
+        when(wmMaterialStockMapper.selectByItemIds(any())).thenReturn(List.of(stockA, stockB));
 
         List<Map<String, Object>> result = workorderService.checkMaterialReadiness(50L);
 
@@ -570,8 +579,6 @@ class ProWorkorderServiceUnitTest {
     @Test
     @DisplayName("7c. 物料齐套：多仓库库存汇总计算")
     void testMaterialAvailabilityMultiStocks() {
-        when(workorderMapper.selectProWorkorderByWorkorderId(1L)).thenReturn(testWorkorder);
-
         ProWorkorderBom bom = new ProWorkorderBom();
         bom.setLineId(1L);
         bom.setItemId(200L);
@@ -584,10 +591,12 @@ class ProWorkorderServiceUnitTest {
 
         // 两个仓库各100 → 汇总为200，仍不足
         WmMaterialStock stock1 = new WmMaterialStock();
+        stock1.setItemId(200L);
         stock1.setQuantityAvailable(new BigDecimal("100"));
         WmMaterialStock stock2 = new WmMaterialStock();
+        stock2.setItemId(200L);
         stock2.setQuantityAvailable(new BigDecimal("100"));
-        when(materialStockService.selectWmMaterialStockList(any(WmMaterialStock.class)))
+        when(wmMaterialStockMapper.selectByItemIds(any()))
                 .thenReturn(List.of(stock1, stock2));
 
         List<Map<String, Object>> result = workorderService.checkMaterialReadiness(1L);

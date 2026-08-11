@@ -20,6 +20,8 @@ public class WmOutsourceOrder extends BaseEntity
 
     private Long orderId;
     private Long factoryId;
+    /** 外协场景：供应商对应系统工厂ID（外协 8 表冗余字段，便于跨工厂查询） */
+    private Long outsourceFactoryId;
     private String orderCode;
 
     // 关联
@@ -49,6 +51,12 @@ public class WmOutsourceOrder extends BaseEntity
     // 操作
     private String operator;
     private Date issueTime;
+    private Date vendorReceiveTime;
+    private String vendorReceiver;
+    private Date finishTime;
+    private String finishBy;
+    private Date shipTime;
+    private String shipBy;
     private Date receiveTime;
 
     /** 发料行（创建/详情时用） */
@@ -63,6 +71,8 @@ public class WmOutsourceOrder extends BaseEntity
     public void setOrderId(Long v) { this.orderId = v; }
     public Long getFactoryId() { return factoryId; }
     public void setFactoryId(Long v) { this.factoryId = v; }
+    public Long getOutsourceFactoryId() { return outsourceFactoryId; }
+    public void setOutsourceFactoryId(Long v) { this.outsourceFactoryId = v; }
     public String getOrderCode() { return orderCode; }
     public void setOrderCode(String v) { this.orderCode = v; }
     public Long getVendorId() { return vendorId; }
@@ -101,6 +111,18 @@ public class WmOutsourceOrder extends BaseEntity
     public void setOperator(String v) { this.operator = v; }
     public Date getIssueTime() { return issueTime; }
     public void setIssueTime(Date v) { this.issueTime = v; }
+    public Date getVendorReceiveTime() { return vendorReceiveTime; }
+    public void setVendorReceiveTime(Date v) { this.vendorReceiveTime = v; }
+    public String getVendorReceiver() { return vendorReceiver; }
+    public void setVendorReceiver(String v) { this.vendorReceiver = v; }
+    public Date getFinishTime() { return finishTime; }
+    public void setFinishTime(Date v) { this.finishTime = v; }
+    public String getFinishBy() { return finishBy; }
+    public void setFinishBy(String v) { this.finishBy = v; }
+    public Date getShipTime() { return shipTime; }
+    public void setShipTime(Date v) { this.shipTime = v; }
+    public String getShipBy() { return shipBy; }
+    public void setShipBy(String v) { this.shipBy = v; }
     public Date getReceiveTime() { return receiveTime; }
     public void setReceiveTime(Date v) { this.receiveTime = v; }
     public List<WmOutsourceIssueLine> getIssueLines() { return issueLines; }

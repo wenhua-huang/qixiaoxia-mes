@@ -1,8 +1,10 @@
 package com.ruoyi.system.service.mes.pro.impl;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
@@ -71,22 +73,40 @@ public class ProMaterialTraceServiceImpl implements IProMaterialTraceService
     private static final int MAX_TRACE_DEPTH = 20;
 
     /**
+     * 业务单据节点类型：作为追溯分支的「视角锚点」。
+     * 菱形汇聚时，引用节点的「首现于 XXX」文案取最近一个锚点节点的描述。
+     */
+    private static final Set<String> BRANCH_ANCHOR_TYPES = Set.of(
+            "CARD", "OUTSOURCE_ORDER", "WORKORDER", "SALES_OUT", "PUR_ORDER", "VENDOR");
+
+    /**
      * 深度追溯：后端一次性递归返回完整链路，替代前端 N+1 查询。
      * 同时构建三种视图数据：
      *   - tree：完整追溯树（递归展开所有分支），用于横向 DAG 流向图
      *   - chain：主链（深度优先第一条路径），兼容旧时间线视图
      *   - branches：主链之外的同节点兄弟跳，兼容旧分支展示
-     * 用 visited 集合按 "type:id" 防环；循环节点标记 cycle=true 不再深入。
+     *
+     * 防环/汇聚采用两层集合：
+     *   - ancestors：当前 DFS 路径（进入 add、回溯 remove），命中即真环 cycle=true
+     *   - expanded：全遍历只增不减，命中即菱形汇聚 reference=true，指向首现分支
      */
     @Override
     public ProMaterialTraceChainResult traceChain(String startType, Long startId, String direction) {
         ProMaterialTraceChainResult result = new ProMaterialTraceChainResult(direction, startType, startId);
-        Set<String> visited = new HashSet<>();
-        Set<String> depthHit = new HashSet<>();  // 达到深度上限的节点
+        Set<String> ancestors = new HashSet<>();
+        Set<String> expanded = new HashSet<>();
+        Map<String, String> firstBranchOf = new HashMap<>();
+        Map<String, Integer> refCount = new HashMap<>();
+        Set<String> depthHit = new HashSet<>();
+        Set<String> cycleHit = new HashSet<>();
         boolean isForward = "forward".equals(direction);
 
-        // 构建完整追溯树
-        TraceTreeNode root = buildTraceTree(startType, startId, null, 0, visited, depthHit, isForward);
+        // 构建完整追溯树（根节点不归属任何分支）
+        TraceTreeNode root = buildTraceTree(startType, startId, null, 0,
+                ancestors, expanded, firstBranchOf, refCount,
+                depthHit, cycleHit, null, isForward);
+        // 把被引用次数回填到首次出现的节点上（角标「🔗N 处关联」）
+        annotateRefCount(root, refCount);
         result.setTree(root);
 
         // 兼容旧字段：从树提取主链 + 兄弟分支
@@ -99,6 +119,8 @@ public class ProMaterialTraceServiceImpl implements IProMaterialTraceService
         // 终止原因判定
         if (root.getChildren().isEmpty() && root.getTraceType() == null) {
             result.setEndedReason("NOT_FOUND");
+        } else if (!cycleHit.isEmpty()) {
+            result.setEndedReason("LOOP");
         } else if (!depthHit.isEmpty()) {
             result.setEndedReason("MAX_DEPTH");
         } else {
@@ -109,17 +131,21 @@ public class ProMaterialTraceServiceImpl implements IProMaterialTraceService
 
     /**
      * 递归构建追溯树。
-     * @param nodeType 当前节点类型
-     * @param nodeId   当前节点 ID
-     * @param enterEdge 进入此节点的边（trace 记录），根节点为 null
-     * @param depth    当前深度（根=0）
-     * @param visited  全局已访问节点（按 "type:id"），防环
-     * @param depthHit 达到深度上限的节点集合（用于 endedReason 判定）
-     * @param isForward 正向/反向
+     *
+     * @param ancestors      当前 DFS 路径上的节点 key（进入 add、回溯 remove），命中表示真环
+     * @param expanded       全遍历已展开节点 key（只增不减），命中表示菱形汇聚
+     * @param firstBranchOf  key → 首次出现所在分支锚点描述
+     * @param refCount       key → 被其他分支引用的次数
+     * @param depthHit       达到深度上限的节点集合
+     * @param cycleHit       命中真环的节点集合
+     * @param currentBranch  当前路径最近一个业务单据锚点描述（用于「首现于 XXX」）
      */
     private TraceTreeNode buildTraceTree(String nodeType, Long nodeId, ProMaterialTrace enterEdge,
-                                         int depth, Set<String> visited, Set<String> depthHit,
-                                         boolean isForward) {
+                                         int depth,
+                                         Set<String> ancestors, Set<String> expanded,
+                                         Map<String, String> firstBranchOf, Map<String, Integer> refCount,
+                                         Set<String> depthHit, Set<String> cycleHit,
+                                         String currentBranch, boolean isForward) {
         TraceTreeNode node = new TraceTreeNode();
         node.setNodeType(nodeType);
         node.setNodeId(nodeId);
@@ -134,14 +160,14 @@ public class ProMaterialTraceServiceImpl implements IProMaterialTraceService
             node.setItemName(enterEdge.getItemName());
             node.setBatchCode(enterEdge.getBatchCode());
         } else {
-            // 根节点描述稍后在父侧补充（取首条出边的 parent 描述）
             node.setNodeDesc(nodeType + " #" + nodeId);
         }
 
         String key = nodeType + ":" + nodeId;
-        // 防环：已访问过的节点不再深入
-        if (visited.contains(key)) {
+        // ① 真环：当前路径回到祖先（数据异常，标红截断）
+        if (ancestors.contains(key)) {
             node.setCycle(true);
+            cycleHit.add(key);
             return node;
         }
         // 深度限制
@@ -149,7 +175,23 @@ public class ProMaterialTraceServiceImpl implements IProMaterialTraceService
             depthHit.add(key);
             return node;
         }
-        visited.add(key);
+        // ② 菱形汇聚：该节点已在其他分支展开过，渲染为引用卡，不再递归
+        if (expanded.contains(key)) {
+            node.setReference(true);
+            node.setRefToBranch(firstBranchOf.get(key));
+            refCount.merge(key, 1, Integer::sum);
+            return node;
+        }
+
+        ancestors.add(key);
+        expanded.add(key);
+        // 记录首次出现时所属的业务分支（仅在有锚点时记录，避免 null 覆盖）
+        if (currentBranch != null) {
+            firstBranchOf.putIfAbsent(key, currentBranch);
+        }
+
+        // 业务单据节点本身作为新的分支锚点
+        String nextBranch = BRANCH_ANCHOR_TYPES.contains(nodeType) ? node.getNodeDesc() : currentBranch;
 
         // 查所有子跳
         List<ProMaterialTrace> hops = isForward
@@ -166,11 +208,28 @@ public class ProMaterialTraceServiceImpl implements IProMaterialTraceService
                 String childType = isForward ? hop.getChildType() : hop.getParentType();
                 Long childId = isForward ? hop.getChildId() : hop.getParentId();
                 if (childType == null || childId == null) continue;
-                TraceTreeNode child = buildTraceTree(childType, childId, hop, depth + 1, visited, depthHit, isForward);
+                TraceTreeNode child = buildTraceTree(childType, childId, hop, depth + 1,
+                        ancestors, expanded, firstBranchOf, refCount,
+                        depthHit, cycleHit, nextBranch, isForward);
                 node.getChildren().add(child);
             }
         }
+        // 回溯：只退出当前路径，expanded 保留（跨分支去重）
+        ancestors.remove(key);
         return node;
+    }
+
+    /** 后序遍历，把 refCount 中累计的被引用次数回填到首次出现（非 reference/cycle）的节点上 */
+    private void annotateRefCount(TraceTreeNode node, Map<String, Integer> refCount) {
+        if (node == null) return;
+        if (!node.isReference() && !node.isCycle()) {
+            String key = node.getNodeType() + ":" + node.getNodeId();
+            Integer n = refCount.get(key);
+            if (n != null && n > 0) node.setRefCount(n);
+        }
+        if (node.getChildren() != null) {
+            for (TraceTreeNode c : node.getChildren()) annotateRefCount(c, refCount);
+        }
     }
 
     /**

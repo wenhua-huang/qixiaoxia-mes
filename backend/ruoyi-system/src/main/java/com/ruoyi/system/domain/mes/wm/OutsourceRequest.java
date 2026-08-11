@@ -40,6 +40,9 @@ public class OutsourceRequest
 
     private String remark;
 
+    /** 草稿模式：true=只建单不扣料（DRAFT），false=直接发料扣料（ISSUED） */
+    private boolean draft = false;
+
     public Long getVendorId() { return vendorId; }
     public void setVendorId(Long v) { this.vendorId = v; }
     public String getVendorCode() { return vendorCode; }
@@ -68,4 +71,6 @@ public class OutsourceRequest
     public void setIssueLines(List<WmOutsourceIssueLine> v) { this.issueLines = v; }
     public String getRemark() { return remark; }
     public void setRemark(String v) { this.remark = v; }
+    public boolean isDraft() { return draft; }
+    public void setDraft(boolean v) { this.draft = v; }
 }

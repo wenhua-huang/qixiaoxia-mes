@@ -66,6 +66,11 @@
       "navigationBarTitleText": "常见问题"
     }
   }, {
+    "path": "pages/mine/usage/index",
+    "style": {
+      "navigationBarTitleText": "使用说明"
+    }
+  }, {
     "path": "pages/mine/about/index",
     "style": {
       "navigationBarTitleText": "关于我们"

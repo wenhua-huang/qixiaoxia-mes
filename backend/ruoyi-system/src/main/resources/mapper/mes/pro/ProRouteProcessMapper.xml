@@ -11,7 +11,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="processId"    column="process_id"    />
         <result property="processCode"    column="process_code"    />
         <result property="processName"    column="process_name"    />
-        <result property="processType"    column="process_type"    />
         <result property="orderNum"    column="order_num"    />
         <result property="nextProcessId"    column="next_process_id"    />
         <result property="nextProcessCode"    column="next_process_code"    />
@@ -35,7 +34,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectProRouteProcessVo">
-        select record_id, factory_id, route_id, process_id, process_code, process_name, process_type, order_num, next_process_id, next_process_code, next_process_name, link_type, default_pre_time, default_suf_time, color_code, key_flag, is_check, is_outsource, vendor_id, vendor_code, vendor_name, outsource_factory_id, remark, create_by, create_time, update_by, update_time from qxx_pro_route_process
+        select record_id, factory_id, route_id, process_id, process_code, process_name, order_num, next_process_id, next_process_code, next_process_name, link_type, default_pre_time, default_suf_time, color_code, key_flag, is_check, is_outsource, vendor_id, vendor_code, vendor_name, outsource_factory_id, remark, create_by, create_time, update_by, update_time from qxx_pro_route_process
     </sql>
 
     <select id="selectProRouteProcessList" parameterType="ProRouteProcess" resultMap="ProRouteProcessResult">
@@ -44,7 +43,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="routeId != null "> and route_id = #{routeId}</if>
             <if test="processCode != null  and processCode != ''"> and process_code = #{processCode}</if>
             <if test="processName != null  and processName != ''"> and process_name like concat('%', #{processName}, '%')</if>
-            <if test="processType != null  and processType != ''"> and process_type = #{processType}</if>
             <if test="keyFlag != null  and keyFlag != ''"> and key_flag = #{keyFlag}</if>
             <if test="isCheck != null  and isCheck != ''"> and is_check = #{isCheck}</if>
             <if test="isOutsource != null  and isOutsource != ''"> and is_outsource = #{isOutsource}</if>
@@ -77,7 +75,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="processId != null">process_id,</if>
             <if test="processCode != null and processCode != ''">process_code,</if>
             <if test="processName != null and processName != ''">process_name,</if>
-            <if test="processType != null and processType != ''">process_type,</if>
             <if test="orderNum != null">order_num,</if>
             <if test="nextProcessId != null">next_process_id,</if>
             <if test="nextProcessCode != null">next_process_code,</if>
@@ -102,7 +99,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="processId != null">#{processId},</if>
             <if test="processCode != null and processCode != ''">#{processCode},</if>
             <if test="processName != null and processName != ''">#{processName},</if>
-            <if test="processType != null and processType != ''">#{processType},</if>
             <if test="orderNum != null">#{orderNum},</if>
             <if test="nextProcessId != null">#{nextProcessId},</if>
             <if test="nextProcessCode != null">#{nextProcessCode},</if>
@@ -131,7 +127,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="processId != null">process_id = #{processId},</if>
             <if test="processCode != null and processCode != ''">process_code = #{processCode},</if>
             <if test="processName != null and processName != ''">process_name = #{processName},</if>
-            <if test="processType != null and processType != ''">process_type = #{processType},</if>
             <if test="orderNum != null">order_num = #{orderNum},</if>
             <if test="nextProcessId != null">next_process_id = #{nextProcessId},</if>
             <if test="nextProcessCode != null">next_process_code = #{nextProcessCode},</if>

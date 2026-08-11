@@ -202,7 +202,14 @@
               <el-date-picker v-model="form.hireDate" type="date" placeholder="请选择入职日期" value-format="YYYY-MM-DD" style="width: 100%" />
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <el-col :span="12" v-if="isVendorRoleSelected">
+            <el-form-item label="关联厂商" prop="vendorId" :rules="{ required: true, message: '请选择外协厂商', trigger: 'change' }">
+              <el-select v-model="form.vendorId" placeholder="请选择外协厂商" filterable clearable style="width: 100%">
+                <el-option v-for="v in vendorOptions" :key="v.vendorId" :label="v.vendorName" :value="v.vendorId" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12" v-if="!isVendorRoleSelected">
             <el-form-item label="微信openid">
               <el-input v-model="form.openid" placeholder="请输入微信openid" maxlength="100" />
             </el-form-item>
@@ -264,7 +271,8 @@ import ExcelImportDialog from "@/components/ExcelImportDialog/index.vue"
 import UserViewDrawer from "./view.vue"
 import { usePasswordRule } from "@/utils/passwordRule"
 import { changeUserStatus, listUser, resetUserPwd, delUser, getUser, updateUser, addUser, deptTreeSelect } from "@/api/system/user"
-import { listEmployeeSkill, addEmployeeSkill, delEmployeeSkill } from "@/api/mes/md/employeeSkill"
+import { listEmployeeSkill, addEmployeeSkill, updateEmployeeSkill, delEmployeeSkill } from "@/api/mes/md/employeeSkill"
+import { listAllVendor } from "@/api/mes/md/vendor"
 import type { SysUser, UserQueryParams, UserFormDataResult } from '@/types/api/system/user'
 import type { MdEmployeeSkill } from '@/api/mes/md/employeeSkill'
 import type { SysRole } from '@/types/api/system/role'
@@ -294,6 +302,10 @@ const postOptions = ref<SysPost[]>([])
 const roleOptions = ref<SysRole[]>([])
 // 技能列表（当前编辑用户的技能）
 const skillList = ref<MdEmployeeSkill[]>([])
+// 已持久化技能的原始快照（按 skillId 索引），用于保存时识别被修改的行
+const originalSkillMap = ref<Record<number, MdEmployeeSkill>>({})
+// 外协厂商下拉（仅厂商角色选中时关联）
+const vendorOptions = ref<any[]>([])
 // 列显隐信息
 const columns = ref<Record<string, TableShowColumns>>({
   userId: { label: '用户编号', visible: true },
@@ -329,13 +341,34 @@ const data = reactive({
 
 const { queryParams, form, rules } = toRefs(data)
 
+/** 是否选中了外协厂商角色（roleKey='vendor'）—— 决定是否显示关联厂商选择器 */
+const isVendorRoleSelected = computed(() => {
+  const vendorRole = roleOptions.value.find((r: SysRole) => r.roleKey === 'vendor')
+  if (!vendorRole) return false
+  return (form.value.roleIds || []).includes(vendorRole.roleId)
+})
+
+// 取消厂商角色时清空 vendorId，防止残留值被提交
+watch(isVendorRoleSelected, (selected) => {
+  if (!selected) form.value.vendorId = undefined
+})
+
+/** 懒加载外协厂商下拉（仅首次需要时拉取） */
+async function ensureVendorOptions() {
+  if (vendorOptions.value.length > 0) return
+  const res = await listAllVendor()
+  // 仅展示可分切的厂商：外协 or 兼营
+  vendorOptions.value = (res.data || []).filter((v: any) => v.vendorType === 'OUTSOURCE' || v.vendorType === 'BOTH')
+}
+
 /** 查询用户列表 */
 function getList() {
   loading.value = true
   listUser(proxy.addDateRange(queryParams.value, dateRange.value)).then(res => {
-    loading.value = false
     userList.value = res.rows
     total.value = res.total
+  }).finally(() => {
+    loading.value = false
   })
 }
 
@@ -440,7 +473,7 @@ function handleResetPwd(row: SysUser) {
     inputValidator: pwdPromptValidator
   }).then(({ value }: { value: string }) => { 
     resetUserPwd(row.userId!, value).then(() => {
-      proxy.$modal.msgSuccess("修改成功，新密码是：" + value)
+      proxy.$modal.msgSuccess("修改成功")
     })
   }).catch(() => {})
 }
@@ -480,9 +513,11 @@ function reset() {
       openid: undefined,
       wageType: undefined,
       employeeType: undefined,
-      hireDate: undefined
+      hireDate: undefined,
+      vendorId: undefined
     }
     skillList.value = []
+    originalSkillMap.value = {}
     proxy.resetForm("userRef")
   }
 
@@ -502,6 +537,7 @@ function handleAdd() {
     title.value = "添加用户"
     form.value.password = initPassword.value
   })
+  ensureVendorOptions()
 }
 
 /** 修改按钮操作 */
@@ -520,12 +556,21 @@ function handleUpdate(row?: SysUser) {
     // 加载该用户的技能列表
     loadSkills(userId)
   })
+  ensureVendorOptions()
 }
 
 /** 加载用户技能列表 */
 function loadSkills(userId: number) {
   listEmployeeSkill({ userId }).then(res => {
     skillList.value = res.rows || []
+    // 保存已持久化技能的原始快照（深拷贝字段），用于保存时识别被修改的行
+    const snap: Record<number, MdEmployeeSkill> = {}
+    for (const s of skillList.value) {
+      if (s.skillId) {
+        snap[s.skillId] = { skillId: s.skillId, skillName: s.skillName, skillLevel: s.skillLevel, userId: s.userId, userName: s.userName }
+      }
+    }
+    originalSkillMap.value = snap
   })
 }
 
@@ -549,19 +594,25 @@ function handleRemoveSkill(index: number) {
   }
 }
 
-/** 保存技能（新增未持久化的技能） */
+/** 保存技能（新增未持久化的 + 更新被修改的已持久化行） */
 function saveSkills(userId: number, userName: string) {
-  const newSkills = skillList.value.filter((s: MdEmployeeSkill) => !s.skillId)
-  if (newSkills.length === 0) return Promise.resolve()
-  const promises = newSkills.map((s: MdEmployeeSkill) => {
-    return addEmployeeSkill({
-      userId,
-      userName,
-      skillName: s.skillName,
-      skillLevel: s.skillLevel
-    })
-  })
-  return Promise.all(promises)
+  const promises: Promise<any>[] = []
+  for (const s of skillList.value) {
+    if (!s.skillId) {
+      // 新增行
+      promises.push(addEmployeeSkill({ userId, userName, skillName: s.skillName, skillLevel: s.skillLevel }))
+    } else {
+      // 已持久化行：仅在技能名/等级相对加载时的快照发生变化时才调更新
+      const orig = originalSkillMap.value[s.skillId]
+      if (orig && (orig.skillName !== s.skillName || orig.skillLevel !== s.skillLevel)) {
+        promises.push(updateEmployeeSkill({
+          skillId: s.skillId, userId, userName,
+          skillName: s.skillName, skillLevel: s.skillLevel
+        }))
+      }
+    }
+  }
+  return promises.length > 0 ? Promise.all(promises) : Promise.resolve()
 }
 
 /** 提交按钮 */

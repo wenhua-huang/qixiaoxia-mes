@@ -2,11 +2,15 @@ package com.ruoyi.system.service.mes.pro.impl;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.exception.ServiceException;
@@ -22,6 +26,9 @@ import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderBom;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderDeviationVO;
+import com.ruoyi.system.domain.mes.pro.ProOutsourceWorkorderInfoVO;
+import com.ruoyi.system.domain.mes.pro.ProCard;
+import com.ruoyi.system.domain.mes.wm.WmOutsourceOrder;
 import com.ruoyi.system.domain.mes.wm.WmMaterialStock;
 import com.ruoyi.system.domain.mes.wm.WmIssueHeader;
 import com.ruoyi.system.domain.mes.wm.WmIssueLine;
@@ -100,6 +107,15 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
     private IProRouteProcessParamService proRouteProcessParamService;
 
     @Autowired
+    private com.ruoyi.system.mapper.mes.wm.WmOutsourceOrderMapper wmOutsourceOrderMapper;
+
+    @Autowired
+    private com.ruoyi.system.mapper.mes.wm.WmMaterialStockMapper wmMaterialStockMapper;
+
+    @Autowired
+    private com.ruoyi.system.service.mes.wm.OutsourceIssueHelper outsourceIssueHelper;
+
+    @Autowired
     private IProTaskService proTaskService;
 
     @Autowired
@@ -128,6 +144,12 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
 
     @Autowired
     private com.ruoyi.system.mapper.mes.pro.ProCardMapper proCardMapper;
+    @Autowired
+    private com.ruoyi.system.mapper.mes.wm.WmIssueLineMapper wmIssueLineMapper;
+    @Autowired
+    private com.ruoyi.system.mapper.mes.pro.ProParamTemplateMapper proParamTemplateMapper;
+    @Autowired
+    private com.ruoyi.system.mapper.mes.pro.ProProcessMapper proProcessMapper;
 
     @Autowired
     private com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator autoCodeGenerator;
@@ -360,6 +382,119 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
     }
 
     /**
+     * 查询工单外协发料信息（App"外协按工单发料"入口）。
+     * 返回该工单所有外协工序(is_outsource=1)及其 BOM 发料行、默认厂商、已有外协单（防重复建单）。
+     */
+    @Override
+    public ProOutsourceWorkorderInfoVO getOutsourceInfoByCode(String workorderCode)
+    {
+        ProWorkorder wo = qxxProWorkorderMapper.selectProWorkorderByWorkorderCode(workorderCode);
+        if (wo == null) throw new ServiceException("未找到工单：" + workorderCode);
+
+        ProOutsourceWorkorderInfoVO vo = new ProOutsourceWorkorderInfoVO();
+        vo.setWorkorderId(wo.getWorkorderId());
+        vo.setWorkorderCode(wo.getWorkorderCode());
+        vo.setWorkorderName(wo.getWorkorderName());
+        vo.setProductName(wo.getProductName());
+
+        // routeId：routeProductId → ProRouteProduct.routeId
+        Long routeId = resolveRouteId(wo);
+        vo.setRouteId(routeId);
+
+        // 活跃流转卡（建单后用于标记 OUTSOURCING）
+        vo.setActiveCardId(resolveActiveCardId(wo.getWorkorderId()));
+
+        // 外协工序索引：processId → 路线工序(含默认厂商)
+        Map<Long, ProRouteProcess> outsourceMap = outsourceIssueHelper.resolveOutsourceProcessMap(wo);
+
+        // 一次查全该工单所有外协单，按 processId 分组取最新，消除 N+1
+        Map<Long, WmOutsourceOrder> existingByProcess = new HashMap<>();
+        List<WmOutsourceOrder> existingOrders = wmOutsourceOrderMapper.selectByWorkorderId(wo.getWorkorderId());
+        if (existingOrders != null) {
+            for (WmOutsourceOrder o : existingOrders) {
+                if (o.getProcessId() == null) continue;
+                // 已按 order_id desc 排序，首条即最新
+                existingByProcess.putIfAbsent(o.getProcessId(), o);
+            }
+        }
+
+        // BOM 按工序分组（与开工自动建草稿口径一致：跳过未关联工序的 BOM 行）
+        List<ProWorkorderBom> bomList = proWorkorderBomService.selectProWorkorderBomByWorkorderId(wo.getWorkorderId());
+        Map<Long, List<ProWorkorderBom>> bomByProcess = new LinkedHashMap<>();
+        if (bomList != null)
+        {
+            for (ProWorkorderBom bom : bomList)
+            {
+                if (bom.getProcessId() == null) continue;
+                bomByProcess.computeIfAbsent(bom.getProcessId(), k -> new ArrayList<>()).add(bom);
+            }
+        }
+
+        List<ProOutsourceWorkorderInfoVO.OutsourceProcessItem> items = new ArrayList<>();
+        for (ProRouteProcess rp : outsourceMap.values().stream()
+                .sorted(Comparator.comparing(p -> p.getOrderNum() == null ? Integer.MAX_VALUE : p.getOrderNum()))
+                .collect(Collectors.toList()))
+        {
+            ProOutsourceWorkorderInfoVO.OutsourceProcessItem item = new ProOutsourceWorkorderInfoVO.OutsourceProcessItem();
+            item.setProcessId(rp.getProcessId());
+            item.setProcessCode(rp.getProcessCode());
+            item.setProcessName(rp.getProcessName());
+            item.setOrderNum(rp.getOrderNum());
+            item.setVendorId(rp.getVendorId());
+            item.setVendorCode(rp.getVendorCode());
+            item.setVendorName(rp.getVendorName());
+
+            // 已有外协单（任意状态）：前端据此防重，草稿可继续执行，其他状态只读展示
+            WmOutsourceOrder existing = existingByProcess.get(rp.getProcessId());
+            if (existing != null)
+            {
+                item.setExistingOrderId(existing.getOrderId());
+                item.setExistingOrderCode(existing.getOrderCode());
+                item.setExistingStatus(existing.getStatus());
+            }
+
+            // BOM 发料行（数量取预计总用量，空则回退单位用量）
+            List<ProWorkorderBom> processBoms = bomByProcess.getOrDefault(rp.getProcessId(), new ArrayList<>());
+            List<ProOutsourceWorkorderInfoVO.OutsourceBomLine> bomLines = new ArrayList<>();
+            for (ProWorkorderBom bom : processBoms)
+            {
+                ProOutsourceWorkorderInfoVO.OutsourceBomLine line = new ProOutsourceWorkorderInfoVO.OutsourceBomLine();
+                line.setItemId(bom.getItemId());
+                line.setItemCode(bom.getItemCode());
+                line.setItemName(bom.getItemName());
+                line.setSpecification(bom.getItemSpc());
+                line.setUnitOfMeasure(bom.getUnitOfMeasure());
+                line.setUnitName(bom.getUnitName());
+                line.setQuantity(bom.getTotalQuantity() != null ? bom.getTotalQuantity() : bom.getQuantity());
+                bomLines.add(line);
+            }
+            item.setBomLines(bomLines);
+            items.add(item);
+        }
+        vo.setOutsourceProcesses(items);
+        return vo;
+    }
+
+    /** routeProductId → ProRouteProduct.routeId */
+    private Long resolveRouteId(ProWorkorder wo)
+    {
+        if (wo == null || wo.getRouteProductId() == null) return null;
+        ProRouteProduct rp = proRouteProductService.selectProRouteProductByRecordId(wo.getRouteProductId());
+        return rp != null ? rp.getRouteId() : null;
+    }
+
+    /** 查工单一张活跃流转卡ID（无则 null） */
+    private Long resolveActiveCardId(Long workorderId)
+    {
+        if (workorderId == null) return null;
+        ProCard q = new ProCard();
+        q.setWorkorderId(workorderId);
+        q.setStatus("ACTIVE");
+        List<ProCard> cards = proCardMapper.selectProCardList(q);
+        return (cards != null && !cards.isEmpty()) ? cards.get(0).getCardId() : null;
+    }
+
+    /**
      * 查询生产工单列表
      *
      * @param proWorkorder 生产工单
@@ -570,6 +705,59 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         card.setCreateTime(DateUtils.getNowDate());
         proCardMapper.insertProCard(card);
         log.info("开工自动建流转卡: workorderId={}, cardCode={}", wo.getWorkorderId(), cardCode);
+
+        // 回填已完成的外协工序（外协收货先于开工建卡的时序）
+        advanceCardForCompletedOutsource(card, wo);
+    }
+
+    /**
+     * 建卡后回填已收货的外协工序：把 currentProcessId 推进到路线中最后一个已完成外协工序。
+     * 场景：外协建单→收货 完成在开工建卡之前，卡 currentProcessId 初始为 null，
+     * 若不回填，后续首道自制工序报工会被 validateProcessSequence 的"新卡只能报首道"拦截。
+     */
+    private void advanceCardForCompletedOutsource(com.ruoyi.system.domain.mes.pro.ProCard card, ProWorkorder wo) {
+        try {
+            if (wo.getRouteProductId() == null) return;
+            // 查该工单已收货的外协单
+            com.ruoyi.system.domain.mes.wm.WmOutsourceOrder oq = new com.ruoyi.system.domain.mes.wm.WmOutsourceOrder();
+            oq.setWorkorderId(wo.getWorkorderId());
+            oq.setStatus("RECEIVED");
+            List<com.ruoyi.system.domain.mes.wm.WmOutsourceOrder> receivedOrders =
+                    wmOutsourceOrderMapper.selectOutsourceOrderList(oq);
+            if (receivedOrders == null || receivedOrders.isEmpty()) return;
+
+            // 路线工序顺序
+            com.ruoyi.system.domain.mes.pro.ProRouteProduct rp = proRouteProductService
+                    .selectProRouteProductByRecordId(wo.getRouteProductId());
+            if (rp == null || rp.getRouteId() == null) return;
+            List<com.ruoyi.system.domain.mes.pro.ProRouteProcess> rps =
+                    proRouteProcessService.selectProRouteProcessByRouteId(rp.getRouteId());
+            if (rps == null || rps.isEmpty()) return;
+
+            // 在路线顺序中找最后一个已收货外协单覆盖的工序位置
+            java.util.Set<Long> receivedProcessIds = receivedOrders.stream()
+                    .map(com.ruoyi.system.domain.mes.wm.WmOutsourceOrder::getProcessId)
+                    .filter(java.util.Objects::nonNull)
+                    .collect(java.util.stream.Collectors.toSet());
+            int lastPos = -1;
+            for (int i = 0; i < rps.size(); i++) {
+                if (receivedProcessIds.contains(rps.get(i).getProcessId())) lastPos = i;
+            }
+            if (lastPos < 0) return;
+
+            com.ruoyi.system.domain.mes.pro.ProRouteProcess target = rps.get(lastPos);
+            com.ruoyi.system.domain.mes.pro.ProCard upd = new com.ruoyi.system.domain.mes.pro.ProCard();
+            upd.setCardId(card.getCardId());
+            upd.setCurrentProcessId(target.getProcessId());
+            upd.setCurrentProcessName(target.getProcessName());
+            upd.setUpdateBy(SecurityUtils.getUsername());
+            upd.setUpdateTime(DateUtils.getNowDate());
+            proCardMapper.updateProCard(upd);
+            log.info("建卡回填外协工序: cardId={}, workorderId={}, currentProcessId={}({})",
+                    card.getCardId(), wo.getWorkorderId(), target.getProcessId(), target.getProcessName());
+        } catch (Exception e) {
+            log.error("建卡回填外协工序失败, cardId={}, workorderId={}", card.getCardId(), wo.getWorkorderId(), e);
+        }
     }
 
     /**
@@ -580,6 +768,17 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
      */
     @Override
     public int cancelWorkorder(Long workorderId)
+    {
+        // 先锁后事务（AGENTS.md 红线）：cancel 内部调用 wmIssueHeaderService.cancel/releaseAllocation
+        // 会再取各自 Redis 锁并开内部 TransactionTemplate（REQUIRED 加入外层事务），
+        // 外层必须先拿锁再开事务，避免 DB 连接跨 Redis 锁等待、锁先于事务提交释放导致并发丢失更新。
+        TransactionTemplate tt = new TransactionTemplate(txManager);
+        tt.setTimeout(30);
+        return lockTemplate.execute("pro:workorder:cancel:" + workorderId,
+                () -> tt.execute(status -> doCancelWorkorder(workorderId)));
+    }
+
+    private int doCancelWorkorder(Long workorderId)
     {
         ProWorkorder wo = selectProWorkorderByWorkorderId(workorderId);
         if (wo == null) throw new ServiceException("工单不存在");
@@ -638,34 +837,24 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
             throw new ServiceException("工单无 BOM 数据，请先维护物料清单");
         }
 
-        // 2. 获取工单信息（用于 factory_id 过滤）
-        ProWorkorder wo = selectProWorkorderByWorkorderId(workorderId);
-
-        // 3. 本工单已备料量（领料单 ALLOCATED/PARTIAL_ISSUED/ISSUED）—— 预占/出库时已扣
+        // 2. 本工单已备料量（领料单 ALLOCATED/PARTIAL_ISSUED/ISSUED）—— 预占/出库时已扣
         //    quantity_available，齐套计算需加回，否则发料后永远显示缺料
         Map<Long, BigDecimal> reservedByItem = sumReservedByItem(workorderId);
+
+        // 3. 一次性批量加载所有 BOM 物料的库存，消除逐物料 N+1（factory_id 由拦截器注入）
+        List<Long> bomItemIds = new ArrayList<>();
+        for (ProWorkorderBom bom : bomList) {
+            if (bom.getItemId() != null) bomItemIds.add(bom.getItemId());
+        }
+        Map<Long, BigDecimal> availableByItem = sumAvailableByItemIds(bomItemIds);
 
         List<Map<String, Object>> result = new ArrayList<>();
         boolean allSufficient = true;
 
         for (ProWorkorderBom bom : bomList) {
-            // 查询该物料在工厂下的所有库存
-            WmMaterialStock query = new WmMaterialStock();
-            query.setItemId(bom.getItemId());
-            if (wo.getFactoryId() != null) {
-                query.setFactoryId(wo.getFactoryId());
-            }
-            List<WmMaterialStock> stocks = wmMaterialStockService.selectWmMaterialStockList(query);
-
             // 汇总可用库存（确认领料时已预占扣减quantity_available）
             // 存量数据已通过 migration_init_available.sql 初始化为 quantity_onhand
-            BigDecimal availableTotal = BigDecimal.ZERO;
-            for (WmMaterialStock stock : stocks) {
-                BigDecimal avail = stock.getQuantityAvailable();
-                if (avail != null) {
-                    availableTotal = availableTotal.add(avail);
-                }
-            }
+            BigDecimal availableTotal = availableByItem.getOrDefault(bom.getItemId(), BigDecimal.ZERO);
 
             // 本工单已备料量（已预占或已发料，库存 available 已被扣除，需加回）
             BigDecimal reserved = reservedByItem.getOrDefault(bom.getItemId(), BigDecimal.ZERO);
@@ -730,15 +919,90 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         }
 
         // 按物料聚合领料数量（quantity_issue：应发量；预占/出库态下等于已备好量）
-        for (Long issueId : issueIds) {
-            WmIssueLine lQuery = new WmIssueLine();
-            lQuery.setIssueId(issueId);
-            for (WmIssueLine line : wmIssueLineService.selectWmIssueLineList(lQuery)) {
-                BigDecimal qty = line.getQuantityIssue() != null ? line.getQuantityIssue() : BigDecimal.ZERO;
-                reservedByItem.merge(line.getItemId(), qty, BigDecimal::add);
-            }
+        // 批量查明细，避免按单循环 N+1
+        for (WmIssueLine line : wmIssueLineMapper.selectByIssueIds(issueIds))
+        {
+            BigDecimal qty = line.getQuantityIssue() != null ? line.getQuantityIssue() : BigDecimal.ZERO;
+            reservedByItem.merge(line.getItemId(), qty, BigDecimal::add);
         }
         return reservedByItem;
+    }
+
+    /**
+     * 按 itemId 集合汇总可用库存 quantity_available（批量查询，消除齐套分析 N+1）。
+     *
+     * @param itemIds 物料ID集合
+     * @return itemId → 可用库存合计
+     */
+    private Map<Long, BigDecimal> sumAvailableByItemIds(List<Long> itemIds)
+    {
+        Map<Long, BigDecimal> availableByItem = new HashMap<>();
+        if (itemIds == null || itemIds.isEmpty()) return availableByItem;
+        List<WmMaterialStock> stocks = wmMaterialStockMapper.selectByItemIds(itemIds);
+        if (stocks == null) return availableByItem;
+        for (WmMaterialStock stock : stocks) {
+            if (stock.getItemId() == null || stock.getQuantityAvailable() == null) continue;
+            availableByItem.merge(stock.getItemId(), stock.getQuantityAvailable(), BigDecimal::add);
+        }
+        return availableByItem;
+    }
+
+    /**
+     * 加载工单下全部排产任务，按 processId 索引（消除逐工序任务查询 N+1）。
+     */
+    private Map<Long, ProTask> loadWorkorderTasksByProcess(Long workorderId)
+    {
+        Map<Long, ProTask> taskByProcess = new HashMap<>();
+        ProTask q = new ProTask();
+        q.setWorkorderId(workorderId);
+        List<ProTask> tasks = proTaskService.selectProTaskList(q);
+        if (tasks != null) {
+            for (ProTask t : tasks) {
+                if (t.getProcessId() != null) taskByProcess.putIfAbsent(t.getProcessId(), t);
+            }
+        }
+        return taskByProcess;
+    }
+
+    /**
+     * 加载工单下已有领料单的 taskId 集合（消除逐工序幂等查询 N+1）。
+     */
+    private Set<Long> loadIssuedTaskIds(Long workorderId)
+    {
+        Set<Long> taskIds = new HashSet<>();
+        WmIssueHeader q = new WmIssueHeader();
+        q.setWorkorderId(workorderId);
+        List<WmIssueHeader> headers = wmIssueHeaderService.selectWmIssueHeaderList(q);
+        if (headers != null) {
+            for (WmIssueHeader h : headers) {
+                if (h.getTaskId() != null) taskIds.add(h.getTaskId());
+            }
+        }
+        return taskIds;
+    }
+
+    /**
+     * 按 templateId 集合批量加载参数模板（空集合返回空 Map，factory_id 由拦截器注入）。
+     */
+    private Map<Long, ProParamTemplate> loadTemplatesByIds(List<Long> templateIds)
+    {
+        Map<Long, ProParamTemplate> map = new HashMap<>();
+        if (templateIds == null || templateIds.isEmpty()) return map;
+        List<ProParamTemplate> list = proParamTemplateMapper.selectByTemplateIds(templateIds);
+        if (list != null) for (ProParamTemplate t : list) map.put(t.getTemplateId(), t);
+        return map;
+    }
+
+    /**
+     * 按 processId 集合批量加载工序（空集合返回空 Map，factory_id 由拦截器注入）。
+     */
+    private Map<Long, ProProcess> loadProcessesByIds(Set<Long> processIds)
+    {
+        Map<Long, ProProcess> map = new HashMap<>();
+        if (processIds == null || processIds.isEmpty()) return map;
+        List<ProProcess> list = proProcessMapper.selectByProcessIds(processIds);
+        if (list != null) for (ProProcess p : list) map.put(p.getProcessId(), p);
+        return map;
     }
 
     /**
@@ -931,12 +1195,21 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
             grouped.computeIfAbsent(pid, k -> new ArrayList<>()).add(bom);
         }
 
+        // 外协工序索引：is_outsource=1 的工序走外协发料单，不发厂内领料单
+        Map<Long, ProRouteProcess> outsourceMap = outsourceIssueHelper.resolveOutsourceProcessMap(wo);
+
         // 找到默认仓库
         Long defaultWarehouseId = findDefaultWarehouse(wo.getFactoryId());
 
+        // 一次性加载该工单的全部排产任务（按 processId 分组），消除逐工序任务查询 N+1
+        Map<Long, ProTask> taskByProcess = loadWorkorderTasksByProcess(wo.getWorkorderId());
+        // 一次性加载该工单已有领料单的 taskId 集合（幂等判断），消除逐工序查询 N+1
+        Set<Long> issuedTaskIds = loadIssuedTaskIds(wo.getWorkorderId());
+
         List<Map<String, Object>> generatedIssues = new ArrayList<>();
-        List<Map<String, Object>> skippedProcesses = new ArrayList<>();
-        int totalCreated = 0;
+        int internalCreated = 0;
+        int outsourceCreated = 0;
+        int skippedCount = 0;
 
         for (Map.Entry<Long, List<ProWorkorderBom>> entry : grouped.entrySet())
         {
@@ -946,40 +1219,40 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
             // processId=0 表示 BOM 行未关联工序，跳过
             if (processId == 0L)
             {
-                Map<String, Object> skip = new HashMap<>();
-                skip.put("processId", 0L);
-                skip.put("processName", "未指定工序");
-                skip.put("itemCount", processBoms.size());
-                skippedProcesses.add(skip);
+                skippedCount++;
                 continue;
             }
 
             String processName = processBoms.get(0).getProcessName();
+            ProRouteProcess outsourceRp = outsourceMap.get(processId);
 
-            // 查找该工序对应的排产任务
-            ProTask taskQuery = new ProTask();
-            taskQuery.setWorkorderId(wo.getWorkorderId());
-            taskQuery.setProcessId(processId);
-            List<ProTask> tasks = proTaskService.selectProTaskList(taskQuery);
-            ProTask task = (tasks != null && !tasks.isEmpty()) ? tasks.get(0) : null;
+            if (outsourceRp != null)
+            {
+                // 外协工序：物料走外协发料单（qxx_wm_outsource_order），幂等
+                String outsourceCode = outsourceIssueHelper.issueOutsourceForProcess(wo, outsourceRp, processBoms, defaultWarehouseId);
+                if (outsourceCode != null) outsourceCreated++;
+                Map<String, Object> info = new HashMap<>();
+                info.put("docType", "OUTSOURCE");
+                info.put("processId", processId);
+                info.put("processName", processName);
+                info.put("vendorName", outsourceRp.getVendorName());
+                info.put("orderCode", outsourceCode);
+                info.put("lineCount", processBoms.size());
+                info.put("created", outsourceCode != null);
+                generatedIssues.add(info);
+                continue;
+            }
+
+            // 厂内工序：生成生产领料单
+            // 从预加载的任务 Map 中取该工序对应的排产任务
+            ProTask task = taskByProcess.get(processId);
             String processCode = (task != null) ? task.getProcessCode() : null;
 
             // 幂等检查：如果该工单+任务已有领料单，跳过
-            if (task != null)
+            if (task != null && issuedTaskIds.contains(task.getTaskId()))
             {
-                WmIssueHeader existQuery = new WmIssueHeader();
-                existQuery.setWorkorderId(wo.getWorkorderId());
-                existQuery.setTaskId(task.getTaskId());
-                List<WmIssueHeader> existingIssues = wmIssueHeaderService.selectWmIssueHeaderList(existQuery);
-                if (existingIssues != null && !existingIssues.isEmpty())
-                {
-                    Map<String, Object> skip = new HashMap<>();
-                    skip.put("processId", processId);
-                    skip.put("processName", processName);
-                    skip.put("message", "已存在领料单，跳过");
-                    skippedProcesses.add(skip);
-                    continue;
-                }
+                skippedCount++;
+                continue;
             }
 
             // 生成领料单编码：LL + 日期 + 序号
@@ -1036,6 +1309,7 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
             wmIssueHeaderService.updateWmIssueHeader(header);
 
             Map<String, Object> issueInfo = new HashMap<>();
+            issueInfo.put("docType", "ISSUE");
             issueInfo.put("issueId", header.getIssueId());
             issueInfo.put("issueCode", issueCode);
             issueInfo.put("processId", processId);
@@ -1044,14 +1318,16 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
             issueInfo.put("lineCount", processBoms.size());
             issueInfo.put("taskId", task != null ? task.getTaskId() : null);
             generatedIssues.add(issueInfo);
-            totalCreated++;
+            internalCreated++;
         }
 
         // 构建 message
         StringBuilder msg = new StringBuilder();
-        msg.append("已生成 ").append(totalCreated).append(" 张领料单");
-        if (!skippedProcesses.isEmpty())
-            msg.append("，").append(skippedProcesses.size()).append(" 个分组无工序关联已跳过");
+        msg.append("已生成 ").append(internalCreated).append(" 张领料单");
+        if (outsourceCreated > 0)
+            msg.append("、").append(outsourceCreated).append(" 张外协领料单");
+        if (skippedCount > 0)
+            msg.append("，").append(skippedCount).append(" 个工序已存在单据/无工序关联已跳过");
 
         step.put("status", "PASS");
         step.put("message", msg.toString());
@@ -1095,11 +1371,21 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         return 1L; // 最终兜底
     }
 
-    /** 生成领料单编码 LL-yyyyMMddHHmmssSSS */
+    /** 生成领料单编码：优先走 AutoCodeGenerator（规则可配置），失败则用 LL+时间戳+随机数兜底 */
     private String generateIssueCode()
     {
+        try
+        {
+            String code = autoCodeGenerator.genSerialCode("ISSUE_CODE", null);
+            if (code != null && !code.isEmpty()) return code;
+        }
+        catch (Exception ignored)
+        {
+            // 规则未配置时降级为时间戳
+        }
         String ts = new java.text.SimpleDateFormat("yyyyMMddHHmmssSSS").format(new Date());
-        return "LL" + ts.substring(2); // 取后15位
+        int rand = (int) (Math.random() * 10000);
+        return "LL" + ts.substring(2) + String.format("%04d", rand);
     }
 
     /** 跳过从 fromStep 到 toStep 的步骤 */
@@ -1620,6 +1906,23 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         }
 
         if (paramList != null) {
+            // 先找出所有发生调整的参数模板ID，一次性批量加载模板及其工序，消除逐参数 N+1
+            List<Long> adjustedTemplateIds = new ArrayList<>();
+            for (ProWorkorderParam p : paramList) {
+                if (p.getTemplateId() == null) continue;
+                String adj = (p.getAdjustedValue() != null) ? p.getAdjustedValue().trim() : "";
+                if (adj.isEmpty()) continue;
+                String std = routeParamMap.getOrDefault(p.getTemplateId(),
+                        p.getStandardValue() != null ? p.getStandardValue() : "");
+                if (!adj.equals(std)) adjustedTemplateIds.add(p.getTemplateId());
+            }
+            Map<Long, ProParamTemplate> tmplById = loadTemplatesByIds(adjustedTemplateIds);
+            Set<Long> processIds = new HashSet<>();
+            for (ProParamTemplate t : tmplById.values()) {
+                if (t.getProcessId() != null) processIds.add(t.getProcessId());
+            }
+            Map<Long, ProProcess> procById = loadProcessesByIds(processIds);
+
             for (ProWorkorderParam p : paramList) {
                 if (p.getTemplateId() == null) continue;
                 String adj = (p.getAdjustedValue() != null) ? p.getAdjustedValue().trim() : "";
@@ -1627,16 +1930,13 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
                 String std = routeParamMap.getOrDefault(p.getTemplateId(),
                         p.getStandardValue() != null ? p.getStandardValue() : "");
                 if (!adj.equals(std)) {
-                    // 富化参数名：从 paramTemplate 查询
+                    ProParamTemplate tmpl = tmplById.get(p.getTemplateId());
                     String paramName = "";
                     String processName = "";
-                    ProParamTemplate tmpl = proParamTemplateService.selectProParamTemplateByTemplateId(p.getTemplateId());
                     if (tmpl != null) {
                         paramName = tmpl.getParamName() != null ? tmpl.getParamName() : "";
-                        if (tmpl.getProcessId() != null) {
-                            ProProcess proc = proProcessService.selectProProcessByProcessId(tmpl.getProcessId());
-                            if (proc != null) processName = proc.getProcessName() != null ? proc.getProcessName() : "";
-                        }
+                        ProProcess proc = tmpl.getProcessId() != null ? procById.get(tmpl.getProcessId()) : null;
+                        if (proc != null) processName = proc.getProcessName() != null ? proc.getProcessName() : "";
                     }
                     items.add(buildDeviation("参数", paramName, processName,
                             "", std, adj, "参数调整"));

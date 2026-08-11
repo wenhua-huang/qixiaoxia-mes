@@ -15,6 +15,7 @@ public class ProKitIssueStatusVO
     private String issueName;
     private String processName;
     private String status;
+    private String docType;
     private int lineCount;
     private BigDecimal totalQuantity;
     private Long taskId;
@@ -33,6 +34,10 @@ public class ProKitIssueStatusVO
 
     public String getStatus() { return status; }
     public void setStatus(String v) { this.status = v; }
+
+    /** 单据类型：ISSUE-厂内领料单，OUTSOURCE-外协发料单 */
+    public String getDocType() { return docType; }
+    public void setDocType(String v) { this.docType = v; }
 
     public int getLineCount() { return lineCount; }
     public void setLineCount(int v) { this.lineCount = v; }

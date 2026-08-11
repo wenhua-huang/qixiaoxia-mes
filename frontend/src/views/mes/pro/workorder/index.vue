@@ -265,12 +265,26 @@
               <el-table-column label="工序序号" align="center" prop="orderNum" width="90" />
             </el-table>
 
-            <!-- Step 3: 生成的领料单列表 -->
+            <!-- Step 3: 生成的领料单/外协领料单列表 -->
             <el-table v-if="i===2 && s.details && s.details.length>0" :data="s.details" size="small">
-              <el-table-column label="领料单编码" align="center" prop="issueCode" width="180" />
+              <el-table-column label="类型" align="center" width="80">
+                <template #default="scope">
+                  <el-tag :type="scope.row.docType === 'OUTSOURCE' ? 'warning' : 'success'" size="small">
+                    {{ scope.row.docType === 'OUTSOURCE' ? '外协' : '厂内' }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="单据编码" align="center" width="180">
+                <template #default="scope">{{ scope.row.issueCode || scope.row.orderCode || '-' }}</template>
+              </el-table-column>
               <el-table-column label="工序名称" align="center" prop="processName" width="130" />
+              <el-table-column label="外协厂商" align="center" prop="vendorName" width="120">
+                <template #default="scope">{{ scope.row.vendorName || '-' }}</template>
+              </el-table-column>
               <el-table-column label="物料行数" align="center" prop="lineCount" width="90" />
-              <el-table-column label="关联排产任务" align="center" prop="taskId" width="120"><template #default="scope">{{ scope.row.taskId || '-' }}</template></el-table-column>
+              <el-table-column label="关联排产任务" align="center" prop="taskId" width="120">
+                <template #default="scope">{{ scope.row.taskId || '-' }}</template>
+              </el-table-column>
             </el-table>
           </div>
         </div>
@@ -290,7 +304,6 @@
       <el-table :data="availableProcesses" highlight-current-row @row-dblclick="addRouteProcessByRow">
         <el-table-column label="工序编码" prop="processCode" width="130" />
         <el-table-column label="工序名称" prop="processName" />
-        <el-table-column label="工序类型" width="80"><template #default="s">{{ processTypeMap[s.row.processType]||s.row.processType }}</template></el-table-column>
       </el-table>
       <template #footer><el-button type="primary" @click="showProcessSelector=false">关 闭</el-button></template>
     </el-dialog>
@@ -336,7 +349,6 @@ export default {
       statusMap: { PREPARE: '待生产', PRODUCING: '生产中', COMPLETED: '已完成', CANCEL: '已取消', CLOSED: '已关闭' },
       statusColor: { PREPARE: '#E6A23C', PRODUCING: '#409EFF', COMPLETED: '#67C23A', CANCEL: '#909399', CLOSED: '#909399' },
       itemOrProductMap: { RAW: '原料', SEMI: '半成品', FINISHED: '成品', AUXILIARY: '辅料', PACK: '包材' },
-      processTypeMap: { INTERNAL: '自制', OUTSOURCE: '外发', SLITTING: '分切' },
       // SKU变体对话框
       skuDialogOpen: false, skuChoice: '', skuCode: '', skuName: '', skuDeviationList: [],
       queryParams: { pageNum: 1, pageSize: 10, workorderCode: null, productName: null, status: null },
@@ -391,7 +403,7 @@ export default {
   },
   created() { this.getList(); listAllProcess().then(r=>{ this.processOptions=r.data||[] }) },
   methods: {
-    getList() { this.loading=true; listWorkorder(this.queryParams).then(r=>{ this.workorderList=r.rows; this.total=r.total; this.loading=false }) },
+    getList() { this.loading=true; listWorkorder(this.queryParams).then(r=>{ this.workorderList=r.rows; this.total=r.total; }).catch(()=>{}).finally(()=>{ this.loading=false }) },
     cancel() { this.open=false; this.reset() },
     reset() { this.form={ workorderId:null, workorderCode:null, workorderName:null, workorderType:'SELF', orderSource:'MANUAL', productId:null, productCode:null, productName:null, productSpc:null, unitOfMeasure:'PCS', unitName:'个', quantity:1, status:'PREPARE', clientOrderCode:null, orderType:'NEW', productSize:null, ropeSpec:null, printingReq:null, packageReq:null, lineAttrs:{}, requestDate:null, remark:null }; this.effAttrSchema=[]; this.autoGenFlag=false; this.step=1; this.prorouteId=null; this.bomList=[]; this.paramList=[]; this.routeProcesses=[]; this.routeOptions=[]; this.showProcessSelector=false },
     handleQuery() { this.queryParams.pageNum=1; this.getList() },
@@ -514,7 +526,7 @@ export default {
     addRouteProcessByRow(row) {
       if (!row || !row.processId) return
       if (this.routeProcesses.find(p => p.processId === row.processId)) return
-      this.routeProcesses.push({ processId: row.processId, processName: row.processName, processCode: row.processCode, processType: row.processType, orderNum: this.routeProcesses.length + 1 })
+      this.routeProcesses.push({ processId: row.processId, processName: row.processName, processCode: row.processCode, orderNum: this.routeProcesses.length + 1 })
       this.showProcessSelector = false
     },
     removeRouteProcess(processId) {

@@ -9,7 +9,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="factoryId"    column="factory_id"    />
         <result property="processCode"    column="process_code"    />
         <result property="processName"    column="process_name"    />
-        <result property="processType"    column="process_type"    />
         <result property="attention"    column="attention"    />
         <result property="enableFlag"    column="enable_flag"    />
         <result property="remark"    column="remark"    />
@@ -20,7 +19,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectProProcessVo">
-        select process_id, factory_id, process_code, process_name, process_type, attention, enable_flag, remark, create_by, create_time, update_by, update_time from qxx_pro_process
+        select process_id, factory_id, process_code, process_name, attention, enable_flag, remark, create_by, create_time, update_by, update_time from qxx_pro_process
     </sql>
 
     <select id="selectProProcessList" parameterType="ProProcess" resultMap="ProProcessResult">
@@ -28,7 +27,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <where>
             <if test="processCode != null  and processCode != ''"> and process_code = #{processCode}</if>
             <if test="processName != null  and processName != ''"> and process_name like concat('%', #{processName}, '%')</if>
-            <if test="processType != null  and processType != ''"> and process_type = #{processType}</if>
             <if test="enableFlag != null  and enableFlag != ''"> and enable_flag = #{enableFlag}</if>
         </where>
         order by process_id desc
@@ -44,12 +42,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where process_code = #{processCode}
     </select>
 
+    <select id="selectByProcessIds" resultMap="ProProcessResult">
+        <include refid="selectProProcessVo"/>
+        where process_id in
+        <foreach item="processId" collection="processIds" open="(" separator="," close=")">
+            #{processId}
+        </foreach>
+    </select>
+
     <insert id="insertProProcess" parameterType="ProProcess" useGeneratedKeys="true" keyProperty="processId">
         insert into qxx_pro_process
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="processCode != null and processCode != ''">process_code,</if>
             <if test="processName != null and processName != ''">process_name,</if>
-            <if test="processType != null and processType != ''">process_type,</if>
             <if test="attention != null">attention,</if>
             <if test="enableFlag != null and enableFlag != ''">enable_flag,</if>
             <if test="remark != null">remark,</if>
@@ -59,7 +64,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="processCode != null and processCode != ''">#{processCode},</if>
             <if test="processName != null and processName != ''">#{processName},</if>
-            <if test="processType != null and processType != ''">#{processType},</if>
             <if test="attention != null">#{attention},</if>
             <if test="enableFlag != null and enableFlag != ''">#{enableFlag},</if>
             <if test="remark != null">#{remark},</if>
@@ -73,7 +77,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <trim prefix="SET" suffixOverrides=",">
             <if test="processCode != null and processCode != ''">process_code = #{processCode},</if>
             <if test="processName != null and processName != ''">process_name = #{processName},</if>
-            <if test="processType != null and processType != ''">process_type = #{processType},</if>
             <if test="attention != null">attention = #{attention},</if>
             <if test="enableFlag != null and enableFlag != ''">enable_flag = #{enableFlag},</if>
             <if test="remark != null">remark = #{remark},</if>

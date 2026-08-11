@@ -443,8 +443,10 @@ class WmItemRecptServiceUnitTest {
             when(wmItemRecptMapper.insertWmItemRecpt(any())).thenReturn(1);
             when(wmItemRecptMapper.updateWmItemRecpt(any())).thenReturn(1);
             when(wmItemRecptLineService.insertWmItemRecptLine(any())).thenReturn(1);
-            when(purOrderLineMapper.selectPurOrderLineList(any())).thenReturn(Collections.singletonList(poLine));
             stubConfirmMocks(header);
+            // 测试专用 PO 行（itemId=208→lineId=555）必须在 stubConfirmMocks 之后，
+            // 否则会被其通用 stub（itemId=201）覆盖，导致 backfill 匹配不到
+            when(purOrderLineService.selectPurOrderLineList(any())).thenReturn(Collections.singletonList(poLine));
 
             service.receiveWithLines(body);
 

@@ -10,8 +10,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
+import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.domain.mes.pro.ProDocGenerationLog;
 import com.ruoyi.system.domain.mes.pro.ProMaterialTrace;
+import com.ruoyi.system.domain.mes.wm.WmBatch;
 import com.ruoyi.system.domain.mes.wm.WmProductRecpt;
 import com.ruoyi.system.domain.mes.wm.WmProductRecptLine;
 import com.ruoyi.system.domain.mes.wm.WmProductRecptMobileBody;
@@ -22,6 +24,7 @@ import com.ruoyi.system.mapper.mes.pro.ProDocGenerationLogMapper;
 import com.ruoyi.system.mapper.mes.wm.WmProductRecptMapper;
 import com.ruoyi.system.mapper.mes.wm.WmTransactionMapper;
 import com.ruoyi.system.service.mes.pro.IProMaterialTraceService;
+import com.ruoyi.system.service.mes.wm.IWmBatchService;
 import com.ruoyi.system.service.mes.wm.IWmProductRecptLineService;
 import com.ruoyi.system.service.mes.wm.IWmProductRecptService;
 import com.ruoyi.system.service.mes.wm.IWmStorageCoreService;
@@ -46,6 +49,9 @@ public class WmProductRecptServiceImpl implements IWmProductRecptService
 
     @Autowired
     private IProMaterialTraceService proMaterialTraceService;
+
+    @Autowired
+    private IWmBatchService wmBatchService;
 
     @Override
     public List<WmProductRecpt> selectWmProductRecptList(WmProductRecpt entity) {
@@ -126,6 +132,8 @@ public class WmProductRecptServiceImpl implements IWmProductRecptService
         Long recptId = header.getRecptId();
         List<ProductRecptTxBean> txBeans = new ArrayList<>();
         for (WmProductRecptLine line : lines) {
+            // 启用批次管理的物料：行无批次时自动生成成品批次（同工单复用、不同工单不串批）
+            resolveLineBatch(line, header);
             ProductRecptTxBean b = new ProductRecptTxBean();
             b.setSourceDocType("wm_product_recpt");
             b.setSourceDocId(recptId);
@@ -156,6 +164,32 @@ public class WmProductRecptServiceImpl implements IWmProductRecptService
         wmProductRecptMapper.updateWmProductRecpt(header);
         // 补写产出回库的追溯链路（FEEDBACK → MATERIAL_STOCK），打通产出→销售的全链路
         writeProduceStockinTrace(header);
+    }
+
+    /**
+     * 解析产出行成品批次：物料启用批次管理时，按 (物料+工单+生产日期) 查重或新建独立成品批次，
+     * 写回 batchId/batchCode 并持久化入库行。已带批次（移动端手填/分切生成）则跳过，未启用则返回 null。
+     * 生产日期未提供时用当天兜底。
+     */
+    private void resolveLineBatch(WmProductRecptLine line, WmProductRecpt header) {
+        if (line.getBatchId() != null || StringUtils.isNotEmpty(line.getBatchCode())) {
+            return;
+        }
+        WmBatch param = new WmBatch();
+        param.setItemId(line.getItemId());
+        param.setItemCode(line.getItemCode());
+        param.setItemName(line.getItemName());
+        param.setSpecification(line.getSpecification());
+        param.setWorkorderId(header.getWorkorderId());
+        param.setWorkorderCode(header.getWorkorderCode());
+        param.setProduceDate(DateUtils.getNowDate());
+        param.setRecptDate(DateUtils.getNowDate());
+        WmBatch generated = wmBatchService.getOrGenerateBatchCode(param);
+        if (generated != null) {
+            line.setBatchId(generated.getBatchId());
+            line.setBatchCode(generated.getBatchCode());
+            wmProductRecptLineService.updateWmProductRecptLine(line);
+        }
     }
 
     /**

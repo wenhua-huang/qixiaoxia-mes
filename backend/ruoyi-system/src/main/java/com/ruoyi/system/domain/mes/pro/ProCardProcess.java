@@ -26,7 +26,6 @@ public class ProCardProcess extends BaseEntity
     private Long processId;
     private String processCode;
     private String processName;
-    private String processType;
     private Long taskId;
     private String taskCode;
     private Date inputTime;
@@ -65,8 +64,6 @@ public class ProCardProcess extends BaseEntity
     public void setProcessCode(String v) { this.processCode = v; }
     public String getProcessName() { return processName; }
     public void setProcessName(String v) { this.processName = v; }
-    public String getProcessType() { return processType; }
-    public void setProcessType(String v) { this.processType = v; }
     public Date getInputTime() { return inputTime; }
     public void setInputTime(Date v) { this.inputTime = v; }
     public Date getOutputTime() { return outputTime; }

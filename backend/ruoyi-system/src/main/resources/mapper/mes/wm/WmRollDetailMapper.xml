@@ -39,6 +39,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="lastWorkorderCode" column="last_workorder_code" />
         <result property="status" column="status" />
         <result property="remark" column="remark" />
+        <result property="slitBatchNo" column="slit_batch_no" />
         <result property="createBy" column="create_by" />
         <result property="createTime" column="create_time" />
         <result property="updateBy" column="update_by" />
@@ -46,7 +47,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectWmRollDetailVo">
-        select roll_id, factory_id, roll_code, item_id, item_code, item_name, specification, batch_id, batch_code, recpt_id, recpt_detail_id, vendor_id, vendor_code, vendor_name, vendor_roll_no, parent_roll_id, actual_width, actual_weight_gsm, actual_length, actual_weight, unit_of_measure, original_quantity, remaining_quantity, warehouse_id, warehouse_code, warehouse_name, location_id, area_id, material_stock_id, last_issue_id, last_workorder_id, last_workorder_code, status, remark, create_by, create_time, update_by, update_time from qxx_wm_roll_detail
+        select roll_id, factory_id, roll_code, item_id, item_code, item_name, specification, batch_id, batch_code, recpt_id, recpt_detail_id, vendor_id, vendor_code, vendor_name, vendor_roll_no, parent_roll_id, actual_width, actual_weight_gsm, actual_length, actual_weight, unit_of_measure, original_quantity, remaining_quantity, warehouse_id, warehouse_code, warehouse_name, location_id, area_id, material_stock_id, last_issue_id, last_workorder_id, last_workorder_code, status, remark, slit_batch_no, create_by, create_time, update_by, update_time from qxx_wm_roll_detail
     </sql>
 
     <select id="selectWmRollDetailList" parameterType="WmRollDetail" resultMap="WmRollDetailResult">
@@ -78,6 +79,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="lastWorkorderId != null"> and last_workorder_id = #{lastWorkorderId}</if>
             <if test="lastWorkorderCode != null and lastWorkorderCode != ''"> and last_workorder_code like concat('%', #{lastWorkorderCode}, '%')</if>
             <if test="status != null and status != ''"> and status like concat('%', #{status}, '%')</if>
+            <if test="slitBatchNo != null and slitBatchNo != ''"> and slit_batch_no = #{slitBatchNo}</if>
             <if test="createBy != null and createBy != ''"> and create_by like concat('%', #{createBy}, '%')</if>
             <if test="updateBy != null and updateBy != ''"> and update_by like concat('%', #{updateBy}, '%')</if>
         </where>
@@ -127,6 +129,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="lastWorkorderCode != null">last_workorder_code,</if>
             <if test="status != null">status,</if>
             <if test="remark != null">remark,</if>
+            <if test="slitBatchNo != null">slit_batch_no,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
             <if test="updateBy != null">update_by,</if>
@@ -164,6 +167,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="lastWorkorderCode != null">#{lastWorkorderCode},</if>
             <if test="status != null">#{status},</if>
             <if test="remark != null">#{remark},</if>
+            <if test="slitBatchNo != null">#{slitBatchNo},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
             <if test="updateBy != null">#{updateBy},</if>
@@ -205,6 +209,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="lastWorkorderCode != null">last_workorder_code = #{lastWorkorderCode},</if>
             <if test="status != null">status = #{status},</if>
             <if test="remark != null">remark = #{remark},</if>
+            <if test="slitBatchNo != null">slit_batch_no = #{slitBatchNo},</if>
             <if test="createBy != null">create_by = #{createBy},</if>
             <if test="createTime != null">create_time = #{createTime},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
@@ -216,6 +221,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <delete id="deleteWmRollDetailByRollId" parameterType="Long">
         delete from qxx_wm_roll_detail where roll_id = #{rollId}
     </delete>
+
+    <update id="markOutsourcedIfInStock">
+        update qxx_wm_roll_detail
+        set status = 'OUTSOURCED',
+            remaining_quantity = 0,
+            update_by = #{operator},
+            update_time = #{now}
+        where roll_id = #{rollId}
+          and status = 'IN_STOCK'
+    </update>
 
     <delete id="deleteWmRollDetailByRollIds" parameterType="String">
         delete from qxx_wm_roll_detail where roll_id in

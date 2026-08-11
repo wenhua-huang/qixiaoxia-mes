@@ -11,9 +11,14 @@ import com.ruoyi.system.mapper.mes.pro.*;
 import com.ruoyi.system.service.mes.cal.IWorkCalendarService;
 import com.ruoyi.system.service.mes.pro.IProChangeoverService;
 import com.ruoyi.system.service.mes.pro.IScheduleService;
+import com.ruoyi.common.core.redis.RedisLockTemplate;
+import com.ruoyi.common.exception.ServiceException;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 排产计算服务实现
@@ -38,6 +43,18 @@ public class ScheduleServiceImpl implements IScheduleService
     private IProChangeoverService changeoverService;
     @Autowired
     private com.ruoyi.system.mapper.mes.md.MdWorkstationMapper workstationMapper;
+    @Autowired
+    private RedisLockTemplate lockTemplate;
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
+    private TransactionTemplate txTemplate;
+
+    @PostConstruct
+    void initTx() {
+        this.txTemplate = new TransactionTemplate(transactionManager);
+        this.txTemplate.setTimeout(30);
+    }
 
     private static final ThreadLocal<SimpleDateFormat> SDF_ISO = new ThreadLocal<SimpleDateFormat>() {
         @Override protected SimpleDateFormat initialValue() { return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss"); }
@@ -53,8 +70,13 @@ public class ScheduleServiceImpl implements IScheduleService
     }
 
     @Override
-    @Transactional
     public Map<String, Object> scheduleWorkOrder(Long workorderId) {
+        // 先锁后事务：同工单并发排产会重复建任务，按工单加 Redis 锁串行化
+        return lockTemplate.executeWithResult("pro:schedule:" + workorderId, 10,
+                () -> txTemplate.execute(status -> doScheduleWorkOrder(workorderId)));
+    }
+
+    private Map<String, Object> doScheduleWorkOrder(Long workorderId) {
         Map<String, Object> result = new LinkedHashMap<>();
 
         // 1. 加载工单
@@ -103,16 +125,38 @@ public class ScheduleServiceImpl implements IScheduleService
                 newTask.setQuantity(wo.getQuantity() != null ? wo.getQuantity() : BigDecimal.ONE);
                 newTask.setUnitOfMeasure(wo.getUnitOfMeasure() != null ? wo.getUnitOfMeasure() : DEFAULT_UNIT);
                 newTask.setUnitName(wo.getUnitName() != null ? wo.getUnitName() : DEFAULT_UNIT);
-                // 匹配候选工作站：process_id 精确 → process_type 兜底（覆盖 process_id 为空的工作站）
-                List<MdWorkstation> candidates = matchCandidates(rp.getProcessId(), rp.getProcessType(), factoryId);
+                // 外协工序(is_outsource=1)：不分配厂内工作站，标外协厂商。任务仍建（外协收货靠 workorderId+processId 反查任务推进状态）
+                boolean isOutsource = "1".equals(rp.getIsOutsource());
+                if (isOutsource) {
+                    newTask.setWorkstationId(WS_VIRTUAL_ID);
+                    newTask.setWorkstationCode(WS_CODE_VENDOR);
+                    newTask.setWorkstationName(rp.getVendorName() != null ? rp.getVendorName() : "外协");
+                    if (rp.getVendorId() != null) newTask.setVendorId(rp.getVendorId());
+                    if (rp.getVendorCode() != null) newTask.setVendorCode(rp.getVendorCode());
+                    if (rp.getOutsourceFactoryId() != null) newTask.setOutsourceFactoryId(rp.getOutsourceFactoryId());
+                    newTask.setUnitDuration(BigDecimal.ZERO); // 外协时长不按厂内产能算
+                    newTask.setSetupDuration(0);
+                    newTask.setStatus(TASK_STATUS_NORMAL);
+                    newTask.setColorCode(rp.getColorCode() != null ? rp.getColorCode() : DEFAULT_COLOR_CODE);
+                    newTask.setTaskCode(wo.getWorkorderCode() + "-" + String.format("%03d", rp.getOrderNum() != null ? rp.getOrderNum() : 1));
+                    newTask.setTaskName((rp.getProcessName() != null ? rp.getProcessName() : "工序") + "-外协");
+                    newTask.setCreateTime(DateUtils.getNowDate());
+                    newTask.setCreateBy(SYSTEM_USER);
+                    taskMapper.insertProTask(newTask);
+                    taskMap.computeIfAbsent(rp.getProcessId(), k -> new ArrayList<>()).add(newTask);
+                    // 外协任务不进 candidateMap → 第6步不会 pickIdle 换站
+                    continue;
+                }
+                // 匹配候选工作站：process_id 精确 → process_type 兜底（按工序编码匹配登记了同设备码的工作站）
+                List<MdWorkstation> candidates = matchCandidates(rp.getProcessId(), rp.getProcessCode(), factoryId);
                 if (!candidates.isEmpty()) {
                     MdWorkstation first = candidates.get(0);
                     newTask.setWorkstationId(first.getWorkstationId());
                     newTask.setWorkstationCode(first.getWorkstationCode());
                     newTask.setWorkstationName(first.getWorkstationName());
                 } else {
-                    newTask.setWorkstationId(0L);
-                    newTask.setWorkstationCode("AUTO");
+                    newTask.setWorkstationId(WS_VIRTUAL_ID);
+                    newTask.setWorkstationCode(WS_CODE_AUTO);
                     newTask.setWorkstationName("自动分配");
                 }
                 // 从产能计算 unitDuration（个/分钟 = 产能/60）
@@ -221,17 +265,16 @@ public class ScheduleServiceImpl implements IScheduleService
             Long factoryId = task.getFactoryId();
             Date newStart = parseDate(newStartTime);
             Date newEnd = parseDate(newEndTime);
+            if (newStart == null || newEnd == null) {
+                result.put("error", "开始/结束时间格式无效，需为 yyyy-MM-dd HH:mm:ss");
+                return result;
+            }
+            if (newEnd.before(newStart)) {
+                result.put("error", "结束时间不能早于开始时间");
+                return result;
+            }
 
             result.put("workorderId", task.getWorkorderId());
-
-            // 1. 更新当前任务（duration = 实际时间差）
-            task.setStartTime(newStart);
-            task.setEndTime(newEnd);
-            long actualDurationMs = newEnd.getTime() - newStart.getTime();
-            task.setDuration((int) (actualDurationMs / 60000)); // 转换为分钟
-            task.setUpdateTime(DateUtils.getNowDate());
-            taskMapper.updateProTask(task);
-            updatedIds.add(String.valueOf(taskId));
 
             // 2. 获取工艺路线（通过工单 → routeProduct → route）
             ProWorkorder wo = workorderMapper.selectProWorkorderByWorkorderId(task.getWorkorderId());
@@ -240,45 +283,54 @@ public class ScheduleServiceImpl implements IScheduleService
                 ProRouteProduct rp = routeProductMapper.selectProRouteProductByRecordId(wo.getRouteProductId());
                 if (rp != null) routeId = rp.getRouteId();
             }
-            if (routeId == null) { result.put("updatedTasks", updatedIds); return result; }
-
-            // 3. 找到当前工序的后续工序
-            ProRouteProcess rpQ = new ProRouteProcess();
-            rpQ.setRouteId(routeId);
-            List<ProRouteProcess> allRp = routeProcessMapper.selectProRouteProcessList(rpQ);
-
-            // 按order_num排序找到当前工序位置
-            allRp.sort(Comparator.comparing(p -> p.getOrderNum() != null ? p.getOrderNum() : 0));
             int idx = -1;
-            for (int i = 0; i < allRp.size(); i++) {
-                if (allRp.get(i).getProcessId().equals(task.getProcessId())) { idx = i; break; }
-            }
+            List<ProRouteProcess> allRp = Collections.emptyList();
+            if (routeId != null) {
+                ProRouteProcess rpQ = new ProRouteProcess();
+                rpQ.setRouteId(routeId);
+                allRp = routeProcessMapper.selectProRouteProcessList(rpQ);
+                allRp.sort(Comparator.comparing(p -> p.getOrderNum() != null ? p.getOrderNum() : 0));
+                for (int i = 0; i < allRp.size(); i++) {
+                    if (allRp.get(i).getProcessId().equals(task.getProcessId())) { idx = i; break; }
+                }
 
-            // 0. 前置约束（仅 SS 类型）：不能早于前道工序的结束时间+换型
-            if (idx > 0) {
-                Long prevProcessId = allRp.get(idx - 1).getProcessId();
-                String linkType = allRp.get(idx - 1).getLinkType();
-                if (!LINK_TYPE_FS.equals(linkType)) {
-                    ProTask prevQ = new ProTask();
-                    prevQ.setWorkorderId(task.getWorkorderId());
-                    prevQ.setProcessId(prevProcessId);
-                    List<ProTask> prevTasks = taskMapper.selectProTaskList(prevQ);
-                    if (!prevTasks.isEmpty()) {
-                        Date maxPrevEnd = prevTasks.stream()
-                            .map(ProTask::getEndTime).filter(Objects::nonNull)
-                            .max(Date::compareTo).orElse(null);
-                        if (maxPrevEnd != null) {
-                            int changeoverMins = changeoverService.getChangeoverMinutes(prevProcessId, task.getProcessId(), task.getWorkstationId(), factoryId);
-                            Date minStart = calendarService.calculateEndTime(maxPrevEnd, changeoverMins * 60L, factoryId);
-                            if (newStart.before(minStart)) {
-                                long durMs = newEnd.getTime() - newStart.getTime();
-                                newStart = minStart;
-                                newEnd = calendarService.calculateEndTime(newStart, durMs / 1000, factoryId);
+                // 3. 前置约束（仅 SS 类型）：不能早于前道工序的结束时间+换型（在持久化前校验并调整）
+                if (idx > 0) {
+                    Long prevProcessId = allRp.get(idx - 1).getProcessId();
+                    String linkType = allRp.get(idx - 1).getLinkType();
+                    if (!LINK_TYPE_FS.equals(linkType)) {
+                        ProTask prevQ = new ProTask();
+                        prevQ.setWorkorderId(task.getWorkorderId());
+                        prevQ.setProcessId(prevProcessId);
+                        List<ProTask> prevTasks = taskMapper.selectProTaskList(prevQ);
+                        if (!prevTasks.isEmpty()) {
+                            Date maxPrevEnd = prevTasks.stream()
+                                .map(ProTask::getEndTime).filter(Objects::nonNull)
+                                .max(Date::compareTo).orElse(null);
+                            if (maxPrevEnd != null) {
+                                int changeoverMins = changeoverService.getChangeoverMinutes(prevProcessId, task.getProcessId(), task.getWorkstationId(), factoryId);
+                                Date minStart = calendarService.calculateEndTime(maxPrevEnd, changeoverMins * 60L, factoryId);
+                                if (newStart.before(minStart)) {
+                                    long durMs = newEnd.getTime() - newStart.getTime();
+                                    newStart = minStart;
+                                    newEnd = calendarService.calculateEndTime(newStart, durMs / 1000, factoryId);
+                                }
                             }
                         }
                     }
                 }
             }
+
+            // 4. 校验/调整完成后再持久化当前任务（duration = 实际时间差）
+            task.setStartTime(newStart);
+            task.setEndTime(newEnd);
+            long actualDurationMs = newEnd.getTime() - newStart.getTime();
+            task.setDuration((int) (actualDurationMs / 60000));
+            task.setUpdateTime(DateUtils.getNowDate());
+            taskMapper.updateProTask(task);
+            updatedIds.add(String.valueOf(taskId));
+
+            if (routeId == null) { result.put("updatedTasks", updatedIds); return result; }
 
             // 4. 级联更新后续工序
             Date currentTime = newEnd;
@@ -327,6 +379,9 @@ public class ScheduleServiceImpl implements IScheduleService
             enforceOrder(task.getWorkorderId(), factoryId);
 
         } catch (Exception e) {
+            // 关键：标记事务回滚，避免部分更新被提交（甘特图中途失败不能留半成品数据）
+            org.springframework.transaction.interceptor.TransactionAspectSupport
+                    .currentTransactionStatus().setRollbackOnly();
             result.put("error", e.getMessage());
         }
         return result;
@@ -350,19 +405,21 @@ public class ScheduleServiceImpl implements IScheduleService
         ProRouteProcess rpQ = new ProRouteProcess(); rpQ.setRouteId(routeId);
         List<ProRouteProcess> rps = routeProcessMapper.selectProRouteProcessList(rpQ);
         Map<Long, Integer> orderMap = new HashMap<>();
+        Map<Long, String> linkTypeMap = new HashMap<>();
         for (ProRouteProcess r : rps) {
             orderMap.put(r.getProcessId(), r.getOrderNum() != null ? r.getOrderNum() : 99);
+            linkTypeMap.put(r.getProcessId(), r.getLinkType());
         }
 
         all.sort((a, b) -> Integer.compare(
             orderMap.getOrDefault(a.getProcessId(), 99),
             orderMap.getOrDefault(b.getProcessId(), 99)));
 
-        // 按 link_type 约束：SS=必须先后，FS=可并行
+        // 按 link_type 约束：SS=必须先后，FS=可并行（从已加载的 route_process 取，消除 N+1）
         for (int i = 1; i < all.size(); i++) {
             ProTask prev = all.get(i - 1);
             ProTask cur = all.get(i);
-            String linkType = getLinkType(routeId, prev.getProcessId());
+            String linkType = linkTypeMap.get(prev.getProcessId());
             if (LINK_TYPE_SS.equals(linkType) || linkType == null) {  // SS 或未设=必须先后
                 if (prev.getEndTime() != null && cur.getEndTime() != null &&
                     cur.getStartTime() != null && cur.getStartTime().before(prev.getEndTime())) {
@@ -388,7 +445,8 @@ public class ScheduleServiceImpl implements IScheduleService
 
     /**
      * 按工序匹配候选工作站：优先 process_id 精确匹配；为空时退回 process_type 匹配
-     * （兼容 process_id 为 NULL、仅登记 process_type 的工作站）。仅取启用的工作站。
+     * （workstation.process_type 存设备工序码 PRINT/BAG_MAKE 等，调用方传工序编码 processCode）。
+     * 仅取启用的工作站。
      */
     @Override
     public List<MdWorkstation> matchCandidates(Long processId, String processType, Long factoryId) {

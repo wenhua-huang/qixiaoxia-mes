@@ -30,10 +30,6 @@ public class ProProcess extends BaseEntity
     @Excel(name = "工序名称")
     private String processName;
 
-    /** 工序类型:INTERNAL-自制工序,OUTSOURCE-外发工序,SLITTING-分切工序 */
-    @Excel(name = "工序类型")
-    private String processType;
-
     /** 工艺要求/注意事项 */
     @Excel(name = "工艺要求")
     private String attention;
@@ -82,16 +78,6 @@ public class ProProcess extends BaseEntity
         return processName;
     }
 
-    public void setProcessType(String processType)
-    {
-        this.processType = processType;
-    }
-
-    public String getProcessType()
-    {
-        return processType;
-    }
-
     public void setAttention(String attention)
     {
         this.attention = attention;
@@ -119,7 +105,6 @@ public class ProProcess extends BaseEntity
             .append("factoryId", getFactoryId())
             .append("processCode", getProcessCode())
             .append("processName", getProcessName())
-            .append("processType", getProcessType())
             .append("attention", getAttention())
             .append("enableFlag", getEnableFlag())
             .append("remark", getRemark())

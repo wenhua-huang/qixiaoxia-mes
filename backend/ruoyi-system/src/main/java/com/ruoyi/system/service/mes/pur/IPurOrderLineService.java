@@ -1,5 +1,6 @@
 package com.ruoyi.system.service.mes.pur;
 
+import java.util.Collection;
 import java.util.List;
 import com.ruoyi.system.domain.mes.pur.PurOrderLine;
 
@@ -26,6 +27,11 @@ public interface IPurOrderLineService
      * @return 采购订单行集合
      */
     public List<PurOrderLine> selectPurOrderLineList(PurOrderLine purOrderLine);
+
+    /**
+     * 批量查询工单+物料集合的有效采购订单行（非取消/关闭），消除齐套看板逐物料 N+1。
+     */
+    public List<PurOrderLine> selectPendingByWorkorderAndItems(Long workorderId, Collection<Long> itemIds);
 
     /**
      * 新增采购订单行

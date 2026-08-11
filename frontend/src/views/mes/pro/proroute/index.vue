@@ -137,9 +137,6 @@
             <el-table-column label="工序" align="center">
               <template #default="scope">{{ scope.row.processName || scope.row.processCode }}</template>
             </el-table-column>
-            <el-table-column label="工序类型" align="center" prop="processType" width="100">
-              <template #default="scope">{{ processTypeMap[scope.row.processType] || scope.row.processType }}</template>
-            </el-table-column>
             <el-table-column label="关系" align="center" width="100">
               <template #default="scope">
                 <el-tag :type="scope.row.linkType==='SS'?'success':(scope.row.linkType==='FS'?'warning':'info')" size="small">{{ linkTypeMap[scope.row.linkType] || scope.row.linkType }}</el-tag>
@@ -236,7 +233,7 @@
             <el-form-item label="检验工序"><el-radio-group v-model="rpForm.isCheck"><el-radio label="Y">是</el-radio><el-radio label="N">否</el-radio></el-radio-group></el-form-item>
           </el-col>
         </el-row>
-        <el-row v-if="rpForm.processType === 'OUTSOURCE'">
+        <el-row>
           <el-col :span="12">
             <el-form-item label="外发工序"><el-radio-group v-model="rpForm.isOutsource"><el-radio label="1">是</el-radio><el-radio label="0">否</el-radio></el-radio-group></el-form-item>
           </el-col>
@@ -422,7 +419,6 @@ export default {
       _procParamOpen: false, _procParamTitle: '', _procParamLoading: false, _procParamList: [],
       _currentProcProcessId: null, _templateMap: {},
       sys_yes_no_options: [{ label: '是', value: '1' }, { label: '否', value: '0' }],
-      processTypeMap: { INTERNAL: '自制', OUTSOURCE: '外发', SLITTING: '分切' },
       linkTypeOptions: [
         { label: '串行(SS) — 必须完成本工序才能开始下一道', value: 'SS' },
         { label: '并行(FS) — 可与下一道工序同时进行', value: 'FS' },
@@ -460,7 +456,7 @@ export default {
     },
   },
   methods: {
-    getList() { this.loading = true; listRoute(this.queryParams).then(r => { this.routeList = r.rows; this.total = r.total; this.loading = false }) },
+    getList() { this.loading = true; listRoute(this.queryParams).then(r => { this.routeList = r.rows; this.total = r.total; }).catch(()=>{}).finally(()=>{ this.loading = false }) },
     loadAllProcess() { listAllProcess().then(r => { this.allProcessOptions = r.data || [] }) },
     cancel() { this.open = false; this.reset() },
     reset() {
@@ -495,12 +491,12 @@ export default {
     // 工序组成
     loadProcessList(routeId) { this.processLoading = true; listRouteProcessByRouteId(routeId).then(r => { this.processList = r.data || []; this.processLoading = false }).catch(() => { this.processLoading = false }) },
     handleAddRouteProcess() {
-      this.rpForm = { routeId: this.form.routeId, processId: null, processCode: null, processName: null, processType: null, orderNum: this.processList.length + 1, linkType: 'SS', defaultPreTime: 0, defaultSufTime: 0, colorCode: '#00AEF3', keyFlag: 'N', isCheck: 'N', isOutsource: '0', remark: null }
+      this.rpForm = { routeId: this.form.routeId, processId: null, processCode: null, processName: null, orderNum: this.processList.length + 1, linkType: 'SS', defaultPreTime: 0, defaultSufTime: 0, colorCode: '#00AEF3', keyFlag: 'N', isCheck: 'N', isOutsource: '0', remark: null }
       this.rpTitle = '添加工序'; this.rpOpen = true
     },
     handleUpdateRouteProcess(row) { this.rpForm = { ...row }; this.rpTitle = '修改工序'; this.rpOpen = true },
     handleDeleteRouteProcess(row) { this.$modal.confirm('确认删除该工序？').then(() => delRouteProcess(row.recordId)).then(() => { this.loadProcessList(this.form.routeId); this.$modal.msgSuccess('删除成功') }).catch(() => {}) },
-    onProcessSelected(val) { const p = this.allProcessOptions.find(i => i.processId === val); if (p) { this.rpForm.processCode = p.processCode; this.rpForm.processName = p.processName; this.rpForm.processType = p.processType } },
+    onProcessSelected(val) { const p = this.allProcessOptions.find(i => i.processId === val); if (p) { this.rpForm.processCode = p.processCode; this.rpForm.processName = p.processName } },
     submitRpForm() {
       this.$refs.rpForm.validate(valid => {
         if (!valid) return

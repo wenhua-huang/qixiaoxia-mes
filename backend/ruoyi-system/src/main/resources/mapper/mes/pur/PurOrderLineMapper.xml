@@ -75,6 +75,20 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where line_id = #{lineId}
     </select>
 
+    <!-- 批量查询工单+物料集合的有效采购订单行（JOIN 头过滤工单与非终态，消除齐套看板 N+1） -->
+    <select id="selectPendingByWorkorderAndItems" resultMap="PurOrderLineResult">
+        select l.line_id, l.factory_id, l.order_id, l.item_id, l.item_code, l.item_name, l.specification,
+               l.unit_of_measure, l.unit_name, l.quantity_ordered, l.quantity_received, l.status, l.create_time
+        from qxx_pur_order_line l
+        inner join qxx_pur_order o on o.order_id = l.order_id
+        where o.workorder_id = #{workorderId}
+          and o.status not in ('CANCEL','CLOSED')
+          and l.item_id in
+        <foreach collection="itemIds" item="itemId" open="(" separator="," close=")">
+            #{itemId}
+        </foreach>
+    </select>
+
     <insert id="insertPurOrderLine" parameterType="PurOrderLine" useGeneratedKeys="true" keyProperty="lineId">
         insert into qxx_pur_order_line
         <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="orderId != null">order_id,</if>

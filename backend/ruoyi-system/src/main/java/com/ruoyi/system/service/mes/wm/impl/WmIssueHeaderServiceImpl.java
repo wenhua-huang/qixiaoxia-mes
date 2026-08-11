@@ -36,6 +36,7 @@ import com.ruoyi.system.domain.mes.wm.WmTransaction;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderBom;
 import com.ruoyi.system.domain.mes.pro.ProMaterialTrace;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
+import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
 import com.ruoyi.system.domain.mes.pro.ProCard;
 import com.ruoyi.system.mapper.mes.pro.ProCardMapper;
 import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
@@ -82,6 +83,9 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
     private ProWorkorderMapper proWorkorderMapper;
 
     @Autowired
+    private com.ruoyi.system.service.mes.wm.OutsourceIssueHelper outsourceIssueHelper;
+
+    @Autowired
     private RedisLockTemplate lockTemplate;
 
     @Autowired
@@ -126,8 +130,20 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
     public List<WmIssueHeader> selectAll() { return wmIssueHeaderMapper.selectWmIssueHeaderList(new WmIssueHeader()); }
 
     @Override
-    @Transactional
     public int insertWmIssueHeader(WmIssueHeader e) {
+        // 手工创建（Controller 直调）无上层 doc-gen 锁，需按工单+工序加锁防 TOCTOU 重复建单；
+        // doc-gen 路径已持 pro:workorder:doc-gen 锁，Redisson 可重入，无死锁风险。
+        String lockKey = (e.getWorkorderId() != null && e.getTaskId() != null)
+                ? "wm:issue:create:" + e.getWorkorderId() + ":" + e.getTaskId() : null;
+        if (lockKey != null) {
+            lockTemplate.execute(lockKey, 10, () -> txTemplate.execute(status -> doInsertWmIssueHeader(e)));
+        } else {
+            txTemplate.execute(status -> doInsertWmIssueHeader(e));
+        }
+        return 1;
+    }
+
+    private int doInsertWmIssueHeader(WmIssueHeader e) {
         e.setCreateTime(DateUtils.getNowDate());
         e.setCreateBy(SecurityUtils.getUsername());
         if (e.getStatus() == null) e.setStatus(WmIssueConstants.STATUS_DRAFT);
@@ -160,6 +176,9 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
                 }
             }
         }
+        // 防御：外协工序(is_outsource=1)的物料必须走外协发料单(qxx_wm_outsource_order)，
+        // 不允许生成厂内生产领料单。自动生成路径已分流，此处兜底拦截手工/其他入口。
+        rejectOutsourceLines(e);
         wmIssueHeaderMapper.insertWmIssueHeader(e);
         // 头行一次性原子落库（修复旧版"先存头后存行中途出错留脏单"问题）
         if (e.getLines() != null && !e.getLines().isEmpty()) {
@@ -168,7 +187,30 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
         return 1;
     }
 
+    /**
+     * 校验领料明细不包含外协工序(is_outsource=1)的 BOM 行。
+     * 外协工序物料应走外协发料单，不能走厂内生产领料。
+     */
+    private void rejectOutsourceLines(WmIssueHeader header) {
+        if (header.getWorkorderId() == null || !WmIssueConstants.TYPE_PRODUCE.equals(header.getIssueType())) {
+            return;
+        }
+        if (header.getLines() == null || header.getLines().isEmpty()) return;
+        ProWorkorder wo = proWorkorderMapper.selectProWorkorderByWorkorderId(header.getWorkorderId());
+        if (wo == null) return;
+        Map<Long, ProRouteProcess> outsourceMap = outsourceIssueHelper.resolveOutsourceProcessMap(wo);
+        if (outsourceMap.isEmpty()) return;
+        for (WmIssueLine line : header.getLines()) {
+            if (line.getProcessId() != null && outsourceMap.containsKey(line.getProcessId())) {
+                ProRouteProcess rp = outsourceMap.get(line.getProcessId());
+                throw new ServiceException("工序[" + (rp != null ? rp.getProcessName() : line.getProcessId())
+                        + "]为外协工序，物料应走外协发料单，不能生成厂内领料单");
+            }
+        }
+    }
+
     @Override
+    @Transactional
     public int updateWmIssueHeader(WmIssueHeader e) {
         e.setUpdateTime(DateUtils.getNowDate());
         e.setUpdateBy(SecurityUtils.getUsername());
@@ -220,13 +262,23 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
         WmIssueHeader header = wmIssueHeaderMapper.selectWmIssueHeaderByIssueId(issueId);
         if (header == null) throw new ServiceException("领料单不存在");
 
+        ProWorkorder wo = proWorkorderMapper.selectProWorkorderByWorkorderId(workorderId);
+        if (wo == null) throw new ServiceException("工单不存在");
+        // 外协工序(is_outsource=1)的 BOM 行走外协发料单，不导入厂内领料单
+        Map<Long, ProRouteProcess> outsourceMap = outsourceIssueHelper.resolveOutsourceProcessMap(wo);
+
         ProWorkorderBom query = new ProWorkorderBom();
         query.setWorkorderId(workorderId);
         List<ProWorkorderBom> bomList = proWorkorderBomMapper.selectProWorkorderBomList(query);
         if (bomList == null || bomList.isEmpty()) throw new ServiceException("工单BOM为空，请先维护工单BOM");
 
         BigDecimal totalQty = BigDecimal.ZERO;
+        int skipped = 0;
         for (ProWorkorderBom bom : bomList) {
+            if (bom.getProcessId() != null && outsourceMap.containsKey(bom.getProcessId())) {
+                skipped++;
+                continue; // 外协工序物料走外协发料单
+            }
             WmIssueLine line = new WmIssueLine();
             line.setIssueId(issueId);
             line.setItemId(bom.getItemId());
@@ -234,6 +286,7 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
             line.setItemName(bom.getItemName());
             line.setUnitOfMeasure(bom.getUnitOfMeasure());
             line.setUnitName(bom.getUnitName());
+            line.setProcessId(bom.getProcessId());
             line.setQuantityIssue(bom.getTotalQuantity() != null ? bom.getTotalQuantity() : BigDecimal.ZERO);
             line.setWarehouseId(header.getWarehouseId());
             line.setCreateTime(DateUtils.getNowDate());
@@ -241,11 +294,18 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
             wmIssueLineMapper.insertWmIssueLine(line);
             totalQty = totalQty.add(bom.getTotalQuantity() != null ? bom.getTotalQuantity() : BigDecimal.ZERO);
         }
+        if (totalQty.compareTo(BigDecimal.ZERO) == 0) {
+            throw new ServiceException("工单BOM全部为外协工序物料，请走外协发料模块");
+        }
 
         header.setQuantityTotal(totalQty);
         header.setUpdateTime(DateUtils.getNowDate());
         header.setUpdateBy(SecurityUtils.getUsername());
-        return wmIssueHeaderMapper.updateWmIssueHeader(header);
+        int rows = wmIssueHeaderMapper.updateWmIssueHeader(header);
+        if (skipped > 0) {
+            log.info("loadBomLines 跳过外协工序BOM行: workorderId={}, skipped={}", workorderId, skipped);
+        }
+        return rows;
     }
 
     // ── 2a-bis. 从工单生成领料单草稿（不落库，前端编辑后走 insert）──
@@ -265,8 +325,14 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
         List<ProWorkorderBom> bomList = proWorkorderBomMapper.selectProWorkorderBomList(query);
         if (bomList == null || bomList.isEmpty()) throw new ServiceException("工单BOM为空，请先维护工单BOM");
 
+        // 外协工序(is_outsource=1)的 BOM 行走外协发料单，不生成厂内领料草稿
+        Map<Long, ProRouteProcess> outsourceMap = outsourceIssueHelper.resolveOutsourceProcessMap(wo);
+
         List<WmIssueLine> lines = new ArrayList<>();
         for (ProWorkorderBom bom : bomList) {
+            if (bom.getProcessId() != null && outsourceMap.containsKey(bom.getProcessId())) {
+                continue; // 外协工序物料走外协发料单
+            }
             WmIssueLine line = new WmIssueLine();
             line.setItemId(bom.getItemId());
             line.setItemCode(bom.getItemCode());
@@ -276,6 +342,9 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
             line.setProcessId(bom.getProcessId());
             line.setQuantityIssue(bom.getTotalQuantity() != null ? bom.getTotalQuantity() : BigDecimal.ZERO);
             lines.add(line);
+        }
+        if (lines.isEmpty()) {
+            throw new ServiceException("该工单所有工序均为外协，请走外协发料模块");
         }
 
         WmIssueHeader draft = new WmIssueHeader();
@@ -519,6 +588,8 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
      * 写入外协发料 OUTSOURCE_ISSUE 追溯（原料发给供应商加工）。
      * parent = MATERIAL_STOCK（具体扣减的库存行），child = VENDOR（供应商）。
      * 按本 line 已写入的 ISSUE_OUT 事务逐 stockId 拆分，与真实扣减记录一一对应，避免 parentId=0 造成断链。
+     * 同时补一条 MATERIAL_STOCK → CARD 边（若 header.cardId 非空），与厂内发料 ISSUE 边对称，
+     * 让反查追溯从 CARD 能回溯到原料库存，避免外协卡片在追溯图中断联。
      */
     private void writeOutsourceIssueTrace(WmIssueHeader header, WmIssueLine line) {
         // 汇总本 line 所有 ISSUE_OUT 的量（qty 为负），按 materialStockId 分组
@@ -549,11 +620,33 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
             trace.setWorkorderId(header.getWorkorderId());
             trace.setIssueId(header.getIssueId());
             trace.setVendorId(header.getVendorId());
+            trace.setCardId(header.getCardId());
             trace.setProcessId(line.getProcessId());
             trace.setTraceTime(DateUtils.getNowDate());
             trace.setCreateTime(DateUtils.getNowDate());
             trace.setCreateBy(SecurityUtils.getUsername());
             proMaterialTraceMapper.insertProMaterialTrace(trace);
+
+            // 补 MATERIAL_STOCK → CARD 边，与厂内发料 ISSUE 边对称，修复反查追溯在 CARD 节点断联
+            if (header.getCardId() != null) {
+                ProMaterialTrace cardEdge = new ProMaterialTrace();
+                cardEdge.setTraceType("OUTSOURCE_ISSUE");
+                cardEdge.setParentType("MATERIAL_STOCK");
+                cardEdge.setParentId(e.getKey());
+                cardEdge.setChildType("CARD");
+                cardEdge.setChildId(header.getCardId());
+                cardEdge.setQuantity(e.getValue());
+                cardEdge.setUnitOfMeasure(line.getUnitOfMeasure());
+                cardEdge.setWorkorderId(header.getWorkorderId());
+                cardEdge.setIssueId(header.getIssueId());
+                cardEdge.setVendorId(header.getVendorId());
+                cardEdge.setCardId(header.getCardId());
+                cardEdge.setProcessId(line.getProcessId());
+                cardEdge.setTraceTime(DateUtils.getNowDate());
+                cardEdge.setCreateTime(DateUtils.getNowDate());
+                cardEdge.setCreateBy(SecurityUtils.getUsername());
+                proMaterialTraceMapper.insertProMaterialTrace(cardEdge);
+            }
         }
     }
 
@@ -1073,7 +1166,7 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
             if (remaining.compareTo(BigDecimal.ZERO) <= 0) break;
             BigDecimal allocQty = e.getValue(); // 该批次净预占量（正数）
             if (allocQty.compareTo(BigDecimal.ZERO) <= 0) continue;
-            WmMaterialStock stock = wmMaterialStockMapper.selectWmMaterialStockByMaterialStockId(e.getKey());
+            WmMaterialStock stock = wmMaterialStockMapper.selectMaterialStockForUpdateById(e.getKey());
             if (stock == null) continue;
             // 本次从该批次发的量 = min(剩余需求, 净预占量, 实际 onhand)
             BigDecimal onhand = stock.getQuantityOnhand() != null ? stock.getQuantityOnhand() : BigDecimal.ZERO;

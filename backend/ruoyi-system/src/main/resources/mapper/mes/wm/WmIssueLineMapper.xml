@@ -63,6 +63,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where line_id = #{lineId}
     </select>
 
+    <select id="selectByIssueIds" resultMap="WmIssueLineResult">
+        <include refid="selectWmIssueLineVo"/>
+        where issue_id in
+        <foreach item="issueId" collection="list" open="(" separator="," close=")">
+            #{issueId}
+        </foreach>
+        order by issue_id, line_id
+    </select>
+
     <insert id="insertWmIssueLine" parameterType="WmIssueLine" useGeneratedKeys="true" keyProperty="lineId">
         insert into qxx_wm_issue_line
         <trim prefix="(" suffix=")" suffixOverrides=",">

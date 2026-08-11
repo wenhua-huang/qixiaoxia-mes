@@ -115,7 +115,6 @@ public class ProRouteProductServiceImpl implements IProRouteProductService
                     newProc.setProcessId(pp.getProcessId());
                     newProc.setProcessCode(pp.getProcessCode());
                     newProc.setProcessName(pp.getProcessName());
-                    newProc.setProcessType(pp.getProcessType());
                     newProc.setOrderNum(pp.getOrderNum());
                     newProc.setKeyFlag(pp.getKeyFlag());
                     newProc.setIsCheck(pp.getIsCheck());

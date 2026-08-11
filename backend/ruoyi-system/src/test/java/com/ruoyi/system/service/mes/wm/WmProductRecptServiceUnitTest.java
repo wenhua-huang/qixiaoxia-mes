@@ -1,16 +1,22 @@
 package com.ruoyi.system.service.mes.wm;
 
+import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.system.domain.mes.wm.WmProductRecpt;
 import com.ruoyi.system.domain.mes.wm.WmProductRecptLine;
 import com.ruoyi.system.domain.mes.wm.tx.ProductRecptTxBean;
+import com.ruoyi.system.mapper.mes.pro.ProDocGenerationLogMapper;
 import com.ruoyi.system.mapper.mes.wm.WmProductRecptMapper;
+import com.ruoyi.system.mapper.mes.wm.WmTransactionMapper;
 import com.ruoyi.system.service.mes.wm.impl.WmProductRecptServiceImpl;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
@@ -32,7 +38,25 @@ class WmProductRecptServiceUnitTest {
     @Mock private WmProductRecptMapper wmProductRecptMapper;
     @Mock private IWmProductRecptLineService wmProductRecptLineService;
     @Mock private IWmStorageCoreService storageCoreService;
+    @Mock private ProDocGenerationLogMapper proDocGenerationLogMapper;
+    @Mock private WmTransactionMapper wmTransactionMapper;
+    @Mock private IWmBatchService wmBatchService;
     @InjectMocks private WmProductRecptServiceImpl service;
+
+    private MockedStatic<SecurityUtils> securityUtilsMock;
+
+    @BeforeEach
+    void setUp() {
+        securityUtilsMock = mockStatic(SecurityUtils.class);
+        securityUtilsMock.when(SecurityUtils::getUsername).thenReturn("tester");
+        // 无 doc-generation 日志 → writeProduceStockinTrace 提前返回（非报工入库）
+        lenient().when(proDocGenerationLogMapper.selectList(any())).thenReturn(Collections.emptyList());
+    }
+
+    @AfterEach
+    void tearDown() {
+        securityUtilsMock.close();
+    }
 
     @Test
     @DisplayName("1. 确认收货：DRAFT -> CONFIRMED，调 processProductRecpt 更新库存")

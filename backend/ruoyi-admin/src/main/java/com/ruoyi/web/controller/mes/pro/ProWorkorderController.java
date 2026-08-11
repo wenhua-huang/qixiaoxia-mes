@@ -30,10 +30,12 @@ import com.ruoyi.system.domain.mes.pro.ProWorkorderDeviationVO;
 import com.ruoyi.system.service.mes.pro.IProWorkorderService;
 import com.ruoyi.system.service.mes.pro.IProTaskService;
 import com.ruoyi.system.service.mes.pro.IScheduleService;
+import com.ruoyi.system.service.mes.pro.IProFeedbackService;
 import com.ruoyi.system.service.mes.pro.IProWorkorderDocService;
 import com.ruoyi.system.domain.mes.pro.ProDocGenerationRequestVO;
 import com.ruoyi.system.domain.mes.pro.ProDocGenerationResultVO;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderKitDashboardVO;
+import com.ruoyi.system.domain.mes.pro.ProOutsourceWorkorderInfoVO;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.page.TableDataInfo;
 
@@ -58,6 +60,9 @@ public class ProWorkorderController extends BaseController
     private IProWorkorderDocService proWorkorderDocService;
     @Autowired
     private IProTaskService proTaskService;
+
+    @Autowired
+    private IProFeedbackService proFeedbackService;
 
     /**
      * 查询生产工单列表
@@ -325,17 +330,47 @@ public class ProWorkorderController extends BaseController
         if (!"PREPARE".equals(wo.getStatus()) && !"PRODUCING".equals(wo.getStatus())) {
             return error("该工单状态为「" + wo.getStatus() + "」，仅待生产/生产中可报工");
         }
-        // 查该工单的任务，只返回 PRODUCING 状态（可报工的任务）
+        // 查该工单的任务：外协任务(vendorCode 非空)单独分流，厂内任务才进可报工列表
         ProTask taskQuery = new ProTask();
         taskQuery.setWorkorderId(wo.getWorkorderId());
         List<ProTask> allTasks = proTaskService.selectProTaskList(taskQuery);
+        // 可报工任务：厂内工序(vendorCode 为空) + PRODUCING 状态
         List<ProTask> reportableTasks = allTasks.stream()
                 .filter(t -> "PRODUCING".equals(t.getStatus()))
+                .filter(t -> t.getVendorCode() == null || t.getVendorCode().isEmpty())
                 .collect(Collectors.toList());
+        // 外协任务：展示在"外协"区域（不含厂内工序）
+        List<ProTask> outsourceTasks = allTasks.stream()
+                .filter(t -> t.getVendorCode() != null && !t.getVendorCode().isEmpty())
+                .collect(Collectors.toList());
+        fillPendingFeedbackCount(allTasks);
 
         Map<String, Object> result = new HashMap<>();
         result.put("workorder", wo);
         result.put("tasks", reportableTasks);
+        result.put("outsourceTasks", outsourceTasks);
         return success(result);
+    }
+
+    /**
+     * 移动端外协发料入口：按工单编码一次查询外协工序、BOM 发料行、默认厂商、已有外协单（防重）。
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:query')")
+    @GetMapping("/outsourceInfo")
+    public AjaxResult outsourceInfo(@RequestParam String workorderCode)
+    {
+        ProOutsourceWorkorderInfoVO info = proWorkorderService.getOutsourceInfoByCode(workorderCode);
+        return success(info);
+    }
+
+    /** 批量查询每个 task 的待审核(PREPARE)报工数，设置到 pendingFeedbackCount */
+    private void fillPendingFeedbackCount(List<ProTask> tasks) {
+        if (tasks == null || tasks.isEmpty()) return;
+        List<Long> taskIds = tasks.stream().map(ProTask::getTaskId).collect(Collectors.toList());
+        Map<Long, Integer> countMap = proFeedbackService.countPendingByTaskIds(taskIds);
+        for (ProTask t : tasks) {
+            Integer c = countMap != null ? countMap.get(t.getTaskId()) : null;
+            t.setPendingFeedbackCount(c != null ? c : 0);
+        }
     }
 }

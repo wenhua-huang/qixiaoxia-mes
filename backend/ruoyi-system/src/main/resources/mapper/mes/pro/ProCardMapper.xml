@@ -51,6 +51,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where card_id = #{cardId}
     </select>
 
+    <select id="selectProCardByCardIdForUpdate" parameterType="Long" resultMap="ProCardResult">
+        <include refid="selectProCardVo"/>
+        where card_id = #{cardId}
+        for update
+    </select>
+
     <insert id="insertProCard" parameterType="ProCard" useGeneratedKeys="true" keyProperty="cardId">
         insert into qxx_pro_card
         <trim prefix="(" suffix=")" suffixOverrides=",">
@@ -148,5 +154,33 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           and factory_id = #{factoryId}
           and status = 'ACTIVE'
           and quantity_transfered &gt;= #{delta}
+    </update>
+
+    <!-- 条件推进卡：仅 expectedStatus → 目标状态，防并发覆盖。厂内报工 ACTIVE，外协收货 OUTSOURCING。返回 0=已推进/状态不符 -->
+    <update id="advanceCard">
+        update qxx_pro_card
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="currentProcessId != null">current_process_id = #{currentProcessId},</if>
+            <if test="currentProcessName != null and currentProcessName != ''">current_process_name = #{currentProcessName},</if>
+            status = #{status},
+            update_by = #{operator},
+            update_time = NOW(),
+        </trim>
+        where card_id = #{cardId}
+          and status = #{expectedStatus}
+    </update>
+
+    <!-- 发料外协标记卡：仅 ACTIVE → OUTSOURCING，不回退已完工/已取消卡，防并发外协单覆盖工序 -->
+    <update id="markOutsourcingIfActive">
+        update qxx_pro_card
+        <trim prefix="SET" suffixOverrides=",">
+            status = 'OUTSOURCING',
+            <if test="currentProcessId != null">current_process_id = #{currentProcessId},</if>
+            <if test="currentProcessName != null and currentProcessName != ''">current_process_name = #{currentProcessName},</if>
+            update_by = #{operator},
+            update_time = NOW(),
+        </trim>
+        where card_id = #{cardId}
+          and status = 'ACTIVE'
     </update>
 </mapper>

@@ -90,26 +90,34 @@
         </el-table>
       </el-collapse-item>
 
-      <!-- 面板 2: 生产领料单 -->
+      <!-- 面板 2: 领料单（厂内生产领料单 + 外协发料单） -->
       <el-collapse-item name="issue">
         <template #title>
           <div class="panel-header">
-            <span>生产领料单</span>
+            <span>领料单</span>
             <el-tag size="small" style="margin-left: 12px" :type="dashboard?.hasIssueDocs ? '' : 'info'">
               {{ issueStatusSummary }}
             </el-tag>
           </div>
         </template>
         <el-table v-if="dashboard?.hasIssueDocs" :data="dashboard?.issueStatuses" size="small" border>
-          <el-table-column label="单据编码" prop="issueCode" width="150" align="center" />
-          <el-table-column label="单据名称" prop="issueName" :show-overflow-tooltip="true" />
-          <el-table-column label="状态" width="90" align="center">
+          <el-table-column label="类型" width="90" align="center">
             <template #default="scope">
-              <el-tag :type="scope.row.status === 'POSTED' ? 'success' : scope.row.status === 'DRAFT' ? 'warning' : 'info'" size="small">
-                {{ scope.row.status === 'POSTED' ? '已过账' : scope.row.status === 'DRAFT' ? '草稿' : scope.row.status }}
+              <el-tag :type="scope.row.docType === 'OUTSOURCE' ? 'warning' : ''" size="small">
+                {{ scope.row.docType === 'OUTSOURCE' ? '外协' : '厂内' }}
               </el-tag>
             </template>
           </el-table-column>
+          <el-table-column label="单据编码" prop="issueCode" width="150" align="center" />
+          <el-table-column label="单据名称" prop="issueName" :show-overflow-tooltip="true" />
+            <el-table-column label="状态" width="90" align="center">
+              <template #default="scope">
+                <dict-tag
+                  :options="scope.row.docType === 'OUTSOURCE' ? mes_outsource_status : mes_wm_issue_status"
+                  :value="scope.row.status"
+                />
+              </template>
+            </el-table-column>
           <el-table-column label="领料总数" prop="totalQuantity" width="100" align="center" />
         </el-table>
         <el-empty v-else description="暂无领料单" :image-size="50" />
@@ -158,13 +166,11 @@
           <el-table-column label="单据编码" prop="rtCode" width="150" align="center" />
           <el-table-column label="单据名称" prop="rtName" :show-overflow-tooltip="true" />
           <el-table-column label="关联领料单" prop="issueCode" width="150" align="center" />
-          <el-table-column label="状态" width="90" align="center">
-            <template #default="scope">
-              <el-tag :type="scope.row.status === 'POSTED' ? 'success' : 'warning'" size="small">
-                {{ scope.row.status === 'POSTED' ? '已过账' : '草稿' }}
-              </el-tag>
-            </template>
-          </el-table-column>
+            <el-table-column label="状态" width="90" align="center">
+              <template #default="scope">
+                <dict-tag :options="mes_wm_issue_status" :value="scope.row.status" />
+              </template>
+            </el-table-column>
           <el-table-column label="退料总数" prop="totalQuantity" width="100" align="center" />
         </el-table>
         <el-empty v-else description="暂无退料单" :image-size="50">
@@ -205,10 +211,86 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, getCurrentInstance } from 'vue'
 import { loadKitDashboard, generateDocs } from '@/api/mes/pro/kit'
 import { ElMessage } from 'element-plus'
 import PurOrderWizard from './PurOrderWizard.vue'
+
+interface MaterialRow {
+  lineId: number
+  itemId: number
+  itemCode: string
+  itemName: string
+  unitName: string
+  requiredQty: number
+  availableQty: number
+  reservedForOrder: number
+  effectiveQty: number
+  sufficient: boolean
+  shortageQty: number
+}
+interface IssueStatusRow {
+  docType: string
+  issueCode: string
+  issueName: string
+  status: string
+  totalQuantity: number
+}
+interface PurchaseRecommendRow {
+  itemCode: string
+  itemName: string
+  unitName: string
+  shortageQty: number
+  recommendedQty: number
+  hasPendingPO: boolean
+  pendingPOInfo: string
+}
+interface ReturnStatusRow {
+  rtCode: string
+  rtName: string
+  issueCode: string
+  status: string
+  totalQuantity: number
+}
+interface ReceiptRecommend {
+  producedQty: number
+  qualifiedQty: number
+  lastProcessName: string
+  alreadyHasReceipt: boolean
+  existingReceiptCode: string
+  recommended: boolean
+}
+interface KitDashboardData {
+  workorderCode: string
+  productName: string
+  planQuantity: number
+  unitName: string
+  requestDate: string
+  workorderStatus: string
+  allSufficient: boolean
+  sufficientCount: number
+  shortageCount: number
+  materialRows: MaterialRow[]
+  hasIssueDocs: boolean
+  issueStatuses: IssueStatusRow[]
+  issuePostedCount: number
+  issueConfirmedCount: number
+  issueDraftCount: number
+  hasPurchaseRecommend: boolean
+  purchaseRecommends: PurchaseRecommendRow[]
+  returnReady: boolean
+  hasPendingReturns: boolean
+  returnStatuses: ReturnStatusRow[]
+  receiptReady: boolean
+  receiptRecommend: ReceiptRecommend | null
+}
+
+// 工单状态映射（全项目统一硬编码，未走服务端字典）
+const WO_STATUS_LABEL: Record<string, string> = { PREPARE: '待生产', PRODUCING: '生产中', COMPLETED: '已完成', CANCEL: '已取消', CLOSED: '已关闭' }
+const WO_STATUS_TAG: Record<string, string> = { PREPARE: 'info', PRODUCING: 'warning', COMPLETED: 'success', CANCEL: 'danger', CLOSED: '' }
+
+const { proxy } = getCurrentInstance() as any
+const { mes_wm_issue_status, mes_outsource_status } = proxy.useDict('mes_wm_issue_status', 'mes_outsource_status')
 
 const props = defineProps<{
   modelValue: boolean
@@ -221,11 +303,10 @@ const emit = defineEmits<{
 }>()
 
 const visible = ref(false)
-const loading = ref(false)
 const genLoading = ref(false)
 const genMsg = ref('')
 const purWizOpen = ref(false)
-const dashboard = ref<any>(null)
+const dashboard = ref<KitDashboardData | null>(null)
 const activePanels = ref<string[]>(['material'])
 
 // 从 prop 同步 visible
@@ -241,31 +322,30 @@ watch(visible, (val) => {
 })
 
 function loadData() {
-  if (!props.workorderId) return
-  loading.value = true
-  loadKitDashboard(props.workorderId).then(r => {
-    dashboard.value = r.data
-    // 自动展开有内容的/有问题的面板
-    const panels: string[] = ['material']
-    if (dashboard.value?.allSufficient === false) panels.push('purOrder')
-    if (dashboard.value?.hasIssueDocs) panels.push('issue')
-    if (dashboard.value?.receiptReady) panels.push('receipt')
-    activePanels.value = panels
-  }).catch(() => {
-    // 错误提示由 request 拦截器统一处理（ElMessage），此处仅兜底避免未捕获拒绝
-  }).finally(() => { loading.value = false })
-}
+    if (!props.workorderId) return
+    loadKitDashboard(props.workorderId).then(r => {
+      dashboard.value = r.data as KitDashboardData
+      // 自动展开有内容的/有问题的面板
+      const panels: string[] = ['material']
+      if (dashboard.value?.allSufficient === false) panels.push('purOrder')
+      if (dashboard.value?.hasIssueDocs) panels.push('issue')
+      if (dashboard.value?.receiptReady) panels.push('receipt')
+      activePanels.value = panels
+    }).catch(() => {
+      // 错误提示由 request 拦截器统一处理（ElMessage），此处仅兜底避免未捕获拒绝
+    })
+  }
 
 const isCompleted = computed(() => dashboard.value?.workorderStatus === 'COMPLETED')
 
 const statusLabel = computed(() => {
-  const m: Record<string, string> = { PREPARE: '待生产', PRODUCING: '生产中', COMPLETED: '已完成', CANCEL: '已取消', CLOSED: '已关闭' }
-  return m[dashboard.value?.workorderStatus] || dashboard.value?.workorderStatus || '-'
+  const s = dashboard.value?.workorderStatus
+  return (s && WO_STATUS_LABEL[s]) || s || '-'
 })
 
 const statusTagType = computed(() => {
-  const m: Record<string, string> = { PREPARE: 'info', PRODUCING: 'warning', COMPLETED: 'success', CANCEL: 'danger', CLOSED: '' }
-  return m[dashboard.value?.workorderStatus] || ''
+  const s = dashboard.value?.workorderStatus
+  return (s && WO_STATUS_TAG[s]) || ''
 })
 
 const issueStatusSummary = computed(() => {

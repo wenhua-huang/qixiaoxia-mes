@@ -1,5 +1,6 @@
 package com.ruoyi.system.service.mes.pur.impl;
 
+import java.util.Collection;
 import java.util.List;
 import com.ruoyi.common.enums.PurOrderStatus;
 import com.ruoyi.common.exception.ServiceException;
@@ -51,6 +52,13 @@ public class PurOrderLineServiceImpl implements IPurOrderLineService
     public List<PurOrderLine> selectPurOrderLineList(PurOrderLine purOrderLine)
     {
         return purOrderLineMapper.selectPurOrderLineList(purOrderLine);
+    }
+
+    @Override
+    public List<PurOrderLine> selectPendingByWorkorderAndItems(Long workorderId, Collection<Long> itemIds)
+    {
+        if (itemIds == null || itemIds.isEmpty()) return java.util.Collections.emptyList();
+        return purOrderLineMapper.selectPendingByWorkorderAndItems(workorderId, itemIds);
     }
 
     /**

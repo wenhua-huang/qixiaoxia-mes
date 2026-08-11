@@ -301,4 +301,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by min(s.create_time) asc
     </select>
 
+    <!-- 按 itemId 集合批量查库存（齐套分析等消除 N+1）；factory_id 由拦截器注入 -->
+    <select id="selectByItemIds" resultMap="WmMaterialStockResult">
+        <include refid="selectWmMaterialStockVo"/>
+        where item_id in
+        <foreach item="itemId" collection="itemIds" open="(" separator="," close=")">
+            #{itemId}
+        </foreach>
+    </select>
+
 </mapper>

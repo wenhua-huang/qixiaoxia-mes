@@ -89,6 +89,20 @@ export const constantRoutes = [
         meta: { title: '个人中心', icon: 'user' }
       }
     ]
+  },
+  {
+    path: '/help',
+    component: Layout,
+    hidden: true,
+    redirect: 'noredirect',
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/help/index.vue'),
+        name: 'Help',
+        meta: { title: '帮助中心' }
+      }
+    ]
   }
 ]
 

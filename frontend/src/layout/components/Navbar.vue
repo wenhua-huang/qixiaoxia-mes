@@ -48,6 +48,9 @@
             <router-link to="/user/profile">
               <el-dropdown-item>个人中心</el-dropdown-item>
             </router-link>
+            <router-link to="/help">
+              <el-dropdown-item>帮助中心</el-dropdown-item>
+            </router-link>
             <el-dropdown-item command="setLayout" v-if="settingsStore.showSettings">
                 <span>布局设置</span>
             </el-dropdown-item>

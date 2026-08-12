@@ -2,6 +2,7 @@ package com.ruoyi.system.service.mes.wm.impl;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -19,6 +20,7 @@ import jakarta.annotation.PostConstruct;
 import com.ruoyi.common.core.redis.RedisLockTemplate;
 import com.ruoyi.common.enums.OutsourceStatus;
 import com.ruoyi.common.enums.TransactionTypeEnum;
+import com.ruoyi.common.enums.WmIssueConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
@@ -255,7 +257,7 @@ public class OutsourceServiceImpl implements IOutsourceService
         if (line.getBatchId() != null && line.getBatchId() > 0) return;
         if (line.getItemId() == null) return;
         List<WmMaterialStock> stocks = materialStockMapper.selectAvailableBatches(
-                line.getItemId(), line.getWarehouseId(), "NORMAL");
+                line.getItemId(), line.getWarehouseId(), WmIssueConstants.QUALITY_NORMAL);
         if (stocks != null && !stocks.isEmpty())
         {
             WmMaterialStock s = stocks.get(0);
@@ -268,6 +270,38 @@ public class OutsourceServiceImpl implements IOutsourceService
                 line.setWarehouseName(s.getWarehouseName());
             }
         }
+    }
+
+    /**
+     * 发料前定位真实库存桶，回填 vendorId。
+     *
+     * 采购收货按 PO 供应商把原料写入不同 vendor_id 桶（见 WmItemRecptServiceImpl），
+     * 而发料事务默认 vendorId=0，loadMaterialStockForUpdate 的 6 元组等值匹配会
+     * 因 vendor_id 不一致而查不到桶，误报"库存记录不存在"。这里按 item+batch+warehouse
+     * （workorder=0 通用原料、NORMAL）忽略 vendor 定位实际库存行，供 buildPickTx 回填。
+     *
+     * @return 命中的库存记录；未定位到返回 null（交由后续流程报库存不存在）
+     */
+    private WmMaterialStock resolvePickStock(WmOutsourceIssueLine line)
+    {
+        if (line.getItemId() == null || line.getBatchId() == null || line.getWarehouseId() == null)
+            return null;
+        WmMaterialStock q = new WmMaterialStock();
+        q.setItemId(line.getItemId());
+        q.setBatchId(line.getBatchId());
+        q.setWarehouseId(line.getWarehouseId());
+        q.setWorkorderId(0L);
+        q.setQualityStatus(WmIssueConstants.QUALITY_NORMAL);
+        List<WmMaterialStock> list = materialStockMapper.selectWmMaterialStockList(q);
+        if (list == null || list.isEmpty()) return null;
+        // 多供应商桶时优先扣有现货的，按最早入库 FIFO
+        return list.stream()
+                .filter(s -> s.getQuantityOnhand() != null
+                        && s.getQuantityOnhand().compareTo(BigDecimal.ZERO) > 0)
+                .min(Comparator.comparing(
+                        WmMaterialStock::getCreateTime,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .orElse(list.get(0));
     }
 
     /**
@@ -318,6 +352,8 @@ public class OutsourceServiceImpl implements IOutsourceService
         // 扣库存 + 写发料追溯（草稿创建时跳过的动作，此处补做）
         for (WmOutsourceIssueLine line : lines)
         {
+            // 草稿行可能未指定批次（PC 直接保存草稿），执行时按 FIFO 补最早可用批次
+            resolveFifoBatchIfMissing(line);
             WmTransaction pickTx = buildPickTx(line, order);
             transactionService.processTransaction(pickTx);
             writeIssueTrace(line, order, pickTx.getMaterialStockId());
@@ -1023,7 +1059,16 @@ public class OutsourceServiceImpl implements IOutsourceService
         // 单据与工单的关联由 sourceDocType=OUTSOURCE/sourceDocId(外协单头) 及 writeIssueTrace 承载。
         tx.setWorkorderId(null);
         tx.setWorkorderCode(null);
-        // 发料扣的是我方库存（vendorId 不设，processTransaction 兜底为 0）
+        // 发料扣的是我方原料库存：采购收货按 PO 供应商分桶（vendor_id 非 0），
+        // 必须按 item+batch+warehouse 定位真实库存桶回填 vendorId，否则 6 元组匹配
+        // 会因 vendor_id=0 找不到记录而误报"库存记录不存在"。
+        WmMaterialStock pickStock = resolvePickStock(line);
+        if (pickStock != null)
+        {
+            tx.setVendorId(pickStock.getVendorId());
+            tx.setLocationId(pickStock.getLocationId());
+            tx.setAreaId(pickStock.getAreaId());
+        }
         tx.setTransactionTime(new Date());
         return tx;
     }

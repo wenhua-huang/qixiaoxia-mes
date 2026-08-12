@@ -100,11 +100,15 @@
               </view>
               <view class="field">
                 <text class="field-label">生产日期</text>
-                <uni-datetime-picker v-model="line.produceDate" type="date" :clear-icon="true" />
+                <picker mode="date" :value="line.produceDate" @change="(e) => line.produceDate = e.detail.value">
+                  <view class="date-picker-box" :class="{ 'is-placeholder': !line.produceDate }">{{ line.produceDate || '请选择' }}</view>
+                </picker>
               </view>
               <view class="field">
                 <text class="field-label">有效期</text>
-                <uni-datetime-picker v-model="line.expireDate" type="date" :clear-icon="true" />
+                <picker mode="date" :value="line.expireDate" @change="(e) => line.expireDate = e.detail.value">
+                  <view class="date-picker-box" :class="{ 'is-placeholder': !line.expireDate }">{{ line.expireDate || '请选择' }}</view>
+                </picker>
               </view>
             </view>
           </view>
@@ -308,6 +312,13 @@ page { background-color: #f5f6f7; min-height: 100%; padding-bottom: 200rpx; }
 .roll-edit-fields { display: flex; gap: 12rpx; }
 .field { flex: 1; display: flex; flex-direction: column; gap: 6rpx; }
 .field-label { font-size: 22rpx; color: #999; }
+.date-picker-box {
+  height: 70rpx; line-height: 70rpx;
+  border: 1px solid #e5e5e5; border-radius: 8rpx;
+  padding: 0 16rpx; font-size: 26rpx; color: #333;
+  background: #fff; box-sizing: border-box;
+}
+.date-picker-box.is-placeholder { color: #c0c4cc; }
 .batch-toggle { padding: 10rpx 0; }
 .batch-toggle-text { font-size: 24rpx; color: #007aff; }
 .footer-bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 16rpx 24rpx calc(16rpx + env(safe-area-inset-bottom)); background: #fff; border-top: 1px solid #eee; }

@@ -78,6 +78,12 @@
             <text class="text">生产报工</text>
           </view>
         </uni-grid-item>
+        <uni-grid-item @click="goScan">
+          <view class="grid-item-box">
+            <uni-icons type="scan" size="30" color="#409eff"></uni-icons>
+            <text class="text">扫一扫</text>
+          </view>
+        </uni-grid-item>
         <uni-grid-item @click="goFeedbackHistory">
           <view class="grid-item-box">
             <uni-icons type="list" size="30" color="#67c23a"></uni-icons>
@@ -205,6 +211,7 @@
   import UniGrid from '@/uni_modules/uni-grid/components/uni-grid/uni-grid.vue'
   import UniGridItem from '@/uni_modules/uni-grid/components/uni-grid-item/uni-grid-item.vue'
   import UniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue'
+  import { scanAndDispatch } from '@/utils/scanDispatch'
 
   const { proxy } = getCurrentInstance()
   const userStore = useUserStore()
@@ -246,6 +253,10 @@
   // 生产管理入口
   function goReport() {
     proxy.$tab.navigateTo('/pages/mes/pro/report')
+  }
+  // 统一扫码分发：扫流转卡/工单码跳报工页
+  async function goScan() {
+    await scanAndDispatch()
   }
   function goFeedbackHistory() {
     proxy.$tab.navigateTo('/pages/mes/pro/history')

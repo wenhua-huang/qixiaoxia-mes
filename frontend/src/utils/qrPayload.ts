@@ -1,0 +1,18 @@
+const PREFIX = 'QXX'
+export type QrType = 'CARD' | 'MAT' | 'ROLL' | 'WO' | 'PKG'
+const ALL_TYPES: QrType[] = ['CARD', 'MAT', 'ROLL', 'WO', 'PKG']
+
+export function buildQrPayload(type: QrType, code: string): string {
+  return `${PREFIX}|${type}|${code}`
+}
+
+export function parseQrPayload(raw: string): { type: QrType; code: string } | null {
+  if (!raw) return null
+  const parts = raw.split('|', 3)
+  if (parts.length < 3 || parts[0] !== PREFIX) return null
+  if (!ALL_TYPES.includes(parts[1] as QrType)) return null
+  if (!parts[2]) return null
+  return { type: parts[1] as QrType, code: parts[2] }
+}
+
+export const buildCardPayload = (cardCode: string) => buildQrPayload('CARD', cardCode)

@@ -70,7 +70,7 @@ const docTree = ref<DocGroup[]>([
     title: '入门',
     items: [
       { file: 'quick-start.md', title: '快速上手' },
-      { file: 'pro-workflow.md', title: '生产主流程：工单→报工→入库' }
+      { file: 'pro-workflow.md', title: '订单到交付：销售订单→生产→发货' }
     ]
   }
 ])

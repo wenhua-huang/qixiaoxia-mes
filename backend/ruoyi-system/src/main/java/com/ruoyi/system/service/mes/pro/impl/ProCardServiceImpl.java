@@ -195,6 +195,7 @@ public class ProCardServiceImpl implements IProCardService
         List<ProTask> reportable = all.stream()
                 .filter(t -> ProConstants.TASK_STATUS_PRODUCING.equals(t.getStatus()))
                 .filter(t -> !ProConstants.WS_CODE_VENDOR.equals(t.getWorkstationCode()))
+                .filter(t -> card.getCurrentProcessId() == null || card.getCurrentProcessId().equals(t.getProcessId()))
                 .collect(Collectors.toList());
         fillPendingCount(reportable);
         vo.setReportableTasks(reportable);

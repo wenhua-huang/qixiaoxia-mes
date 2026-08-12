@@ -81,6 +81,7 @@ class ProCardScanServiceUnitTest {
         t.setTaskId(33L);
         t.setStatus("PRODUCING");
         t.setWorkstationCode("WS1");
+        t.setProcessId(5L);
         when(proTaskMapper.selectProTaskList(any())).thenReturn(List.of(t));
         when(proFeedbackMapper.selectPendingTaskIds(any())).thenReturn(Collections.emptyList());
         when(proFeedbackService.getDefaultConsume(10L)).thenReturn(Collections.emptyList());
@@ -104,6 +105,58 @@ class ProCardScanServiceUnitTest {
 
         CardScanResultVO vo = service.scanForReport("CRD1");
         assertThat(vo.isCanReport()).isFalse();
+        assertThat(vo.getReason()).isEqualTo("NO_REPORTABLE_TASK");
+    }
+
+    /** §6.2：卡在当前工序 5，但任务 processId=6（不同工序）→ 排除，无可报任务 */
+    @Test
+    void activeCard_taskDifferentProcess_excluded() {
+        ProCard c = new ProCard();
+        c.setCardId(1L);
+        c.setCardCode("CRD1");
+        c.setStatus("ACTIVE");
+        c.setWorkorderId(10L);
+        c.setCurrentProcessId(5L);
+        when(proCardMapper.selectProCardList(any())).thenReturn(List.of(c));
+
+        ProTask t = new ProTask();
+        t.setTaskId(33L);
+        t.setStatus("PRODUCING");
+        t.setWorkstationCode("WS1");
+        t.setProcessId(6L); // 与卡当前工序不一致
+        when(proTaskMapper.selectProTaskList(any())).thenReturn(List.of(t));
+        when(proFeedbackService.getDefaultConsume(10L)).thenReturn(Collections.emptyList());
+        when(proFeedbackMapper.sumAuditedQualifiedByCardAndProcess(1L, 5L)).thenReturn(BigDecimal.ZERO);
+
+        CardScanResultVO vo = service.scanForReport("CRD1");
+        assertThat(vo.isCanReport()).isFalse();
+        assertThat(vo.getReportableTasks()).isEmpty();
+        assertThat(vo.getReason()).isEqualTo("NO_REPORTABLE_TASK");
+    }
+
+    /** §6.2：任务工位为外协(VENDOR) → 排除，无可报任务 */
+    @Test
+    void activeCard_taskVendorWorkstation_excluded() {
+        ProCard c = new ProCard();
+        c.setCardId(1L);
+        c.setCardCode("CRD1");
+        c.setStatus("ACTIVE");
+        c.setWorkorderId(10L);
+        c.setCurrentProcessId(5L);
+        when(proCardMapper.selectProCardList(any())).thenReturn(List.of(c));
+
+        ProTask t = new ProTask();
+        t.setTaskId(33L);
+        t.setStatus("PRODUCING");
+        t.setWorkstationCode("VENDOR"); // 外协工位
+        t.setProcessId(5L);
+        when(proTaskMapper.selectProTaskList(any())).thenReturn(List.of(t));
+        when(proFeedbackService.getDefaultConsume(10L)).thenReturn(Collections.emptyList());
+        when(proFeedbackMapper.sumAuditedQualifiedByCardAndProcess(1L, 5L)).thenReturn(BigDecimal.ZERO);
+
+        CardScanResultVO vo = service.scanForReport("CRD1");
+        assertThat(vo.isCanReport()).isFalse();
+        assertThat(vo.getReportableTasks()).isEmpty();
         assertThat(vo.getReason()).isEqualTo("NO_REPORTABLE_TASK");
     }
 }

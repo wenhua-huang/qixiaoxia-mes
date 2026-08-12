@@ -434,10 +434,25 @@ watch(() => paramList.value.map(p => p.actualValue).join(','), () => {
 })
 
 // 提交报工
-function submitReport() {
+async function submitReport() {
   if (totalQuantity.value <= 0) {
     proxy.$modal.msgError('请至少填写一项报工数量')
     return
+  }
+  // 防超报软提醒：扫码报工且卡有流转数量时，校验累计合格是否超过流转数
+  if (card.value && card.value.quantityTransfered != null) {
+    const willTotal = (Number(form.quantityQualified) || 0) + Number(reportedQualifiedSum.value || 0)
+    if (willTotal > Number(card.value.quantityTransfered)) {
+      try {
+        await proxy.$modal.confirm(
+          '该卡流转数量 ' + card.value.quantityTransfered + '，已报合格 ' +
+          reportedQualifiedSum.value + '，本次合格将超报，是否继续？',
+          '超报提醒'
+        )
+      } catch (e) {
+        return
+      }
+    }
   }
   doSubmit()
 }
@@ -459,6 +474,7 @@ function doSubmit() {
       feedbackType: 'INTERNAL',
       feedbackCode: '',
       taskId: t.taskId,
+      cardId: card.value?.cardId || null,
       taskCode: t.taskCode,
       workorderId: w.workorderId,
       workorderCode: w.workorderCode,

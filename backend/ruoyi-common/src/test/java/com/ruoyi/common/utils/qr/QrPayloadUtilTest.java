@@ -53,4 +53,11 @@ class QrPayloadUtilTest {
             assertThat(p.getCode()).isEqualTo("CODE123");
         }
     }
+
+    @Test
+    void roundtrip_codeWithPipes_preservedBySplitLimit() {
+        // code 内含管道符：split(SEP, 3) 限长，第三段整体保留为 code（§3.1 契约）
+        assertThat(QrPayloadUtil.parse(QrPayloadUtil.build(QrPayloadType.CARD, "A|B|C")).getCode())
+                .isEqualTo("A|B|C");
+    }
 }

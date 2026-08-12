@@ -15,6 +15,11 @@
           <el-option label="待确认" value="PREPARE" /><el-option label="已确认" value="CONFIRMED" /><el-option label="已关闭" value="CLOSED" /><el-option label="已取消" value="CANCEL" />
         </el-select>
       </el-form-item>
+      <el-form-item label="来源" prop="source">
+        <el-select v-model="queryParams.source" placeholder="全部" clearable style="width:110px">
+          <el-option label="直接新增" :value="1" /><el-option label="CRM系统" :value="2" />
+        </el-select>
+      </el-form-item>
       <el-form-item><el-button type="primary" size="small" @click="handleQuery">搜索</el-button><el-button size="small" @click="resetQuery">重置</el-button></el-form-item>
     </el-form>
 
@@ -33,6 +38,7 @@
       <el-table-column label="客户" align="center" prop="clientName" :show-overflow-tooltip="true" />
       <el-table-column label="客户PO号" align="center" prop="clientOrderCode" width="120" />
       <el-table-column label="业务线" align="center" prop="businessLine" width="80"><template #default="s">{{ businessLineText(s.row.businessLine) }}</template></el-table-column>
+      <el-table-column label="来源" align="center" prop="source" width="90"><template #default="s"><el-tag :type="sourceTag(s.row.source)">{{ sourceText(s.row.source) }}</el-tag></template></el-table-column>
       <el-table-column label="交期" align="center" prop="requestDate" width="110"><template #default="s">{{ parseTime(s.row.requestDate, '{y}-{m}-{d}') }}</template></el-table-column>
       <el-table-column label="总金额" align="center" prop="totalAmount" width="100" />
       <el-table-column label="状态" align="center" prop="status" width="90"><template #default="s"><el-tag :type="statusTag(s.row.status)">{{ statusText(s.row.status) }}</el-tag></template></el-table-column>
@@ -254,7 +260,7 @@ export default {
       orderList: [], title: '', open: false, optType: undefined, autoGenFlag: true,
       // 业务员选项列表(SysUser,存展示用姓名 nickName,与客户/成品销售的 salesperson 口径一致)
       userOptions: [],
-      queryParams: { pageNum: 1, pageSize: 10, orderCode: null, orderName: null, clientName: null, clientOrderCode: null, businessLine: null, status: null },
+      queryParams: { pageNum: 1, pageSize: 10, orderCode: null, orderName: null, clientName: null, clientOrderCode: null, businessLine: null, status: null, source: null },
       form: {}, lineList: [],
       lineEditOpen: false, editingLine: null,
       twOpen: false, twLines: [], twOrderCode: '', twAutoGenFlag: true,
@@ -288,6 +294,8 @@ export default {
     statusText(s) { return { PREPARE: '待确认', CONFIRMED: '已确认', CLOSED: '已关闭', CANCEL: '已取消' }[s] || s },
     statusTag(s) { return { PREPARE: 'info', CONFIRMED: 'success', CLOSED: '', CANCEL: 'danger' }[s] || '' },
     businessLineText(b) { return { DOMESTIC: '内贸', FOREIGN: '外贸', SPOT: '现货' }[b] || b },
+    sourceText(s) { return { 1: '直接新增', 2: 'CRM系统' }[s] || (s == null ? '' : s) },
+    sourceTag(s) { return s === 2 ? 'warning' : 'info' },
     cancel() { this.open = false; this.reset() },
     reset() {
       this.form = { orderId: null, orderCode: null, orderName: null, orderType: 'NEW', clientId: null, clientCode: null, clientName: null, clientOrderCode: null, salesperson: null, businessLine: null, sampleFlag: 'N', orderDate: null, requestDate: null, totalAmount: 0, paymentMethod: null, status: 'PREPARE', remark: null }

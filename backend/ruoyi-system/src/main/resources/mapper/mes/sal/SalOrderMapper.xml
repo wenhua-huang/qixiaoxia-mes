@@ -18,6 +18,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="salesperson"      column="salesperson"       />
         <result property="businessLine"     column="business_line"     />
         <result property="sampleFlag"       column="sample_flag"       />
+        <result property="source"           column="source"            />
         <result property="orderDate"        column="order_date"        />
         <result property="requestDate"      column="request_date"      />
         <result property="totalAmount"      column="total_amount"      />
@@ -31,7 +32,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectSalOrderVo">
-        select order_id, factory_id, order_code, order_name, order_type, client_id, client_code, client_name, client_nick, client_order_code, salesperson, business_line, sample_flag, order_date, request_date, total_amount, payment_method, status, remark, create_by, create_time, update_by, update_time from qxx_sal_order
+        select order_id, factory_id, order_code, order_name, order_type, client_id, client_code, client_name, client_nick, client_order_code, salesperson, business_line, sample_flag, source, order_date, request_date, total_amount, payment_method, status, remark, create_by, create_time, update_by, update_time from qxx_sal_order
     </sql>
 
     <select id="selectSalOrderList" parameterType="SalOrder" resultMap="SalOrderResult">
@@ -83,6 +84,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="salesperson != null">salesperson,</if>
             <if test="businessLine != null">business_line,</if>
             <if test="sampleFlag != null">sample_flag,</if>
+            <if test="source != null">source,</if>
             <if test="orderDate != null">order_date,</if>
             <if test="requestDate != null">request_date,</if>
             <if test="totalAmount != null">total_amount,</if>
@@ -104,6 +106,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="salesperson != null">#{salesperson},</if>
             <if test="businessLine != null">#{businessLine},</if>
             <if test="sampleFlag != null">#{sampleFlag},</if>
+            <if test="source != null">#{source},</if>
             <if test="orderDate != null">#{orderDate},</if>
             <if test="requestDate != null">#{requestDate},</if>
             <if test="totalAmount != null">#{totalAmount},</if>

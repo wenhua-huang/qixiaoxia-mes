@@ -2,6 +2,7 @@ package com.ruoyi.system.service.mes.sal;
 
 import java.util.List;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
+import com.ruoyi.system.domain.mes.sal.CrmOrderCreateRequest;
 import com.ruoyi.system.domain.mes.sal.SalOrder;
 import com.ruoyi.system.domain.mes.sal.SalOrderCreateRequest;
 import com.ruoyi.system.domain.mes.sal.SalOrderToWorkorderRequest;
@@ -22,6 +23,8 @@ public interface ISalOrderService
 
     /** 创建订单(头+明细行,一个事务) */
     public SalOrder createWithLines(SalOrderCreateRequest req);
+    /** CRM 等外部系统推单：productCode 反查物料，orderCode 缺省自动生成，source 标记为 CRM */
+    public SalOrder createFromCrm(CrmOrderCreateRequest req);
     /** 修改订单(头+全量替换行,仅 PREPARE 状态可改明细) */
     public SalOrder updateWithLines(SalOrderCreateRequest req);
     /** 详情(头+行,行带已转量/可转量) */

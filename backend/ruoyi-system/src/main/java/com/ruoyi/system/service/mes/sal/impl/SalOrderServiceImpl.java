@@ -13,16 +13,22 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.system.domain.mes.md.MdItem;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderBom;
+import com.ruoyi.system.domain.mes.sal.CrmOrderCreateRequest;
+import com.ruoyi.system.domain.mes.sal.CrmOrderLineDTO;
+import com.ruoyi.system.domain.mes.sal.SalConstants;
 import com.ruoyi.system.domain.mes.sal.SalOrder;
 import com.ruoyi.system.domain.mes.sal.SalOrderCreateRequest;
 import com.ruoyi.system.domain.mes.sal.SalOrderLine;
 import com.ruoyi.system.domain.mes.sal.SalOrderToWorkorderRequest;
+import com.ruoyi.system.mapper.mes.md.MdItemMapper;
 import com.ruoyi.system.mapper.mes.sal.SalOrderLineMapper;
 import com.ruoyi.system.mapper.mes.sal.SalOrderMapper;
 import com.ruoyi.system.service.mes.pro.IProWorkorderService;
 import com.ruoyi.system.service.mes.sal.ISalOrderService;
+import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 
 /**
  * 销售订单Service实现
@@ -43,6 +49,12 @@ public class SalOrderServiceImpl implements ISalOrderService
 
     @Autowired
     private SalOrderLineMapper salOrderLineMapper;
+
+    @Autowired
+    private MdItemMapper mdItemMapper;
+
+    @Autowired
+    private AutoCodeGenerator autoCodeGenerator;
 
     @Autowired
     private IProWorkorderService proWorkorderService;
@@ -99,11 +111,68 @@ public class SalOrderServiceImpl implements ISalOrderService
         if (order.getStatus() == null) order.setStatus("PREPARE");
         if (order.getOrderType() == null) order.setOrderType("NEW");
         if (order.getSampleFlag() == null) order.setSampleFlag("N");
+        if (order.getSource() == null) order.setSource(SalConstants.SOURCE_DIRECT);
         order.setCreateBy(SecurityUtils.getUsername());
         order.setCreateTime(DateUtils.getNowDate());
         salOrderMapper.insertSalOrder(order);
         saveLines(order.getOrderId(), req.getLines(), true);
         return order;
+    }
+
+    @Override
+    @Transactional
+    public SalOrder createFromCrm(CrmOrderCreateRequest req)
+    {
+        SalOrder order = new SalOrder();
+        order.setOrderCode(StringUtils.isEmpty(req.getOrderCode())
+                ? autoCodeGenerator.genSerialCode("ORDER_NO", "")
+                : req.getOrderCode());
+        order.setOrderName(req.getOrderName());
+        order.setClientName(req.getClientName());
+        order.setClientCode(req.getClientCode());
+        order.setClientOrderCode(req.getClientOrderCode());
+        order.setSalesperson(req.getSalesperson());
+        order.setOrderDate(req.getOrderDate() != null ? req.getOrderDate() : DateUtils.getNowDate());
+        order.setRequestDate(req.getRequestDate());
+        order.setRemark(req.getRemark());
+        order.setOrderType("NEW");
+        order.setSampleFlag("N");
+        order.setStatus("PREPARE");
+        order.setSource(SalConstants.SOURCE_CRM);
+
+        List<SalOrderLine> lines = new java.util.ArrayList<>();
+        for (CrmOrderLineDTO dto : req.getLines())
+        {
+            lines.add(buildLineFromCrm(dto));
+        }
+        SalOrderCreateRequest payload = new SalOrderCreateRequest();
+        payload.setOrder(order);
+        payload.setLines(lines);
+        return createWithLines(payload);
+    }
+
+    /** CRM 明细行 productCode -> 反查物料填充 productId/name/单位 */
+    private SalOrderLine buildLineFromCrm(CrmOrderLineDTO dto)
+    {
+        MdItem query = new MdItem();
+        query.setItemCode(dto.getProductCode());
+        List<MdItem> items = mdItemMapper.selectMdItemList(query);
+        if (items == null || items.isEmpty())
+        {
+            throw new ServiceException("物料编码不存在:" + dto.getProductCode());
+        }
+        MdItem item = items.get(0);
+        SalOrderLine line = new SalOrderLine();
+        line.setProductId(item.getItemId());
+        line.setProductCode(item.getItemCode());
+        line.setProductName(item.getItemName());
+        line.setProductSpc(item.getSpecification());
+        line.setUnitOfMeasure(item.getUnitOfMeasure());
+        line.setQuantity(dto.getQuantity());
+        line.setUnitPrice(dto.getUnitPrice());
+        line.setRequestDate(dto.getRequestDate());
+        line.setRemark(dto.getRemark());
+        return line;
     }
 
     @Override

@@ -51,6 +51,9 @@ public class SalOrder extends BaseEntity
     @Excel(name = "是否有样品", readConverterExp = "Y=是,N=否")
     private String sampleFlag;
 
+    @Excel(name = "订单来源", readConverterExp = "1=直接新增,2=CRM系统")
+    private Integer source;
+
     @JsonFormat(pattern = "yyyy-MM-dd")
     @Excel(name = "订单日期", width = 30, dateFormat = "yyyy-MM-dd")
     private Date orderDate;
@@ -97,6 +100,8 @@ public class SalOrder extends BaseEntity
     public void setBusinessLine(String v) { this.businessLine = v; }
     public String getSampleFlag() { return sampleFlag; }
     public void setSampleFlag(String v) { this.sampleFlag = v; }
+    public Integer getSource() { return source; }
+    public void setSource(Integer v) { this.source = v; }
     public Date getOrderDate() { return orderDate; }
     public void setOrderDate(Date v) { this.orderDate = v; }
     public Date getRequestDate() { return requestDate; }

@@ -1,7 +1,11 @@
 package com.ruoyi.system.service.mes.pro.impl;
 
 import java.math.BigDecimal;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import jakarta.annotation.PostConstruct;
@@ -15,8 +19,15 @@ import org.springframework.stereotype.Service;
 import com.ruoyi.common.core.redis.RedisLockTemplate;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.system.mapper.mes.pro.ProCardMapper;
+import com.ruoyi.system.mapper.mes.pro.ProFeedbackMapper;
+import com.ruoyi.system.mapper.mes.pro.ProTaskMapper;
+import com.ruoyi.system.domain.mes.pro.CardScanResultVO;
 import com.ruoyi.system.domain.mes.pro.ProCard;
+import com.ruoyi.system.domain.mes.pro.ProConstants;
+import com.ruoyi.system.domain.mes.pro.ProFeedbackConsume;
+import com.ruoyi.system.domain.mes.pro.ProTask;
 import com.ruoyi.system.service.mes.pro.IProCardService;
+import com.ruoyi.system.service.mes.pro.IProFeedbackService;
 import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 
 /**
@@ -38,6 +49,12 @@ public class ProCardServiceImpl implements IProCardService
     private PlatformTransactionManager transactionManager;
     @Autowired
     private AutoCodeGenerator autoCodeGenerator;
+    @Autowired
+    private ProTaskMapper proTaskMapper;
+    @Autowired
+    private ProFeedbackMapper proFeedbackMapper;
+    @Autowired
+    private IProFeedbackService proFeedbackService;
     private TransactionTemplate txTemplate;
 
     @PostConstruct
@@ -131,5 +148,91 @@ public class ProCardServiceImpl implements IProCardService
         c.setCurrentProcessName(src.getCurrentProcessName());
         c.setStatus("ACTIVE");
         return c;
+    }
+
+    /** 扫流转卡码反查报工上下文（设计文档 §6.2，App 扫码报工入口） */
+    @Override
+    public CardScanResultVO scanForReport(String cardCode) {
+        CardScanResultVO vo = new CardScanResultVO();
+        // 1. 按 cardCode 查卡（factory_id 由拦截器自动注入）
+        ProCard q = new ProCard();
+        q.setCardCode(cardCode);
+        List<ProCard> list = proCardMapper.selectProCardList(q);
+        if (list == null || list.isEmpty()) {
+            vo.setCanReport(false);
+            vo.setReason("CARD_NOT_FOUND");
+            return vo;
+        }
+        ProCard card = list.get(0);
+        vo.setCard(card);
+
+        // 2. 卡状态校验（非 ACTIVE 不可报）
+        if (!"ACTIVE".equals(card.getStatus())) {
+            vo.setCanReport(false);
+            vo.setReason(reasonForCardStatus(card.getStatus()));
+            return vo;
+        }
+
+        // 3. 加载工单任务，筛可报（PRODUCING + 非外协工位）
+        ProTask tq = new ProTask();
+        tq.setWorkorderId(card.getWorkorderId());
+        List<ProTask> all = proTaskMapper.selectProTaskList(tq);
+        List<ProTask> reportable = all.stream()
+                .filter(t -> ProConstants.TASK_STATUS_PRODUCING.equals(t.getStatus()))
+                .filter(t -> !ProConstants.WS_CODE_VENDOR.equals(t.getWorkstationCode()))
+                .collect(Collectors.toList());
+        fillPendingCount(reportable);
+        vo.setReportableTasks(reportable);
+
+        // 4. BOM 消耗默认值（失败不阻断，置空列表）
+        try {
+            vo.setConsumeDefaults(proFeedbackService.getDefaultConsume(card.getWorkorderId()));
+        } catch (Exception e) {
+            log.warn("扫码反查 getDefaultConsume 失败 workorderId={}", card.getWorkorderId(), e);
+            vo.setConsumeDefaults(Collections.emptyList());
+        }
+
+        // 5. 已审核合格数（防超报）
+        if (card.getCurrentProcessId() != null) {
+            vo.setReportedQualifiedSum(
+                    proFeedbackMapper.sumAuditedQualifiedByCardAndProcess(card.getCardId(), card.getCurrentProcessId()));
+        } else {
+            vo.setReportedQualifiedSum(BigDecimal.ZERO);
+        }
+
+        // 6. 可报判定
+        if (reportable.isEmpty()) {
+            vo.setCanReport(false);
+            vo.setReason("NO_REPORTABLE_TASK");
+        } else {
+            vo.setCanReport(true);
+        }
+        return vo;
+    }
+
+    /** 卡状态 → 不可报原因码 */
+    private String reasonForCardStatus(String status) {
+        if (status == null) {
+            return "CARD_NOT_ACTIVE";
+        }
+        switch (status) {
+            case "COMPLETED": return "CARD_COMPLETED";
+            case "OUTSOURCING": return "CARD_OUTSOURCING";
+            case "SCRAPPED": return "CARD_SCRAPPED";
+            default: return "CARD_NOT_ACTIVE";
+        }
+    }
+
+    /** 回填任务的待审核报工数（用于前端状态展示，>0 即 1） */
+    private void fillPendingCount(List<ProTask> tasks) {
+        if (tasks == null || tasks.isEmpty()) {
+            return;
+        }
+        List<Long> ids = tasks.stream().map(ProTask::getTaskId).collect(Collectors.toList());
+        List<Long> pending = proFeedbackMapper.selectPendingTaskIds(ids);
+        Set<Long> pendingSet = (pending == null) ? Collections.emptySet() : new HashSet<>(pending);
+        for (ProTask t : tasks) {
+            t.setPendingFeedbackCount(pendingSet.contains(t.getTaskId()) ? 1 : 0);
+        }
     }
 }

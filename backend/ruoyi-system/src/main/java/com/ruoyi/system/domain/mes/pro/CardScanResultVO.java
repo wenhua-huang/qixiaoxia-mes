@@ -11,7 +11,7 @@ public class CardScanResultVO {
     /** 流转卡（携带 cardCode/status/currentProcess/workorder/item 等冗余字段） */
     private ProCard card;
 
-    /** 当前可报任务（工单下、当前工序、PRODUCING、非外协工位） */
+    /** 当前可报任务（工单下、PRODUCING 状态、非外协工位的可报任务） */
     private List<ProTask> reportableTasks;
 
     /** BOM 消耗默认值 */

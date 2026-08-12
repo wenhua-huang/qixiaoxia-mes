@@ -173,6 +173,21 @@ public class ProCardServiceImpl implements IProCardService
             return vo;
         }
 
+        // 3-5. 加载报工上下文（任务/BOM/已审核合格数）
+        loadReportContext(card, vo);
+
+        // 6. 可报判定
+        if (vo.getReportableTasks().isEmpty()) {
+            vo.setCanReport(false);
+            vo.setReason("NO_REPORTABLE_TASK");
+        } else {
+            vo.setCanReport(true);
+        }
+        return vo;
+    }
+
+    /** 加载报工上下文：工单下 PRODUCING+非外协工位任务、BOM 消耗默认值、已审核合格数 */
+    private void loadReportContext(ProCard card, CardScanResultVO vo) {
         // 3. 加载工单任务，筛可报（PRODUCING + 非外协工位）
         ProTask tq = new ProTask();
         tq.setWorkorderId(card.getWorkorderId());
@@ -199,15 +214,6 @@ public class ProCardServiceImpl implements IProCardService
         } else {
             vo.setReportedQualifiedSum(BigDecimal.ZERO);
         }
-
-        // 6. 可报判定
-        if (reportable.isEmpty()) {
-            vo.setCanReport(false);
-            vo.setReason("NO_REPORTABLE_TASK");
-        } else {
-            vo.setCanReport(true);
-        }
-        return vo;
     }
 
     /** 卡状态 → 不可报原因码 */

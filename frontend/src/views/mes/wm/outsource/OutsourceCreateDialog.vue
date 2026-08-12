@@ -193,8 +193,16 @@ function onCardChange(cardId: number) {
 
 function onProcessChange(processId: number) {
   const p = processOptions.value.find((x: any) => x.processId === processId)
-  if (p) { form.processCode = p.processCode; form.processName = p.processName }
-  else { form.processCode = ''; form.processName = '' }
+  if (p) {
+    form.processCode = p.processCode
+    form.processName = p.processName
+    // 选工序时自动派生来源类型：分切工序→SLITTING，其余→GENERIC（后端 resolveSourceType 为权威，此处仅前端展示联动）
+    form.sourceType = p.processCode === 'SLITTING' ? 'SLITTING' : 'GENERIC'
+  } else {
+    form.processCode = ''
+    form.processName = ''
+    form.sourceType = 'GENERIC'
+  }
 }
 
 function onItemSelected(row: any) {

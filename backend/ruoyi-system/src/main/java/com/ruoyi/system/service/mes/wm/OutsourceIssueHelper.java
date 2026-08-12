@@ -132,7 +132,7 @@ public class OutsourceIssueHelper {
         // vendorId 从路线工序节点回填（is_outsource=1 的节点配置了厂商）
         req.setVendorId(rp.getVendorId());
         req.setCardId(null);
-        // sourceType 按工序码派生：PRC-SLIT→SLITTING，其余 GENERIC，避免分切单被标成通用
+        // sourceType 按工序码派生：SLITTING→SLITTING，其余 GENERIC，避免分切单被标成通用
         req.setSourceType(com.ruoyi.system.service.mes.wm.impl.OutsourceServiceImpl.resolveSourceType(null, rp.getProcessCode()));
         req.setIssueLines(lines);
         req.setDraft(true); // 草稿模式：不扣料，用户确认发料行后 executeOutsource 执行扣料

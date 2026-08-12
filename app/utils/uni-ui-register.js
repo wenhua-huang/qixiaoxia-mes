@@ -26,10 +26,12 @@ import UniList from '@/uni_modules/uni-list/components/uni-list/uni-list.vue'
 import UniListItem from '@/uni_modules/uni-list/components/uni-list-item/uni-list-item.vue'
 import UniLoadMore from '@/uni_modules/uni-load-more/components/uni-load-more/uni-load-more.vue'
 import UniNumberBox from '@/uni_modules/uni-number-box/components/uni-number-box/uni-number-box.vue'
+import UniPopup from '@/uni_modules/uni-popup/components/uni-popup/uni-popup.vue'
 import UniSection from '@/components/uni-section/uni-section.vue'
 import UniSwiperDot from '@/uni_modules/uni-swiper-dot/components/uni-swiper-dot/uni-swiper-dot.vue'
 import UniTag from '@/uni_modules/uni-tag/components/uni-tag/uni-tag.vue'
 import UniTitle from '@/uni_modules/uni-title/components/uni-title/uni-title.vue'
+import UniTransition from '@/uni_modules/uni-transition/components/uni-transition/uni-transition.vue'
 
 export function registerUniUI(app) {
   app.component('uni-badge', UniBadge)
@@ -46,8 +48,10 @@ export function registerUniUI(app) {
   app.component('uni-list-item', UniListItem)
   app.component('uni-load-more', UniLoadMore)
   app.component('uni-number-box', UniNumberBox)
+  app.component('uni-popup', UniPopup)
   app.component('uni-section', UniSection)
   app.component('uni-swiper-dot', UniSwiperDot)
   app.component('uni-tag', UniTag)
   app.component('uni-title', UniTitle)
+  app.component('uni-transition', UniTransition)
 }

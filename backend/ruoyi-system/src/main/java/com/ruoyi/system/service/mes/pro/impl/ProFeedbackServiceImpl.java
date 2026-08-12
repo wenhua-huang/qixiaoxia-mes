@@ -60,9 +60,6 @@ import com.ruoyi.system.service.mes.pro.IProWorkorderDocService;
 @Service
 public class ProFeedbackServiceImpl implements IProFeedbackService {
 
-    /** 工序编码：纸张分切（厂内分切工序，产出半成品由 SlittingService 处理库存，不报工入库） */
-    private static final String PROCESS_CODE_SLIT = "PRC-SLIT";
-
     @Autowired private RedisLockTemplate lockTemplate;
     @Autowired private PlatformTransactionManager transactionManager;
     @Autowired(required = false) private com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator autoCodeGenerator;
@@ -399,7 +396,7 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
      * trace_type 统一策略：
      *   - 末工序 = PRODUCE（成品产出）
      *   - 外协工序 = OUTSOURCE_PROCESS（看路线工序 is_outsource，非工序类型）
-     *   - 分切工序 = SLIT（按工序编码 PRC-SLIT 判定）
+     *   - 分切工序 = SLIT（按工序编码 SLITTING 判定）
      *   - 其余工序 = PROCESS
      * parent=CARD（投料/产出的枢纽），child=报工记录（工序产出标识）。
      */
@@ -414,7 +411,7 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
                 traceType = "PRODUCE";
             } else if (fb.getRouteId() != null && isOutsourceRouteProcess(fb.getRouteId(), fb.getProcessId())) {
                 traceType = "OUTSOURCE_PROCESS";
-            } else if (proc != null && PROCESS_CODE_SLIT.equals(proc.getProcessCode())) {
+            } else if (proc != null && ProConstants.PROCESS_CODE_SLITTING.equals(proc.getProcessCode())) {
                 traceType = "SLIT";
             } else {
                 traceType = "PROCESS";
@@ -513,7 +510,7 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
                     if (fb.getRouteId() != null && fb.getProcessId() != null) {
                         // 查工序编码（用于判断分切工序：分切不触发产品入库，库存由 SlittingService 处理）
                         ProProcess proc = proProcessMapper.selectProProcessByProcessId(fb.getProcessId());
-                        boolean isSlitting = proc != null && PROCESS_CODE_SLIT.equals(proc.getProcessCode());
+                        boolean isSlitting = proc != null && ProConstants.PROCESS_CODE_SLITTING.equals(proc.getProcessCode());
                         // 有工艺路线信息：仅末工序报工才更新工单已生产数
                         if (isLastProcessOfRoute(fb.getRouteId(), fb.getProcessId())) {
                             // 【Fix #1/#2/#4】末工序场景：quantity_produced 更新 + 完工判定 都在外层本事务完成，

@@ -58,7 +58,7 @@
           </view>
         </view>
         <view class="task-sub">
-          <text class="text-grey">工作站：{{ task.workstationName || '-' }}</text>
+          <text class="text-grey">工作站：{{ task.workstationName || '-' }} · 进度：{{ task.quantityProduced || 0 }}/{{ task.quantity || 0 }} {{ workorder.unitName || 'PCS' }}</text>
         </view>
       </view>
       <view v-if="taskList.length === 0" class="empty-tip">该工单暂无可报工的工序任务</view>

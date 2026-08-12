@@ -12,6 +12,9 @@ public class ProConstants
     public static final String LINK_TYPE_SS = "SS";  // 顺序-必须先后
     public static final String LINK_TYPE_FS = "FS";  // 并行-可重叠
 
+    /** 工序编码：纸张分切（外协来源类型派生、厂内分切报工判定依据；须与 V16 种子数据 qxx_pro_process.process_code 对齐） */
+    public static final String PROCESS_CODE_SLITTING = "SLITTING";
+
     /** 排产快照状态 */
     public static final String SNAPSHOT_DRAFT = "DRAFT";
     public static final String SNAPSHOT_PUBLISHED = "PUBLISHED";

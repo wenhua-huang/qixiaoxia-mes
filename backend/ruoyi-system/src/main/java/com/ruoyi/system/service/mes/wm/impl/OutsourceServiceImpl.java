@@ -91,8 +91,6 @@ public class OutsourceServiceImpl implements IOutsourceService
     // 库存事务来源单据类型
     private static final String SOURCE_DOC_OUTSOURCE = "OUTSOURCE";
 
-    /** 工序编码：纸张分切（外协分切来源类型判定依据） */
-    private static final String PROCESS_CODE_SLIT = "PRC-SLIT";
     private static final String SOURCE_TYPE_SLITTING = "SLITTING";
     private static final String SOURCE_TYPE_GENERIC = "GENERIC";
 
@@ -306,14 +304,14 @@ public class OutsourceServiceImpl implements IOutsourceService
 
     /**
      * 派生外协来源类型：调用方未明确指定(空/GENERIC)时，按工序码识别。
-     * PRC-SLIT（纸张分切）→ SLITTING；其余默认 GENERIC。
+     * SLITTING（纸张分切）→ SLITTING；其余默认 GENERIC。
      * 让 OutsourceIssueHelper 等自动建单也能正确标注来源，避免分切单显示为通用、录结果走错策略。
      */
     public static String resolveSourceType(String sourceType, String processCode)
     {
         if (sourceType != null && !SOURCE_TYPE_GENERIC.equals(sourceType))
             return sourceType;
-        if (PROCESS_CODE_SLIT.equals(processCode))
+        if (ProConstants.PROCESS_CODE_SLITTING.equals(processCode))
             return SOURCE_TYPE_SLITTING;
         return sourceType != null ? sourceType : SOURCE_TYPE_GENERIC;
     }

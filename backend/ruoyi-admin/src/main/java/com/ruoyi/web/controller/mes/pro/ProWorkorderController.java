@@ -36,6 +36,7 @@ import com.ruoyi.system.domain.mes.pro.ProDocGenerationRequestVO;
 import com.ruoyi.system.domain.mes.pro.ProDocGenerationResultVO;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderKitDashboardVO;
 import com.ruoyi.system.domain.mes.pro.ProOutsourceWorkorderInfoVO;
+import com.ruoyi.system.domain.mes.pro.ProConstants;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.page.TableDataInfo;
 
@@ -330,18 +331,18 @@ public class ProWorkorderController extends BaseController
         if (!"PREPARE".equals(wo.getStatus()) && !"PRODUCING".equals(wo.getStatus())) {
             return error("该工单状态为「" + wo.getStatus() + "」，仅待生产/生产中可报工");
         }
-        // 查该工单的任务：外协任务(vendorCode 非空)单独分流，厂内任务才进可报工列表
+        // 查该工单的任务：外协任务(workstation_code=VENDOR)单独分流，厂内任务才进可报工列表
         ProTask taskQuery = new ProTask();
         taskQuery.setWorkorderId(wo.getWorkorderId());
         List<ProTask> allTasks = proTaskService.selectProTaskList(taskQuery);
-        // 可报工任务：厂内工序(vendorCode 为空) + PRODUCING 状态
+        // 可报工任务：厂内工序(workstation_code != VENDOR) + PRODUCING 状态
         List<ProTask> reportableTasks = allTasks.stream()
                 .filter(t -> "PRODUCING".equals(t.getStatus()))
-                .filter(t -> t.getVendorCode() == null || t.getVendorCode().isEmpty())
+                .filter(t -> !ProConstants.WS_CODE_VENDOR.equals(t.getWorkstationCode()))
                 .collect(Collectors.toList());
-        // 外协任务：展示在"外协"区域（不含厂内工序）
+        // 外协任务：展示在"外协"区域（workstation_code=VENDOR，不限状态）
         List<ProTask> outsourceTasks = allTasks.stream()
-                .filter(t -> t.getVendorCode() != null && !t.getVendorCode().isEmpty())
+                .filter(t -> ProConstants.WS_CODE_VENDOR.equals(t.getWorkstationCode()))
                 .collect(Collectors.toList());
         fillPendingFeedbackCount(allTasks);
 

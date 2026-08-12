@@ -281,7 +281,7 @@ async function submit(p) {
       workorderId: info.value.workorderId, workorderCode: info.value.workorderCode,
       cardId: info.value.activeCardId, routeId: info.value.routeId,
       processId: p.processId, processCode: p.processCode, processName: p.processName,
-      sourceType: p.processCode === 'PRC-SLIT' ? 'SLITTING' : 'GENERIC',
+      sourceType: p.processCode === 'SLITTING' ? 'SLITTING' : 'GENERIC',
       remark: f.remark,
       // <input type="digit"> 的 v-model 产出字符串，后端/BigDecimal 反序列化需显式转数字
       issueLines: f.issueLines.map(l => ({ ...l, quantity: Number(l.quantity) }))

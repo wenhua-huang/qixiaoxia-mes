@@ -33,9 +33,10 @@ description: Use when fixing any bug or defect — enforces investigate-before-f
 - 每次改动最小化，一个 commit 做一件事
 - 保持和现有代码风格一致
 
-### 5. 验证
+### 5. 验证（编译通过 ≠ 修复完成）
 - 跑 lint / 编译确认无语法错误
-- 启动 dev server 实际看效果
+- **后端改动必须重新打包并重启运行中的进程**：`mvn -pl ruoyi-admin -am package -DskipTests` → kill 旧进程 → `java -jar` 重启 → 等端口就绪。仅 `mvn compile` 不会更新运行中的 jar，等于没生效。
+- **实测真实接口/页面**：用 token 调真正的接口（curl），或在浏览器/小程序里实际点一次，看到返回结果符合预期（报错被拦住 / 数据正确）。不能只看日志"启动成功"或只跑编译就声称修好。
 - 跑全量 E2E 确认无回退
 - 说明如何验证修复有效（查哪些数据、看哪些页面）
 

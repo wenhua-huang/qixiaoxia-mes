@@ -17,6 +17,7 @@ import com.ruoyi.system.domain.mes.wm.WmIssueLine;
 import com.ruoyi.system.domain.mes.wm.WmMaterialStock;
 import com.ruoyi.system.domain.mes.wm.WmTransaction;
 import com.ruoyi.system.mapper.mes.pro.ProMaterialTraceMapper;
+import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
 import com.ruoyi.system.mapper.mes.wm.WmIssueHeaderMapper;
 import com.ruoyi.system.mapper.mes.wm.WmIssueLineMapper;
 import com.ruoyi.system.mapper.mes.wm.WmMaterialStockMapper;
@@ -54,6 +55,7 @@ class WmIssueHeaderServiceUnitTest {
     @Mock private WmMaterialStockMapper materialStockMapper;
     @Mock private WmTransactionMapper transactionMapper;
     @Mock private ProMaterialTraceMapper materialTraceMapper;
+    @Mock private ProWorkorderMapper proWorkorderMapper;
     @Mock private com.ruoyi.system.mapper.mes.wm.WmIssueDetailMapper issueDetailMapper;
     @Mock private com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator autoCodeGenerator;
     @Mock private RedisLockTemplate lockTemplate;
@@ -423,9 +425,18 @@ class WmIssueHeaderServiceUnitTest {
         dirtyStock.setMaterialStockId(1L);
         dirtyStock.setItemId(100L);
         dirtyStock.setItemCode("MAT-001");
+        dirtyStock.setBatchId(999L);
         dirtyStock.setQuantityOnhand(new BigDecimal("20"));
         dirtyStock.setQuantityAvailable(new BigDecimal("100"));
-        when(materialStockMapper.loadMaterialStockForUpdate(any(WmMaterialStock.class))).thenReturn(dirtyStock);
+        // 重构后：指定批次先发只读探测 loadMaterialStock，再按 stockId 升序 for update
+        when(materialStockMapper.loadMaterialStock(any(WmMaterialStock.class))).thenReturn(dirtyStock);
+        when(materialStockMapper.selectMaterialStockForUpdateById(1L)).thenReturn(dirtyStock);
+        // 净预占 10（该批次已预占，toSwap=0 直接发料，验证 available 钳制）
+        WmTransaction allocTx = new WmTransaction();
+        allocTx.setMaterialStockId(1L);
+        allocTx.setTransactionType("ALLOCATE");
+        allocTx.setQuantity(new BigDecimal("-10"));
+        when(transactionMapper.selectWmTransactionList(any(WmTransaction.class))).thenReturn(List.of(allocTx));
 
         WmIssueDetail d = new WmIssueDetail();
         d.setLineId(1L);
@@ -466,7 +477,7 @@ class WmIssueHeaderServiceUnitTest {
         phantomStock.setItemName("测试物料");
         phantomStock.setUnitOfMeasure("KG");
         phantomStock.setQuantityOnhand(new BigDecimal("14"));
-        when(materialStockMapper.selectWmMaterialStockByMaterialStockId(5L)).thenReturn(phantomStock);
+        when(materialStockMapper.selectMaterialStockForUpdateById(5L)).thenReturn(phantomStock);
 
         WmIssueDetail d = new WmIssueDetail();
         d.setLineId(1L);
@@ -500,7 +511,7 @@ class WmIssueHeaderServiceUnitTest {
         stock.setUnitOfMeasure("KG");
         stock.setQuantityOnhand(new BigDecimal("200"));
         stock.setQuantityAvailable(new BigDecimal("100")); // 已预占 100
-        when(materialStockMapper.selectWmMaterialStockByMaterialStockId(5L)).thenReturn(stock);
+        when(materialStockMapper.selectMaterialStockForUpdateById(5L)).thenReturn(stock);
 
         WmIssueDetail d = new WmIssueDetail();
         d.setLineId(1L);

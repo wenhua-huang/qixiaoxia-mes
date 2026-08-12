@@ -35,6 +35,9 @@ public class SysUser extends BaseEntity
     /** 工厂ID */
     private Long factoryId;
 
+    /** 关联厂商ID（外协厂商员工账号绑定 qxx_md_vendor；我方员工为 null） */
+    private Long vendorId;
+
     /** 用户账号 */
     @Excel(name = "登录名称")
     private String userName;
@@ -157,6 +160,16 @@ public class SysUser extends BaseEntity
     public void setFactoryId(Long factoryId)
     {
         this.factoryId = factoryId;
+    }
+
+    public Long getVendorId()
+    {
+        return vendorId;
+    }
+
+    public void setVendorId(Long vendorId)
+    {
+        this.vendorId = vendorId;
     }
 
     @Xss(message = "用户昵称不能包含脚本字符")

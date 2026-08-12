@@ -1,7 +1,10 @@
 package com.ruoyi.system.service.mes.pro;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import com.ruoyi.system.domain.mes.pro.ProFeedback;
+import com.ruoyi.system.domain.mes.pro.ProFeedbackConsume;
 
 /**
  * 报工记录Service接口
@@ -91,4 +94,17 @@ public interface IProFeedbackService
      * @return total/successCount/failedCount/failures[{recordId,feedbackCode,workorderName,reason}]
      */
     public java.util.Map<String, Object> batchAuditFeedback(Long[] recordIds);
+
+    /**
+     * 批量统计每个 task 的待审核(PREPARE)报工数。
+     * @param taskIds 任务ID集合
+     * @return taskId → 待审核报工数（无记录的 taskId 不在 map 中）
+     */
+    public Map<Long, Integer> countPendingByTaskIds(Collection<Long> taskIds);
+
+    /**
+     * 获取工单默认物料消耗（新增报工时预填）。
+     * 从工单BOM构建，batchCode 反查该工单最近领料的真实批次（与 insertProFeedback 自动填充逻辑一致）。
+     */
+    public List<ProFeedbackConsume> getDefaultConsume(Long workorderId);
 }

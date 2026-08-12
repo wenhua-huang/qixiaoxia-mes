@@ -36,4 +36,10 @@ public interface ProTaskMapper {
     int updateStatusByWorkorder(@Param("workorderId") Long workorderId,
                                 @Param("fromStatuses") List<String> fromStatuses,
                                 @Param("toStatus") String toStatus);
+
+    /**
+     * 条件完成任务：仅当任务当前为 PRODUCING 时置 COMPLETED，防止收货与工单取消并发时回退状态。
+     * @return 影响行数；0 表示任务已被其他流程推进/取消
+     */
+    int completeTaskIfProducing(@Param("taskId") Long taskId, @Param("operator") String operator);
 }

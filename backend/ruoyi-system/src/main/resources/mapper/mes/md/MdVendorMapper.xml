@@ -64,7 +64,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectMdVendorAllEnabled" resultMap="MdVendorResult">
         <include refid="selectMdVendorVo"/>
-        where enable_flag = 'Y'
+        where enable_flag = '1'
     </select>
 
     <select id="checkVendorCodeUnique" parameterType="com.ruoyi.system.domain.mes.md.MdVendor" resultMap="MdVendorResult">

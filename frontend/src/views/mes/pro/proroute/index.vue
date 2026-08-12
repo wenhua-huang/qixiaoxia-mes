@@ -137,9 +137,6 @@
             <el-table-column label="工序" align="center">
               <template #default="scope">{{ scope.row.processName || scope.row.processCode }}</template>
             </el-table-column>
-            <el-table-column label="工序类型" align="center" prop="processType" width="100">
-              <template #default="scope">{{ processTypeMap[scope.row.processType] || scope.row.processType }}</template>
-            </el-table-column>
             <el-table-column label="关系" align="center" width="100">
               <template #default="scope">
                 <el-tag :type="scope.row.linkType==='SS'?'success':(scope.row.linkType==='FS'?'warning':'info')" size="small">{{ linkTypeMap[scope.row.linkType] || scope.row.linkType }}</el-tag>
@@ -153,6 +150,12 @@
             <el-table-column label="检验工序" align="center" prop="isCheck" width="80">
               <template #default="scope">
                 <span :style="{color:scope.row.isCheck==='Y'?'#67C23A':'#909399'}">{{ scope.row.isCheck==='Y'?'是':'否' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="外协供应商" align="center" min-width="120">
+              <template #default="scope">
+                <el-tag v-if="scope.row.isOutsource==='1'" type="warning" size="small">{{ scope.row.vendorName || '未指定' }}</el-tag>
+                <span v-else style="color:#909399">—</span>
               </template>
             </el-table-column>
             <el-table-column label="操作" align="center" width="135" v-if="optType !== 'view'" class-name="small-padding fixed-width">
@@ -236,11 +239,16 @@
             <el-form-item label="检验工序"><el-radio-group v-model="rpForm.isCheck"><el-radio label="Y">是</el-radio><el-radio label="N">否</el-radio></el-radio-group></el-form-item>
           </el-col>
         </el-row>
-        <el-row v-if="rpForm.processType === 'OUTSOURCE'">
+        <el-row>
           <el-col :span="12">
-            <el-form-item label="外发工序"><el-radio-group v-model="rpForm.isOutsource"><el-radio label="1">是</el-radio><el-radio label="0">否</el-radio></el-radio-group></el-form-item>
+            <el-form-item label="外发工序"><el-radio-group v-model="rpForm.isOutsource" @change="onRpOutsourceChange"><el-radio label="1">是</el-radio><el-radio label="0">否</el-radio></el-radio-group></el-form-item>
           </el-col>
         </el-row>
+        <el-form-item v-if="rpForm.isOutsource === '1'" label="外协供应商">
+          <el-select v-model="rpForm.vendorId" placeholder="请选择外协供应商" filterable clearable style="width:100%" @change="onRpVendorChange">
+            <el-option v-for="v in vendorOptions" :key="v.vendorId" :label="v.vendorName + ' (' + v.vendorCode + ')'" :value="v.vendorId" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="备注"><el-input v-model="rpForm.remark" type="textarea" maxlength="500" /></el-form-item>
       </el-form>
       <template #footer>
@@ -394,6 +402,7 @@ import { listRouteProductBomByRouteId, addRouteProductBom, updateRouteProductBom
 import { listRouteProcessParamByRouteProductId, addRouteProcessParam, updateRouteProcessParam, delRouteProcessParam } from '@/api/mes/pro/routeprocessparam'
 import { listParamTemplateByProcessId } from '@/api/mes/pro/paramtemplate'
 import { listAllProcess } from '@/api/mes/pro/process'
+import { listAllVendor } from '@/api/mes/md/vendor'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import ItemSelect from '@/components/itemSelect/single.vue'
 
@@ -405,7 +414,7 @@ export default {
       autoGenFlag: false, optType: undefined, activeTab: 'base',
       loading: true, processLoading: false, productLoading: false, bomLoading: false, paramLoading: false,
       ids: [], single: true, multiple: true, showSearch: true, total: 0,
-      routeList: [], processList: [], productList: [], bomList: [], paramList: [], allProcessOptions: [],
+      routeList: [], processList: [], productList: [], bomList: [], paramList: [], allProcessOptions: [], vendorOptions: [],
       title: '', open: false,
       // 路线工序弹窗
       rpOpen: false, rpTitle: '', rpForm: {},
@@ -422,7 +431,6 @@ export default {
       _procParamOpen: false, _procParamTitle: '', _procParamLoading: false, _procParamList: [],
       _currentProcProcessId: null, _templateMap: {},
       sys_yes_no_options: [{ label: '是', value: '1' }, { label: '否', value: '0' }],
-      processTypeMap: { INTERNAL: '自制', OUTSOURCE: '外发', SLITTING: '分切' },
       linkTypeOptions: [
         { label: '串行(SS) — 必须完成本工序才能开始下一道', value: 'SS' },
         { label: '并行(FS) — 可与下一道工序同时进行', value: 'FS' },
@@ -460,7 +468,7 @@ export default {
     },
   },
   methods: {
-    getList() { this.loading = true; listRoute(this.queryParams).then(r => { this.routeList = r.rows; this.total = r.total; this.loading = false }) },
+    getList() { this.loading = true; listRoute(this.queryParams).then(r => { this.routeList = r.rows; this.total = r.total; }).catch(()=>{}).finally(()=>{ this.loading = false }) },
     loadAllProcess() { listAllProcess().then(r => { this.allProcessOptions = r.data || [] }) },
     cancel() { this.open = false; this.reset() },
     reset() {
@@ -495,12 +503,29 @@ export default {
     // 工序组成
     loadProcessList(routeId) { this.processLoading = true; listRouteProcessByRouteId(routeId).then(r => { this.processList = r.data || []; this.processLoading = false }).catch(() => { this.processLoading = false }) },
     handleAddRouteProcess() {
-      this.rpForm = { routeId: this.form.routeId, processId: null, processCode: null, processName: null, processType: null, orderNum: this.processList.length + 1, linkType: 'SS', defaultPreTime: 0, defaultSufTime: 0, colorCode: '#00AEF3', keyFlag: 'N', isCheck: 'N', isOutsource: '0', remark: null }
+      this.rpForm = { routeId: this.form.routeId, processId: null, processCode: null, processName: null, orderNum: this.processList.length + 1, linkType: 'SS', defaultPreTime: 0, defaultSufTime: 0, colorCode: '#00AEF3', keyFlag: 'N', isCheck: 'N', isOutsource: '0', vendorId: null, vendorCode: null, vendorName: null, remark: null }
+      this.loadVendorOptions()
       this.rpTitle = '添加工序'; this.rpOpen = true
     },
-    handleUpdateRouteProcess(row) { this.rpForm = { ...row }; this.rpTitle = '修改工序'; this.rpOpen = true },
+    handleUpdateRouteProcess(row) { this.rpForm = { ...row }; this.loadVendorOptions(); this.rpTitle = '修改工序'; this.rpOpen = true },
     handleDeleteRouteProcess(row) { this.$modal.confirm('确认删除该工序？').then(() => delRouteProcess(row.recordId)).then(() => { this.loadProcessList(this.form.routeId); this.$modal.msgSuccess('删除成功') }).catch(() => {}) },
-    onProcessSelected(val) { const p = this.allProcessOptions.find(i => i.processId === val); if (p) { this.rpForm.processCode = p.processCode; this.rpForm.processName = p.processName; this.rpForm.processType = p.processType } },
+    onProcessSelected(val) { const p = this.allProcessOptions.find(i => i.processId === val); if (p) { this.rpForm.processCode = p.processCode; this.rpForm.processName = p.processName } },
+    // 外协供应商：懒加载一次，仅取外协/整单外发类型
+    loadVendorOptions() {
+      if (this.vendorOptions.length) return Promise.resolve()
+      return listAllVendor().then(res => {
+        this.vendorOptions = (res.data || []).filter(v => v.vendorType === 'OUTSOURCE' || v.vendorType === 'BOTH')
+      })
+    },
+    onRpVendorChange(vendorId) {
+      const v = this.vendorOptions.find(x => x.vendorId === vendorId)
+      if (v) { this.rpForm.vendorCode = v.vendorCode; this.rpForm.vendorName = v.vendorName }
+      else { this.rpForm.vendorCode = null; this.rpForm.vendorName = null }
+    },
+    onRpOutsourceChange(val) {
+      // 切回厂内工序时清空外协供应商
+      if (val === '0') { this.rpForm.vendorId = null; this.rpForm.vendorCode = null; this.rpForm.vendorName = null }
+    },
     submitRpForm() {
       this.$refs.rpForm.validate(valid => {
         if (!valid) return

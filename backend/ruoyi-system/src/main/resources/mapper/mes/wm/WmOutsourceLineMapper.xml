@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.wm.WmOutsourceLineMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.wm.WmOutsourceIssueLine" id="IssueLineResult">
+        <id property="lineId" column="line_id" />
+        <result property="factoryId" column="factory_id" />
+        <result property="orderId" column="order_id" />
+        <result property="itemId" column="item_id" />
+        <result property="itemCode" column="item_code" />
+        <result property="itemName" column="item_name" />
+        <result property="specification" column="specification" />
+        <result property="unitOfMeasure" column="unit_of_measure" />
+        <result property="unitName" column="unit_name" />
+        <result property="quantity" column="quantity" />
+        <result property="batchId" column="batch_id" />
+        <result property="batchCode" column="batch_code" />
+        <result property="warehouseId" column="warehouse_id" />
+        <result property="warehouseCode" column="warehouse_code" />
+        <result property="warehouseName" column="warehouse_name" />
+        <result property="sourceRefType" column="source_ref_type" />
+        <result property="sourceRefId" column="source_ref_id" />
+        <result property="remark" column="remark" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+    </resultMap>
+
+    <resultMap type="com.ruoyi.system.domain.mes.wm.WmOutsourceRecptLine" id="RecptLineResult">
+        <id property="lineId" column="line_id" />
+        <result property="factoryId" column="factory_id" />
+        <result property="orderId" column="order_id" />
+        <result property="itemId" column="item_id" />
+        <result property="itemCode" column="item_code" />
+        <result property="itemName" column="item_name" />
+        <result property="specification" column="specification" />
+        <result property="unitOfMeasure" column="unit_of_measure" />
+        <result property="unitName" column="unit_name" />
+        <result property="quantity" column="quantity" />
+        <result property="batchId" column="batch_id" />
+        <result property="batchCode" column="batch_code" />
+        <result property="warehouseId" column="warehouse_id" />
+        <result property="warehouseCode" column="warehouse_code" />
+        <result property="warehouseName" column="warehouse_name" />
+        <result property="extAttrs" column="ext_attrs" />
+        <result property="sourceRefType" column="source_ref_type" />
+        <result property="sourceRefId" column="source_ref_id" />
+        <result property="produceDate" column="produce_date" />
+        <result property="expireDate" column="expire_date" />
+        <result property="lotNumber" column="lot_number" />
+        <result property="remark" column="remark" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+    </resultMap>
+
+    <select id="selectIssueLinesByOrderId" parameterType="Long" resultMap="IssueLineResult">
+        select line_id, factory_id, order_id, item_id, item_code, item_name, specification,
+               unit_of_measure, unit_name, quantity, batch_id, batch_code,
+               warehouse_id, warehouse_code, warehouse_name,
+               source_ref_type, source_ref_id, remark, create_by, create_time
+        from qxx_wm_outsource_issue_line where order_id = #{orderId}
+    </select>
+
+    <insert id="insertIssueLine" parameterType="com.ruoyi.system.domain.mes.wm.WmOutsourceIssueLine" useGeneratedKeys="true" keyProperty="lineId">
+        insert into qxx_wm_outsource_issue_line
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="orderId != null">order_id,</if>
+            <if test="itemId != null">item_id,</if>
+            <if test="itemCode != null">item_code,</if>
+            <if test="itemName != null">item_name,</if>
+            <if test="specification != null">specification,</if>
+            <if test="unitOfMeasure != null">unit_of_measure,</if>
+            <if test="unitName != null">unit_name,</if>
+            <if test="quantity != null">quantity,</if>
+            <if test="batchId != null">batch_id,</if>
+            <if test="batchCode != null">batch_code,</if>
+            <if test="warehouseId != null">warehouse_id,</if>
+            <if test="warehouseCode != null">warehouse_code,</if>
+            <if test="warehouseName != null">warehouse_name,</if>
+            <if test="sourceRefType != null">source_ref_type,</if>
+            <if test="sourceRefId != null">source_ref_id,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            create_time,
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="orderId != null">#{orderId},</if>
+            <if test="itemId != null">#{itemId},</if>
+            <if test="itemCode != null">#{itemCode},</if>
+            <if test="itemName != null">#{itemName},</if>
+            <if test="specification != null">#{specification},</if>
+            <if test="unitOfMeasure != null">#{unitOfMeasure},</if>
+            <if test="unitName != null">#{unitName},</if>
+            <if test="quantity != null">#{quantity},</if>
+            <if test="batchId != null">#{batchId},</if>
+            <if test="batchCode != null">#{batchCode},</if>
+            <if test="warehouseId != null">#{warehouseId},</if>
+            <if test="warehouseCode != null">#{warehouseCode},</if>
+            <if test="warehouseName != null">#{warehouseName},</if>
+            <if test="sourceRefType != null">#{sourceRefType},</if>
+            <if test="sourceRefId != null">#{sourceRefId},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            NOW(),
+        </trim>
+    </insert>
+
+    <delete id="deleteIssueLinesByOrderId" parameterType="Long">
+        delete from qxx_wm_outsource_issue_line where order_id = #{orderId}
+    </delete>
+
+    <select id="selectRecptLinesByOrderId" parameterType="Long" resultMap="RecptLineResult">
+        select line_id, factory_id, order_id, item_id, item_code, item_name, specification,
+               unit_of_measure, unit_name, quantity, batch_id, batch_code,
+               warehouse_id, warehouse_code, warehouse_name,
+               ext_attrs, source_ref_type, source_ref_id,
+               produce_date, expire_date, lot_number,
+               remark, create_by, create_time
+        from qxx_wm_outsource_recpt_line where order_id = #{orderId}
+    </select>
+
+    <insert id="insertRecptLine" parameterType="com.ruoyi.system.domain.mes.wm.WmOutsourceRecptLine" useGeneratedKeys="true" keyProperty="lineId">
+        insert into qxx_wm_outsource_recpt_line
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">factory_id,</if>
+            <if test="orderId != null">order_id,</if>
+            <if test="itemId != null">item_id,</if>
+            <if test="itemCode != null">item_code,</if>
+            <if test="itemName != null">item_name,</if>
+            <if test="specification != null">specification,</if>
+            <if test="unitOfMeasure != null">unit_of_measure,</if>
+            <if test="unitName != null">unit_name,</if>
+            <if test="quantity != null">quantity,</if>
+            <if test="batchId != null">batch_id,</if>
+            <if test="batchCode != null">batch_code,</if>
+            <if test="warehouseId != null">warehouse_id,</if>
+            <if test="warehouseCode != null">warehouse_code,</if>
+            <if test="warehouseName != null">warehouse_name,</if>
+            <if test="extAttrs != null">ext_attrs,</if>
+            <if test="sourceRefType != null">source_ref_type,</if>
+            <if test="sourceRefId != null">source_ref_id,</if>
+            <if test="produceDate != null">produce_date,</if>
+            <if test="expireDate != null">expire_date,</if>
+            <if test="lotNumber != null">lot_number,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            create_time,
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="orderId != null">#{orderId},</if>
+            <if test="itemId != null">#{itemId},</if>
+            <if test="itemCode != null">#{itemCode},</if>
+            <if test="itemName != null">#{itemName},</if>
+            <if test="specification != null">#{specification},</if>
+            <if test="unitOfMeasure != null">#{unitOfMeasure},</if>
+            <if test="unitName != null">#{unitName},</if>
+            <if test="quantity != null">#{quantity},</if>
+            <if test="batchId != null">#{batchId},</if>
+            <if test="batchCode != null">#{batchCode},</if>
+            <if test="warehouseId != null">#{warehouseId},</if>
+            <if test="warehouseCode != null">#{warehouseCode},</if>
+            <if test="warehouseName != null">#{warehouseName},</if>
+            <if test="extAttrs != null">#{extAttrs},</if>
+            <if test="sourceRefType != null">#{sourceRefType},</if>
+            <if test="sourceRefId != null">#{sourceRefId},</if>
+            <if test="produceDate != null">#{produceDate},</if>
+            <if test="expireDate != null">#{expireDate},</if>
+            <if test="lotNumber != null">#{lotNumber},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            NOW(),
+        </trim>
+    </insert>
+
+    <update id="updateRecptLine" parameterType="com.ruoyi.system.domain.mes.wm.WmOutsourceRecptLine">
+        update qxx_wm_outsource_recpt_line
+        <set>
+            <if test="batchId != null">batch_id = #{batchId},</if>
+            <if test="batchCode != null">batch_code = #{batchCode},</if>
+            <if test="produceDate != null">produce_date = #{produceDate},</if>
+            <if test="expireDate != null">expire_date = #{expireDate},</if>
+            <if test="lotNumber != null">lot_number = #{lotNumber},</if>
+        </set>
+        where line_id = #{lineId}
+    </update>
+
+</mapper>

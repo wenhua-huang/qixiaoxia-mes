@@ -52,6 +52,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where detail_id = #{detailId}
     </select>
 
+    <select id="selectByIssueIds" resultMap="WmIssueDetailResult">
+        <include refid="selectWmIssueDetailVo"/>
+        where issue_id in
+        <foreach collection="list" item="id" open="(" separator="," close=")">#{id}</foreach>
+        order by detail_id desc
+    </select>
+
     <insert id="insertWmIssueDetail" parameterType="WmIssueDetail" useGeneratedKeys="true" keyProperty="detailId">
         insert into qxx_wm_issue_detail
         <trim prefix="(" suffix=")" suffixOverrides=",">

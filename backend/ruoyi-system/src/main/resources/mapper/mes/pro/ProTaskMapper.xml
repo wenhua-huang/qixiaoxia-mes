@@ -288,4 +288,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           and status in
           <foreach collection="fromStatuses" item="s" open="(" separator="," close=")">#{s}</foreach>
     </update>
+
+    <!-- 条件完成任务：仅 PRODUCING → COMPLETED，防并发回退 -->
+    <update id="completeTaskIfProducing">
+        update qxx_pro_task
+        set status = 'COMPLETED', update_by = #{operator}, update_time = NOW()
+        where task_id = #{taskId} and status = 'PRODUCING'
+    </update>
 </mapper>

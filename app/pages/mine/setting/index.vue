@@ -54,7 +54,7 @@
       useUserStore().logOut().then(() => {}).finally(()=>{
         proxy.$tab.reLaunch('/pages/index')
       })
-    })
+    }).catch(() => {})
   }
 </script>
 

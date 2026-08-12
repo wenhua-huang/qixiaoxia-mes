@@ -57,6 +57,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by sort_order asc
     </select>
 
+    <select id="selectByTemplateIds" resultMap="ProParamTemplateResult">
+        <include refid="selectProParamTemplateVo"/>
+        where template_id in
+        <foreach item="templateId" collection="templateIds" open="(" separator="," close=")">
+            #{templateId}
+        </foreach>
+    </select>
+
     <insert id="insertProParamTemplate" parameterType="ProParamTemplate" useGeneratedKeys="true" keyProperty="templateId">
         insert into qxx_pro_param_template
         <trim prefix="(" suffix=")" suffixOverrides=",">

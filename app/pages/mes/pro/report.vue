@@ -52,13 +52,32 @@
         @click="selectTask(task)">
         <view class="task-top">
           <text class="task-name">{{ task.processName || '工序' }}</text>
-          <uni-tag v-if="selectedTaskId === task.taskId" type="primary" text="已选" size="small" />
+          <view class="task-tags">
+            <uni-tag v-if="(task.pendingFeedbackCount || 0) > 0" type="warning" :text="'待审核' + task.pendingFeedbackCount" size="small" />
+            <uni-tag v-if="selectedTaskId === task.taskId" type="primary" text="已选" size="small" />
+          </view>
         </view>
         <view class="task-sub">
-          <text class="text-grey">工作站：{{ task.workstationName || '-' }}</text>
+          <text class="text-grey">工作站：{{ task.workstationName || '-' }} · 进度：{{ task.quantityProduced || 0 }}/{{ task.quantity || 0 }} {{ workorder.unitName || 'PCS' }}</text>
         </view>
       </view>
       <view v-if="taskList.length === 0" class="empty-tip">该工单暂无可报工的工序任务</view>
+
+      <!-- 外协工序任务（展示用，不可点击报工，厂商手机端录结果） -->
+      <view v-if="outsourceTaskList.length > 0" class="completed-section">
+        <view class="line-header">
+          <text class="bold completed-title">外协工序</text>
+        </view>
+        <view v-for="(task, idx) in outsourceTaskList" :key="'co-' + idx" class="task-item completed">
+          <view class="task-top">
+            <text class="task-name">{{ task.processName || '工序' }}</text>
+            <uni-tag :type="taskStatusTagType(task.status)" :text="taskStatusLabel(task.status)" size="small" />
+          </view>
+          <view class="task-sub">
+            <text class="text-grey">厂商：{{ task.workstationName || '-' }} · 进度：{{ task.quantityProduced || 0 }}/{{ task.quantity || 0 }} {{ workorder.unitName || 'PCS' }}</text>
+          </view>
+        </view>
+      </view>
     </view>
 
     <!-- 步骤 3：填报工数量 -->
@@ -157,6 +176,7 @@ const { proxy } = getCurrentInstance()
 const workorderCode = ref('')
 const workorder = ref(null)
 const taskList = ref([])
+const outsourceTaskList = ref([])
 const selectedTaskId = ref(null)
 const selectedTask = ref(null)
 const submitting = ref(false)
@@ -184,6 +204,16 @@ const WO_STATUS_MAP = {
 function woStatusText(s) { return WO_STATUS_MAP[s] || s || '' }
 function woStatusTagType(s) {
   const m = { COMPLETED: 'success', CANCEL: 'error', CLOSED: 'info', PRODUCING: 'warning' }
+  return m[s] || 'default'
+}
+
+// 外协任务状态标签（覆盖外协流转状态：PRODUCING/COMPLETED 等）
+function taskStatusLabel(s) {
+  const m = { PREPARE: '待外发', PRODUCING: '外协中', COMPLETED: '已完工', CANCEL: '已取消' }
+  return m[s] || s || ''
+}
+function taskStatusTagType(s) {
+  const m = { COMPLETED: 'success', PRODUCING: 'warning', CANCEL: 'error', PREPARE: 'default' }
   return m[s] || 'default'
 }
 
@@ -220,6 +250,7 @@ function searchWorkorder() {
   // 重置已选状态
   workorder.value = null
   taskList.value = []
+  outsourceTaskList.value = []
   selectedTaskId.value = null
   selectedTask.value = null
   paramList.value = []
@@ -234,12 +265,16 @@ function searchWorkorder() {
     }
     workorder.value = data.workorder
     taskList.value = data.tasks || []
-    if (taskList.value.length === 0) {
+    outsourceTaskList.value = data.outsourceTasks || []
+    if (taskList.value.length === 0 && outsourceTaskList.value.length > 0) {
+      proxy.$modal.msg('外协工序请在厂商端录结果，无需厂内报工')
+    } else if (taskList.value.length === 0) {
       proxy.$modal.msgError('该工单暂无可报工的工序任务')
     }
-  }).catch(() => {
+  }).catch((err) => {
     proxy.$modal.closeLoading()
-    proxy.$modal.msgError('查询失败，请检查工单号')
+    // request.js 已全局 toast 显示后端错误信息，这里不再覆盖
+    if (!err) proxy.$modal.msgError('查询失败，请检查工单号')
   })
 }
 
@@ -313,13 +348,25 @@ function submitReport() {
     proxy.$modal.msgError('请至少填写一项报工数量')
     return
   }
-  proxy.$modal.confirm('确认提交报工？合格' + form.quantityQualified + '，不合格' + form.quantityUnqualified + '。').then(() => {
+  doSubmit()
+}
+
+function doSubmit() {
+  const pending = selectedTask.value?.pendingFeedbackCount || 0
+  // 第一步：有待审核报工时先提醒
+  const pendingConfirm = pending > 0
+    ? proxy.$modal.confirm('该工序已有 ' + pending + ' 条待审核报工，是否继续提交？', '重复报工提醒')
+    : Promise.resolve()
+  pendingConfirm.then(() => {
+    // 第二步：正常提交确认
+    return proxy.$modal.confirm('确认提交报工？合格' + form.quantityQualified + '，不合格' + form.quantityUnqualified + '。')
+  }).then(() => {
     submitting.value = true
     const t = selectedTask.value
     const w = workorder.value
     const body = {
       feedbackType: 'INTERNAL',
-      feedbackCode: '',  // 留空，后端自动生成
+      feedbackCode: '',
       taskId: t.taskId,
       taskCode: t.taskCode,
       workorderId: w.workorderId,
@@ -342,12 +389,11 @@ function submitReport() {
       quantityMaterialScrap: Number(form.quantityMaterialScrap || 0),
       quantityUncheck: 0,
       quantityOtherScrap: 0,
-      feedbackChannel: 'PAD',
-      feedbackTime: null,  // 后端兜底设为当前时间
+      feedbackChannel: 'APP',
+      feedbackTime: null,
       userName: null,
       remark: form.remark || null,
       status: 'PREPARE',
-      // 工序参数（后端自动判定偏差，只需 templateId + actualValue）
       paramList: paramList.value
         .filter(p => p.actualValue !== null && p.actualValue !== '')
         .map(p => ({
@@ -356,15 +402,17 @@ function submitReport() {
           actualValue: p.actualValue
         }))
     }
-    addFeedback(body).then(() => {
-      proxy.$modal.msgSuccess('报工提交成功！')
-      setTimeout(() => { proxy.$tab.navigateBack() }, 1500)
-    }).catch(e => {
-      proxy.$modal.msgError('报工失败：' + (typeof e === 'string' ? e : (e.msg || e.message || '未知错误')))
-    }).finally(() => {
-      submitting.value = false
-    })
-  }).catch(() => {})
+    return addFeedback(body)
+  }).then(() => {
+    proxy.$modal.msgSuccess('报工提交成功！')
+    setTimeout(() => { proxy.$tab.navigateBack() }, 1500)
+  }).catch(e => {
+    if (e === false || e === undefined || e === 'cancel' || e?.cancel) return // 用户取消，不提示
+    const errMsg = typeof e === 'string' ? e : (e?.msg || e?.message || '未知错误')
+    proxy.$modal.alert(errMsg, '报工失败')
+  }).finally(() => {
+    submitting.value = false
+  })
 }
 </script>
 
@@ -427,9 +475,15 @@ page { background-color: #f5f6f7; min-height: 100%; }
   display: flex; justify-content: space-between; align-items: center;
   margin-bottom: 8rpx;
 }
+.task-tags {
+  display: flex; align-items: center; gap: 8rpx;
+}
 .task-name { font-size: 30rpx; font-weight: 600; color: #333; }
 .task-sub { margin-top: 4rpx; }
 .text-grey { color: #999; font-size: 24rpx; }
+.completed-section { margin-top: 8rpx; }
+.completed-title { color: #67c23a; }
+.task-item.completed { opacity: 0.75; background: #f0f9eb; border-left-color: #67c23a; }
 .empty-tip {
   text-align: center; padding: 40rpx;
   color: #999; font-size: 26rpx;

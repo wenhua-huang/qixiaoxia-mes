@@ -11,7 +11,12 @@ import java.util.List;
  * 每个节点代表一个业务实体（采购单/库存/流转卡/工单/报工/销售单等），
  * 通过 children 递归表达分支关系。
  *
- * <p>防环：循环节点（已被 visited 标记的重复访问）设置 cycle=true，不再继续展开 children。
+ * <p>防环/汇聚：
+ * <ul>
+ *   <li>cycle=true：真环（当前 DFS 路径回到祖先，数据异常），标红，不再展开</li>
+ *   <li>reference=true：菱形汇聚（节点已在其他分支展开过，同一物料的不同业务视角），
+ *       显示为灰色引用卡，不展开 children，refToBranch 指向首次出现的业务单据分支</li>
+ * </ul>
  *
  * @author qixiaoxia
  * @date 2026-07-28
@@ -45,8 +50,17 @@ public class TraceTreeNode
     /** 深度（根节点=0） */
     private Integer depth;
 
-    /** 是否循环节点（重复访问，不再展开） */
+    /** 是否循环节点（真环：当前路径回到祖先，数据异常） */
     private boolean cycle;
+
+    /** 是否同源引用节点（菱形汇聚：已在其他分支展开，此处仅作引用，不递归） */
+    private boolean reference;
+
+    /** 首次出现所在分支的业务单据描述，如「流转卡 000CRD20260811011」 */
+    private String refToBranch;
+
+    /** 被其他分支引用的次数（仅首次出现节点有值，用于角标提示） */
+    private Integer refCount;
 
     /** 子分支 */
     private List<TraceTreeNode> children = new ArrayList<>();
@@ -71,6 +85,12 @@ public class TraceTreeNode
     public void setDepth(Integer depth) { this.depth = depth; }
     public boolean isCycle() { return cycle; }
     public void setCycle(boolean cycle) { this.cycle = cycle; }
+    public boolean isReference() { return reference; }
+    public void setReference(boolean reference) { this.reference = reference; }
+    public String getRefToBranch() { return refToBranch; }
+    public void setRefToBranch(String refToBranch) { this.refToBranch = refToBranch; }
+    public Integer getRefCount() { return refCount; }
+    public void setRefCount(Integer refCount) { this.refCount = refCount; }
     public List<TraceTreeNode> getChildren() { return children; }
     public void setChildren(List<TraceTreeNode> children) { this.children = children; }
 }

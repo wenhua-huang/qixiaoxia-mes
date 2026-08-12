@@ -52,6 +52,21 @@ public class SecurityUtils
     }
 
     /**
+     * 获取厂商ID（外协厂商员工账号绑定的 vendor_id；我方员工为 null）
+     **/
+    public static Long getVendorId()
+    {
+        try
+        {
+            return getLoginUser().getUser().getVendorId();
+        }
+        catch (Exception e)
+        {
+            throw new ServiceException("获取厂商ID异常", HttpStatus.UNAUTHORIZED);
+        }
+    }
+
+    /**
      * 获取部门ID
      **/
     public static Long getDeptId()

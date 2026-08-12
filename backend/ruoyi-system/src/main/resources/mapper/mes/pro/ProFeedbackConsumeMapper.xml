@@ -28,9 +28,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </select>
 
     <select id="selectByWorkorderId" parameterType="Long" resultMap="ProFeedbackConsumeResult">
-        <include refid="selectProFeedbackConsumeVo"/>
-        where workorder_id = #{workorderId}
-        order by consume_id
+        select c.consume_id, c.feedback_id, c.workorder_id, c.item_id, c.item_code, c.item_name, c.quantity, c.batch_code
+        from qxx_pro_feedback_consume c
+        inner join qxx_pro_feedback f on f.record_id = c.feedback_id
+        where c.workorder_id = #{workorderId}
+          and f.status = 'AUDITED'
+        order by c.consume_id
     </select>
 
     <insert id="insertBatch" parameterType="list">

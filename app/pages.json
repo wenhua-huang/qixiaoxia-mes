@@ -66,6 +66,11 @@
       "navigationBarTitleText": "常见问题"
     }
   }, {
+    "path": "pages/mine/usage/index",
+    "style": {
+      "navigationBarTitleText": "使用说明"
+    }
+  }, {
     "path": "pages/mine/about/index",
     "style": {
       "navigationBarTitleText": "关于我们"
@@ -149,6 +154,63 @@
     "style": {
       "navigationBarTitleText": "打卡历史",
       "enablePullDownRefresh": true
+    }
+  }, {
+    "path": "pages/mes/pro/slitting-list",
+    "style": {
+      "navigationBarTitleText": "分切管理",
+      "enablePullDownRefresh": true
+    }
+  }, {
+    "path": "pages/mes/pro/slitting-create",
+    "style": {
+      "navigationBarTitleText": "外协发料"
+    }
+  }, {
+    "path": "pages/mes/pro/slitting-detail",
+    "style": {
+      "navigationBarTitleText": "分切详情"
+    }
+  }, {
+    "path": "pages/mes/pro/slitting-result",
+    "style": {
+      "navigationBarTitleText": "录入分切结果"
+    }
+  }, {
+    "path": "pages/mes/pro/slitting-receive",
+    "style": {
+      "navigationBarTitleText": "外协收货"
+    }
+  }, {
+    "path": "pages/mes/wm/outsource-list",
+    "style": {
+      "navigationBarTitleText": "外协任务",
+      "enablePullDownRefresh": true
+    }
+  }, {
+    "path": "pages/mes/wm/outsource-create",
+    "style": {
+      "navigationBarTitleText": "外协发料"
+    }
+  }, {
+    "path": "pages/mes/wm/outsource-execute",
+    "style": {
+      "navigationBarTitleText": "执行发料"
+    }
+  }, {
+    "path": "pages/mes/wm/outsource-detail",
+    "style": {
+      "navigationBarTitleText": "外协详情"
+    }
+  }, {
+    "path": "pages/mes/wm/outsource-result",
+    "style": {
+      "navigationBarTitleText": "录入加工结果"
+    }
+  }, {
+    "path": "pages/mes/wm/outsource-receive",
+    "style": {
+      "navigationBarTitleText": "外协收货"
     }
   }],
   "tabBar": {

@@ -60,6 +60,8 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
     @Autowired private IPurOrderService purOrderService;
     @Autowired private IPurOrderLineService purOrderLineService;
     @Autowired private com.ruoyi.system.mapper.mes.md.MdItemVendorMapper mdItemVendorMapper;
+    @Autowired private com.ruoyi.system.service.mes.wm.OutsourceIssueHelper outsourceIssueHelper;
+    @Autowired private com.ruoyi.system.mapper.mes.wm.WmOutsourceOrderMapper wmOutsourceOrderMapper;
 
     // ---- 单据类型常量 ----
     private static final String DOC_ISSUE = "ISSUE";
@@ -143,6 +145,35 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
     private List<ProKitPurchaseRecommendVO> buildPurchaseRecommends(Long workorderId, List<Map<String, Object>> materialRows)
     {
         List<ProKitPurchaseRecommendVO> list = new ArrayList<>();
+        // 收集所有缺料 itemId，一次性批量查询在途 PO（消除逐物料 N+1）
+        List<Long> shortageItemIds = new ArrayList<>();
+        for (Map<String, Object> row : materialRows) {
+            if (Boolean.TRUE.equals(row.get("sufficient"))) continue;
+            Long itemId = (Long) row.get("itemId");
+            BigDecimal shortageQty = (BigDecimal) row.get("shortageQty");
+            if (itemId != null && shortageQty != null && shortageQty.compareTo(BigDecimal.ZERO) > 0) {
+                shortageItemIds.add(itemId);
+            }
+        }
+        // 批量查该工单下这些物料的有效 PO 行（JOIN 头已过滤非 CANCEL/CLOSED）
+        Map<Long, String> pendingInfoByItem = new HashMap<>();
+        if (!shortageItemIds.isEmpty()) {
+            List<PurOrderLine> pendingLines = purOrderLineService.selectPendingByWorkorderAndItems(workorderId, shortageItemIds);
+            if (pendingLines != null && !pendingLines.isEmpty()) {
+                // 按工单一次查 PO 头，取 orderCode
+                PurOrder poQ = new PurOrder();
+                poQ.setWorkorderId(workorderId);
+                List<PurOrderVO> pos = purOrderService.selectPurOrderList(poQ);
+                Map<Long, PurOrderVO> poById = new HashMap<>();
+                if (pos != null) for (PurOrderVO po : pos) poById.put(po.getOrderId(), po);
+                for (PurOrderLine pl : pendingLines) {
+                    PurOrderVO po = poById.get(pl.getOrderId());
+                    if (po != null && !pendingInfoByItem.containsKey(pl.getItemId())) {
+                        pendingInfoByItem.put(pl.getItemId(), po.getOrderCode() + "(" + po.getStatus() + ")");
+                    }
+                }
+            }
+        }
         for (Map<String, Object> row : materialRows) {
             if (Boolean.TRUE.equals(row.get("sufficient"))) continue;
 
@@ -158,21 +189,9 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
             rec.setShortageQty(shortageQty);
             rec.setRecommendedQty(shortageQty);
 
-            // 检查是否有在途PO
-            PurOrderLine lineQuery = new PurOrderLine();
-            lineQuery.setItemId(itemId);
-            List<PurOrderLine> lines = purOrderLineService.selectPurOrderLineList(lineQuery);
-            boolean hasPending = false;
-            for (PurOrderLine l : lines) {
-                PurOrder po = purOrderService.selectPurOrderByOrderId(l.getOrderId());
-                if (po != null && !"CANCEL".equals(po.getStatus()) && !"CLOSED".equals(po.getStatus())
-                        && po.getWorkorderId() != null && po.getWorkorderId().equals(workorderId)) {
-                    hasPending = true;
-                    rec.setPendingPOInfo(po.getOrderCode() + "(" + po.getStatus() + ")");
-                    break;
-                }
-            }
-            rec.setHasPendingPO(hasPending);
+            String pendingInfo = pendingInfoByItem.get(itemId);
+            rec.setHasPendingPO(pendingInfo != null);
+            if (pendingInfo != null) rec.setPendingPOInfo(pendingInfo);
             list.add(rec);
         }
         return list;
@@ -181,10 +200,11 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
     // ---- 3. 领料单状态 ----
     private List<ProKitIssueStatusVO> buildIssueStatuses(Long workorderId)
     {
+        List<ProKitIssueStatusVO> list = new ArrayList<>();
+        // 1. 厂内领料单
         WmIssueHeader query = new WmIssueHeader();
         query.setWorkorderId(workorderId);
         List<WmIssueHeader> headers = wmIssueHeaderService.selectWmIssueHeaderList(query);
-        List<ProKitIssueStatusVO> list = new ArrayList<>();
         for (WmIssueHeader h : headers) {
             ProKitIssueStatusVO vo = new ProKitIssueStatusVO();
             vo.setIssueId(h.getIssueId());
@@ -194,7 +214,25 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
             vo.setStatus(h.getStatus());
             vo.setTotalQuantity(h.getQuantityTotal());
             vo.setTaskId(h.getTaskId());
+            vo.setDocType("ISSUE");
             list.add(vo);
+        }
+        // 2. 外协发料单（外协工序 is_outsource=1 的物料走外协订单，与厂内领料单分流）
+        WmOutsourceOrder oq = new WmOutsourceOrder();
+        oq.setWorkorderId(workorderId);
+        List<WmOutsourceOrder> orders = wmOutsourceOrderMapper.selectOutsourceOrderList(oq);
+        if (orders != null) {
+            for (WmOutsourceOrder o : orders) {
+                ProKitIssueStatusVO vo = new ProKitIssueStatusVO();
+                vo.setIssueId(o.getOrderId());
+                vo.setIssueCode(o.getOrderCode());
+                vo.setIssueName(o.getProcessName() != null ? o.getProcessName() : o.getOrderCode());
+                vo.setProcessName(o.getProcessName());
+                vo.setStatus(o.getStatus());
+                vo.setTotalQuantity(o.getIssueTotalQty());
+                vo.setDocType("OUTSOURCE");
+                list.add(vo);
+            }
         }
         return list;
     }
@@ -290,6 +328,8 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
 
                 if (request.isGenerateIssue()) {
                     result.setIssues(generateIssueDocuments(workorderId, batch));
+                    // 外协工序(is_outsource=1)的物料走外协发料单，与厂内领料单分流
+                    result.setOutsourceIssues(generateOutsourceIssueDocuments(workorderId, batch));
                 }
                 if (request.isGeneratePurOrder()) {
                     result.setPurOrders(generatePurOrderDocuments(workorderId, batch));
@@ -306,6 +346,7 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
                 msg.append("批次 ").append(batch.substring(0, 8)).append(": ");
                 int total = 0;
                 if (result.getIssues() != null) total += result.getIssues().size();
+                if (result.getOutsourceIssues() != null) total += result.getOutsourceIssues().size();
                 if (result.getPurOrders() != null) total += result.getPurOrders().size();
                 if (result.getReturns() != null) total += result.getReturns().size();
                 if (result.getReceipts() != null) total += result.getReceipts().size();
@@ -330,28 +371,29 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
             grouped.computeIfAbsent(pid, k -> new ArrayList<>()).add(bom);
         }
 
+        // 外协工序(is_outsource=1)不发厂内领料单——其物料走外协发料单(OutsourceIssueHelper，generateOutsourceIssueDocuments)
+        Map<Long, ProRouteProcess> outsourceMap = outsourceIssueHelper.resolveOutsourceProcessMap(wo);
+
         Long defaultWarehouseId = findDefaultWarehouse(wo.getFactoryId());
         List<Map<String, Object>> result = new ArrayList<>();
+
+        // 一次性加载该工单全部排产任务（按 processId 索引）+ 已有领料单（按 taskId 分组），消除逐工序 N+1
+        Map<Long, ProTask> taskByProcess = loadWorkorderTasksByProcess(workorderId);
+        Map<Long, List<WmIssueHeader>> existingByTask = loadIssueHeadersByTask(workorderId);
 
         for (Map.Entry<Long, List<ProWorkorderBom>> entry : grouped.entrySet()) {
             Long processId = entry.getKey();
             if (processId == 0L) continue;
+            if (outsourceMap.containsKey(processId)) continue; // 外协工序走外协发料，跳过厂内领料
             List<ProWorkorderBom> processBoms = entry.getValue();
             String processName = processBoms.get(0).getProcessName();
 
-            // 找排产任务
-            ProTask taskQuery = new ProTask();
-            taskQuery.setWorkorderId(workorderId);
-            taskQuery.setProcessId(processId);
-            List<ProTask> tasks = proTaskService.selectProTaskList(taskQuery);
-            ProTask task = (tasks != null && !tasks.isEmpty()) ? tasks.get(0) : null;
+            // 从预加载 Map 取排产任务
+            ProTask task = taskByProcess.get(processId);
 
-            // 幂等检查：查询已有领料单（WmIssueHeader 按 workorderId + taskId 查重）
+            // 幂等检查：该工单+任务已有领料单则补记日志后跳过
             if (task != null) {
-                WmIssueHeader existQuery = new WmIssueHeader();
-                existQuery.setWorkorderId(workorderId);
-                existQuery.setTaskId(task.getTaskId());
-                List<WmIssueHeader> existings = wmIssueHeaderService.selectWmIssueHeaderList(existQuery);
+                List<WmIssueHeader> existings = existingByTask.get(task.getTaskId());
                 if (existings != null && !existings.isEmpty()) {
                     for (WmIssueHeader eh : existings) {
                         if (!hasLog(workorderId, DOC_ISSUE, eh.getIssueId())) {
@@ -411,6 +453,47 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
             info.put("processId", processId);
             info.put("processName", processName);
             info.put("lineCount", processBoms.size());
+            result.add(info);
+        }
+        return result;
+    }
+
+    /**
+     * 生成外协发料单：外协工序(is_outsource=1)的物料走通用外协订单(qxx_wm_outsource_order)，
+     * 与厂内生产领料单(wm_issue)分流。幂等：同一工单+工序已有外协订单则跳过。
+     */
+    private List<Map<String, Object>> generateOutsourceIssueDocuments(Long workorderId, String batch)
+    {
+        ProWorkorder wo = proWorkorderMapper.selectProWorkorderByWorkorderId(workorderId);
+        if (wo == null) return new ArrayList<>();
+        // 外协工序 → processId→ProRouteProcess
+        Map<Long, ProRouteProcess> outsourceMap = outsourceIssueHelper.resolveOutsourceProcessMap(wo);
+        if (outsourceMap.isEmpty()) return new ArrayList<>();
+
+        List<ProWorkorderBom> bomList = proWorkorderBomService.selectProWorkorderBomByWorkorderId(workorderId);
+        if (bomList == null || bomList.isEmpty()) return new ArrayList<>();
+        // 按 processId 分组
+        Map<Long, List<ProWorkorderBom>> grouped = new LinkedHashMap<>();
+        for (ProWorkorderBom bom : bomList) {
+            Long pid = bom.getProcessId() != null ? bom.getProcessId() : 0L;
+            grouped.computeIfAbsent(pid, k -> new ArrayList<>()).add(bom);
+        }
+
+        Long defaultWarehouseId = findDefaultWarehouse(wo.getFactoryId());
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Map.Entry<Long, ProRouteProcess> e : outsourceMap.entrySet()) {
+            Long processId = e.getKey();
+            ProRouteProcess rp = e.getValue();
+            List<ProWorkorderBom> processBoms = grouped.get(processId);
+            if (processBoms == null || processBoms.isEmpty()) continue; // 无料的外协工序跳过
+            String createdCode = outsourceIssueHelper.issueOutsourceForProcess(wo, rp, processBoms, defaultWarehouseId);
+            Map<String, Object> info = new HashMap<>();
+            info.put("processId", processId);
+            info.put("processName", rp.getProcessName());
+            info.put("vendorName", rp.getVendorName());
+            info.put("lineCount", processBoms.size());
+            info.put("created", createdCode != null);
+            info.put("orderCode", createdCode);
             result.add(info);
         }
         return result;
@@ -493,21 +576,13 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
 
         Long defaultWarehouseId = findDefaultWarehouse(wo.getFactoryId());
 
-        // 【Fix #10】提前加载消耗量：一次查询所有已审核报工 + 批量加载物料消耗
+        // 提前加载消耗量：一次查询该工单全部已审核报工的物料消耗（批量，消除 N+1）
         Map<Long, BigDecimal> consumedByItem = new HashMap<>();
-        ProFeedback fbPreload = new ProFeedback();
-        fbPreload.setWorkorderId(workorderId);
-        fbPreload.setStatus("AUDITED");
-        List<ProFeedback> workorderFbs = proFeedbackMapper.selectProFeedbackList(fbPreload);
-        if (workorderFbs != null) {
-            for (ProFeedback wfb : workorderFbs) {
-                List<ProFeedbackConsume> clist = proConsumeMapper.selectByFeedbackId(wfb.getRecordId());
-                if (clist != null) {
-                    for (ProFeedbackConsume c : clist) {
-                        if (c.getItemId() != null && c.getQuantity() != null) {
-                            consumedByItem.merge(c.getItemId(), c.getQuantity(), BigDecimal::add);
-                        }
-                    }
+        List<ProFeedbackConsume> allConsumes = proConsumeMapper.selectByWorkorderId(workorderId);
+        if (allConsumes != null) {
+            for (ProFeedbackConsume c : allConsumes) {
+                if (c.getItemId() != null && c.getQuantity() != null) {
+                    consumedByItem.merge(c.getItemId(), c.getQuantity(), BigDecimal::add);
                 }
             }
         }
@@ -965,6 +1040,30 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
 
     // ======================== 工具方法 ========================
 
+    /** 加载工单下全部排产任务，按 processId 索引（消除逐工序 N+1）。 */
+    private Map<Long, ProTask> loadWorkorderTasksByProcess(Long workorderId) {
+        Map<Long, ProTask> map = new HashMap<>();
+        ProTask q = new ProTask();
+        q.setWorkorderId(workorderId);
+        List<ProTask> tasks = proTaskService.selectProTaskList(q);
+        if (tasks != null) for (ProTask t : tasks) {
+            if (t.getProcessId() != null) map.putIfAbsent(t.getProcessId(), t);
+        }
+        return map;
+    }
+
+    /** 加载工单下已有领料单，按 taskId 分组（消除逐工序幂等查询 N+1）。 */
+    private Map<Long, List<WmIssueHeader>> loadIssueHeadersByTask(Long workorderId) {
+        Map<Long, List<WmIssueHeader>> map = new HashMap<>();
+        WmIssueHeader q = new WmIssueHeader();
+        q.setWorkorderId(workorderId);
+        List<WmIssueHeader> headers = wmIssueHeaderService.selectWmIssueHeaderList(q);
+        if (headers != null) for (WmIssueHeader h : headers) {
+            if (h.getTaskId() != null) map.computeIfAbsent(h.getTaskId(), k -> new ArrayList<>()).add(h);
+        }
+        return map;
+    }
+
     private Long findDefaultWarehouse(Long factoryId)
     {
         WmWarehouse query = new WmWarehouse();
@@ -979,7 +1078,9 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
     private String genCode(String prefix)
     {
         String ts = DateUtils.dateTimeNow("yyyyMMddHHmmssSSS");
-        return prefix + ts.substring(2);
+        // 加 4 位随机后缀，防跨工单同毫秒生成同类单号碰撞（doc-gen 锁按工单不互斥）
+        int rand = (int) (Math.random() * 10000);
+        return prefix + ts.substring(2) + String.format("%04d", rand);
     }
 
     // ---- 幂等日志操作 ----

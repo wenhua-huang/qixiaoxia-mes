@@ -1,7 +1,9 @@
 package com.ruoyi.system.mapper.mes.pro;
 
+import java.util.Collection;
 import java.util.List;
 import com.ruoyi.system.domain.mes.pro.ProProcess;
+import org.apache.ibatis.annotations.Param;
 
 /**
  * 生产工序Mapper接口
@@ -16,6 +18,11 @@ public interface ProProcessMapper
     public List<ProProcess> selectProProcessList(ProProcess proProcess);
 
     public ProProcess selectProProcessByProcessCode(String processCode);
+
+    /**
+     * 按 processId 集合批量查工序（消除偏差检测 N+1，factory_id 由拦截器注入）。
+     */
+    public List<ProProcess> selectByProcessIds(@Param("processIds") Collection<Long> processIds);
 
     public int insertProProcess(ProProcess proProcess);
 

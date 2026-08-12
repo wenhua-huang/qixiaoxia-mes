@@ -1,5 +1,6 @@
 package com.ruoyi.system.mapper.mes.wm;
 
+import java.util.Collection;
 import java.util.List;
 import com.ruoyi.system.domain.mes.wm.WmMaterialStock;
 import com.ruoyi.system.domain.mes.wm.vo.WmStockWarehouseSummary;
@@ -52,4 +53,12 @@ public interface WmMaterialStockMapper
      * 按 MIN(create_time) ASC 排序（FIFO：早入库的仓优先）。factory_id 由拦截器注入。
      */
     public List<WmStockWarehouseSummary> selectStockWarehouseSummary(@Param("itemId") Long itemId);
+
+    /**
+     * 按 itemId 集合批量查库存（消除逐物料 N+1，factory_id 由拦截器注入）。
+     *
+     * @param itemIds 物料ID集合（空集合返回空列表）
+     * @return 匹配的库存记录
+     */
+    public List<WmMaterialStock> selectByItemIds(@Param("itemIds") Collection<Long> itemIds);
 }

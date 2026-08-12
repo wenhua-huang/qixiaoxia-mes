@@ -87,6 +87,14 @@ public interface SysUserMapper
     public int updateUserStatus(@Param("userId") Long userId, @Param("status") String status);
 
     /**
+     * 清空用户厂商绑定（撤销厂商角色时调用；updateUser 的动态 SQL 会跳过 null 字段，故需专用方法）
+     *
+     * @param userId 用户ID
+     * @return 结果
+     */
+    public int clearVendorId(@Param("userId") Long userId);
+
+    /**
      * 更新用户登录信息（IP和登录时间）
      * 
      * @param userId 用户ID

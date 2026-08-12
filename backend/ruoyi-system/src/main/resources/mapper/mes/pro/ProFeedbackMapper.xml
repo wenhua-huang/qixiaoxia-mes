@@ -71,6 +71,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="feedbackType != null  and feedbackType != ''"> and feedback_type = #{feedbackType}</if>
             <if test="workorderId != null "> and workorder_id = #{workorderId}</if>
             <if test="workorderCode != null  and workorderCode != ''"> and workorder_code = #{workorderCode}</if>
+            <if test="cardId != null"> and card_id = #{cardId}</if>
             <if test="workstationId != null "> and workstation_id = #{workstationId}</if>
             <if test="processId != null "> and process_id = #{processId}</if>
             <if test="itemId != null "> and item_id = #{itemId}</if>
@@ -278,5 +279,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where card_id = #{cardId}
           and process_id = #{processId}
           and status = 'AUDITED'
+    </select>
+
+    <!-- 查询有 PREPARE（待审核）报工的 taskId（不去重，Java 端按出现次数计数） -->
+    <select id="selectPendingTaskIds" resultType="java.lang.Long">
+        select task_id from qxx_pro_feedback
+        where status = 'PREPARE' and task_id in
+        <foreach collection="taskIds" item="tid" open="(" separator="," close=")">#{tid}</foreach>
+    </select>
+
+    <!-- 轻量查询：卡下所有报工的工序ID（仅 process_id 列） -->
+    <select id="selectProcessIdsByCardId" resultType="java.lang.Long">
+        select process_id from qxx_pro_feedback
+        where card_id = #{cardId} and process_id is not null
     </select>
 </mapper>

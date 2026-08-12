@@ -87,6 +87,14 @@ frontend/node_modules
 trace-*.png
 materialtrace-*.png
 issue-batch-*.png
+report-*.png
+mes-menu.png
+outsource-*.png
+slitting-*.png
+user-page.png
+
+# --- app/src 本地构建符号链接（指向 app/ 根，不入库）---
+app/src/
 
 # --- DB backups ---
 mes_full_backup_*.sql

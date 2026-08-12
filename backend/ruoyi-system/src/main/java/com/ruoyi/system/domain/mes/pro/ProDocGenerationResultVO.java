@@ -16,6 +16,7 @@ public class ProDocGenerationResultVO
     private List<Map<String, Object>> purOrders;  // 生成的采购单
     private List<Map<String, Object>> returns;    // 生成的退料单
     private List<Map<String, Object>> receipts;   // 生成的入库单
+    private List<Map<String, Object>> outsourceIssues; // 生成的外协发料单
     private String message;                       // 汇总描述
 
     public String getGenerationBatch() { return generationBatch; }
@@ -32,6 +33,9 @@ public class ProDocGenerationResultVO
 
     public List<Map<String, Object>> getReceipts() { return receipts; }
     public void setReceipts(List<Map<String, Object>> v) { this.receipts = v; }
+
+    public List<Map<String, Object>> getOutsourceIssues() { return outsourceIssues; }
+    public void setOutsourceIssues(List<Map<String, Object>> v) { this.outsourceIssues = v; }
 
     public String getMessage() { return message; }
     public void setMessage(String v) { this.message = v; }

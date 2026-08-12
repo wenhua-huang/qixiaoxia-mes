@@ -261,6 +261,7 @@ public class SysUserServiceImpl implements ISysUserService
     @Transactional
     public int insertUser(SysUser user)
     {
+        normalizeVendorBinding(user);
         // 新增用户信息
         int rows = userMapper.insertUser(user);
         // 新增用户岗位关联
@@ -292,6 +293,7 @@ public class SysUserServiceImpl implements ISysUserService
     @Transactional
     public int updateUser(SysUser user)
     {
+        normalizeVendorBinding(user);
         Long userId = user.getUserId();
         // 删除用户与角色关联
         userRoleMapper.deleteUserRoleByUserId(userId);
@@ -302,6 +304,38 @@ public class SysUserServiceImpl implements ISysUserService
         // 新增用户与岗位管理
         insertUserPost(user);
         return userMapper.updateUser(user);
+    }
+
+    /**
+     * 规范化 vendorId 与厂商角色的绑定关系（防越权批量赋值）：
+     * <ul>
+     *   <li>分配了厂商角色（roleKey=vendor）→ vendorId 必填</li>
+     *   <li>未分配厂商角色 → 强制清空 vendorId（防止遗留/越权挂靠）</li>
+     * </ul>
+     * 注意：个人中心 updateUserProfile 不传 roleIds，不会进入此路径。
+     */
+    private void normalizeVendorBinding(SysUser user)
+    {
+        if (user.getRoleIds() == null || user.getRoleIds().length == 0)
+        {
+            // 未提交角色分配：不动 vendorId（个人中心/状态修改等场景）
+            return;
+        }
+        SysRole vendorRole = roleMapper.checkRoleKeyUnique("vendor");
+        boolean hasVendorRole = vendorRole != null
+                && java.util.Arrays.asList(user.getRoleIds()).contains(vendorRole.getRoleId());
+        if (hasVendorRole)
+        {
+            if (user.getVendorId() == null)
+                throw new ServiceException("分配了厂商角色，必须选择关联厂商");
+        }
+        else
+        {
+            // 撤销厂商角色：清空 vendorId。updateUser 动态 SQL 跳过 null 字段，
+            // 故须用专用 clearVendorId 直接置 null，防止残留挂靠。
+            user.setVendorId(null);
+            if (user.getUserId() != null) userMapper.clearVendorId(user.getUserId());
+        }
     }
 
     /**
@@ -316,6 +350,43 @@ public class SysUserServiceImpl implements ISysUserService
     {
         userRoleMapper.deleteUserRoleByUserId(userId);
         insertUserRole(userId, roleIds);
+        // 与 insertUser/updateUser 的 normalizeVendorBinding 保持同一不变量：
+        // 授予厂商角色时用户必须已绑定 vendorId（需先在用户编辑页选择关联厂商）；
+        // 撤销厂商角色时清空残留 vendorId，防止非厂商账号挂靠厂商数据。
+        enforceVendorBindingForRoles(userId, roleIds);
+    }
+
+    /**
+     * 角色授权场景的厂商绑定校验：
+     * <ul>
+     *   <li>授予厂商角色 → 用户必须已有非空 vendorId，否则拒绝（提示先在编辑页绑定）</li>
+     *   <li>撤销厂商角色 → 清空残留 vendorId</li>
+     * </ul>
+     */
+    private void enforceVendorBindingForRoles(Long userId, Long[] roleIds)
+    {
+        SysRole vendorRole = roleMapper.checkRoleKeyUnique("vendor");
+        if (vendorRole == null) return;
+        SysUser current = userMapper.selectUserById(userId);
+        if (current == null) return;
+        // 清空全部角色（roleIds 为 null/空）：deleteUserRoleByUserId 已移除所有角色，
+        // 必须同步清空 vendorId，否则无厂商角色的账号仍挂靠厂商数据
+        if (roleIds == null || roleIds.length == 0)
+        {
+            if (current.getVendorId() != null) userMapper.clearVendorId(userId);
+            return;
+        }
+        boolean hasVendorRole = java.util.Arrays.asList(roleIds).contains(vendorRole.getRoleId());
+        if (hasVendorRole)
+        {
+            if (current.getVendorId() == null)
+                throw new ServiceException("该用户尚未关联厂商，请先在用户编辑中选择关联厂商后再授予厂商角色");
+        }
+        else if (current.getVendorId() != null)
+        {
+            // 撤销厂商角色：清空 vendorId（updateUser 动态 SQL 跳过 null，故用专用方法）
+            userMapper.clearVendorId(userId);
+        }
     }
 
     /**
@@ -519,6 +590,9 @@ public class SysUserServiceImpl implements ISysUserService
                     deptService.checkDeptDataScope(user.getDeptId());
                     String password = configService.selectConfigByKey("sys.user.initPassword");
                     user.setPassword(SecurityUtils.encryptPassword(password));
+                    // 导入不分配角色：禁止直接写入 vendorId（会产生无厂商角色却挂靠厂商的脏数据）。
+                    // 厂商绑定必须在用户编辑页「关联厂商 + 授予厂商角色」成对完成（normalizeVendorBinding 校验）。
+                    user.setVendorId(null);
                     user.setCreateBy(operName);
                     userMapper.insertUser(user);
                     successNum++;

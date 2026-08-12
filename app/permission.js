@@ -19,6 +19,9 @@ let list = ["navigateTo", "redirectTo", "reLaunch", "switchTab"]
 list.forEach(item => {
   uni.addInterceptor(item, {
     invoke(to) {
+      // 路由跳转前清除可能残留的全局 loading（uni.showLoading 跨页面不自动消失，
+      // 若上个页面因异常未 hideLoading，loading 会盖到新页面，如"登录中"残留）
+      uni.hideLoading()
       if (getToken()) {
         if (to.url === loginPage) {
           uni.reLaunch({ url: "/" })

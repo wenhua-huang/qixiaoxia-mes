@@ -8,6 +8,9 @@
   const { proxy } = getCurrentInstance()
 
   onLaunch(() => {
+    // 清除可能残留的全局 loading（uni.showLoading 是全局模态，
+    // 跨页面不自动消失；上次会话若因异常未 hideLoading 会一直盖在页面上）
+    uni.hideLoading()
     initApp()
   })
 

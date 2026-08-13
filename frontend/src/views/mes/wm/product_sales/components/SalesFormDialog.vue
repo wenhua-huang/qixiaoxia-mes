@@ -37,6 +37,7 @@
             <el-col :span="12">
               <el-form-item label="出货仓库">
                 <SalesWarehouseSelect v-model="form.warehouseId" :client-id="form.clientId"
+                                      :client-name="form.clientName"
                                       @select="onWarehouseSelected" />
                 <div style="font-size:12px;color:#909399;line-height:1.4;margin-top:2px">
                   仓库已按库存自动分配到各行；此处选择可批量覆盖所有行仓库<span v-if="form.clientId">（已按客户过滤，客户仓置顶）</span>
@@ -228,11 +229,11 @@ function onClientSelected(row: any) {
   if (row.shippingAddress) form.shippingAddress = row.shippingAddress
 }
 
-/** 表头选仓即批量覆盖所有行仓库（含即时新建的客户仓） */
+/** 表头选仓即批量覆盖所有行仓库（含即时新建的客户仓）；清空时同步清行仓库 */
 function onWarehouseSelected(w?: WmWarehouse) {
   Object.assign(form, { warehouseId: w?.warehouseId, warehouseCode: w?.warehouseCode, warehouseName: w?.warehouseName })
-  if (w) lineList.value.forEach(l => {
-    l.warehouseId = w.warehouseId!; l.warehouseCode = w.warehouseCode; l.warehouseName = w.warehouseName
+  lineList.value.forEach(l => {
+    l.warehouseId = w?.warehouseId; l.warehouseCode = w?.warehouseCode; l.warehouseName = w?.warehouseName
   })
 }
 function handleAddLine() { itemSelectRef.value?.open() }

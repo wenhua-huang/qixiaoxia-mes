@@ -249,4 +249,33 @@ class ProWorkorderDocServiceReceiptTest {
         verify(wmProductRecptService).insertWmProductRecpt(any());
         verify(wmProductRecptLineService).insertWmProductRecptLine(any());
     }
+
+    // ═══════════════════════════════════════
+    // 场景 6：客户无专属仓 → 回退公共仓，不落到他人专属仓 (M2)
+    // ═══════════════════════════════════════
+    @Test
+    @DisplayName("客户无专属仓时回退公共成品仓，不落到其他客户的专属仓")
+    void should_fallback_to_public_warehouse_not_other_client_exclusive() {
+        // 工单属于客户203，但客户203没有专属仓
+        wo.setClientId(203L);
+        when(wmWarehouseService.findClientWarehouse(1L, 203L)).thenReturn(null);
+        when(wmProductRecptMapper.sumQuantityByWorkorderId(1L)).thenReturn(new BigDecimal("40"));
+        when(docLogMapper.selectList(any())).thenReturn(Collections.emptyList());
+        // 仓库列表：第一个是别人的客户仓(203=客户A)，第二个是公共成品仓(206)
+        WmWarehouse otherCustomerWh = new WmWarehouse();
+        otherCustomerWh.setWarehouseId(203L);
+        otherCustomerWh.setWarehouseType("CUSTOMER");
+        otherCustomerWh.setClientId(201L);
+        WmWarehouse publicWh = new WmWarehouse();
+        publicWh.setWarehouseId(206L);
+        publicWh.setWarehouseType("FINISHED");
+        when(wmWarehouseService.selectWmWarehouseList(any()))
+                .thenReturn(Arrays.asList(otherCustomerWh, publicWh));
+
+        docService.generateProductReceipt(1L);
+
+        // 入库仓必须是公共仓 206，不能是别人的客户仓 203
+        verify(wmProductRecptService).insertWmProductRecpt(argThat(r ->
+                r.getWarehouseId() != null && r.getWarehouseId() == 206L));
+    }
 }

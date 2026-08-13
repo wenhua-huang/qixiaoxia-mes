@@ -5,6 +5,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import com.ruoyi.common.enums.WmIssueConstants;
+import com.ruoyi.common.enums.WmWarehouseConstants;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.exception.ServiceException;
@@ -1065,15 +1066,32 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
         return map;
     }
 
+    /**
+     * 查找工厂默认公共仓（排除客户仓/供应商仓，避免回退落到他人专属仓）。
+     * 取最新创建的公共仓；无公共仓时回退 ID=1（兼容老数据）。
+     */
     private Long findDefaultWarehouse(Long factoryId)
     {
         WmWarehouse query = new WmWarehouse();
         if (factoryId != null) query.setFactoryId(factoryId);
         List<WmWarehouse> warehouses = wmWarehouseService.selectWmWarehouseList(query);
-        if (warehouses != null && !warehouses.isEmpty()) return warehouses.get(0).getWarehouseId();
+        Long publicWh = pickFirstPublicWarehouseId(warehouses);
+        if (publicWh != null) return publicWh;
         List<WmWarehouse> all = wmWarehouseService.selectWmWarehouseAll();
-        if (all != null && !all.isEmpty()) return all.get(0).getWarehouseId();
+        publicWh = pickFirstPublicWarehouseId(all);
+        if (publicWh != null) return publicWh;
         return 1L;
+    }
+
+    /** 从仓库列表中取第一个公共仓（非客户仓/供应商仓）的 ID */
+    private Long pickFirstPublicWarehouseId(List<WmWarehouse> list)
+    {
+        if (list == null) return null;
+        return list.stream()
+                .filter(w -> !WmWarehouseConstants.TYPE_CUSTOMER.equals(w.getWarehouseType())
+                          && !WmWarehouseConstants.TYPE_SUPPLIER.equals(w.getWarehouseType()))
+                .map(WmWarehouse::getWarehouseId)
+                .findFirst().orElse(null);
     }
 
     /**

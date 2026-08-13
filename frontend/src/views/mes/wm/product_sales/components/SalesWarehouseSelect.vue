@@ -4,14 +4,18 @@
                :loading="loading" style="flex:1" @change="onChange">
       <el-option v-for="w in options" :key="w.warehouseId" :label="labelOf(w)" :value="w.warehouseId" />
     </el-select>
-    <el-button icon="Plus" v-hasPermi="['mes:wm:warehouse:add']"
-               @click="createRef?.open('CUSTOMER')">新建客户仓</el-button>
+    <el-tooltip :disabled="!!clientId" content="请先选择客户" placement="top">
+      <span>
+        <el-button icon="Plus" :disabled="!clientId" v-hasPermi="['mes:wm:warehouse:add']"
+                   @click="openCreate">新建客户仓</el-button>
+      </span>
+    </el-tooltip>
     <CreateWarehouseDialog ref="createRef" @onCreated="onCreated" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { listAllWmWarehouse } from '@/api/mes/wm/warehouse'
 import CreateWarehouseDialog from '@/components/warehouseSelect/CreateWarehouseDialog.vue'
 import type { WmWarehouse } from '@/types'
@@ -19,6 +23,7 @@ import type { WmWarehouse } from '@/types'
 const props = withDefaults(defineProps<{
   modelValue?: number
   clientId?: number
+  clientName?: string
   placeholder?: string
 }>(), { placeholder: '可选（批量改仓）' })
 
@@ -48,6 +53,15 @@ const options = computed<WmWarehouse[]>(() => {
   return merged
 })
 
+/** 切换客户：若已选仓是其他客户的专属仓，自动清空（避免保存能过、过账才被硬隔离拦截） */
+watch(() => props.clientId, (newCid) => {
+  const cur = props.modelValue == null ? undefined : all.value.find(w => w.warehouseId === props.modelValue)
+  if (cur && cur.warehouseType === 'CUSTOMER' && cur.clientId !== newCid) {
+    emit('update:modelValue', undefined)
+    emit('select', undefined)
+  }
+})
+
 function labelOf(w: WmWarehouse): string {
   const n = w.warehouseName || w.warehouseCode || String(w.warehouseId)
   return w.warehouseType === 'CUSTOMER' ? `${n}（客户仓${w.clientName ? '·' + w.clientName : ''}）` : n
@@ -66,6 +80,11 @@ function onCreated(w: WmWarehouse) {
   if (w.warehouseId && !all.value.some(x => x.warehouseId === w.warehouseId)) all.value.push(w)
   if (w.warehouseId) { emit('update:modelValue', w.warehouseId); emit('select', w) }
   load()
+}
+
+/** 新建客户仓时把当前单据客户带入，避免重复选择 */
+function openCreate() {
+  createRef.value?.open('CUSTOMER', { clientId: props.clientId, clientName: props.clientName })
 }
 
 function load() {

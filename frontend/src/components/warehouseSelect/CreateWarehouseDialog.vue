@@ -113,10 +113,17 @@ function onVendorSelected(row: MdVendor) {
 /**
  * 打开新建弹窗。
  * @param type 预设仓库类型（可选），不传默认客户仓。
+ * @param preset 预设归属（可选），从单据带入客户/供应商，避免重复选择。
  */
-function open(type?: OwnerType) {
+function open(type?: OwnerType, preset?: { clientId?: number; clientName?: string; vendorId?: number; vendorName?: string }) {
   form.value = getDefaultForm()
   if (type) form.value.warehouseType = type
+  if (preset) {
+    form.value.clientId = preset.clientId
+    form.value.clientName = preset.clientName
+    form.value.vendorId = preset.vendorId
+    form.value.vendorName = preset.vendorName
+  }
   showFlag.value = true
   formRef.value?.clearValidate()
 }

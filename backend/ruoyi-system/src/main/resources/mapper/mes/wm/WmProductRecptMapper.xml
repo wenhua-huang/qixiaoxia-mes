@@ -14,6 +14,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="workorderId" column="workorder_id" />
         <result property="workorderCode" column="workorder_code" />
         <result property="clientId" column="client_id" />
+        <result property="clientName" column="client_name" />
         <result property="sourceWarehouseId" column="source_warehouse_id" />
         <result property="warehouseId" column="warehouse_id" />
         <result property="warehouseCode" column="warehouse_code" />
@@ -32,29 +33,35 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectWmProductRecptVo">
-        select recpt_id, factory_id, recpt_code, recpt_name, produce_id, produce_code, workorder_id, workorder_code, client_id, source_warehouse_id, warehouse_id, warehouse_code, warehouse_name, recpt_date, total_quantity, total_box, ipqc_id, ipqc_code, status, remark, create_by, create_time, update_by, update_time from qxx_wm_product_recpt
+        select t.recpt_id, t.factory_id, t.recpt_code, t.recpt_name, t.produce_id, t.produce_code,
+               t.workorder_id, t.workorder_code, t.client_id, t.source_warehouse_id, t.warehouse_id,
+               t.warehouse_code, t.warehouse_name, t.recpt_date, t.total_quantity, t.total_box,
+               t.ipqc_id, t.ipqc_code, t.status, t.remark, t.create_by, t.create_time, t.update_by, t.update_time,
+               c.client_name
+        from qxx_wm_product_recpt t
+        left join qxx_md_client c on c.client_id = t.client_id
     </sql>
 
     <select id="selectWmProductRecptList" parameterType="WmProductRecpt" resultMap="WmProductRecptResult">
         <include refid="selectWmProductRecptVo"/>
         <where>
-            <if test="recptCode != null and recptCode != ''"> and recpt_code like concat('%', #{recptCode}, '%')</if>
-            <if test="recptName != null and recptName != ''"> and recpt_name like concat('%', #{recptName}, '%')</if>
-            <if test="produceId != null"> and produce_id = #{produceId}</if>
-            <if test="produceCode != null and produceCode != ''"> and produce_code like concat('%', #{produceCode}, '%')</if>
-            <if test="workorderId != null"> and workorder_id = #{workorderId}</if>
-            <if test="workorderCode != null and workorderCode != ''"> and workorder_code like concat('%', #{workorderCode}, '%')</if>
-            <if test="sourceWarehouseId != null"> and source_warehouse_id = #{sourceWarehouseId}</if>
-            <if test="warehouseId != null"> and warehouse_id = #{warehouseId}</if>
-            <if test="warehouseCode != null and warehouseCode != ''"> and warehouse_code like concat('%', #{warehouseCode}, '%')</if>
-            <if test="warehouseName != null and warehouseName != ''"> and warehouse_name like concat('%', #{warehouseName}, '%')</if>
-            <if test="ipqcId != null"> and ipqc_id = #{ipqcId}</if>
-            <if test="ipqcCode != null and ipqcCode != ''"> and ipqc_code like concat('%', #{ipqcCode}, '%')</if>
-            <if test="status != null and status != ''"> and status like concat('%', #{status}, '%')</if>
-            <if test="createBy != null and createBy != ''"> and create_by like concat('%', #{createBy}, '%')</if>
-            <if test="updateBy != null and updateBy != ''"> and update_by like concat('%', #{updateBy}, '%')</if>
+            <if test="recptCode != null and recptCode != ''"> and t.recpt_code like concat('%', #{recptCode}, '%')</if>
+            <if test="recptName != null and recptName != ''"> and t.recpt_name like concat('%', #{recptName}, '%')</if>
+            <if test="produceId != null"> and t.produce_id = #{produceId}</if>
+            <if test="produceCode != null and produceCode != ''"> and t.produce_code like concat('%', #{produceCode}, '%')</if>
+            <if test="workorderId != null"> and t.workorder_id = #{workorderId}</if>
+            <if test="workorderCode != null and workorderCode != ''"> and t.workorder_code like concat('%', #{workorderCode}, '%')</if>
+            <if test="sourceWarehouseId != null"> and t.source_warehouse_id = #{sourceWarehouseId}</if>
+            <if test="warehouseId != null"> and t.warehouse_id = #{warehouseId}</if>
+            <if test="warehouseCode != null and warehouseCode != ''"> and t.warehouse_code like concat('%', #{warehouseCode}, '%')</if>
+            <if test="warehouseName != null and warehouseName != ''"> and t.warehouse_name like concat('%', #{warehouseName}, '%')</if>
+            <if test="ipqcId != null"> and t.ipqc_id = #{ipqcId}</if>
+            <if test="ipqcCode != null and ipqcCode != ''"> and t.ipqc_code like concat('%', #{ipqcCode}, '%')</if>
+            <if test="status != null and status != ''"> and t.status like concat('%', #{status}, '%')</if>
+            <if test="createBy != null and createBy != ''"> and t.create_by like concat('%', #{createBy}, '%')</if>
+            <if test="updateBy != null and updateBy != ''"> and t.update_by like concat('%', #{updateBy}, '%')</if>
         </where>
-        order by create_time desc
+        order by t.create_time desc
     </select>
 
     <select id="selectWmProductRecptAll" resultMap="WmProductRecptResult">
@@ -63,7 +70,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectWmProductRecptByRecptId" parameterType="Long" resultMap="WmProductRecptResult">
         <include refid="selectWmProductRecptVo"/>
-        where recpt_id = #{recptId}
+        where t.recpt_id = #{recptId}
     </select>
 
     <insert id="insertWmProductRecpt" parameterType="WmProductRecpt" useGeneratedKeys="true" keyProperty="recptId">

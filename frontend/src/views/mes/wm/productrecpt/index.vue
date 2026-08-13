@@ -37,6 +37,7 @@
       </el-table-column>
       <el-table-column label="入库名称" align="center" prop="recptName" :show-overflow-tooltip="true" width="180" />
       <el-table-column label="工单号" align="center" prop="workorderCode" width="160" />
+      <el-table-column label="客户" align="center" prop="clientName" :show-overflow-tooltip="true" width="140" />
       <el-table-column label="产品编码" align="center" prop="produceCode" width="140" />
       <el-table-column label="仓库" align="center" prop="warehouseName" width="120" />
       <el-table-column label="入库数量" align="center" prop="totalQuantity" width="100" />
@@ -82,6 +83,13 @@
           <el-col :span="12">
             <el-form-item label="产品编码" prop="produceCode">
               <el-input v-model="form.produceCode" placeholder="产品编码" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row v-if="form.clientName">
+          <el-col :span="12">
+            <el-form-item label="客户">
+              <el-input v-model="form.clientName" readonly placeholder="—" />
             </el-form-item>
           </el-col>
         </el-row>

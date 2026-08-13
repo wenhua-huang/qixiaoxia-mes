@@ -45,6 +45,10 @@ public class WmProductRecpt extends BaseEntity
     /** 成品归属客户ID(来源工单) */
     private Long clientId;
 
+    /** 客户名称(查询时 LEFT JOIN qxx_md_client 取得，非持久化字段) */
+    @Excel(name = "客户名称")
+    private String clientName;
+
     @Excel(name = "来源仓库ID")
     private Long sourceWarehouseId;
 
@@ -104,6 +108,9 @@ public class WmProductRecpt extends BaseEntity
 
     public Long getClientId() { return clientId; }
     public void setClientId(Long v) { this.clientId = v; }
+
+    public String getClientName() { return clientName; }
+    public void setClientName(String v) { this.clientName = v; }
 
     public Long getSourceWarehouseId() { return sourceWarehouseId; }
     public void setSourceWarehouseId(Long v) { this.sourceWarehouseId = v; }

@@ -17,6 +17,7 @@ import com.ruoyi.system.domain.mes.wm.ItemRecptReceiveBody;
 import com.ruoyi.system.domain.mes.wm.WmBatch;
 import com.ruoyi.system.domain.mes.wm.WmItemRecpt;
 import com.ruoyi.system.domain.mes.wm.WmItemRecptLine;
+import com.ruoyi.system.domain.mes.wm.WmWarehouse;
 import com.ruoyi.system.domain.mes.wm.tx.ItemRecptTxBean;
 import com.ruoyi.system.mapper.mes.wm.WmItemRecptMapper;
 import com.ruoyi.system.mapper.mes.pur.PurOrderLineMapper;
@@ -26,6 +27,7 @@ import com.ruoyi.system.service.mes.wm.IWmBatchService;
 import com.ruoyi.system.service.mes.wm.IWmItemRecptLineService;
 import com.ruoyi.system.service.mes.wm.IWmItemRecptService;
 import com.ruoyi.system.service.mes.wm.IWmStorageCoreService;
+import com.ruoyi.system.service.mes.wm.IWmWarehouseService;
 import com.ruoyi.system.domain.mes.pro.ProMaterialTrace;
 import com.ruoyi.system.mapper.mes.pro.ProMaterialTraceMapper;
 import com.ruoyi.system.domain.mes.wm.WmTransaction;
@@ -62,6 +64,9 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
 
     @Autowired
     private WmTransactionMapper wmTransactionMapper;
+
+    @Autowired
+    private IWmWarehouseService wmWarehouseService;
 
     private static final Logger log = LoggerFactory.getLogger(WmItemRecptServiceImpl.class);
 
@@ -541,6 +546,15 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
         draft.setRecptType("PURCHASE");
         draft.setStatus("DRAFT");
         draft.setLines(recptLines);
+        // 定向入供应商仓（决策E1）：命中供应商专属仓则预填头仓库，未命中保持空由用户头表选
+        if (order.getVendorId() != null) {
+            WmWarehouse vendorWh = wmWarehouseService.findVendorWarehouse(order.getFactoryId(), order.getVendorId());
+            if (vendorWh != null) {
+                draft.setWarehouseId(vendorWh.getWarehouseId());
+                draft.setWarehouseCode(vendorWh.getWarehouseCode());
+                draft.setWarehouseName(vendorWh.getWarehouseName());
+            }
+        }
         return draft;
     }
 

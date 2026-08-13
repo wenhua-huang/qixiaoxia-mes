@@ -12,6 +12,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="warehouseType" column="warehouse_type" />
         <result property="clientId" column="client_id" />
         <result property="vendorId" column="vendor_id" />
+        <result property="clientName" column="client_name" />
+        <result property="vendorName" column="vendor_name" />
         <result property="address" column="address" />
         <result property="area" column="area" />
         <result property="charge" column="charge" />
@@ -24,33 +26,39 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectWmWarehouseVo">
-        select warehouse_id, factory_id, warehouse_code, warehouse_name, warehouse_type, client_id, vendor_id, address, area, charge, enable_flag, remark, create_by, create_time, update_by, update_time from qxx_wm_warehouse
+        select t.warehouse_id, t.factory_id, t.warehouse_code, t.warehouse_name, t.warehouse_type,
+               t.client_id, t.vendor_id, c.client_name, v.vendor_name,
+               t.address, t.area, t.charge, t.enable_flag, t.remark, t.create_by, t.create_time, t.update_by, t.update_time
+        from qxx_wm_warehouse t
+        left join qxx_md_client c on c.client_id = t.client_id
+        left join qxx_md_vendor v on v.vendor_id = t.vendor_id
     </sql>
 
     <select id="selectWmWarehouseList" parameterType="WmWarehouse" resultMap="WmWarehouseResult">
         <include refid="selectWmWarehouseVo"/>
-        <where>            <if test="warehouseCode != null and warehouseCode != ''"> and warehouse_code like concat('%', #{warehouseCode}, '%')</if>
-            <if test="warehouseName != null and warehouseName != ''"> and warehouse_name like concat('%', #{warehouseName}, '%')</if>
-            <if test="warehouseType != null and warehouseType != ''"> and warehouse_type like concat('%', #{warehouseType}, '%')</if>
-            <if test="clientId != null"> and client_id = #{clientId}</if>
-            <if test="vendorId != null"> and vendor_id = #{vendorId}</if>
-            <if test="address != null and address != ''"> and address like concat('%', #{address}, '%')</if>
-            <if test="charge != null and charge != ''"> and charge like concat('%', #{charge}, '%')</if>
-            <if test="enableFlag != null and enableFlag != ''"> and enable_flag like concat('%', #{enableFlag}, '%')</if>
-            <if test="createBy != null and createBy != ''"> and create_by like concat('%', #{createBy}, '%')</if>
-            <if test="updateBy != null and updateBy != ''"> and update_by like concat('%', #{updateBy}, '%')</if>
+        <where>
+            <if test="warehouseCode != null and warehouseCode != ''"> and t.warehouse_code like concat('%', #{warehouseCode}, '%')</if>
+            <if test="warehouseName != null and warehouseName != ''"> and t.warehouse_name like concat('%', #{warehouseName}, '%')</if>
+            <if test="warehouseType != null and warehouseType != ''"> and t.warehouse_type like concat('%', #{warehouseType}, '%')</if>
+            <if test="clientId != null"> and t.client_id = #{clientId}</if>
+            <if test="vendorId != null"> and t.vendor_id = #{vendorId}</if>
+            <if test="address != null and address != ''"> and t.address like concat('%', #{address}, '%')</if>
+            <if test="charge != null and charge != ''"> and t.charge like concat('%', #{charge}, '%')</if>
+            <if test="enableFlag != null and enableFlag != ''"> and t.enable_flag = #{enableFlag}</if>
+            <if test="createBy != null and createBy != ''"> and t.create_by like concat('%', #{createBy}, '%')</if>
+            <if test="updateBy != null and updateBy != ''"> and t.update_by like concat('%', #{updateBy}, '%')</if>
         </where>
-        order by create_time desc
+        order by t.create_time desc
     </select>
 
     <select id="selectWmWarehouseAll" resultMap="WmWarehouseResult">
         <include refid="selectWmWarehouseVo"/>
-        where enable_flag = '1'
+        where t.enable_flag = '1'
     </select>
 
     <select id="selectWmWarehouseByWarehouseId" parameterType="Long" resultMap="WmWarehouseResult">
         <include refid="selectWmWarehouseVo"/>
-        where warehouse_id = #{warehouseId}
+        where t.warehouse_id = #{warehouseId}
     </select>
 
     <insert id="insertWmWarehouse" parameterType="WmWarehouse" useGeneratedKeys="true" keyProperty="warehouseId">
@@ -89,11 +97,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateWmWarehouse" parameterType="WmWarehouse">
         update qxx_wm_warehouse
-        <trim prefix="SET" suffixOverrides=",">            <if test="warehouseCode != null">warehouse_code = #{warehouseCode},</if>
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="warehouseCode != null">warehouse_code = #{warehouseCode},</if>
             <if test="warehouseName != null">warehouse_name = #{warehouseName},</if>
             <if test="warehouseType != null">warehouse_type = #{warehouseType},</if>
-            <if test="clientId != null">client_id = #{clientId},</if>
-            <if test="vendorId != null">vendor_id = #{vendorId},</if>
+            <!-- 归属字段无条件写入：service 层 normalizeWarehouseOwner 已按类型设好正确值(含置空)，
+                 避免类型转换时旧 client_id/vendor_id 残留 -->
+            client_id = #{clientId},
+            vendor_id = #{vendorId},
             <if test="address != null">address = #{address},</if>
             <if test="area != null">area = #{area},</if>
             <if test="charge != null">charge = #{charge},</if>

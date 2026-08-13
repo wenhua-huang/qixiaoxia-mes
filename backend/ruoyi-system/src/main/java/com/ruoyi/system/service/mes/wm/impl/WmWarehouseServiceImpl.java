@@ -39,13 +39,15 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService
     @Override
     @Transactional
     public int insertWmWarehouse(WmWarehouse entity) {
-        normalizeWarehouseOwner(entity);
+        normalizeOwnership(entity);
         entity.setCreateTime(DateUtils.getNowDate());
         return wmWarehouseMapper.insertWmWarehouse(entity);
-    }    @Override
+    }
+
+    @Override
     @Transactional
     public int updateWmWarehouse(WmWarehouse entity) {
-        normalizeWarehouseOwner(entity);
+        normalizeOwnership(entity);
         entity.setUpdateTime(DateUtils.getNowDate());
         return wmWarehouseMapper.updateWmWarehouse(entity);
     }
@@ -69,7 +71,7 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService
         }
         WmWarehouse q = new WmWarehouse();
         q.setFactoryId(factoryId);
-        q.setWarehouseType(WmWarehouseConstants.TYPE_CUSTOMER);
+        q.setOwnershipType(WmWarehouseConstants.OWNER_CUSTOMER);
         q.setClientId(clientId);
         q.setEnableFlag("1");
         List<WmWarehouse> list = wmWarehouseMapper.selectWmWarehouseList(q);
@@ -83,7 +85,7 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService
         }
         WmWarehouse q = new WmWarehouse();
         q.setFactoryId(factoryId);
-        q.setWarehouseType(WmWarehouseConstants.TYPE_SUPPLIER);
+        q.setOwnershipType(WmWarehouseConstants.OWNER_SUPPLIER);
         q.setVendorId(vendorId);
         q.setEnableFlag("1");
         List<WmWarehouse> list = wmWarehouseMapper.selectWmWarehouseList(q);
@@ -109,15 +111,23 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService
         return list.get(0);
     }
 
-    /** 校验并归一仓库归属：客户仓必填 clientId、供应商仓必填 vendorId、普通仓清空两者。 */
-    private void normalizeWarehouseOwner(WmWarehouse w) {
-        String t = w.getWarehouseType();
-        if (WmWarehouseConstants.TYPE_CUSTOMER.equals(t)) {
+    /**
+     * 校验并归一仓库归属：
+     * CUSTOMER 必填 clientId、清 vendorId；SUPPLIER 必填 vendorId、清 clientId；PUBLIC 清两者。
+     * ownershipType 为 null 时默认 PUBLIC。
+     */
+    private void normalizeOwnership(WmWarehouse w) {
+        String t = w.getOwnershipType();
+        if (t == null) {
+            t = WmWarehouseConstants.OWNER_PUBLIC;
+            w.setOwnershipType(t);
+        }
+        if (WmWarehouseConstants.OWNER_CUSTOMER.equals(t)) {
             if (w.getClientId() == null) {
                 throw new ServiceException("客户仓必须填写归属客户");
             }
             w.setVendorId(null);
-        } else if (WmWarehouseConstants.TYPE_SUPPLIER.equals(t)) {
+        } else if (WmWarehouseConstants.OWNER_SUPPLIER.equals(t)) {
             if (w.getVendorId() == null) {
                 throw new ServiceException("供应商仓必须填写归属供应商");
             }

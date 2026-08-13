@@ -37,10 +37,10 @@ class WmProductSalesClientIsolationTest {
     @InjectMocks
     private WmProductSalesServiceImpl service;
 
-    private WmWarehouse warehouse(Long id, String type, Long clientId) {
+    private WmWarehouse warehouse(Long id, String ownershipType, Long clientId) {
         WmWarehouse w = new WmWarehouse();
         w.setWarehouseId(id);
-        w.setWarehouseType(type);
+        w.setOwnershipType(ownershipType);
         w.setClientId(clientId);
         w.setWarehouseName("仓" + id);
         return w;
@@ -57,7 +57,7 @@ class WmProductSalesClientIsolationTest {
         header.setClientId(201L);
         header.setWarehouseId(203L);
         when(wmWarehouseService.selectWmWarehouseByWarehouseId(eq(203L)))
-                .thenReturn(warehouse(203L, WmWarehouseConstants.TYPE_CUSTOMER, 201L));
+                .thenReturn(warehouse(203L, WmWarehouseConstants.OWNER_CUSTOMER, 201L));
 
         assertThatCode(() -> validate(header, Collections.emptyList())).doesNotThrowAnyException();
     }
@@ -69,7 +69,7 @@ class WmProductSalesClientIsolationTest {
         header.setClientId(202L);  // 出库单属于客户B
         header.setWarehouseId(203L);
         when(wmWarehouseService.selectWmWarehouseByWarehouseId(eq(203L)))
-                .thenReturn(warehouse(203L, WmWarehouseConstants.TYPE_CUSTOMER, 201L));  // 仓属于客户A
+                .thenReturn(warehouse(203L, WmWarehouseConstants.OWNER_CUSTOMER, 201L));  // 仓属于客户A
 
         assertThatThrownBy(() -> validate(header, Collections.emptyList()))
                 .isInstanceOf(ServiceException.class)
@@ -84,7 +84,7 @@ class WmProductSalesClientIsolationTest {
         header.setClientId(null);
         header.setWarehouseId(203L);
         when(wmWarehouseService.selectWmWarehouseByWarehouseId(eq(203L)))
-                .thenReturn(warehouse(203L, WmWarehouseConstants.TYPE_CUSTOMER, 201L));
+                .thenReturn(warehouse(203L, WmWarehouseConstants.OWNER_CUSTOMER, 201L));
 
         assertThatThrownBy(() -> validate(header, Collections.emptyList()))
                 .isInstanceOf(ServiceException.class);
@@ -97,7 +97,7 @@ class WmProductSalesClientIsolationTest {
         header.setClientId(201L);
         header.setWarehouseId(206L);
         when(wmWarehouseService.selectWmWarehouseByWarehouseId(eq(206L)))
-                .thenReturn(warehouse(206L, "FINISHED", null));
+                .thenReturn(warehouse(206L, WmWarehouseConstants.OWNER_PUBLIC, null));
 
         assertThatCode(() -> validate(header, Collections.emptyList())).doesNotThrowAnyException();
     }
@@ -110,12 +110,12 @@ class WmProductSalesClientIsolationTest {
         header.setWarehouseId(206L);  // 表头公共仓
         // 表头公共仓放行
         lenient().when(wmWarehouseService.selectWmWarehouseByWarehouseId(eq(206L)))
-                .thenReturn(warehouse(206L, "FINISHED", null));
+                .thenReturn(warehouse(206L, WmWarehouseConstants.OWNER_PUBLIC, null));
 
         WmProductSalesDetail d = new WmProductSalesDetail();
         d.setWarehouseId(204L);  // 明细选了客户B的仓
         when(wmWarehouseService.selectWmWarehouseByWarehouseId(eq(204L)))
-                .thenReturn(warehouse(204L, WmWarehouseConstants.TYPE_CUSTOMER, 202L));
+                .thenReturn(warehouse(204L, WmWarehouseConstants.OWNER_CUSTOMER, 202L));
 
         List<WmProductSalesDetail> details = new ArrayList<>();
         details.add(d);

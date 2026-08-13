@@ -264,13 +264,18 @@ class ProWorkorderDocServiceReceiptTest {
         // 仓库列表：第一个是别人的客户仓(203=客户A)，第二个是公共成品仓(206)
         WmWarehouse otherCustomerWh = new WmWarehouse();
         otherCustomerWh.setWarehouseId(203L);
-        otherCustomerWh.setWarehouseType("CUSTOMER");
+        otherCustomerWh.setOwnershipType("CUSTOMER");
         otherCustomerWh.setClientId(201L);
         WmWarehouse publicWh = new WmWarehouse();
         publicWh.setWarehouseId(206L);
         publicWh.setWarehouseType("FINISHED");
+        publicWh.setOwnershipType("PUBLIC");
+        publicWh.setWarehouseCode("WH-206");
+        publicWh.setWarehouseName("成品仓");
         when(wmWarehouseService.selectWmWarehouseList(any()))
                 .thenReturn(Arrays.asList(otherCustomerWh, publicWh));
+        // resolveRecptWarehouse 回退到默认仓后按 ID 查完整对象回填 code/name
+        when(wmWarehouseService.selectWmWarehouseByWarehouseId(206L)).thenReturn(publicWh);
 
         docService.generateProductReceipt(1L);
 

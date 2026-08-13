@@ -25,7 +25,11 @@
       </el-table-column>
       <el-table-column label="编码" align="center" prop="warehouseCode" width="120" />
       <el-table-column label="名称" align="center" prop="warehouseName" :show-overflow-tooltip="true" />
-      <el-table-column label="类型" align="center" prop="warehouseType" width="90" />
+      <el-table-column label="类型" align="center" width="100">
+        <template #default="scope">
+          <dict-tag :options="mes_warehouse_owner_type" :value="scope.row.ownershipType" />
+        </template>
+      </el-table-column>
       <el-table-column label="地址" align="center" prop="address" :show-overflow-tooltip="true" />
     </el-table>
 
@@ -48,6 +52,8 @@ import { ElMessage } from 'element-plus'
 import CreateWarehouseDialog from './CreateWarehouseDialog.vue'
 
 const emit = defineEmits<{ onSelected: [row: WmWarehouse] }>()
+
+const { mes_warehouse_owner_type } = useDict('mes_warehouse_owner_type')
 
 const showFlag = ref(false)
 const loading = ref(false)

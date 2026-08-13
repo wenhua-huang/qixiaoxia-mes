@@ -7,6 +7,11 @@
       <el-form-item label="仓库名称" prop="warehouseName">
         <el-input v-model="queryParams.warehouseName" placeholder="请输入仓库名称" clearable @keyup.enter="handleQuery" />
       </el-form-item>
+      <el-form-item label="归属类型" prop="ownershipType">
+        <el-select v-model="queryParams.ownershipType" placeholder="请选择" clearable style="width:120px">
+          <el-option v-for="d in mes_warehouse_owner_type" :key="d.value" :label="d.label" :value="d.value" />
+        </el-select>
+      </el-form-item>
       <el-form-item>
         <el-button type="primary" icon="Search" size="small" @click="handleQuery">搜索</el-button>
         <el-button icon="Refresh" size="small" @click="resetQuery">重置</el-button>
@@ -36,7 +41,12 @@
           <dict-tag :options="mes_warehouse_type" :value="scope.row.warehouseType" />
         </template>
       </el-table-column>
-      <el-table-column label="归属" align="center" width="140" :show-overflow-tooltip="true">
+      <el-table-column label="归属类型" align="center" prop="ownershipType" width="90">
+        <template #default="scope">
+          <dict-tag :options="mes_warehouse_owner_type" :value="scope.row.ownershipType" />
+        </template>
+      </el-table-column>
+      <el-table-column label="归属客户/供应商" align="center" width="160" :show-overflow-tooltip="true">
         <template #default="scope">{{ ownerText(scope.row) }}</template>
       </el-table-column>
       <el-table-column label="地址" align="center" prop="address" :show-overflow-tooltip="true" width="200" />
@@ -87,19 +97,28 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
+            <el-form-item label="归属类型" prop="ownershipType">
+              <el-select v-model="form.ownershipType" placeholder="请选择" style="width:100%" @change="onOwnershipChange">
+                <el-option v-for="d in mes_warehouse_owner_type" :key="d.value" :label="d.label" :value="d.value" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row>
+          <el-col :span="12">
             <el-form-item label="负责人" prop="charge">
               <el-input v-model="form.charge" placeholder="请输入负责人" />
             </el-form-item>
           </el-col>
         </el-row>
-        <el-row v-if="form.warehouseType === 'CUSTOMER' || form.warehouseType === 'SUPPLIER'">
+        <el-row v-if="form.ownershipType === 'CUSTOMER' || form.ownershipType === 'SUPPLIER'">
           <el-col :span="12">
-            <el-form-item label="归属客户" prop="clientId" v-if="form.warehouseType === 'CUSTOMER'">
+            <el-form-item label="归属客户" prop="clientId" v-if="form.ownershipType === 'CUSTOMER'">
               <el-input :model-value="clientDisplay" readonly placeholder="请选择归属客户">
                 <template #append><el-button icon="Search" @click="handleSelectClient" /></template>
               </el-input>
             </el-form-item>
-            <el-form-item label="归属供应商" prop="vendorId" v-else-if="form.warehouseType === 'SUPPLIER'">
+            <el-form-item label="归属供应商" prop="vendorId" v-else-if="form.ownershipType === 'SUPPLIER'">
               <el-input :model-value="vendorDisplay" readonly placeholder="请选择归属供应商">
                 <template #append><el-button icon="Search" @click="handleSelectVendor" /></template>
               </el-input>
@@ -162,7 +181,7 @@ import VendorSelect from '@/components/vendorSelect/single.vue'
 
 const { proxy } = getCurrentInstance() as any
 const router = useRouter()
-const { mes_warehouse_type } = useDict('mes_warehouse_type')
+const { mes_warehouse_type, mes_warehouse_owner_type } = useDict('mes_warehouse_type', 'mes_warehouse_owner_type')
 
 const warehouseList = ref<WmWarehouse[]>([])
 const open = ref(false)
@@ -183,8 +202,8 @@ const clientDisplay = computed(() => form.value.clientName || (form.value.client
 const vendorDisplay = computed(() => form.value.vendorName || (form.value.vendorId ? `#${form.value.vendorId}` : ''))
 // 列表归属列展示（列表仅带 ID，无 name）
 function ownerText(row: WmWarehouse) {
-  if (row.warehouseType === 'CUSTOMER') return row.clientName || (row.clientId ? `#${row.clientId}` : '')
-  if (row.warehouseType === 'SUPPLIER') return row.vendorName || (row.vendorId ? `#${row.vendorId}` : '')
+  if (row.ownershipType === 'CUSTOMER') return row.clientName || (row.clientId ? `#${row.clientId}` : '')
+  if (row.ownershipType === 'SUPPLIER') return row.vendorName || (row.vendorId ? `#${row.vendorId}` : '')
   return ''
 }
 
@@ -221,7 +240,14 @@ function onVendorSelected(row: MdVendor) {
   form.value.clientId = undefined
   form.value.clientName = undefined
 }
-function handleAdd() { reset(); optType.value = 'add'; open.value = true; title.value = '新增仓库' }
+/** 切换归属类型时清空旧归属，避免脏数据 */
+function onOwnershipChange() {
+  form.value.clientId = undefined
+  form.value.clientName = undefined
+  form.value.vendorId = undefined
+  form.value.vendorName = undefined
+}
+function handleAdd() { reset(); optType.value = 'add'; form.value.ownershipType = 'PUBLIC'; open.value = true; title.value = '新增仓库' }
 function handleView(row: WmWarehouse) { reset(); optType.value = 'view'; form.value = { ...row }; open.value = true; title.value = '查看仓库' }
 function handleUpdate(row?: WmWarehouse) {
   reset()
@@ -232,8 +258,8 @@ function handleUpdate(row?: WmWarehouse) {
 function submitForm() {
   proxy.$refs['formRef'].validate((v: boolean) => {
     if (!v) return
-    // 归属互斥清空，与后端 normalizeWarehouseOwner 一致
-    const t = form.value.warehouseType
+    // 归属互斥清空，与后端 normalizeOwnership 一致
+    const t = form.value.ownershipType
     if (t === 'CUSTOMER') {
       form.value.vendorId = undefined
       form.value.vendorName = undefined

@@ -17,6 +17,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="cardCode"             column="card_code"             />
         <result property="taskId"               column="task_id"               />
         <result property="taskCode"             column="task_code"             />
+        <result property="processId"            column="process_id"            />
+        <result property="processName"          column="process_name"          />
         <result property="workstationId"        column="workstation_id"        />
         <result property="workstationCode"      column="workstation_code"      />
         <result property="workstationName"      column="workstation_name"      />
@@ -51,7 +53,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select issue_id, factory_id, issue_code, issue_name, issue_type,
                workorder_id, workorder_code, workorder_name,
                card_id, card_code,
-               task_id, task_code, workstation_id, workstation_code, workstation_name,
+               task_id, task_code, process_id, process_name, workstation_id, workstation_code, workstation_name,
                vendor_id, vendor_code,
                warehouse_id, warehouse_code, warehouse_name,
                location_id, location_code, location_name,
@@ -71,6 +73,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="workorderCode != null and workorderCode != ''"> and workorder_code = #{workorderCode}</if>
             <if test="workorderName != null and workorderName != ''"> and workorder_name like concat('%', #{workorderName}, '%')</if>
             <if test="taskId != null"> and task_id = #{taskId}</if>
+            <if test="processId != null"> and process_id = #{processId}</if>
             <if test="warehouseId != null"> and warehouse_id = #{warehouseId}</if>
             <if test="issueType != null  and issueType != ''"> and issue_type = #{issueType}</if>
             <if test="status != null  and status != ''"> and status = #{status}</if>
@@ -98,6 +101,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="cardCode != null and cardCode != ''">card_code,</if>
             <if test="taskId != null">task_id,</if>
             <if test="taskCode != null and taskCode != ''">task_code,</if>
+            <if test="processId != null">process_id,</if>
+            <if test="processName != null and processName != ''">process_name,</if>
             <if test="workstationId != null">workstation_id,</if>
             <if test="workstationCode != null and workstationCode != ''">workstation_code,</if>
             <if test="workstationName != null and workstationName != ''">workstation_name,</if>
@@ -136,6 +141,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="cardCode != null and cardCode != ''">#{cardCode},</if>
             <if test="taskId != null">#{taskId},</if>
             <if test="taskCode != null and taskCode != ''">#{taskCode},</if>
+            <if test="processId != null">#{processId},</if>
+            <if test="processName != null and processName != ''">#{processName},</if>
             <if test="workstationId != null">#{workstationId},</if>
             <if test="workstationCode != null and workstationCode != ''">#{workstationCode},</if>
             <if test="workstationName != null and workstationName != ''">#{workstationName},</if>
@@ -177,6 +184,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="cardCode != null and cardCode != ''">card_code = #{cardCode},</if>
             <if test="taskId != null">task_id = #{taskId},</if>
             <if test="taskCode != null and taskCode != ''">task_code = #{taskCode},</if>
+            <if test="processId != null">process_id = #{processId},</if>
+            <if test="processName != null and processName != ''">process_name = #{processName},</if>
             <if test="workstationId != null">workstation_id = #{workstationId},</if>
             <if test="workstationCode != null and workstationCode != ''">workstation_code = #{workstationCode},</if>
             <if test="workstationName != null and workstationName != ''">workstation_name = #{workstationName},</if>

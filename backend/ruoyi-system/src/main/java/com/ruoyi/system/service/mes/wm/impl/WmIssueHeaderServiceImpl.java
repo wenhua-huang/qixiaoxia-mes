@@ -133,14 +133,26 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
     public int insertWmIssueHeader(WmIssueHeader e) {
         // 手工创建（Controller 直调）无上层 doc-gen 锁，需按工单+工序加锁防 TOCTOU 重复建单；
         // doc-gen 路径已持 pro:workorder:doc-gen 锁，Redisson 可重入，无死锁风险。
-        String lockKey = (e.getWorkorderId() != null && e.getTaskId() != null)
-                ? "wm:issue:create:" + e.getWorkorderId() + ":" + e.getTaskId() : null;
+        // 未排产（taskId 为空）时退化到 processId 加锁，避免空 key 穿透。
+        String lockKey = buildCreateLockKey(e);
         if (lockKey != null) {
             lockTemplate.execute(lockKey, 10, () -> txTemplate.execute(status -> doInsertWmIssueHeader(e)));
         } else {
             txTemplate.execute(status -> doInsertWmIssueHeader(e));
         }
         return 1;
+    }
+
+    /** 构造领料单创建锁 key：优先 taskId，无 taskId 时退化到 processId；两者皆空返回 null（无工单/无工序不锁）。 */
+    private String buildCreateLockKey(WmIssueHeader e) {
+        if (e.getWorkorderId() == null) return null;
+        if (e.getTaskId() != null) {
+            return "wm:issue:create:" + e.getWorkorderId() + ":" + e.getTaskId();
+        }
+        if (e.getProcessId() != null) {
+            return "wm:issue:create:" + e.getWorkorderId() + ":p:" + e.getProcessId();
+        }
+        return null;
     }
 
     private int doInsertWmIssueHeader(WmIssueHeader e) {
@@ -155,17 +167,21 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
         if (StringUtils.isEmpty(e.getIssueCode())) {
             e.setIssueCode(autoCodeGenerator.genSerialCode(WmIssueConstants.CODE_RULE_ISSUE, ""));
         }
-        // 查重：生产领料同工单+同工序任务(task)不允许存在多张非终态领料单
-        //   - 一个工单允许按 taskId(工序) 拆多张领料单（generateIssueDocuments 按 processId 分组循环创建）
-        //   - 仅当本单带 taskId 时才在此处查重（精确到工序）；
-        //     无 taskId（工单未排产/手工整单）时由上层 generateIssueDocuments 的幂等检查负责，
-        //     避免多工序工单（各单 taskId 均为 null）互相误判为重复。
+        // 查重：生产领料同工单+同工序不允许存在多张非终态领料单
+        //   - 一个工单允许按工序(processId/taskId)拆多张领料单（generateIssueDocuments 按 processId 分组循环创建）
+        //   - 有 taskId 时按 taskId 查；未排产 taskId 为空时按 processId 查，
+        //     防止"一键生成"在排产前、"开工检查"在排产后两路径各建一张
+        //   - 两者皆空（手工整单无工序）不在此查重，由上层调用方负责
         if (e.getWorkorderId() != null && WmIssueConstants.TYPE_PRODUCE.equals(e.getIssueType())
-                && e.getTaskId() != null) {
+                && (e.getTaskId() != null || e.getProcessId() != null)) {
             WmIssueHeader q = new WmIssueHeader();
             q.setWorkorderId(e.getWorkorderId());
             q.setIssueType(WmIssueConstants.TYPE_PRODUCE);
-            q.setTaskId(e.getTaskId());
+            if (e.getTaskId() != null) {
+                q.setTaskId(e.getTaskId());
+            } else {
+                q.setProcessId(e.getProcessId());
+            }
             List<WmIssueHeader> existings = wmIssueHeaderMapper.selectWmIssueHeaderList(q);
             if (existings != null) {
                 for (WmIssueHeader ex : existings) {

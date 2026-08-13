@@ -36,14 +36,14 @@ const all = ref<WmWarehouse[]>([])
 const loading = ref(false)
 const createRef = ref()
 
-/** 候选：有客户→该客户专属仓置顶 + 非客户仓(公共/其他类型)；无客户→全部。后端 Task7 做客户隔离硬校验 */
+/** 候选：有客户→该客户专属仓置顶 + 非客户仓(公共/其他类型)；无客户→全部。后端做客户隔离硬校验 */
 const options = computed<WmWarehouse[]>(() => {
   const list = all.value, cid = props.clientId
   const merged = cid == null
     ? [...list]
     : [
-        ...list.filter(w => w.warehouseType === 'CUSTOMER' && w.clientId === cid),
-        ...list.filter(w => w.warehouseType !== 'CUSTOMER')
+        ...list.filter(w => w.ownershipType === 'CUSTOMER' && w.clientId === cid),
+        ...list.filter(w => w.ownershipType !== 'CUSTOMER')
       ]
   // 切换客户后已选仓不在候选内仍保留可见（不丢标签；后端最终校验合法性）
   if (props.modelValue && !merged.some(w => w.warehouseId === props.modelValue)) {
@@ -56,7 +56,7 @@ const options = computed<WmWarehouse[]>(() => {
 /** 切换客户：若已选仓是其他客户的专属仓，自动清空（避免保存能过、过账才被硬隔离拦截） */
 watch(() => props.clientId, (newCid) => {
   const cur = props.modelValue == null ? undefined : all.value.find(w => w.warehouseId === props.modelValue)
-  if (cur && cur.warehouseType === 'CUSTOMER' && cur.clientId !== newCid) {
+  if (cur && cur.ownershipType === 'CUSTOMER' && cur.clientId !== newCid) {
     emit('update:modelValue', undefined)
     emit('select', undefined)
   }
@@ -64,7 +64,7 @@ watch(() => props.clientId, (newCid) => {
 
 function labelOf(w: WmWarehouse): string {
   const n = w.warehouseName || w.warehouseCode || String(w.warehouseId)
-  return w.warehouseType === 'CUSTOMER' ? `${n}（客户仓${w.clientName ? '·' + w.clientName : ''}）` : n
+  return w.ownershipType === 'CUSTOMER' ? `${n}（客户仓${w.clientName ? '·' + w.clientName : ''}）` : n
 }
 
 function find(id?: number): WmWarehouse | undefined {

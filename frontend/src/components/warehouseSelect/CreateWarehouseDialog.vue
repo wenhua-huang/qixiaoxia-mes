@@ -7,18 +7,18 @@
       <el-form-item label="仓库名称" prop="warehouseName">
         <el-input v-model="form.warehouseName" placeholder="请输入仓库名称" maxlength="50" />
       </el-form-item>
-      <el-form-item label="仓库类型" prop="warehouseType">
-        <el-radio-group v-model="form.warehouseType" @change="onTypeChange">
+      <el-form-item label="仓库归属" prop="ownershipType">
+        <el-radio-group v-model="form.ownershipType" @change="onTypeChange">
           <el-radio value="CUSTOMER">客户仓</el-radio>
           <el-radio value="SUPPLIER">供应商仓</el-radio>
         </el-radio-group>
       </el-form-item>
-      <el-form-item v-if="form.warehouseType === 'CUSTOMER'" label="归属客户" prop="clientId">
+      <el-form-item v-if="form.ownershipType === 'CUSTOMER'" label="归属客户" prop="clientId">
         <el-input :model-value="ownerDisplay" readonly placeholder="请选择归属客户">
           <template #append><el-button icon="Search" @click="clientSelectRef?.open(form.clientId)" /></template>
         </el-input>
       </el-form-item>
-      <el-form-item v-else-if="form.warehouseType === 'SUPPLIER'" label="归属供应商" prop="vendorId">
+      <el-form-item v-else-if="form.ownershipType === 'SUPPLIER'" label="归属供应商" prop="vendorId">
         <el-input :model-value="ownerDisplay" readonly placeholder="请选择归属供应商">
           <template #append><el-button icon="Search" @click="vendorSelectRef?.open(form.vendorId)" /></template>
         </el-input>
@@ -55,18 +55,24 @@ const formRef = ref()
 const clientSelectRef = ref()
 const vendorSelectRef = ref()
 
-/** 仓库类型 */
+/** 归属类型（客户仓/供应商仓） */
 type OwnerType = 'CUSTOMER' | 'SUPPLIER'
 
+/** 归属类型 → 内容类型默认值（客户仓放成品，供应商仓放原料） */
+const DEFAULT_CONTENT_TYPE: Record<OwnerType, string> = {
+  CUSTOMER: 'FINISHED',
+  SUPPLIER: 'RAW'
+}
+
 function getDefaultForm(): WmWarehouse {
-  return { warehouseType: 'CUSTOMER', enableFlag: '1' } as WmWarehouse
+  return { ownershipType: 'CUSTOMER', enableFlag: '1' } as WmWarehouse
 }
 
 const form = ref<WmWarehouse>(getDefaultForm())
 
 /** 归属展示值：无 name 时回退到 #id，避免选中后空白 */
 const ownerDisplay = computed(() => {
-  if (form.value.warehouseType === 'CUSTOMER') {
+  if (form.value.ownershipType === 'CUSTOMER') {
     return form.value.clientName || (form.value.clientId ? `#${form.value.clientId}` : '')
   }
   return form.value.vendorName || (form.value.vendorId ? `#${form.value.vendorId}` : '')
@@ -75,12 +81,12 @@ const ownerDisplay = computed(() => {
 /** 校验规则：归属按类型动态必填 */
 const rules = computed(() => ({
   warehouseName: [{ required: true, message: '仓库名称不能为空', trigger: 'blur' }],
-  warehouseType: [{ required: true, message: '请选择仓库类型', trigger: 'change' }],
+  ownershipType: [{ required: true, message: '请选择仓库归属', trigger: 'change' }],
   address: [{ required: true, message: '地址不能为空', trigger: 'blur' }],
-  clientId: form.value.warehouseType === 'CUSTOMER'
+  clientId: form.value.ownershipType === 'CUSTOMER'
     ? [{ required: true, message: '请选择归属客户', trigger: 'change' }]
     : [],
-  vendorId: form.value.warehouseType === 'SUPPLIER'
+  vendorId: form.value.ownershipType === 'SUPPLIER'
     ? [{ required: true, message: '请选择归属供应商', trigger: 'change' }]
     : []
 })) as any
@@ -117,7 +123,7 @@ function onVendorSelected(row: MdVendor) {
  */
 function open(type?: OwnerType, preset?: { clientId?: number; clientName?: string; vendorId?: number; vendorName?: string }) {
   form.value = getDefaultForm()
-  if (type) form.value.warehouseType = type
+  if (type) form.value.ownershipType = type
   if (preset) {
     form.value.clientId = preset.clientId
     form.value.clientName = preset.clientName
@@ -135,11 +141,15 @@ function submit() {
     const doSubmit = (code?: string) => {
       const payload: WmWarehouse = { ...form.value }
       if (code) payload.warehouseCode = code
-      // 归属互斥清空，与后端 normalizeWarehouseOwner 一致
-      if (payload.warehouseType === 'CUSTOMER') {
+      // 自动填内容类型：客户仓→成品仓，供应商仓→原料仓
+      if (payload.ownershipType) {
+        payload.warehouseType = DEFAULT_CONTENT_TYPE[payload.ownershipType as OwnerType]
+      }
+      // 归属互斥清空，与后端 normalizeOwnership 一致
+      if (payload.ownershipType === 'CUSTOMER') {
         payload.vendorId = undefined
         payload.vendorName = undefined
-      } else if (payload.warehouseType === 'SUPPLIER') {
+      } else if (payload.ownershipType === 'SUPPLIER') {
         payload.clientId = undefined
         payload.clientName = undefined
       }

@@ -194,9 +194,9 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
     }
 
     /**
-     * 客户仓硬隔离：客户专属仓(warehouse_type=CUSTOMER)的货只能发给归属客户。
+     * 客户仓硬隔离：客户专属仓(ownership_type=CUSTOMER)的货只能发给归属客户。
      * 决策B：出库目标仓库若是客户仓，要求出库单 clientId == 仓库 clientId，否则拦截。
-     * 公共成品仓(type!=CUSTOMER)不受限。
+     * 公共仓(ownership_type!=CUSTOMER)不受限。
      */
     private void validateClientWarehouseIsolation(WmProductSales header, List<WmProductSalesDetail> details) {
         java.util.Set<Long> whIds = new java.util.HashSet<>();
@@ -209,7 +209,7 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         Long clientId = header.getClientId();
         for (Long whId : whIds) {
             WmWarehouse wh = wmWarehouseService.selectWmWarehouseByWarehouseId(whId);
-            if (wh != null && WmWarehouseConstants.TYPE_CUSTOMER.equals(wh.getWarehouseType())
+            if (wh != null && WmWarehouseConstants.OWNER_CUSTOMER.equals(wh.getOwnershipType())
                     && (clientId == null || !clientId.equals(wh.getClientId()))) {
                 throw new ServiceException("仓库[" + wh.getWarehouseName()
                         + "]为客户专属仓，不能给当前客户发货");

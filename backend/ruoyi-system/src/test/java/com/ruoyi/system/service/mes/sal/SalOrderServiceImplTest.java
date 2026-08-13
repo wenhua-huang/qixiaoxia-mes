@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,8 +44,8 @@ import static org.mockito.Mockito.*;
 
 /**
  * 销售订单Service单元测试
- * 覆盖:createWithLines / confirmOrder / cancelOrder / deleteSalOrderByOrderIds(状态守卫) /
- *      toWorkorder(可转量校验 + 工单回填 order_source/source_code/sales_order_line_id)
+ * 覆盖:createWithLines / submitOrder/approveOrder/rejectOrder(审核链路+状态守卫) / cancelOrder /
+ *      deleteSalOrderByOrderIds(状态守卫) / toWorkorder(可转量校验 + 工单回填 order_source/source_code/sales_order_line_id)
  *
  * @author qixiaoxia
  */
@@ -117,8 +118,8 @@ class SalOrderServiceImplTest
     }
 
     @Test
-    @DisplayName("confirmOrder - 待确认且有行 -> 已确认")
-    void confirmOrder_ok()
+    @DisplayName("submitOrder - 待提交且有行 -> 待审核(PENDING)")
+    void submitOrder_ok()
     {
         SalOrder order = buildOrder(1L, "SO001", "PREPARE");
         when(salOrderMapper.selectSalOrderByOrderId(1L)).thenReturn(order);
@@ -126,22 +127,130 @@ class SalOrderServiceImplTest
                 .thenReturn(Collections.singletonList(new SalOrderLine()));
         when(salOrderMapper.updateSalOrder(any(SalOrder.class))).thenReturn(1);
 
-        int n = salOrderService.confirmOrder(1L);
+        int n = salOrderService.submitOrder(1L);
 
         assertThat(n).isEqualTo(1);
-        verify(salOrderMapper).updateSalOrder(argThat(o -> "CONFIRMED".equals(o.getStatus())));
+        verify(salOrderMapper).updateSalOrder(argThat(o -> "PENDING".equals(o.getStatus())));
     }
 
     @Test
-    @DisplayName("confirmOrder - 无明细行 -> 拒绝")
-    void confirmOrder_noLines_rejected()
+    @DisplayName("submitOrder - 无明细行 -> 拒绝")
+    void submitOrder_noLines_rejected()
     {
         when(salOrderMapper.selectSalOrderByOrderId(1L)).thenReturn(buildOrder(1L, "SO001", "PREPARE"));
         when(salOrderLineMapper.selectSalOrderLineByOrderId(1L)).thenReturn(Collections.emptyList());
 
-        assertThatThrownBy(() -> salOrderService.confirmOrder(1L))
+        assertThatThrownBy(() -> salOrderService.submitOrder(1L))
                 .isInstanceOf(ServiceException.class)
                 .hasMessageContaining("明细行");
+    }
+
+    @Test
+    @DisplayName("approveOrder - 待审核 -> 已确认,写入审核人")
+    void approveOrder_ok()
+    {
+        when(salOrderMapper.selectSalOrderByOrderId(1L)).thenReturn(buildOrder(1L, "SO001", "PENDING"));
+        when(salOrderLineMapper.selectSalOrderLineByOrderId(1L))
+                .thenReturn(Collections.singletonList(new SalOrderLine()));
+        when(salOrderMapper.updateSalOrder(any(SalOrder.class))).thenReturn(1);
+
+        salOrderService.approveOrder(1L);
+
+        verify(salOrderMapper).updateSalOrder(argThat(o -> "CONFIRMED".equals(o.getStatus()) && "tester".equals(o.getApproveBy())));
+    }
+
+    @Test
+    @DisplayName("approveOrder - 非待审核 -> 拒绝")
+    void approveOrder_notPending_rejected()
+    {
+        when(salOrderMapper.selectSalOrderByOrderId(1L)).thenReturn(buildOrder(1L, "SO001", "PREPARE"));
+        assertThatThrownBy(() -> salOrderService.approveOrder(1L))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("待审核");
+    }
+
+    @Test
+    @DisplayName("rejectOrder - PENDING 回退 PREPARE,记录驳回意见")
+    void rejectOrder_ok()
+    {
+        when(salOrderMapper.selectSalOrderByOrderId(1L)).thenReturn(buildOrder(1L, "SO001", "PENDING"));
+        when(salOrderMapper.updateSalOrder(any(SalOrder.class))).thenReturn(1);
+
+        salOrderService.rejectOrder(1L, "价格异常");
+
+        verify(salOrderMapper).updateSalOrder(argThat(o -> "PREPARE".equals(o.getStatus()) && "价格异常".equals(o.getApproveRemark())));
+    }
+
+    @Test
+    @DisplayName("rejectOrder - 驳回意见为空 -> 拒绝")
+    void rejectOrder_noRemark_rejected()
+    {
+        assertThatThrownBy(() -> salOrderService.rejectOrder(1L, ""))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("审核意见");
+    }
+
+    @Test
+    @DisplayName("approveOrder - 无明细行 -> 拒绝(防空单审核)")
+    void approveOrder_noLines_rejected()
+    {
+        when(salOrderMapper.selectSalOrderByOrderId(1L)).thenReturn(buildOrder(1L, "SO001", "PENDING"));
+        when(salOrderLineMapper.selectSalOrderLineByOrderId(1L)).thenReturn(Collections.emptyList());
+
+        assertThatThrownBy(() -> salOrderService.approveOrder(1L))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("明细行");
+        verify(salOrderMapper, never()).updateSalOrder(any());
+    }
+
+    @Test
+    @DisplayName("submitOrder - 重新提交清空上次驳回原因")
+    void submitOrder_clearsApproveRemark()
+    {
+        SalOrder order = buildOrder(1L, "SO001", "PREPARE");
+        order.setApproveRemark("上次驳回原因");
+        when(salOrderMapper.selectSalOrderByOrderId(1L)).thenReturn(order);
+        when(salOrderLineMapper.selectSalOrderLineByOrderId(1L))
+                .thenReturn(Collections.singletonList(new SalOrderLine()));
+        when(salOrderMapper.updateSalOrder(any(SalOrder.class))).thenReturn(1);
+
+        salOrderService.submitOrder(1L);
+
+        verify(salOrderMapper).updateSalOrder(argThat(o ->
+                "PENDING".equals(o.getStatus()) && "".equals(o.getApproveRemark())));
+    }
+
+    @Test
+    @DisplayName("batchSubmit - 空数组 -> 抛异常")
+    void batchSubmit_empty_rejected()
+    {
+        assertThatThrownBy(() -> salOrderService.batchSubmit(new Long[0]))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("未选择");
+    }
+
+    @Test
+    @DisplayName("batchSubmit - 部分成功部分失败,返回汇总")
+    void batchSubmit_partialFailure()
+    {
+        // ID=1 PREPARE 有行 -> 成功; ID=2 CONFIRMED -> 状态不允许,失败
+        SalOrder o1 = buildOrder(1L, "SO001", "PREPARE");
+        SalOrder o2 = buildOrder(2L, "SO002", "CONFIRMED");
+        when(salOrderMapper.selectSalOrderByOrderId(1L)).thenReturn(o1);
+        when(salOrderMapper.selectSalOrderByOrderId(2L)).thenReturn(o2);
+        when(salOrderLineMapper.selectSalOrderLineByOrderId(1L))
+                .thenReturn(Collections.singletonList(new SalOrderLine()));
+        when(salOrderMapper.updateSalOrder(any(SalOrder.class))).thenReturn(1);
+
+        Map<String, Object> r = salOrderService.batchSubmit(new Long[]{1L, 2L});
+
+        assertThat(r.get("total")).isEqualTo(2);
+        assertThat(r.get("successCount")).isEqualTo(1);
+        assertThat(r.get("failedCount")).isEqualTo(1);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> failures = (List<Map<String, Object>>) r.get("failures");
+        assertThat(failures).hasSize(1);
+        assertThat(failures.get(0).get("orderId")).isEqualTo(2L);
     }
 
     @Test

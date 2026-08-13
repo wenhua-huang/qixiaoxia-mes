@@ -33,6 +33,12 @@ export interface SalOrder extends BaseEntity {
   totalAmount?: number;
   paymentMethod?: string;
   status?: string;
+  /** 审核人 */
+  approveBy?: string;
+  /** 审核时间 */
+  approveTime?: string;
+  /** 审核意见/驳回原因 */
+  approveRemark?: string;
   lines?: SalOrderLine[];
 }
 

@@ -31,4 +31,24 @@ export interface PurOrder extends BaseEntity {
   currency?: string;
   sourceOrderCode?: string;
   status?: string;
+  /** 订单明细行（详情接口返回） */
+  lines?: PurOrderLine[];
+}
+
+/** 采购订单明细行 */
+export interface PurOrderLine extends BaseEntity {
+  lineId?: number;
+  orderId?: number;
+  itemCode?: string;
+  itemName?: string;
+  specification?: string;
+  unitOfMeasure?: string;
+  unitName?: string;
+  quantityOrdered?: number;
+  quantityReceived?: number;
+  unitPrice?: number;
+  amount?: number;
+  taxRate?: number;
+  expectedDate?: string;
+  status?: string;
 }

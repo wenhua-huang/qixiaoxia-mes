@@ -19,8 +19,20 @@ export function createOrderWithLines(data: SalOrderCreateRequest): Promise<AjaxR
 export function updateOrderWithLines(data: SalOrderCreateRequest): Promise<AjaxResult<SalOrder>> {
   return request({ url: '/mes/sal/order/updateWithLines', method: 'put', data })
 }
-export function confirmOrder(id: number): Promise<AjaxResult> {
-  return request({ url: '/mes/sal/order/confirm/' + id, method: 'put' })
+export function submitOrder(id: number): Promise<AjaxResult> {
+  return request({ url: '/mes/sal/order/submit/' + id, method: 'put' })
+}
+export function approveOrder(id: number): Promise<AjaxResult> {
+  return request({ url: '/mes/sal/order/approve/' + id, method: 'put' })
+}
+export function rejectOrder(id: number, remark: string): Promise<AjaxResult> {
+  return request({ url: '/mes/sal/order/reject/' + id, method: 'put', data: { remark } })
+}
+export function batchSubmitOrder(ids: number[]): Promise<AjaxResult> {
+  return request({ url: '/mes/sal/order/batchSubmit', method: 'put', data: ids })
+}
+export function batchApproveOrder(ids: number[]): Promise<AjaxResult> {
+  return request({ url: '/mes/sal/order/batchApprove', method: 'put', data: ids })
 }
 export function closeOrder(id: number): Promise<AjaxResult> {
   return request({ url: '/mes/sal/order/close/' + id, method: 'put' })

@@ -32,6 +32,11 @@ public class WmWarehouse extends BaseEntity
     @Excel(name = "仓库类型:RAW-原料仓")
     private String warehouseType;
 
+    /** 客户仓归属客户ID(warehouse_type=CUSTOMER时必填) */
+    private Long clientId;
+    /** 供应商仓归属供应商ID(warehouse_type=SUPPLIER时必填) */
+    private Long vendorId;
+
     @Excel(name = "仓库位置/地址")
     private String address;
 
@@ -58,6 +63,11 @@ public class WmWarehouse extends BaseEntity
 
     public String getWarehouseType() { return warehouseType; }
     public void setWarehouseType(String v) { this.warehouseType = v; }
+
+    public Long getClientId() { return clientId; }
+    public void setClientId(Long v) { this.clientId = v; }
+    public Long getVendorId() { return vendorId; }
+    public void setVendorId(Long v) { this.vendorId = v; }
 
     public String getAddress() { return address; }
     public void setAddress(String v) { this.address = v; }

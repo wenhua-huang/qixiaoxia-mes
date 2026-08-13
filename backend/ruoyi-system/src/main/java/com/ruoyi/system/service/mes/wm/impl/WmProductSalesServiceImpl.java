@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import com.ruoyi.common.enums.WmProductSalesConstants;
+import com.ruoyi.common.enums.WmWarehouseConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
@@ -23,6 +24,7 @@ import com.ruoyi.system.domain.mes.wm.WmProductSalesLine;
 import com.ruoyi.system.domain.mes.wm.WmProductSalesShipment;
 import com.ruoyi.system.domain.mes.wm.WmMaterialStock;
 import com.ruoyi.system.domain.mes.wm.WmTransaction;
+import com.ruoyi.system.domain.mes.wm.WmWarehouse;
 import com.ruoyi.system.domain.mes.wm.vo.WmStockWarehouseSummary;
 import com.ruoyi.system.domain.mes.pro.ProMaterialTrace;
 import com.ruoyi.system.domain.mes.sal.SalOrder;
@@ -38,6 +40,7 @@ import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 import com.ruoyi.system.service.mes.wm.IWmProductSalesService;
 import com.ruoyi.system.service.mes.wm.IWmProductSalesShipmentService;
 import com.ruoyi.system.service.mes.wm.IWmProductSalesBoxService;
+import com.ruoyi.system.service.mes.wm.IWmWarehouseService;
 
 /**
  * 销售出库单业务层（状态机 + 过账扣库存 + FIFO 批次拣货）
@@ -61,6 +64,7 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
     @Autowired private ISalOrderService salOrderService;
     @Autowired private IWmProductSalesShipmentService shipmentService;
     @Autowired private IWmProductSalesBoxService boxService;
+    @Autowired private IWmWarehouseService wmWarehouseService;
 
     private TransactionTemplate txTemplate;
 
@@ -174,6 +178,7 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
             throw new ServiceException("当前状态[" + header.getStatus() + "]不允许过账");
         }
         Map<Long, WmProductSalesLine> lineMap = buildLineMap(salesId);
+        validateClientWarehouseIsolation(header, details);
         BigDecimal postedThisTime = BigDecimal.ZERO;
         for (WmProductSalesDetail d : details) {
             BigDecimal qty = d.getQuantity() != null ? d.getQuantity() : BigDecimal.ZERO;
@@ -186,6 +191,30 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         }
         updateHeaderAfterPost(header, postedThisTime);
         return salesId;
+    }
+
+    /**
+     * 客户仓硬隔离：客户专属仓(warehouse_type=CUSTOMER)的货只能发给归属客户。
+     * 决策B：出库目标仓库若是客户仓，要求出库单 clientId == 仓库 clientId，否则拦截。
+     * 公共成品仓(type!=CUSTOMER)不受限。
+     */
+    private void validateClientWarehouseIsolation(WmProductSales header, List<WmProductSalesDetail> details) {
+        java.util.Set<Long> whIds = new java.util.HashSet<>();
+        if (header.getWarehouseId() != null) whIds.add(header.getWarehouseId());
+        if (details != null) {
+            for (WmProductSalesDetail d : details) {
+                if (d.getWarehouseId() != null) whIds.add(d.getWarehouseId());
+            }
+        }
+        Long clientId = header.getClientId();
+        for (Long whId : whIds) {
+            WmWarehouse wh = wmWarehouseService.selectWmWarehouseByWarehouseId(whId);
+            if (wh != null && WmWarehouseConstants.TYPE_CUSTOMER.equals(wh.getWarehouseType())
+                    && (clientId == null || !clientId.equals(wh.getClientId()))) {
+                throw new ServiceException("仓库[" + wh.getWarehouseName()
+                        + "]为客户专属仓，不能给当前客户发货");
+            }
+        }
     }
 
     private Map<Long, WmProductSalesLine> buildLineMap(Long salesId) {

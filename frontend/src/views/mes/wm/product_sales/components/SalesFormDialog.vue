@@ -36,11 +36,11 @@
           <el-row>
             <el-col :span="12">
               <el-form-item label="出货仓库">
-                <el-input v-model="form.warehouseName" placeholder="可选（批量改仓）" readonly>
-                  <template #append><el-button icon="Search" @click="handleWarehouseSelect" /></template>
-                </el-input>
+                <SalesWarehouseSelect v-model="form.warehouseId" :client-id="form.clientId"
+                                      :client-name="form.clientName"
+                                      @select="onWarehouseSelected" />
                 <div style="font-size:12px;color:#909399;line-height:1.4;margin-top:2px">
-                  仓库已按库存自动分配到各行；此处选择可批量覆盖所有行仓库
+                  仓库已按库存自动分配到各行；此处选择可批量覆盖所有行仓库<span v-if="form.clientId">（已按客户过滤，客户仓置顶）</span>
                 </div>
               </el-form-item>
             </el-col>
@@ -126,7 +126,6 @@
     </template>
 
     <ClientSelect ref="clientSelectRef" @onSelected="onClientSelected" />
-    <WarehouseSelect ref="warehouseSelectRef" @onSelected="onWarehouseSelected" />
     <ItemSelect ref="itemSelectRef" @onSelected="onItemSelected" />
   </el-dialog>
 </template>
@@ -136,9 +135,9 @@ import { ref, reactive, getCurrentInstance } from 'vue'
 import { addWmProductSales, updateWmProductSales } from '@/api/mes/wm/product_sales'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import ClientSelect from '@/components/clientSelect/single.vue'
-import WarehouseSelect from '@/components/warehouseSelect/single.vue'
 import ItemSelect from '@/components/itemSelect/single.vue'
-import type { WmProductSales, WmProductSalesLine } from '@/types'
+import SalesWarehouseSelect from './SalesWarehouseSelect.vue'
+import type { WmProductSales, WmProductSalesLine, WmWarehouse } from '@/types'
 
 const proxy = getCurrentInstance()?.proxy as any
 const { mes_product_sales_type: sales_type_dict } = proxy.useDict('mes_product_sales_type')
@@ -157,7 +156,6 @@ const rules = {
 }
 
 const clientSelectRef = ref()
-const warehouseSelectRef = ref()
 const itemSelectRef = ref()
 const formRef = ref()
 
@@ -230,28 +228,20 @@ function onClientSelected(row: any) {
   form.salesperson = row.salesperson || form.salesperson
   if (row.shippingAddress) form.shippingAddress = row.shippingAddress
 }
-function handleWarehouseSelect() { warehouseSelectRef.value?.open() }
-function onWarehouseSelected(row: any) {
-  if (!row) return
-  form.warehouseId = row.warehouseId
-  form.warehouseCode = row.warehouseCode
-  form.warehouseName = row.warehouseName
-  // 批量覆盖所有行仓库（表头选仓即统一改仓）
-  lineList.value.forEach((l: WmProductSalesLine) => {
-    l.warehouseId = row.warehouseId
-    l.warehouseCode = row.warehouseCode
-    l.warehouseName = row.warehouseName
+
+/** 表头选仓即批量覆盖所有行仓库（含即时新建的客户仓）；清空时同步清行仓库 */
+function onWarehouseSelected(w?: WmWarehouse) {
+  Object.assign(form, { warehouseId: w?.warehouseId, warehouseCode: w?.warehouseCode, warehouseName: w?.warehouseName })
+  lineList.value.forEach(l => {
+    l.warehouseId = w?.warehouseId; l.warehouseCode = w?.warehouseCode; l.warehouseName = w?.warehouseName
   })
 }
-
-// 物料行
 function handleAddLine() { itemSelectRef.value?.open() }
 function onItemSelected(row: any) {
   lineList.value.push({
-    itemId: row.itemId, itemCode: row.itemCode, itemName: row.itemName,
-    specification: row.specification, unitOfMeasure: row.unitOfMeasure, unitName: row.unitName,
-    quantitySales: 1, quantityPosted: 0, warehouseId: form.warehouseId,
-    warehouseCode: form.warehouseCode, warehouseName: form.warehouseName
+    itemId: row.itemId, itemCode: row.itemCode, itemName: row.itemName, specification: row.specification,
+    unitOfMeasure: row.unitOfMeasure, unitName: row.unitName, quantitySales: 1, quantityPosted: 0,
+    warehouseId: form.warehouseId, warehouseCode: form.warehouseCode, warehouseName: form.warehouseName
   } as unknown as WmProductSalesLine)
 }
 function handleDelLine(idx: number) { lineList.value.splice(idx, 1) }

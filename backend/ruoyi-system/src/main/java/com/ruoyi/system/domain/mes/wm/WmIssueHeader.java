@@ -36,6 +36,9 @@ public class WmIssueHeader extends BaseEntity
     private String cardCode;
     private Long taskId;
     private String taskCode;
+    /** 工序ID（幂等分组依据，即使未排产 taskId 为空也能按工序去重） */
+    private Long processId;
+    private String processName;
     private Long workstationId;
     private String workstationCode;
     private String workstationName;
@@ -97,6 +100,10 @@ public class WmIssueHeader extends BaseEntity
     public void setTaskId(Long v) { this.taskId = v; }
     public String getTaskCode() { return taskCode; }
     public void setTaskCode(String v) { this.taskCode = v; }
+    public Long getProcessId() { return processId; }
+    public void setProcessId(Long v) { this.processId = v; }
+    public String getProcessName() { return processName; }
+    public void setProcessName(String v) { this.processName = v; }
     public Long getWorkstationId() { return workstationId; }
     public void setWorkstationId(Long v) { this.workstationId = v; }
     public String getWorkstationCode() { return workstationCode; }

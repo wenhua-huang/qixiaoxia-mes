@@ -10,6 +10,10 @@ export interface WmProductRecpt {
   produceCode?: string
   workorderId?: number
   workorderCode?: string
+  /** 成品归属客户ID(来源工单) */
+  clientId?: number
+  /** 客户名称(后端JOIN返回,展示用) */
+  clientName?: string
   sourceWarehouseId?: number
   warehouseId?: number
   warehouseCode?: string

@@ -965,20 +965,22 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
     }
 
     /**
-     * 加载工单下已有领料单的 taskId 集合（消除逐工序幂等查询 N+1）。
+     * 加载工单下已有领料单的幂等键集合（消除逐工序查询 N+1）。
+     * taskIds 用于有排产任务的工序；processIds 用于未排产（task_id 为空）时按工序去重，
+     * 防止"一键生成"在排产前建单、"开工检查"在排产后再建单导致重复。
      */
-    private Set<Long> loadIssuedTaskIds(Long workorderId)
+    private void loadIssuedKeys(Long workorderId, Set<Long> taskIds, Set<Long> processIds)
     {
-        Set<Long> taskIds = new HashSet<>();
         WmIssueHeader q = new WmIssueHeader();
         q.setWorkorderId(workorderId);
         List<WmIssueHeader> headers = wmIssueHeaderService.selectWmIssueHeaderList(q);
         if (headers != null) {
             for (WmIssueHeader h : headers) {
+                if (WmIssueConstants.isTerminal(h.getStatus())) continue;
                 if (h.getTaskId() != null) taskIds.add(h.getTaskId());
+                if (h.getProcessId() != null) processIds.add(h.getProcessId());
             }
         }
-        return taskIds;
     }
 
     /**
@@ -1018,10 +1020,16 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
     @Override
     public List<Map<String, Object>> preStartCheck(Long workorderId, boolean forceSchedule, String overrideReason)
     {
-        TransactionTemplate tt = new TransactionTemplate(txManager);
-        tt.setTimeout(30);
-        return lockTemplate.execute("pro:workorder:start:" + workorderId,
-                () -> tt.execute(status -> doPreStartCheck(workorderId, forceSchedule, overrideReason)));
+        // 同时持有 doc-gen 锁，与齐套看板"一键生成"(generateDocuments)互斥，
+        // 防止两路径在排产前后分别执行导致同工单同工序重复建领料单（task_id 一空一非空穿透幂等）。
+        // 锁顺序 start → doc-gen：generateDocuments 只持有 doc-gen，不会反向等 start，无死锁。
+        return lockTemplate.execute("pro:workorder:start:" + workorderId, () ->
+            lockTemplate.execute("pro:workorder:doc-gen:" + workorderId, () -> {
+                TransactionTemplate tt = new TransactionTemplate(txManager);
+                tt.setTimeout(30);
+                return tt.execute(status -> doPreStartCheck(workorderId, forceSchedule, overrideReason));
+            })
+        );
     }
 
     private List<Map<String, Object>> doPreStartCheck(Long workorderId, boolean forceSchedule, String overrideReason)
@@ -1203,8 +1211,10 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
 
         // 一次性加载该工单的全部排产任务（按 processId 分组），消除逐工序任务查询 N+1
         Map<Long, ProTask> taskByProcess = loadWorkorderTasksByProcess(wo.getWorkorderId());
-        // 一次性加载该工单已有领料单的 taskId 集合（幂等判断），消除逐工序查询 N+1
-        Set<Long> issuedTaskIds = loadIssuedTaskIds(wo.getWorkorderId());
+        // 一次性加载该工单已有领料单的幂等键（taskIds + processIds），消除逐工序查询 N+1
+        Set<Long> issuedTaskIds = new HashSet<>();
+        Set<Long> issuedProcessIds = new HashSet<>();
+        loadIssuedKeys(wo.getWorkorderId(), issuedTaskIds, issuedProcessIds);
 
         List<Map<String, Object>> generatedIssues = new ArrayList<>();
         int internalCreated = 0;
@@ -1248,8 +1258,12 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
             ProTask task = taskByProcess.get(processId);
             String processCode = (task != null) ? task.getProcessCode() : null;
 
-            // 幂等检查：如果该工单+任务已有领料单，跳过
-            if (task != null && issuedTaskIds.contains(task.getTaskId()))
+            // 幂等检查：该工单+工序已有非终态领料单则跳过
+            //   有 task 时按 taskId 去重；无 task（未排产）时按 processId 去重，
+            //   防止与齐套看板"一键生成"路径在排产前后分别建单造成重复
+            boolean alreadyIssued = (task != null && issuedTaskIds.contains(task.getTaskId()))
+                    || issuedProcessIds.contains(processId);
+            if (alreadyIssued)
             {
                 skippedCount++;
                 continue;
@@ -1267,6 +1281,8 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
             header.setWorkorderId(wo.getWorkorderId());
             header.setWorkorderCode(wo.getWorkorderCode());
             header.setWorkorderName(wo.getWorkorderName());
+            header.setProcessId(processId);
+            header.setProcessName(processName);
             if (task != null)
             {
                 header.setTaskId(task.getTaskId());

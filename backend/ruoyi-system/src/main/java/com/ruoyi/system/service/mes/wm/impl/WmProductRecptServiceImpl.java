@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
@@ -122,9 +123,21 @@ public class WmProductRecptServiceImpl implements IWmProductRecptService
         }
         List<WmProductRecptLine> lines = loadRecptLines(recptId);
         if (lines.isEmpty()) {
-            throw new RuntimeException("没有入库行，无法确认");
+            throw new ServiceException("没有入库行，无法确认");
         }
+        validateWarehouseResolved(header, lines);
         doConfirmProductRecpt(header, lines);
+    }
+
+    /** 校验每一行都能解析到入库仓库（行级优先，回退表头），否则拒绝确认 */
+    private void validateWarehouseResolved(WmProductRecpt header, List<WmProductRecptLine> lines) {
+        for (WmProductRecptLine line : lines) {
+            Long whId = line.getWarehouseId() != null ? line.getWarehouseId() : header.getWarehouseId();
+            if (whId == null) {
+                throw new ServiceException("入库物料[" + (line.getItemName() != null ? line.getItemName() : line.getItemCode())
+                        + "]未选择入库仓库，请先选择仓库再确认");
+            }
+        }
     }
 
     /** 确认收货核心逻辑（不入库查询，由调用方传入已加载的 header + lines） */
@@ -332,7 +345,8 @@ public class WmProductRecptServiceImpl implements IWmProductRecptService
         header.setUpdateTime(DateUtils.getNowDate());
         wmProductRecptMapper.updateWmProductRecpt(header);
 
-        // 确认收货 — 更新库存（仅处理用户提交的行，避免未提交行产生零数量库存事务）
+        // 确认收货 — 校验仓库已选 + 更新库存（仅处理用户提交的行，避免未提交行产生零数量库存事务）
+        validateWarehouseResolved(header, updatedLines);
         doConfirmProductRecpt(header, updatedLines);
     }
 

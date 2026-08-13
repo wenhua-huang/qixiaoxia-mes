@@ -249,25 +249,40 @@ public class OutsourceServiceImpl implements IOutsourceService
     /**
      * 发料行未指定批次时（batchId 为 null 或 0），按 FIFO 查最早可用库存并回填。
      * 仅在非草稿（直接发货扣料）时调用，保证批次管理物料也能正确扣减。
+     *
+     * 跨仓回退：草稿行可能预选了一个无库存的仓库（如自动建单默认成品仓），
+     * 指定仓查不到批次时按厂内领料 allocateAvailableFifo 的口径跨仓补查，
+     * 并把仓库回填为实际命中的库存仓，否则 buildPickTx/loadMaterialStockForUpdate
+     * 仍按空仓 6 元组匹配，会误报"库存记录不存在"。
      */
     private void resolveFifoBatchIfMissing(WmOutsourceIssueLine line)
     {
         if (line.getBatchId() != null && line.getBatchId() > 0) return;
         if (line.getItemId() == null) return;
-        List<WmMaterialStock> stocks = materialStockMapper.selectAvailableBatches(
-                line.getItemId(), line.getWarehouseId(), WmIssueConstants.QUALITY_NORMAL);
-        if (stocks != null && !stocks.isEmpty())
+        WmMaterialStock picked = pickFirstAvailableBatch(line.getItemId(), line.getWarehouseId());
+        if (picked == null && line.getWarehouseId() != null)
         {
-            WmMaterialStock s = stocks.get(0);
-            line.setBatchId(s.getBatchId());
-            line.setBatchCode(s.getBatchCode());
-            if (line.getWarehouseId() == null)
-            {
-                line.setWarehouseId(s.getWarehouseId());
-                line.setWarehouseCode(s.getWarehouseCode());
-                line.setWarehouseName(s.getWarehouseName());
-            }
+            // 指定仓无可用批次，跨仓 FIFO 回退（与厂内领料口径一致）
+            picked = pickFirstAvailableBatch(line.getItemId(), null);
         }
+        if (picked != null)
+        {
+            line.setBatchId(picked.getBatchId());
+            line.setBatchCode(picked.getBatchCode());
+            // 命中批次所在仓与行上仓库不一致（含行仓为空 / 行仓无库存）时，以实际库存仓为准，
+            // 否则后续 buildPickTx 仍按行仓 6 元组查不到库存桶。
+            line.setWarehouseId(picked.getWarehouseId());
+            line.setWarehouseCode(picked.getWarehouseCode());
+            line.setWarehouseName(picked.getWarehouseName());
+        }
+    }
+
+    /** 查指定物料（可限定仓库）最早一条可用批次库存；无可用返回 null */
+    private WmMaterialStock pickFirstAvailableBatch(Long itemId, Long warehouseId)
+    {
+        List<WmMaterialStock> stocks = materialStockMapper.selectAvailableBatches(
+                itemId, warehouseId, WmIssueConstants.QUALITY_NORMAL);
+        return (stocks == null || stocks.isEmpty()) ? null : stocks.get(0);
     }
 
     /**

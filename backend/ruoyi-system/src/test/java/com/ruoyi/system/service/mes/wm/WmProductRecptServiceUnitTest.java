@@ -173,6 +173,22 @@ class WmProductRecptServiceUnitTest {
             .hasMessageContaining("不存在");
     }
 
+    @Test
+    @DisplayName("9. 确认收货：表头和行都无仓库时拒绝")
+    void testConfirmRejectsMissingWarehouse() {
+        WmProductRecpt header = draftRecpt();
+        header.setWarehouseId(null);  // 表头无仓
+        WmProductRecptLine line = newLine(201L, "ITEM-001", "产品A", new BigDecimal("10"));
+        line.setWarehouseId(null);   // 行也无仓
+
+        when(wmProductRecptMapper.selectWmProductRecptByRecptId(1L)).thenReturn(header);
+        when(wmProductRecptLineService.selectWmProductRecptLineList(any())).thenReturn(Collections.singletonList(line));
+
+        assertThatThrownBy(() -> service.confirmProductRecpt(1L))
+            .hasMessageContaining("未选择入库仓库");
+        verify(storageCoreService, never()).processProductRecpt(any());
+    }
+
     private WmProductRecpt draftRecpt() {
         WmProductRecpt recpt = new WmProductRecpt();
         recpt.setRecptId(1L);

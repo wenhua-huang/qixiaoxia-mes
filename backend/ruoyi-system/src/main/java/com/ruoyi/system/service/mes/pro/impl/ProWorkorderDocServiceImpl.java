@@ -5,6 +5,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import com.ruoyi.common.enums.WmIssueConstants;
+import com.ruoyi.common.enums.WmWarehouseConstants;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.exception.ServiceException;
@@ -377,9 +378,19 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
         Long defaultWarehouseId = findDefaultWarehouse(wo.getFactoryId());
         List<Map<String, Object>> result = new ArrayList<>();
 
-        // 一次性加载该工单全部排产任务（按 processId 索引）+ 已有领料单（按 taskId 分组），消除逐工序 N+1
+        // 一次性加载该工单全部排产任务（按 processId 索引）+ 已有领料单（按 taskId/processId 分组），消除逐工序 N+1
         Map<Long, ProTask> taskByProcess = loadWorkorderTasksByProcess(workorderId);
-        Map<Long, List<WmIssueHeader>> existingByTask = loadIssueHeadersByTask(workorderId);
+        List<WmIssueHeader> existingHeaders = loadIssueHeaders(workorderId);
+        Map<Long, List<WmIssueHeader>> existingByTask = new HashMap<>();
+        Map<Long, List<WmIssueHeader>> existingByProcess = new HashMap<>();
+        for (WmIssueHeader h : existingHeaders) {
+            if (h.getTaskId() != null) {
+                existingByTask.computeIfAbsent(h.getTaskId(), k -> new ArrayList<>()).add(h);
+            }
+            if (h.getProcessId() != null) {
+                existingByProcess.computeIfAbsent(h.getProcessId(), k -> new ArrayList<>()).add(h);
+            }
+        }
 
         for (Map.Entry<Long, List<ProWorkorderBom>> entry : grouped.entrySet()) {
             Long processId = entry.getKey();
@@ -391,18 +402,24 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
             // 从预加载 Map 取排产任务
             ProTask task = taskByProcess.get(processId);
 
-            // 幂等检查：该工单+任务已有领料单则补记日志后跳过
-            if (task != null) {
-                List<WmIssueHeader> existings = existingByTask.get(task.getTaskId());
-                if (existings != null && !existings.isEmpty()) {
-                    for (WmIssueHeader eh : existings) {
-                        if (!hasLog(workorderId, DOC_ISSUE, eh.getIssueId())) {
-                            insertLog(workorderId, DOC_ISSUE, eh.getIssueId(), eh.getIssueCode(), batch);
-                        }
+            // 幂等检查：该工单+工序已有非终态领料单则补记日志后跳过；
+            //   全是终态(CANCELED/CLOSED)时不放行跳过，允许重新生成，与开工检查 loadIssuedKeys 口径一致。
+            //   - 有 task 时按 taskId 查；无 task（未排产）时按 processId 查，
+            //     防止"一键生成"在排产前执行、"开工检查"在排产后再执行导致重复建单
+            List<WmIssueHeader> existings = task != null
+                    ? existingByTask.get(task.getTaskId())
+                    : existingByProcess.get(processId);
+            boolean hasActive = false;
+            if (existings != null) {
+                for (WmIssueHeader eh : existings) {
+                    if (WmIssueConstants.isTerminal(eh.getStatus())) continue;
+                    hasActive = true;
+                    if (!hasLog(workorderId, DOC_ISSUE, eh.getIssueId())) {
+                        insertLog(workorderId, DOC_ISSUE, eh.getIssueId(), eh.getIssueCode(), batch);
                     }
-                    continue;
                 }
             }
+            if (hasActive) continue;
 
             // 创建领料单头
             String issueCode = genCode("LL");
@@ -414,6 +431,8 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
             header.setWorkorderId(wo.getWorkorderId());
             header.setWorkorderCode(wo.getWorkorderCode());
             header.setWorkorderName(wo.getWorkorderName());
+            header.setProcessId(processId);
+            header.setProcessName(processName);
             if (task != null) {
                 header.setTaskId(task.getTaskId());
                 header.setTaskCode(task.getTaskCode());
@@ -427,6 +446,7 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
             wmIssueHeaderService.insertWmIssueHeader(header);
 
             // 创建行
+            String processCode = (task != null) ? task.getProcessCode() : null;
             BigDecimal totalQty = BigDecimal.ZERO;
             for (ProWorkorderBom bom : processBoms) {
                 WmIssueLine line = new WmIssueLine();
@@ -438,6 +458,9 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
                 line.setUnitOfMeasure(bom.getUnitOfMeasure());
                 line.setUnitName(bom.getUnitName());
                 line.setQuantityIssue(bom.getTotalQuantity() != null ? bom.getTotalQuantity() : BigDecimal.ZERO);
+                line.setProcessId(processId);
+                line.setProcessCode(processCode);
+                line.setProcessName(processName);
                 line.setWarehouseId(defaultWarehouseId);
                 wmIssueLineService.insertWmIssueLine(line);
                 totalQty = totalQty.add(bom.getTotalQuantity() != null ? bom.getTotalQuantity() : BigDecimal.ZERO);
@@ -719,7 +742,7 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
             return new ArrayList<>();
         }
 
-        Long defaultWarehouseId = findDefaultWarehouse(wo.getFactoryId());
+        WmWarehouse recptWh = resolveRecptWarehouse(wo);
 
         // 创建产品入库单
         String recptCode = genCode("PR");
@@ -730,7 +753,10 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
         recpt.setProduceCode(wo.getProductCode());
         recpt.setWorkorderId(workorderId);
         recpt.setWorkorderCode(wo.getWorkorderCode());
-        recpt.setWarehouseId(defaultWarehouseId);
+        recpt.setClientId(wo.getClientId());
+        recpt.setWarehouseId(recptWh.getWarehouseId());
+        recpt.setWarehouseCode(recptWh.getWarehouseCode());
+        recpt.setWarehouseName(recptWh.getWarehouseName());
         recpt.setRecptDate(new Date());
         recpt.setTotalQuantity(qtyToRecpt);
         recpt.setTotalBox(0);
@@ -746,7 +772,7 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
         recptLine.setUnitOfMeasure(wo.getUnitOfMeasure());
         recptLine.setUnitName(wo.getUnitName());
         recptLine.setQuantityRecpt(qtyToRecpt);
-        recptLine.setWarehouseId(defaultWarehouseId);
+        recptLine.setWarehouseId(recptWh.getWarehouseId());
         wmProductRecptLineService.insertWmProductRecptLine(recptLine);
 
         // CANCEL 再生：撤销同一 feedbackId 下的旧 ACTIVE log，避免唯一索引冲突
@@ -1052,27 +1078,63 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
         return map;
     }
 
-    /** 加载工单下已有领料单，按 taskId 分组（消除逐工序幂等查询 N+1）。 */
-    private Map<Long, List<WmIssueHeader>> loadIssueHeadersByTask(Long workorderId) {
-        Map<Long, List<WmIssueHeader>> map = new HashMap<>();
+    /** 加载工单下全部已有领料单（调用方按 taskId/processId 自行分组，消除逐工序幂等查询 N+1）。 */
+    private List<WmIssueHeader> loadIssueHeaders(Long workorderId) {
         WmIssueHeader q = new WmIssueHeader();
         q.setWorkorderId(workorderId);
         List<WmIssueHeader> headers = wmIssueHeaderService.selectWmIssueHeaderList(q);
-        if (headers != null) for (WmIssueHeader h : headers) {
-            if (h.getTaskId() != null) map.computeIfAbsent(h.getTaskId(), k -> new ArrayList<>()).add(h);
-        }
-        return map;
+        return headers != null ? headers : new ArrayList<>();
     }
 
+    /**
+     * 查找工厂默认公共仓（排除客户仓/供应商仓，避免回退落到他人专属仓）。
+     * 取最新创建的公共仓；无公共仓时回退 ID=1（兼容老数据）。
+     */
     private Long findDefaultWarehouse(Long factoryId)
     {
         WmWarehouse query = new WmWarehouse();
         if (factoryId != null) query.setFactoryId(factoryId);
         List<WmWarehouse> warehouses = wmWarehouseService.selectWmWarehouseList(query);
-        if (warehouses != null && !warehouses.isEmpty()) return warehouses.get(0).getWarehouseId();
+        Long publicWh = pickFirstPublicWarehouseId(warehouses);
+        if (publicWh != null) return publicWh;
         List<WmWarehouse> all = wmWarehouseService.selectWmWarehouseAll();
-        if (all != null && !all.isEmpty()) return all.get(0).getWarehouseId();
+        publicWh = pickFirstPublicWarehouseId(all);
+        if (publicWh != null) return publicWh;
         return 1L;
+    }
+
+    /** 从仓库列表中取第一个公共仓（非客户仓/供应商仓）的 ID */
+    private Long pickFirstPublicWarehouseId(List<WmWarehouse> list)
+    {
+        if (list == null) return null;
+        return list.stream()
+                .filter(w -> !WmWarehouseConstants.OWNER_CUSTOMER.equals(w.getOwnershipType())
+                          && !WmWarehouseConstants.OWNER_SUPPLIER.equals(w.getOwnershipType()))
+                .map(WmWarehouse::getWarehouseId)
+                .findFirst().orElse(null);
+    }
+
+    /**
+     * 解析产品入库目标仓：工单有客户且该客户有专属客户仓→入客户仓；否则回退工厂默认仓。
+     * 决策C：客户无专属仓时不自动建，入公共成品仓（前端引导新建）。
+     * 返回完整 WmWarehouse 对象，便于回填 warehouse_code/name 到入库单。
+     */
+    private WmWarehouse resolveRecptWarehouse(ProWorkorder wo)
+    {
+        if (wo.getClientId() != null) {
+            WmWarehouse clientWh = wmWarehouseService.findClientWarehouse(wo.getFactoryId(), wo.getClientId());
+            if (clientWh != null) return clientWh;
+        }
+        Long defaultId = findDefaultWarehouse(wo.getFactoryId());
+        WmWarehouse def = wmWarehouseService.selectWmWarehouseByWarehouseId(defaultId);
+        return def != null ? def : buildFallbackWarehouse(defaultId);
+    }
+
+    /** findDefaultWarehouse 回退到 ID=1 但可能查不到时的兜底，避免 NPE */
+    private WmWarehouse buildFallbackWarehouse(Long id) {
+        WmWarehouse w = new WmWarehouse();
+        w.setWarehouseId(id);
+        return w;
     }
 
     private String genCode(String prefix)

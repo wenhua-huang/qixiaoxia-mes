@@ -143,14 +143,18 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
         return 1;
     }
 
-    /** 构造领料单创建锁 key：优先 taskId，无 taskId 时退化到 processId；两者皆空返回 null（无工单/无工序不锁）。 */
+    /**
+     * 构造领料单创建锁 key：processId 是稳定的工序幂等键（排产前/后排产任务不同但工序相同），
+     * 有 processId 时一律按 processId 加锁，使排产前(taskId=null)与排产后(taskId非空)的同工序建单互斥；
+     * 无 processId 时退化到 taskId（手工整单/无工序场景）；两者皆空返回 null（无工单不锁）。
+     */
     private String buildCreateLockKey(WmIssueHeader e) {
         if (e.getWorkorderId() == null) return null;
-        if (e.getTaskId() != null) {
-            return "wm:issue:create:" + e.getWorkorderId() + ":" + e.getTaskId();
-        }
         if (e.getProcessId() != null) {
             return "wm:issue:create:" + e.getWorkorderId() + ":p:" + e.getProcessId();
+        }
+        if (e.getTaskId() != null) {
+            return "wm:issue:create:" + e.getWorkorderId() + ":" + e.getTaskId();
         }
         return null;
     }
@@ -168,19 +172,20 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
             e.setIssueCode(autoCodeGenerator.genSerialCode(WmIssueConstants.CODE_RULE_ISSUE, ""));
         }
         // 查重：生产领料同工单+同工序不允许存在多张非终态领料单
-        //   - 一个工单允许按工序(processId/taskId)拆多张领料单（generateIssueDocuments 按 processId 分组循环创建）
-        //   - 有 taskId 时按 taskId 查；未排产 taskId 为空时按 processId 查，
-        //     防止"一键生成"在排产前、"开工检查"在排产后两路径各建一张
-        //   - 两者皆空（手工整单无工序）不在此查重，由上层调用方负责
+        //   - processId 是稳定的工序幂等键：有 processId 时一律按 processId 查，
+        //     不论 taskId 是否为空，使排产前(taskId=null)与排产后(taskId非空)的同工序单互相可见，
+        //     防止手工/未来入口在 DB 层穿透两自动路径的内存幂等检查
+        //   - 无 processId 时退化到 taskId（手工整单/无工序场景）
+        //   - 两者皆空不在此查重，由上层调用方负责
         if (e.getWorkorderId() != null && WmIssueConstants.TYPE_PRODUCE.equals(e.getIssueType())
                 && (e.getTaskId() != null || e.getProcessId() != null)) {
             WmIssueHeader q = new WmIssueHeader();
             q.setWorkorderId(e.getWorkorderId());
             q.setIssueType(WmIssueConstants.TYPE_PRODUCE);
-            if (e.getTaskId() != null) {
-                q.setTaskId(e.getTaskId());
-            } else {
+            if (e.getProcessId() != null) {
                 q.setProcessId(e.getProcessId());
+            } else {
+                q.setTaskId(e.getTaskId());
             }
             List<WmIssueHeader> existings = wmIssueHeaderMapper.selectWmIssueHeaderList(q);
             if (existings != null) {

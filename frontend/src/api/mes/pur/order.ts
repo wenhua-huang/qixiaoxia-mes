@@ -17,6 +17,14 @@ export function getOrder(orderId) {
   })
 }
 
+// 查询采购订单详情（头+行，详情页/导出用）
+export function getOrderDetail(orderId) {
+  return request({
+    url: '/mes/pur/order/detail/' + orderId,
+    method: 'get'
+  })
+}
+
 // 新增采购订单头
 export function addOrder(data) {
   return request({

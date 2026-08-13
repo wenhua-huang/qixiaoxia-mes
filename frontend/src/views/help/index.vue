@@ -72,6 +72,12 @@ const docTree = ref<DocGroup[]>([
       { file: 'quick-start.md', title: '快速上手' },
       { file: 'pro-workflow.md', title: '订单到交付：销售订单→生产→发货' }
     ]
+  },
+  {
+    title: '开放接口',
+    items: [
+      { file: 'crm-order-api.md', title: '销售订单 API 对接指南' }
+    ]
   }
 ])
 

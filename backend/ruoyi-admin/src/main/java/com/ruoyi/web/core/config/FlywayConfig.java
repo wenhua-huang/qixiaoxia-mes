@@ -42,6 +42,9 @@ public class FlywayConfig
     @Value("${spring.flyway.out-of-order:false}")
     private boolean outOfOrder;
 
+    @Value("${spring.flyway.validate-on-migrate:true}")
+    private boolean validateOnMigrate;
+
     @Value("${spring.datasource.druid.master.url}")
     private String masterUrl;
 
@@ -55,9 +58,12 @@ public class FlywayConfig
      * 注：Flyway 使用独立 DriverManagerDataSource（不走 Druid 连接池），因为 Druid 在
      * Spring SQL init 之后可能将连接标记为 disabled。此机制与 validateOnMigrate 无关。
      *
-     * validateOnMigrate 设为 true：flyway_schema_history 已对齐本地迁移文件
+     * validateOnMigrate 默认 true：flyway_schema_history 已对齐本地迁移文件
      * （测试环境 V43/V50 checksum 已修正、V44/45/46 missing 记录已清理；生产环境 checksum 本就一致），
      * 可正常开启校验，防止已执行迁移被篡改。
+     *
+     * 仅本地多 worktree 开发可用 spring.flyway.validate-on-migrate=false 临时关闭
+     * （不同分支迁移版本号有空洞时会 validate 失败）；生产/测试环境禁止关闭。
      *
      * 约束：已执行的迁移文件禁止修改（checksum 会变导致启动失败），新需求创建新版本迁移文件（V{N+1}__xxx.sql）。
      */
@@ -70,13 +76,16 @@ public class FlywayConfig
         flywayDs.setPassword(masterPassword);
         flywayDs.setDriverClassName("com.mysql.cj.jdbc.Driver");
 
+        if (!validateOnMigrate) {
+            log.warn("⚠️ Flyway 校验已关闭(spring.flyway.validate-on-migrate=false)，仅限本地开发使用");
+        }
         Flyway flyway = Flyway.configure()
                 .dataSource(flywayDs)
                 .locations(locations.split(","))
                 .table(table)
                 .baselineOnMigrate(baselineOnMigrate)
                 .baselineVersion(org.flywaydb.core.api.MigrationVersion.fromVersion(baselineVersion))
-                .validateOnMigrate(true)  // history 已对齐，开启校验
+                .validateOnMigrate(validateOnMigrate)  // 默认 true，history 已对齐
                 .outOfOrder(outOfOrder)
                 .load();
         if (repairBeforeMigrate) {

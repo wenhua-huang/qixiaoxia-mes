@@ -22,6 +22,14 @@ public interface IPurOrderService
     public PurOrderVO selectPurOrderByOrderId(Long orderId);
 
     /**
+     * 查询采购订单详情（头+行，供详情页/明细导出复用）
+     *
+     * @param orderId 采购订单ID
+     * @return 头+行封装；未命中返回 null
+     */
+    public PurOrderDetailVO getDetail(Long orderId);
+
+    /**
      * 按订单编码查询采购订单头+行（移动端扫码/搜索收货一次拿全）
      *
      * @param orderCode 采购订单编码（精确匹配，factory_id 由拦截器注入）

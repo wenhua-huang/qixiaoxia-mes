@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.SysApiKeyMapper">
+
+    <resultMap type="com.ruoyi.system.domain.SysApiKey" id="SysApiKeyResult">
+        <result property="id"          column="id"          />
+        <result property="apiKey"      column="api_key"     />
+        <result property="apiKeyHash"  column="api_key_hash"/>
+        <result property="name"        column="name"        />
+        <result property="factoryId"   column="factory_id"  />
+        <result property="enabled"     column="enabled"     />
+        <result property="expiresAt"   column="expires_at"  />
+        <result property="remark"      column="remark"      />
+        <result property="createBy"    column="create_by"   />
+        <result property="createTime"  column="create_time" />
+        <result property="updateBy"    column="update_by"   />
+        <result property="updateTime"  column="update_time" />
+    </resultMap>
+
+    <sql id="selectApiKeyVo">
+        select id, api_key, api_key_hash, name, factory_id, enabled, expires_at, remark, create_by, create_time, update_by, update_time from qxx_sys_api_key
+    </sql>
+
+    <!-- 按 hash 精确查询（凭证校验入口，FactoryIdInterceptor 无登录上下文时跳过注入，全局匹配） -->
+    <select id="selectByApiKeyHash" parameterType="String" resultMap="SysApiKeyResult">
+        <include refid="selectApiKeyVo"/>
+        where api_key_hash = #{apiKeyHash} limit 1
+    </select>
+
+    <select id="selectApiKeyList" parameterType="com.ruoyi.system.domain.SysApiKey" resultMap="SysApiKeyResult">
+        <include refid="selectApiKeyVo"/>
+        <where>
+            <if test="name != null and name != ''"> and name like concat('%', #{name}, '%')</if>
+            <if test="enabled != null and enabled != ''"> and enabled = #{enabled}</if>
+            <if test="factoryId != null"> and factory_id = #{factoryId}</if>
+        </where>
+        order by id desc
+    </select>
+
+    <select id="selectApiKeyById" parameterType="Long" resultMap="SysApiKeyResult">
+        <include refid="selectApiKeyVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertApiKey" parameterType="com.ruoyi.system.domain.SysApiKey" useGeneratedKeys="true" keyProperty="id">
+        insert into qxx_sys_api_key
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="apiKey != null">api_key,</if>
+            <if test="apiKeyHash != null">api_key_hash,</if>
+            <if test="name != null">name,</if>
+            <if test="factoryId != null">factory_id,</if>
+            <if test="enabled != null">enabled,</if>
+            <if test="expiresAt != null">expires_at,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="apiKey != null">#{apiKey},</if>
+            <if test="apiKeyHash != null">#{apiKeyHash},</if>
+            <if test="name != null">#{name},</if>
+            <if test="factoryId != null">#{factoryId},</if>
+            <if test="enabled != null">#{enabled},</if>
+            <if test="expiresAt != null">#{expiresAt},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateEnabled" parameterType="com.ruoyi.system.domain.SysApiKey">
+        update qxx_sys_api_key
+        set enabled = #{enabled}, update_by = #{updateBy}, update_time = #{updateTime}
+        where id = #{id}
+    </update>
+
+    <delete id="deleteApiKeyById" parameterType="Long">
+        delete from qxx_sys_api_key where id = #{id}
+    </delete>
+
+</mapper>

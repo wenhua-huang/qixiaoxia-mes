@@ -40,6 +40,7 @@
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { addWmWarehouse } from '@/api/mes/wm/warehouse'
+import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import type { WmWarehouse } from '@/types/api/mes/wm/warehouse'
 import type { MdClient } from '@/types/api/mes/md/client'
 import type { MdVendor } from '@/types/api/mes/md/vendor'
@@ -124,25 +125,33 @@ function submit() {
   formRef.value?.validate((valid: boolean) => {
     if (!valid) return
     submitting.value = true
-    const payload: WmWarehouse = { ...form.value }
-    // 归属互斥清空，与后端 normalizeWarehouseOwner 一致
-    if (payload.warehouseType === 'CUSTOMER') {
-      payload.vendorId = undefined
-      payload.vendorName = undefined
-    } else if (payload.warehouseType === 'SUPPLIER') {
-      payload.clientId = undefined
-      payload.clientName = undefined
+    const doSubmit = (code?: string) => {
+      const payload: WmWarehouse = { ...form.value }
+      if (code) payload.warehouseCode = code
+      // 归属互斥清空，与后端 normalizeWarehouseOwner 一致
+      if (payload.warehouseType === 'CUSTOMER') {
+        payload.vendorId = undefined
+        payload.vendorName = undefined
+      } else if (payload.warehouseType === 'SUPPLIER') {
+        payload.clientId = undefined
+        payload.clientName = undefined
+      }
+      addWmWarehouse(payload)
+        .then(r => {
+          // 后端 add 返回 useGeneratedKeys 回填 warehouseId 的实体，直接引用，避免名称回查静默选错
+          const created = r.data as WmWarehouse
+          ElMessage.success('新建成功')
+          emit('onCreated', created)
+          showFlag.value = false
+        })
+        .finally(() => { submitting.value = false })
     }
-    if (!payload.warehouseCode) delete payload.warehouseCode
-    addWmWarehouse(payload)
-      .then(r => {
-        // 后端 add 返回 useGeneratedKeys 回填 warehouseId 的实体，直接引用，避免名称回查静默选错
-        const created = r.data as WmWarehouse
-        ElMessage.success('新建成功')
-        emit('onCreated', created)
-        showFlag.value = false
-      })
-      .finally(() => { submitting.value = false })
+    // 编码留空时自动生成（warehouse_code NOT NULL，与仓库主页一致用 WAREHOUSE_CODE 规则）
+    if (!form.value.warehouseCode) {
+      genSerialCode('WAREHOUSE_CODE').then((r: any) => doSubmit(r.data)).finally(() => {})
+    } else {
+      doSubmit()
+    }
   })
 }
 

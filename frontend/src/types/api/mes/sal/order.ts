@@ -8,6 +8,8 @@ export interface SalOrderQueryParams extends PageDomain {
   clientOrderCode?: string;
   businessLine?: string;
   status?: string;
+  /** 订单来源：1=直接新增 2=CRM系统 */
+  source?: number;
 }
 
 export interface SalOrder extends BaseEntity {
@@ -24,11 +26,19 @@ export interface SalOrder extends BaseEntity {
   salesperson?: string;
   businessLine?: string;
   sampleFlag?: string;
+  /** 订单来源：1=直接新增 2=CRM系统 */
+  source?: number;
   orderDate?: string;
   requestDate?: string;
   totalAmount?: number;
   paymentMethod?: string;
   status?: string;
+  /** 审核人 */
+  approveBy?: string;
+  /** 审核时间 */
+  approveTime?: string;
+  /** 审核意见/驳回原因 */
+  approveRemark?: string;
   lines?: SalOrderLine[];
 }
 

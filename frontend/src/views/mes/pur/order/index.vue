@@ -573,18 +573,11 @@ export default {
         this.title = "修改采购订单头"
       })
     },
-    /** 查看按钮操作（只读） */
+    /** 查看按钮操作（跳转独立详情页） */
     handleView(row) {
-      this.reset()
-      this.optType = 'view'
       // row 可能是 undefined（工具栏勾选调用）；这时用 ids[0]
       const orderId = (row && row.orderId) || (Array.isArray(this.ids) ? this.ids[0] : this.ids)
-      getOrder(orderId).then(response => {
-        this.form = response.data.order
-        this.orderLines = response.data.lines || []
-        this.open = true
-        this.title = "查看采购订单头"
-      })
+      this.$router.push({ path: '/mes/pur/order_detail', query: { orderId } })
     },
     /** 根据 userName 返回 nickName（找不到则回落 userName） */
     nickOf(userName) {

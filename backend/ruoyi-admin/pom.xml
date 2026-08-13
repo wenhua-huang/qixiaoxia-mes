@@ -46,6 +46,16 @@
             <artifactId>flyway-mysql</artifactId>
         </dependency>
 
+        <!-- openhtmltopdf HTML转PDF（销售订单详情导出） -->
+        <dependency>
+            <groupId>com.openhtmltopdf</groupId>
+            <artifactId>openhtmltopdf-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.openhtmltopdf</groupId>
+            <artifactId>openhtmltopdf-pdfbox</artifactId>
+        </dependency>
+
         <!-- 核心模块-->
         <dependency>
             <groupId>com.ruoyi</groupId>

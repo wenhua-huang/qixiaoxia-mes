@@ -173,3 +173,15 @@ minio:
   bucketName: qxx-mes
   # 是否启用 MinIO (true=MinIO, false=本地存储)
   enabled: true
+
+# ==========================================
+# 单据导出配置（销售订单 PDF/Excel 对外单据抬头）
+# 公司信息维护在此，换信息不用改代码
+# ==========================================
+qxx:
+  doc:
+    company-name: 企小侠MES
+    company-phone:
+    company-address:
+    # Logo 资源路径（如 classpath:templates/sal/logo.png），可选，留空不显示
+    logo-path:

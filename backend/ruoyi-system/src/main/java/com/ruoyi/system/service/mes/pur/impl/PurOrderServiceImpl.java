@@ -50,6 +50,25 @@ public class PurOrderServiceImpl implements IPurOrderService
     }
 
     /**
+     * 查询采购订单详情（头+行，供详情页/明细导出复用）
+     *
+     * @param orderId 采购订单ID
+     * @return 头+行封装；未命中返回 null
+     */
+    @Override
+    public PurOrderDetailVO getDetail(Long orderId)
+    {
+        PurOrderVO head = purOrderMapper.selectPurOrderByOrderId(orderId);
+        if (head == null) {
+            return null;
+        }
+        PurOrderLine lineQuery = new PurOrderLine();
+        lineQuery.setOrderId(orderId);
+        List<PurOrderLine> lines = purOrderLineService.selectPurOrderLineList(lineQuery);
+        return new PurOrderDetailVO(head, lines);
+    }
+
+    /**
      * 按订单编码查询采购订单头+行
      * 复用 selectPurOrderList 的 orderCode 精确匹配，factory_id 由拦截器注入。
      *

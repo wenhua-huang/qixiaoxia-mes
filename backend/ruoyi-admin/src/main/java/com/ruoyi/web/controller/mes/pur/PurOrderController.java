@@ -1,5 +1,6 @@
 package com.ruoyi.web.controller.mes.pur;
 
+import java.io.IOException;
 import java.util.List;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -17,14 +18,16 @@ import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.BusinessType;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.system.domain.mes.pur.PurOrder;
-import com.ruoyi.system.domain.mes.pur.PurOrderLine;
 import com.ruoyi.system.domain.mes.pur.vo.PurOrderDetailVO;
 import com.ruoyi.system.domain.mes.pur.vo.PurOrderVO;
 import com.ruoyi.system.service.mes.pur.IPurOrderService;
-import com.ruoyi.system.service.mes.pur.IPurOrderLineService;
+import com.ruoyi.common.utils.file.FileUtils;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.page.TableDataInfo;
+import com.ruoyi.web.controller.mes.pur.export.PurOrderDetailExcelExporter;
+import com.ruoyi.web.controller.mes.pur.export.PurOrderPdfExporter;
 
 /**
  * 采购订单头Controller
@@ -40,7 +43,10 @@ public class PurOrderController extends BaseController
     private IPurOrderService purOrderService;
 
     @Autowired
-    private IPurOrderLineService purOrderLineService;
+    private PurOrderPdfExporter pdfExporter;
+
+    @Autowired
+    private PurOrderDetailExcelExporter excelExporter;
 
     /**
      * 查询采购订单头列表
@@ -68,20 +74,17 @@ public class PurOrderController extends BaseController
     }
 
     /**
-     * 获取采购订单头详细信息
+     * 获取采购订单头详细信息（编辑表单用，返回头+行）
      */
     @PreAuthorize("@ss.hasPermi('mes:pur:order:query')")
     @GetMapping(value = "/{orderId}")
     public AjaxResult getInfo(@PathVariable("orderId") Long orderId)
     {
-        PurOrderVO orderVO = purOrderService.selectPurOrderByOrderId(orderId);
-        if (orderVO == null) {
+        PurOrderDetailVO detail = purOrderService.getDetail(orderId);
+        if (detail == null) {
             return error("采购订单不存在");
         }
-        PurOrderLine queryLine = new PurOrderLine();
-        queryLine.setOrderId(orderId);
-        List<PurOrderLine> lines = purOrderLineService.selectPurOrderLineList(queryLine);
-        return success(new PurOrderDetailVO(orderVO, lines));
+        return success(detail);
     }
 
     /**
@@ -96,6 +99,66 @@ public class PurOrderController extends BaseController
             return error("采购订单不存在");
         }
         return success(detail);
+    }
+
+    /**
+     * 获取采购订单详情（头+行，供详情页/导出复用）
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pur:order:query')")
+    @GetMapping("/detail/{orderId}")
+    public AjaxResult getDetail(@PathVariable("orderId") Long orderId)
+    {
+        PurOrderDetailVO detail = purOrderService.getDetail(orderId);
+        if (detail == null) {
+            return error("采购订单不存在");
+        }
+        return success(detail);
+    }
+
+    /**
+     * 导出采购订单详情为 PDF（对外版）
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pur:order:exportDetail')")
+    @Log(title = "采购订单明细PDF", businessType = BusinessType.EXPORT)
+    @PostMapping("/exportPdf/{orderId}")
+    public void exportPdf(@PathVariable("orderId") Long orderId, HttpServletResponse response) throws IOException
+    {
+        PurOrderDetailVO detail = purOrderService.getDetail(orderId);
+        if (detail == null) throw new ServiceException("采购订单不存在");
+        FileUtils.setAttachmentResponseHeader(response, "采购订单_" + detail.getOrder().getOrderCode() + ".pdf");
+        response.setContentType("application/pdf");
+        response.setCharacterEncoding("utf-8");
+        try
+        {
+            pdfExporter.write(detail, response.getOutputStream());
+        }
+        catch (Exception e)
+        {
+            throw new IOException("导出PDF失败", e);
+        }
+    }
+
+    /**
+     * 导出采购订单详情为 Excel（对内版）
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pur:order:exportDetail')")
+    @Log(title = "采购订单明细Excel", businessType = BusinessType.EXPORT)
+    @PostMapping("/exportExcel/{orderId}")
+    public void exportExcel(@PathVariable("orderId") Long orderId, HttpServletResponse response) throws IOException
+    {
+        PurOrderDetailVO detail = purOrderService.getDetail(orderId);
+        if (detail == null) throw new ServiceException("采购订单不存在");
+        FileUtils.setAttachmentResponseHeader(response, "采购订单_" + detail.getOrder().getOrderCode() + ".xlsx");
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setCharacterEncoding("utf-8");
+        try
+        {
+            excelExporter.write(detail, response.getOutputStream());
+        }
+        catch (Exception e)
+        {
+            throw new IOException("导出Excel失败", e);
+        }
     }
 
     /**

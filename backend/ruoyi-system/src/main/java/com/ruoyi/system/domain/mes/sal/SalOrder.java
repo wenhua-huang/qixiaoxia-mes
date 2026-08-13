@@ -51,6 +51,9 @@ public class SalOrder extends BaseEntity
     @Excel(name = "是否有样品", readConverterExp = "Y=是,N=否")
     private String sampleFlag;
 
+    @Excel(name = "订单来源", readConverterExp = "1=直接新增,2=CRM系统")
+    private Integer source;
+
     @JsonFormat(pattern = "yyyy-MM-dd")
     @Excel(name = "订单日期", width = 30, dateFormat = "yyyy-MM-dd")
     private Date orderDate;
@@ -65,8 +68,18 @@ public class SalOrder extends BaseEntity
     @Excel(name = "付款方式")
     private String paymentMethod;
 
-    @Excel(name = "状态", readConverterExp = "PREPARE=待确认,CONFIRMED=已确认,CLOSED=已关闭,CANCEL=已取消")
+    @Excel(name = "状态", readConverterExp = "PREPARE=待提交,PENDING=待审核,CONFIRMED=已确认,CLOSED=已关闭,CANCEL=已取消")
     private String status;
+
+    @Excel(name = "审核人")
+    private String approveBy;
+
+    @Excel(name = "审核时间", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date approveTime;
+
+    /** 审核意见/驳回原因（驳回时必填） */
+    private String approveRemark;
 
     /** 明细行列表(详情接口返回时填充,非DB字段) */
     private transient List<SalOrderLine> lines;
@@ -97,6 +110,8 @@ public class SalOrder extends BaseEntity
     public void setBusinessLine(String v) { this.businessLine = v; }
     public String getSampleFlag() { return sampleFlag; }
     public void setSampleFlag(String v) { this.sampleFlag = v; }
+    public Integer getSource() { return source; }
+    public void setSource(Integer v) { this.source = v; }
     public Date getOrderDate() { return orderDate; }
     public void setOrderDate(Date v) { this.orderDate = v; }
     public Date getRequestDate() { return requestDate; }
@@ -107,6 +122,12 @@ public class SalOrder extends BaseEntity
     public void setPaymentMethod(String v) { this.paymentMethod = v; }
     public String getStatus() { return status; }
     public void setStatus(String v) { this.status = v; }
+    public String getApproveBy() { return approveBy; }
+    public void setApproveBy(String v) { this.approveBy = v; }
+    public Date getApproveTime() { return approveTime; }
+    public void setApproveTime(Date v) { this.approveTime = v; }
+    public String getApproveRemark() { return approveRemark; }
+    public void setApproveRemark(String v) { this.approveRemark = v; }
     public List<SalOrderLine> getLines() { return lines; }
     public void setLines(List<SalOrderLine> lines) { this.lines = lines; }
 }

@@ -36,6 +36,9 @@
           <dict-tag :options="mes_warehouse_type" :value="scope.row.warehouseType" />
         </template>
       </el-table-column>
+      <el-table-column label="归属" align="center" width="140" :show-overflow-tooltip="true">
+        <template #default="scope">{{ ownerText(scope.row) }}</template>
+      </el-table-column>
       <el-table-column label="地址" align="center" prop="address" :show-overflow-tooltip="true" width="200" />
       <el-table-column label="面积(㎡)" align="center" prop="area" width="90" />
       <el-table-column label="负责人" align="center" prop="charge" width="90" />
@@ -89,6 +92,20 @@
             </el-form-item>
           </el-col>
         </el-row>
+        <el-row v-if="form.warehouseType === 'CUSTOMER' || form.warehouseType === 'SUPPLIER'">
+          <el-col :span="12">
+            <el-form-item label="归属客户" prop="clientId" v-if="form.warehouseType === 'CUSTOMER'">
+              <el-input :model-value="clientDisplay" readonly placeholder="请选择归属客户">
+                <template #append><el-button icon="Search" @click="handleSelectClient" /></template>
+              </el-input>
+            </el-form-item>
+            <el-form-item label="归属供应商" prop="vendorId" v-else-if="form.warehouseType === 'SUPPLIER'">
+              <el-input :model-value="vendorDisplay" readonly placeholder="请选择归属供应商">
+                <template #append><el-button icon="Search" @click="handleSelectVendor" /></template>
+              </el-input>
+            </el-form-item>
+          </el-col>
+        </el-row>
         <el-row>
           <el-col :span="12">
             <el-form-item label="面积(㎡)" prop="area">
@@ -126,15 +143,22 @@
         </div>
       </template>
     </el-dialog>
+
+    <ClientSelect ref="clientSelectRef" @onSelected="onClientSelected" />
+    <VendorSelect ref="vendorSelectRef" @onSelected="onVendorSelected" />
   </div>
 </template>
 
 <script setup lang="ts" name="WmWarehouse">
-import { ref, reactive, toRefs, getCurrentInstance } from 'vue'
+import { ref, reactive, toRefs, computed, getCurrentInstance } from 'vue'
 import { useRouter } from 'vue-router'
 import type { WmWarehouseQueryParams, WmWarehouse } from '@/types/api/mes/wm/warehouse'
+import type { MdClient } from '@/types/api/mes/md/client'
+import type { MdVendor } from '@/types/api/mes/md/vendor'
 import { listWmWarehouse, getWmWarehouse, delWmWarehouse, addWmWarehouse, updateWmWarehouse } from '@/api/mes/wm/warehouse'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
+import ClientSelect from '@/components/clientSelect/single.vue'
+import VendorSelect from '@/components/vendorSelect/single.vue'
 
 const { proxy } = getCurrentInstance() as any
 const router = useRouter()
@@ -151,6 +175,18 @@ const total = ref(0)
 const title = ref('')
 const autoGenFlag = ref(false)
 const optType = ref<string | undefined>(undefined)
+const clientSelectRef = ref()
+const vendorSelectRef = ref()
+
+// 归属展示值：后端列表/详情未带 name 时回退到 ID，避免编辑回显空白
+const clientDisplay = computed(() => form.value.clientName || (form.value.clientId ? `#${form.value.clientId}` : ''))
+const vendorDisplay = computed(() => form.value.vendorName || (form.value.vendorId ? `#${form.value.vendorId}` : ''))
+// 列表归属列展示（列表仅带 ID，无 name）
+function ownerText(row: WmWarehouse) {
+  if (row.warehouseType === 'CUSTOMER') return row.clientName || (row.clientId ? `#${row.clientId}` : '')
+  if (row.warehouseType === 'SUPPLIER') return row.vendorName || (row.vendorId ? `#${row.vendorId}` : '')
+  return ''
+}
 
 const data = reactive({
   form: {} as WmWarehouse,
@@ -171,6 +207,20 @@ function reset() { optType.value = undefined; form.value = {} as WmWarehouse; au
 function handleQuery() { queryParams.value.pageNum = 1; getList() }
 function resetQuery() { proxy.resetForm('queryRef'); handleQuery() }
 function handleSelectionChange(s: any[]) { ids.value = s.map(i => i.warehouseId); single.value = s.length !== 1; multiple.value = !s.length }
+function handleSelectClient() { clientSelectRef.value?.open(form.value.clientId) }
+function onClientSelected(row: MdClient) {
+  form.value.clientId = row.clientId
+  form.value.clientName = row.clientName
+  form.value.vendorId = undefined
+  form.value.vendorName = undefined
+}
+function handleSelectVendor() { vendorSelectRef.value?.open(form.value.vendorId) }
+function onVendorSelected(row: MdVendor) {
+  form.value.vendorId = row.vendorId
+  form.value.vendorName = row.vendorName
+  form.value.clientId = undefined
+  form.value.clientName = undefined
+}
 function handleAdd() { reset(); optType.value = 'add'; open.value = true; title.value = '新增仓库' }
 function handleView(row: WmWarehouse) { reset(); optType.value = 'view'; form.value = { ...row }; open.value = true; title.value = '查看仓库' }
 function handleUpdate(row?: WmWarehouse) {
@@ -181,10 +231,23 @@ function handleUpdate(row?: WmWarehouse) {
 }
 function submitForm() {
   proxy.$refs['formRef'].validate((v: boolean) => {
-    if (v) {
-      const fn = form.value.warehouseId ? updateWmWarehouse : addWmWarehouse
-      fn(form.value).then(() => { proxy.$modal.msgSuccess('操作成功'); open.value = false; getList() })
+    if (!v) return
+    // 归属互斥清空，与后端 normalizeWarehouseOwner 一致
+    const t = form.value.warehouseType
+    if (t === 'CUSTOMER') {
+      form.value.vendorId = undefined
+      form.value.vendorName = undefined
+    } else if (t === 'SUPPLIER') {
+      form.value.clientId = undefined
+      form.value.clientName = undefined
+    } else {
+      form.value.clientId = undefined
+      form.value.clientName = undefined
+      form.value.vendorId = undefined
+      form.value.vendorName = undefined
     }
+    const fn = form.value.warehouseId ? updateWmWarehouse : addWmWarehouse
+    fn(form.value).then(() => { proxy.$modal.msgSuccess('操作成功'); open.value = false; getList() })
   })
 }
 

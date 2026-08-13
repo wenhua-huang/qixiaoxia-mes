@@ -13,6 +13,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="produceCode" column="produce_code" />
         <result property="workorderId" column="workorder_id" />
         <result property="workorderCode" column="workorder_code" />
+        <result property="clientId" column="client_id" />
         <result property="sourceWarehouseId" column="source_warehouse_id" />
         <result property="warehouseId" column="warehouse_id" />
         <result property="warehouseCode" column="warehouse_code" />
@@ -31,7 +32,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectWmProductRecptVo">
-        select recpt_id, factory_id, recpt_code, recpt_name, produce_id, produce_code, workorder_id, workorder_code, source_warehouse_id, warehouse_id, warehouse_code, warehouse_name, recpt_date, total_quantity, total_box, ipqc_id, ipqc_code, status, remark, create_by, create_time, update_by, update_time from qxx_wm_product_recpt
+        select recpt_id, factory_id, recpt_code, recpt_name, produce_id, produce_code, workorder_id, workorder_code, client_id, source_warehouse_id, warehouse_id, warehouse_code, warehouse_name, recpt_date, total_quantity, total_box, ipqc_id, ipqc_code, status, remark, create_by, create_time, update_by, update_time from qxx_wm_product_recpt
     </sql>
 
     <select id="selectWmProductRecptList" parameterType="WmProductRecpt" resultMap="WmProductRecptResult">
@@ -74,6 +75,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="produceCode != null">produce_code,</if>
             <if test="workorderId != null">workorder_id,</if>
             <if test="workorderCode != null">workorder_code,</if>
+            <if test="clientId != null">client_id,</if>
             <if test="sourceWarehouseId != null">source_warehouse_id,</if>
             <if test="warehouseId != null">warehouse_id,</if>
             <if test="warehouseCode != null">warehouse_code,</if>
@@ -97,6 +99,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="produceCode != null">#{produceCode},</if>
             <if test="workorderId != null">#{workorderId},</if>
             <if test="workorderCode != null">#{workorderCode},</if>
+            <if test="clientId != null">#{clientId},</if>
             <if test="sourceWarehouseId != null">#{sourceWarehouseId},</if>
             <if test="warehouseId != null">#{warehouseId},</if>
             <if test="warehouseCode != null">#{warehouseCode},</if>
@@ -124,6 +127,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="produceCode != null">produce_code = #{produceCode},</if>
             <if test="workorderId != null">workorder_id = #{workorderId},</if>
             <if test="workorderCode != null">workorder_code = #{workorderCode},</if>
+            <if test="clientId != null">client_id = #{clientId},</if>
             <if test="sourceWarehouseId != null">source_warehouse_id = #{sourceWarehouseId},</if>
             <if test="warehouseId != null">warehouse_id = #{warehouseId},</if>
             <if test="warehouseCode != null">warehouse_code = #{warehouseCode},</if>

@@ -67,7 +67,9 @@ public class WmWarehouseController extends BaseController
     @PostMapping
     public AjaxResult add(@RequestBody WmWarehouse entity)
     {
-        return toAjax(wmWarehouseService.insertWmWarehouse(entity));
+        // insertWmWarehouse 后 useGeneratedKeys 已回填 entity.warehouseId，返回带 ID 的实体供前端即时引用
+        wmWarehouseService.insertWmWarehouse(entity);
+        return AjaxResult.success(entity);
     }
 
     @PreAuthorize("@ss.hasPermi('mes:wm:warehouse:edit')")

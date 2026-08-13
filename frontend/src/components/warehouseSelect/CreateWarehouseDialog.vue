@@ -39,7 +39,7 @@
 <script setup lang="ts" name="CreateWarehouseDialog">
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { addWmWarehouse, listWmWarehouse } from '@/api/mes/wm/warehouse'
+import { addWmWarehouse } from '@/api/mes/wm/warehouse'
 import type { WmWarehouse } from '@/types/api/mes/wm/warehouse'
 import type { MdClient } from '@/types/api/mes/md/client'
 import type { MdVendor } from '@/types/api/mes/md/vendor'
@@ -135,19 +135,11 @@ function submit() {
     }
     if (!payload.warehouseCode) delete payload.warehouseCode
     addWmWarehouse(payload)
-      .then(() => listWmWarehouse({
-        warehouseName: payload.warehouseName,
-        warehouseType: payload.warehouseType,
-        pageNum: 1, pageSize: 10
-      }))
       .then(r => {
-        // addWmWarehouse 仅返回成功标记，回查拿到带 ID 的完整对象
-        const rows = (r.rows || []) as unknown as WmWarehouse[]
-        const created = rows.find(w =>
-          w.warehouseName === payload.warehouseName && w.warehouseType === payload.warehouseType
-        ) || rows[0]
+        // 后端 add 返回 useGeneratedKeys 回填 warehouseId 的实体，直接引用，避免名称回查静默选错
+        const created = r.data as WmWarehouse
         ElMessage.success('新建成功')
-        emit('onCreated', created as WmWarehouse)
+        emit('onCreated', created)
         showFlag.value = false
       })
       .finally(() => { submitting.value = false })

@@ -2,7 +2,6 @@ package com.ruoyi.system.service.mes.wm;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -21,6 +20,7 @@ import com.ruoyi.system.domain.mes.wm.OutsourceRequest;
 import com.ruoyi.system.domain.mes.wm.WmOutsourceIssueLine;
 import com.ruoyi.system.domain.mes.wm.WmOutsourceOrder;
 import com.ruoyi.system.domain.mes.wm.WmMaterialStock;
+import com.ruoyi.system.domain.mes.wm.WmWarehouse;
 import com.ruoyi.system.mapper.mes.wm.WmOutsourceOrderMapper;
 import com.ruoyi.system.mapper.mes.wm.WmMaterialStockMapper;
 import com.ruoyi.system.service.mes.pro.IProRouteProcessService;
@@ -48,6 +48,8 @@ public class OutsourceIssueHelper {
     private WmOutsourceOrderMapper outsourceOrderMapper;
     @Autowired
     private WmMaterialStockMapper wmMaterialStockMapper;
+    @Autowired
+    private IWmWarehouseService wmWarehouseService;
     /** @Lazy 防 IOutsourceService 实现链间接回引 pro.workorder 造成循环依赖 */
     @Autowired
     @Lazy
@@ -105,7 +107,13 @@ public class OutsourceIssueHelper {
         List<Long> bomItemIds = processBoms.stream()
                 .map(ProWorkorderBom::getItemId).filter(java.util.Objects::nonNull).distinct()
                 .collect(Collectors.toList());
-        Map<Long, WmMaterialStock> fifoByItem = batchFifoStocks(bomItemIds);
+        // 软优先供应商仓：外协供应商有专属仓时，发料行优先从该供应商仓取库存（不足自动回落公共仓）
+        Long vendorWarehouseId = null;
+        if (rp.getVendorId() != null) {
+            WmWarehouse vendorWh = wmWarehouseService.findVendorWarehouse(wo.getFactoryId(), rp.getVendorId());
+            vendorWarehouseId = vendorWh != null ? vendorWh.getWarehouseId() : null;
+        }
+        Map<Long, WmMaterialStock> fifoByItem = batchFifoStocks(bomItemIds, vendorWarehouseId);
 
         List<WmOutsourceIssueLine> lines = new ArrayList<>();
         for (ProWorkorderBom bom : processBoms) {
@@ -150,10 +158,10 @@ public class OutsourceIssueHelper {
     }
 
     /**
-     * 批量 FIFO 预取：一次性查所有物料的可用库存（NORMAL、quantity_available>0），
-     * 按 itemId 分组，每组取 create_time 最早的一条。消除逐行 N+1 查询。
+     * 批量 FIFO 预取：按 itemId 分组取最早可用批次。
+     * @param preferWarehouseId 非空时，同物料优先取该仓库的库存；该仓无则取任意仓库最早批次。
      */
-    private Map<Long, WmMaterialStock> batchFifoStocks(List<Long> itemIds) {
+    private Map<Long, WmMaterialStock> batchFifoStocks(List<Long> itemIds, Long preferWarehouseId) {
         if (itemIds == null || itemIds.isEmpty()) {
             return new LinkedHashMap<>();
         }
@@ -168,8 +176,7 @@ public class OutsourceIssueHelper {
                             && "NORMAL".equals(s.getQualityStatus()))
                     .collect(Collectors.groupingBy(
                             WmMaterialStock::getItemId,
-                            Collectors.minBy(Comparator.comparing(
-                                    s -> s.getCreateTime() != null ? s.getCreateTime() : new Date(0)))))
+                            Collectors.reducing((a, b) -> preferFifo(a, b, preferWarehouseId))))
                     .entrySet().stream()
                     .filter(e -> e.getValue().isPresent())
                     .collect(Collectors.toMap(
@@ -181,6 +188,19 @@ public class OutsourceIssueHelper {
             log.debug("外协草稿批量 FIFO 预取跳过, itemIds={}", itemIds, e);
             return new LinkedHashMap<>();
         }
+    }
+
+    /** FIFO 归约：优先 preferWarehouseId 的记录；同仓或都不在时取 createTime 最早。 */
+    private WmMaterialStock preferFifo(WmMaterialStock a, WmMaterialStock b, Long preferWarehouseId) {
+        if (preferWarehouseId != null) {
+            boolean aPref = preferWarehouseId.equals(a.getWarehouseId());
+            boolean bPref = preferWarehouseId.equals(b.getWarehouseId());
+            if (aPref && !bPref) return a;
+            if (!aPref && bPref) return b;
+        }
+        Date ta = a.getCreateTime() != null ? a.getCreateTime() : new Date(0);
+        Date tb = b.getCreateTime() != null ? b.getCreateTime() : new Date(0);
+        return ta.compareTo(tb) <= 0 ? a : b;
     }
 
     /**

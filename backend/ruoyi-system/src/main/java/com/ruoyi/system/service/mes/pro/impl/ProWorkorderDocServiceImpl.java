@@ -719,7 +719,7 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
             return new ArrayList<>();
         }
 
-        Long defaultWarehouseId = findDefaultWarehouse(wo.getFactoryId());
+        Long warehouseId = resolveRecptWarehouseId(wo);
 
         // 创建产品入库单
         String recptCode = genCode("PR");
@@ -730,7 +730,8 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
         recpt.setProduceCode(wo.getProductCode());
         recpt.setWorkorderId(workorderId);
         recpt.setWorkorderCode(wo.getWorkorderCode());
-        recpt.setWarehouseId(defaultWarehouseId);
+        recpt.setClientId(wo.getClientId());
+        recpt.setWarehouseId(warehouseId);
         recpt.setRecptDate(new Date());
         recpt.setTotalQuantity(qtyToRecpt);
         recpt.setTotalBox(0);
@@ -746,7 +747,7 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
         recptLine.setUnitOfMeasure(wo.getUnitOfMeasure());
         recptLine.setUnitName(wo.getUnitName());
         recptLine.setQuantityRecpt(qtyToRecpt);
-        recptLine.setWarehouseId(defaultWarehouseId);
+        recptLine.setWarehouseId(warehouseId);
         wmProductRecptLineService.insertWmProductRecptLine(recptLine);
 
         // CANCEL 再生：撤销同一 feedbackId 下的旧 ACTIVE log，避免唯一索引冲突
@@ -1073,6 +1074,19 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
         List<WmWarehouse> all = wmWarehouseService.selectWmWarehouseAll();
         if (all != null && !all.isEmpty()) return all.get(0).getWarehouseId();
         return 1L;
+    }
+
+    /**
+     * 解析产品入库目标仓：工单有客户且该客户有专属客户仓→入客户仓；否则回退工厂默认仓。
+     * 决策C：客户无专属仓时不自动建，入公共成品仓（前端引导新建）。
+     */
+    private Long resolveRecptWarehouseId(ProWorkorder wo)
+    {
+        if (wo.getClientId() != null) {
+            WmWarehouse clientWh = wmWarehouseService.findClientWarehouse(wo.getFactoryId(), wo.getClientId());
+            if (clientWh != null) return clientWh.getWarehouseId();
+        }
+        return findDefaultWarehouse(wo.getFactoryId());
     }
 
     private String genCode(String prefix)

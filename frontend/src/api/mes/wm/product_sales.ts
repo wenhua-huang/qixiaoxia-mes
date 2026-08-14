@@ -32,14 +32,9 @@ export function delWmProductSales(salesId: number | number[]): Promise<AjaxResul
 
 // ════════════════════ 业务生命周期 ════════════════════
 
-/** 过账出库 */
+/** 出库确认 */
 export function postOut(salesId: number, details: WmProductSalesDetail[]): Promise<AjaxResult> {
   return request({ url: '/mes/wm/product_sales/post/' + salesId, method: 'put', data: details })
-}
-
-/** 发货 */
-export function shipOut(salesId: number, info: Partial<WmProductSales>): Promise<AjaxResult> {
-  return request({ url: '/mes/wm/product_sales/ship/' + salesId, method: 'put', data: info })
 }
 
 /** 关闭 */

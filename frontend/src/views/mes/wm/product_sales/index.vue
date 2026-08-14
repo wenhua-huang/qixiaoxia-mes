@@ -46,8 +46,8 @@
       <el-table-column label="操作" align="center" width="240" fixed="right" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-tooltip content="查看" placement="top"><el-button link type="primary" icon="View" @click="handleView(scope.row)" /></el-tooltip>
-          <el-tooltip content="过账出库" placement="top" v-if="scope.row.status==='DRAFT' || scope.row.status==='PARTIAL_POSTED'"><el-button link type="warning" icon="Upload" @click="handlePost(scope.row)" v-hasPermi="['mes:wm:sales:post']" /></el-tooltip>
-          <el-tooltip content="发货" placement="top" v-if="scope.row.status==='POSTED' || scope.row.status==='PARTIAL_POSTED' || scope.row.status==='SHIPPED'"><el-button link type="success" icon="Van" @click="handleShip(scope.row)" v-hasPermi="['mes:wm:sales:ship']" /></el-tooltip>
+          <el-tooltip content="出库确认" placement="top" v-if="scope.row.status==='DRAFT' || scope.row.status==='PARTIAL_POSTED'"><el-button link type="warning" icon="Upload" @click="handlePost(scope.row)" v-hasPermi="['mes:wm:sales:post']" /></el-tooltip>
+          <el-tooltip content="发运登记" placement="top" v-if="scope.row.status==='POSTED' || scope.row.status==='PARTIAL_POSTED' || scope.row.status==='SHIPPED'"><el-button link type="success" icon="Van" @click="handleShip(scope.row)" v-hasPermi="['mes:wm:sales:ship']" /></el-tooltip>
           <el-tooltip content="关闭" placement="top" v-if="scope.row.status==='SHIPPED'"><el-button link type="primary" icon="CircleClose" @click="handleCloseRow(scope.row)" v-hasPermi="['mes:wm:sales:close']" /></el-tooltip>
           <el-tooltip content="修改" placement="top" v-if="scope.row.status==='DRAFT'"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:sales:edit']" /></el-tooltip>
           <el-tooltip content="作废" placement="top" v-if="!isTerminal(scope.row.status) && scope.row.status!=='POSTED' && scope.row.status!=='SHIPPED'"><el-button link type="danger" icon="Close" @click="handleCancelRow(scope.row)" v-hasPermi="['mes:wm:sales:cancel']" /></el-tooltip>
@@ -58,7 +58,7 @@
 
     <!-- 表单弹窗（新增/编辑/查看） -->
     <SalesFormDialog ref="formDialogRef" @success="getList" />
-    <!-- 过账出库弹窗 -->
+    <!-- 出库确认弹窗 -->
     <SalesOutDialog ref="outDialogRef" @success="getList" />
     <!-- 销售订单选择 -->
     <SaleOrderSelect ref="orderSelectRef" @onSelected="onOrderSelected" />
@@ -124,10 +124,10 @@ function handleDelete(row?: WmProductSales) {
 }
 function handleExport() { proxy.download('/mes/wm/product_sales/export', { ...queryParams }, `product_sales_${Date.now()}.xlsx`) }
 
-// 过账出库
+// 出库确认
 function handlePost(row: WmProductSales) { outDialogRef.value?.open(row) }
 
-// 发货：跳转独立发货工作台
+// 发运登记：跳转独立发运工作台
 function handleShip(row: WmProductSales) {
   router.push({ path: '/mes/wm/product_sales_ship', query: { salesId: row.salesId } })
 }

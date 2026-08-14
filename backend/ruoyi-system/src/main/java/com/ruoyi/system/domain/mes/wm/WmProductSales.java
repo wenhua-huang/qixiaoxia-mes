@@ -110,7 +110,7 @@ public class WmProductSales extends BaseEntity
     @Excel(name = "状态:DRAFT-草稿")
     private String status;
 
-    @Excel(name = "已过账出库量")
+    @Excel(name = "已出库量")
     private BigDecimal postedQuantity;
 
     @Excel(name = "已发运量")

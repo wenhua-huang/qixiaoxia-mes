@@ -3,17 +3,17 @@ package com.ruoyi.common.enums;
 /**
  * 销售出库单常量 — 状态值、事务类型、文档来源类型
  *
- * <p>销售出库单生命周期状态机（无预占模型，过账即扣减库存）：
+ * <p>销售出库单生命周期状态机（无预占模型，出库确认即扣减库存）：
  * <pre>
- *   DRAFT(草稿) ──post(全量)──▶ POSTED(已过账) ──ship──▶ SHIPPED(已发货) ──close──▶ CLOSED(已关闭)
+ *   DRAFT(草稿) ──post(全量)──▶ POSTED(已出库) ──ship──▶ SHIPPED(已发运) ──close──▶ CLOSED(已关闭)
  *      │
- *      └──post(部分)──▶ PARTIAL_POSTED(部分过账) ──post──▶ { PARTIAL_POSTED | POSTED }
+ *      └──post(部分)──▶ PARTIAL_POSTED(部分出库) ──post──▶ { PARTIAL_POSTED | POSTED }
  *                            │
  *   DRAFT / PARTIAL_POSTED ──cancel──▶ CANCELED(已作废)
  *
  *   说明：
- *   - 无预占，过账(post)时一次性扣减 quantity_onhand
- *   - 部分过账后可继续过账，全部出完转 POSTED
+ *   - 无预占，出库确认(post)时一次性扣减 quantity_onhand
+ *   - 部分出库后可继续出库确认，全部出完转 POSTED
  *   - 作废仅允许 DRAFT/PARTIAL_POSTED；POSTED 已全量扣库存需走销售退货(rt_sales)回库
  * </pre>
  *
@@ -29,11 +29,11 @@ public final class WmProductSalesConstants
     // ==================== 销售出库单状态 ====================
     /** 草稿：制单中，可编辑删除 */
     public static final String STATUS_DRAFT = "DRAFT";
-    /** 部分过账：分批出库中，已扣减部分 quantity_onhand */
+    /** 部分出库：分批出库中，已扣减部分 quantity_onhand */
     public static final String STATUS_PARTIAL_POSTED = "PARTIAL_POSTED";
-    /** 已过账：全量出库完成，quantity_onhand 全部扣减 */
+    /** 已出库：全量出库完成，quantity_onhand 全部扣减 */
     public static final String STATUS_POSTED = "POSTED";
-    /** 已发货：已登记物流发货信息 */
+    /** 已发运：已登记物流发运信息 */
     public static final String STATUS_SHIPPED = "SHIPPED";
     /** 已关闭（终态） */
     public static final String STATUS_CLOSED = "CLOSED";
@@ -43,10 +43,10 @@ public final class WmProductSalesConstants
     /** 可编辑的状态（仅这些状态允许修改/删除） */
     public static final String[] EDITABLE_STATUSES = {STATUS_DRAFT};
 
-    /** 可过账的状态（允许执行出库扣减） */
+    /** 可出库确认的状态（允许执行出库扣减） */
     public static final String[] POSTABLE_STATUSES = {STATUS_DRAFT, STATUS_PARTIAL_POSTED};
 
-    /** 可发货的状态 */
+    /** 可发运的状态（须先完成出库确认；发运量不得超过 postedQuantity） */
     public static final String[] SHIPPABLE_STATUSES = {STATUS_POSTED, STATUS_PARTIAL_POSTED};
 
     /** 终态（不可再流转） */
@@ -85,20 +85,15 @@ public final class WmProductSalesConstants
 
     // ==================== 发运单状态 qxx_wm_product_sales_shipment.status ====================
     /**
-     * 发运单生命周期：
+     * 发运单生命周期（建单即在途；撤销走 delete 回滚箱+头表发运量）：
      * <pre>
-     *   SHIPPING(待发运) ──ship──▶ IN_TRANSIT(在途) ──receive──▶ RECEIVED(已签收)
-     *       │                          │
-     *       └──cancel(未发出)──▶ CANCELED   └──cancel(发出后不可取消，需走退货)──▶ ×
+     *   IN_TRANSIT(在途) ──receive──▶ RECEIVED(已签收)
      * </pre>
+     * CANCELED 仅作历史数据兼容保留，新建单据不再产生。
      */
-    public static final String SHIPMENT_STATUS_SHIPPING = "SHIPPING";
     public static final String SHIPMENT_STATUS_IN_TRANSIT = "IN_TRANSIT";
     public static final String SHIPMENT_STATUS_RECEIVED = "RECEIVED";
     public static final String SHIPMENT_STATUS_CANCELED = "CANCELED";
-
-    /** 可取消的发运单状态（仅待发运可取消） */
-    public static final String[] CANCELABLE_SHIPMENT_STATUSES = {SHIPMENT_STATUS_SHIPPING};
 
     // ==================== 发货方式 ship_method ====================
     /** 物流 */
@@ -128,13 +123,13 @@ public final class WmProductSalesConstants
         return contains(EDITABLE_STATUSES, status);
     }
 
-    /** 判断状态是否可过账（执行出库扣减） */
+    /** 判断状态是否可出库确认（执行出库扣减） */
     public static boolean isPostable(String status)
     {
         return contains(POSTABLE_STATUSES, status);
     }
 
-    /** 判断状态是否可发货 */
+    /** 判断状态是否可发运 */
     public static boolean isShippable(String status)
     {
         return contains(SHIPPABLE_STATUSES, status);
@@ -150,12 +145,6 @@ public final class WmProductSalesConstants
     public static boolean isShippableShipStatus(String shipStatus)
     {
         return contains(SHIPTABLE_SHIP_STATUSES, shipStatus);
-    }
-
-    /** 判断发运单是否可取消（仅待发运可取消） */
-    public static boolean isCancelableShipment(String shipmentStatus)
-    {
-        return contains(CANCELABLE_SHIPMENT_STATUSES, shipmentStatus);
     }
 
     private static boolean contains(String[] arr, String status)

@@ -272,7 +272,7 @@ function handleSubmit() {
     }
     if (noWhLines.length) {
       proxy.$modal.confirm(
-        `${noWhLines.length} 行物料无库存未分配仓库，保存后这些行将无法过账出库。确认保留？`
+        `${noWhLines.length} 行物料无库存未分配仓库，保存后这些行将无法出库确认。确认保留？`
       ).then(doSave).catch(() => {})
     } else {
       doSave()

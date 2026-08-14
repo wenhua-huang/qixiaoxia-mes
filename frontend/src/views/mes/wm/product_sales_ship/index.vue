@@ -3,7 +3,7 @@
     <!-- 顶部：返回 + 单号 + 打印 -->
     <el-page-header @back="goBack" class="mb16">
       <template #content>
-        <span class="header-title">发货工作台</span>
+        <span class="header-title">发运登记工作台</span>
         <el-tag v-if="header.salesCode" type="info" class="ml8">{{ header.salesCode }}</el-tag>
         <el-tag v-if="header.shipStatus" :type="shipStatusTag(header.shipStatus)" class="ml8">
           {{ shipStatusLabel(header.shipStatus) }}
@@ -35,7 +35,7 @@
         <el-card shadow="never" header="发运汇总">
           <el-descriptions :column="2" size="small" border>
             <el-descriptions-item label="应出库量">{{ header.totalQuantity || 0 }}</el-descriptions-item>
-            <el-descriptions-item label="已过账量">{{ header.postedQuantity || 0 }}</el-descriptions-item>
+            <el-descriptions-item label="已出库量">{{ header.postedQuantity || 0 }}</el-descriptions-item>
             <el-descriptions-item label="已发运量">
               <span style="color:#409EFF;font-weight:bold">{{ header.shippedQuantity || 0 }}</span>
             </el-descriptions-item>
@@ -45,8 +45,8 @@
               </span>
             </el-descriptions-item>
           </el-descriptions>
-          <el-progress v-if="header.totalQuantity > 0"
-            :percentage="Math.round(((header.shippedQuantity || 0) / header.totalQuantity) * 100)"
+          <el-progress v-if="header.postedQuantity > 0"
+            :percentage="Math.round(((header.shippedQuantity || 0) / header.postedQuantity) * 100)"
             :stroke-width="10" class="mt8" />
         </el-card>
       </el-col>
@@ -114,9 +114,9 @@ function loadDetail() {
 }
 
 function remainShip(): number {
-  const total = Number(header.value.totalQuantity || 0)
+  const posted = Number(header.value.postedQuantity || 0)
   const shipped = Number(header.value.shippedQuantity || 0)
-  return Math.max(0, total - shipped)
+  return Math.max(0, posted - shipped)
 }
 
 function shipStatusLabel(v?: string): string {

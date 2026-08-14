@@ -43,11 +43,10 @@ import static org.mockito.Mockito.*;
 
 /**
  * 销售出库-发运单 Service 单元测试
- * 覆盖：createShipment（多次发运累加 + 状态推导 + 箱回写）/
+ * 覆盖：createShipment（多次发运累加 + 状态推导 + 箱回写 + 发运量≤出库确认量）/
  *      deleteShipment（回滚箱 + 头表扣减）/
  *      receive（签收 + 全签收头表 RECEIVED）/
- *      cancel（仅 SHIPPING 可取消）/
- *      错误路径（零箱/已签收删/重复发运/状态守卫）
+ *      错误路径（零箱/已签收删/重复发运/状态守卫/超额发运）
  *
  * @author qixiaoxia
  */
@@ -102,7 +101,7 @@ class WmProductSalesShipmentServiceImplTest
     @DisplayName("createShipment - 勾选 1 箱发运，累加 shippedQuantity 并回写箱")
     void createShipment_withBoxes_ok()
     {
-        WmProductSales header = buildHeader(215L, "POSTED", "UN_SHIPPED", "0", "10");
+        WmProductSales header = buildHeader(215L, "POSTED", "UN_SHIPPED", "0", "10", "10");
         when(salesMapper.selectWmProductSalesBySalesId(215L)).thenReturn(header);
 
         WmProductSalesBox box = buildBox(201L, 215L, "PACKED", "3");
@@ -135,7 +134,7 @@ class WmProductSalesShipmentServiceImplTest
     @DisplayName("createShipment - 未指定箱默认取全部 PACKED，全发完主状态→SHIPPED")
     void createShipment_defaultAllBoxes_fullShip()
     {
-        WmProductSales header = buildHeader(215L, "POSTED", "UN_SHIPPED", "0", "5");
+        WmProductSales header = buildHeader(215L, "POSTED", "UN_SHIPPED", "0", "5", "5");
         when(salesMapper.selectWmProductSalesBySalesId(215L)).thenReturn(header);
 
         List<WmProductSalesBox> all = new ArrayList<>();
@@ -166,7 +165,7 @@ class WmProductSalesShipmentServiceImplTest
     @DisplayName("createShipment - 零箱拒绝")
     void createShipment_emptyBoxes_reject()
     {
-        WmProductSales header = buildHeader(215L, "POSTED", "UN_SHIPPED", "0", "10");
+        WmProductSales header = buildHeader(215L, "POSTED", "UN_SHIPPED", "0", "10", "10");
         when(salesMapper.selectWmProductSalesBySalesId(215L)).thenReturn(header);
         when(boxMapper.selectBoxesBySalesId(215L)).thenReturn(new ArrayList<>());
 
@@ -181,7 +180,7 @@ class WmProductSalesShipmentServiceImplTest
     @DisplayName("createShipment - 箱不属于本出库单拒绝")
     void createShipment_boxNotBelong_reject()
     {
-        WmProductSales header = buildHeader(215L, "POSTED", "UN_SHIPPED", "0", "10");
+        WmProductSales header = buildHeader(215L, "POSTED", "UN_SHIPPED", "0", "10", "10");
         when(salesMapper.selectWmProductSalesBySalesId(215L)).thenReturn(header);
         WmProductSalesBox other = buildBox(201L, 999L, "PACKED", "3"); // 属于 999
         when(boxMapper.selectWmProductSalesBoxByBoxId(201L)).thenReturn(other);
@@ -201,7 +200,7 @@ class WmProductSalesShipmentServiceImplTest
     @DisplayName("createShipment - 已发运的箱重复发运拒绝")
     void createShipment_boxAlreadyShipped_reject()
     {
-        WmProductSales header = buildHeader(215L, "POSTED", "PARTIAL_SHIPPED", "3", "10");
+        WmProductSales header = buildHeader(215L, "POSTED", "PARTIAL_SHIPPED", "3", "10", "10");
         when(salesMapper.selectWmProductSalesBySalesId(215L)).thenReturn(header);
         WmProductSalesBox shipped = buildBox(201L, 215L, "SHIPPED", "3");
         when(boxMapper.selectWmProductSalesBoxByBoxId(201L)).thenReturn(shipped);
@@ -229,7 +228,7 @@ class WmProductSalesShipmentServiceImplTest
         List<WmProductSalesBox> boxes = Collections.singletonList(buildBox(201L, 215L, "SHIPPED", "3"));
         when(boxMapper.selectBoxesByShipmentId(500L)).thenReturn(boxes);
 
-        WmProductSales header = buildHeader(215L, "POSTED", "PARTIAL_SHIPPED", "5", "10");
+        WmProductSales header = buildHeader(215L, "POSTED", "PARTIAL_SHIPPED", "5", "10", "10");
         when(salesMapper.selectWmProductSalesBySalesId(215L)).thenReturn(header);
         // 删 500 后剩 2，非全发，仍有在途 → PARTIAL_SHIPPED
         when(shipmentMapper.selectShipmentsBySalesId(215L))
@@ -264,7 +263,7 @@ class WmProductSalesShipmentServiceImplTest
         when(shipmentMapper.selectWmProductSalesShipmentByShipmentId(500L)).thenReturn(ship);
         when(boxMapper.selectBoxesByShipmentId(500L)).thenReturn(new ArrayList<>());
 
-        WmProductSales header = buildHeader(215L, "SHIPPED", "SHIPPED", "10", "10");
+        WmProductSales header = buildHeader(215L, "SHIPPED", "SHIPPED", "10", "10", "10");
         when(salesMapper.selectWmProductSalesBySalesId(215L)).thenReturn(header);
         when(shipmentMapper.selectShipmentsBySalesId(215L))
                 .thenReturn(Collections.singletonList(buildShipment(501L, 215L, "IN_TRANSIT", "5")));
@@ -288,7 +287,7 @@ class WmProductSalesShipmentServiceImplTest
         when(shipmentMapper.selectShipmentsBySalesId(215L))
                 .thenAnswer(inv -> Collections.singletonList(ship));
 
-        WmProductSales header = buildHeader(215L, "SHIPPED", "SHIPPED", "10", "10");
+        WmProductSales header = buildHeader(215L, "SHIPPED", "SHIPPED", "10", "10", "10");
         when(salesMapper.selectWmProductSalesBySalesId(215L)).thenReturn(header);
 
         WmProductSalesShipment info = new WmProductSalesShipment();
@@ -310,7 +309,7 @@ class WmProductSalesShipmentServiceImplTest
         when(shipmentMapper.selectShipmentsBySalesId(215L))
                 .thenAnswer(inv -> Collections.singletonList(ship));
 
-        WmProductSales header = buildHeader(215L, "POSTED", "PARTIAL_SHIPPED", "3", "10");
+        WmProductSales header = buildHeader(215L, "POSTED", "PARTIAL_SHIPPED", "3", "10", "10");
         when(salesMapper.selectWmProductSalesBySalesId(215L)).thenReturn(header);
 
         shipmentService.receive(500L, new WmProductSalesShipment());
@@ -347,37 +346,34 @@ class WmProductSalesShipmentServiceImplTest
                 .hasMessageContaining("不可签收");
     }
 
-    // ═══════════════ cancel（取消） ═══════════════
+    // ═══════════════ 超额发运守卫 ═══════════════
 
     @Test
-    @DisplayName("cancel - SHIPPING 可取消")
-    void cancel_shipping_ok()
+    @DisplayName("createShipment - 累计发运量超过已出库确认量拒绝")
+    void createShipment_overPosted_reject()
     {
-        WmProductSalesShipment ship = buildShipment(500L, 215L, "SHIPPING", "3");
-        when(shipmentMapper.selectWmProductSalesShipmentByShipmentId(500L)).thenReturn(ship);
+        // 已出库确认 5，已发运 3，再发 3 → 6 > 5，拒绝
+        WmProductSales header = buildHeader(215L, "PARTIAL_POSTED", "PARTIAL_SHIPPED", "3", "10", "5");
+        when(salesMapper.selectWmProductSalesBySalesId(215L)).thenReturn(header);
+        WmProductSalesBox box = buildBox(201L, 215L, "PACKED", "3");
+        when(boxMapper.selectWmProductSalesBoxByBoxId(201L)).thenReturn(box);
 
-        shipmentService.cancel(500L);
+        WmProductSalesShipment req = new WmProductSalesShipment();
+        req.setSalesId(215L);
+        WmProductSalesBox ref = new WmProductSalesBox();
+        ref.setBoxId(201L);
+        req.setBoxes(Collections.singletonList(ref));
 
-        assertThat(ship.getStatus()).isEqualTo("CANCELED");
-        verify(shipmentMapper).updateWmProductSalesShipment(ship);
-    }
-
-    @Test
-    @DisplayName("cancel - IN_TRANSIT 不可取消")
-    void cancel_inTransit_reject()
-    {
-        WmProductSalesShipment ship = buildShipment(500L, 215L, "IN_TRANSIT", "3");
-        when(shipmentMapper.selectWmProductSalesShipmentByShipmentId(500L)).thenReturn(ship);
-
-        assertThatThrownBy(() -> shipmentService.cancel(500L))
+        assertThatThrownBy(() -> shipmentService.createShipment(req))
                 .isInstanceOf(ServiceException.class)
-                .hasMessageContaining("不可取消");
+                .hasMessageContaining("超过可发运量");
+        verify(shipmentMapper, never()).insertWmProductSalesShipment(any());
     }
 
     // ═══════════════ 工具方法 ═══════════════
 
     private WmProductSales buildHeader(Long salesId, String status, String shipStatus,
-                                       String shippedQty, String totalQty)
+                                       String shippedQty, String totalQty, String postedQty)
     {
         WmProductSales h = new WmProductSales();
         h.setSalesId(salesId);
@@ -385,6 +381,7 @@ class WmProductSalesShipmentServiceImplTest
         h.setShipStatus(shipStatus);
         h.setShippedQuantity(new BigDecimal(shippedQty));
         h.setTotalQuantity(new BigDecimal(totalQty));
+        h.setPostedQuantity(new BigDecimal(postedQty));
         return h;
     }
 

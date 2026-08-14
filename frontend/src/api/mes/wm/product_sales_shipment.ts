@@ -21,7 +21,7 @@ export function addShipment(d: WmProductSalesShipment): Promise<AjaxResult> {
   return request({ url: '/mes/wm/product_sales_shipment', method: 'post', data: d })
 }
 
-/** 修改发运（仅 SHIPPING/IN_TRANSIT 可改） */
+/** 修改发运（仅 IN_TRANSIT 可改） */
 export function updateShipment(d: WmProductSalesShipment): Promise<AjaxResult> {
   return request({ url: '/mes/wm/product_sales_shipment', method: 'put', data: d })
 }
@@ -34,9 +34,4 @@ export function delShipment(shipmentId: number | number[]): Promise<AjaxResult> 
 /** 签收：写签收时间/人/备注/回单附件 */
 export function receiveShipment(shipmentId: number, info: Partial<WmProductSalesShipment>): Promise<AjaxResult> {
   return request({ url: '/mes/wm/product_sales_shipment/receive/' + shipmentId, method: 'put', data: info })
-}
-
-/** 取消发运（仅 SHIPPING 可取消） */
-export function cancelShipment(shipmentId: number): Promise<AjaxResult> {
-  return request({ url: '/mes/wm/product_sales_shipment/cancel/' + shipmentId, method: 'put' })
 }

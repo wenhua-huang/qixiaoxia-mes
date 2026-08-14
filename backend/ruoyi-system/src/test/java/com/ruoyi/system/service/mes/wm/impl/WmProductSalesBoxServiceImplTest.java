@@ -22,7 +22,9 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.system.domain.mes.wm.WmProductSalesBox;
+import com.ruoyi.system.domain.mes.wm.WmProductSalesLine;
 import com.ruoyi.system.mapper.mes.wm.WmProductSalesBoxMapper;
+import com.ruoyi.system.mapper.mes.wm.WmProductSalesLineMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -44,6 +46,7 @@ import static org.mockito.Mockito.*;
 class WmProductSalesBoxServiceImplTest
 {
     @Mock private WmProductSalesBoxMapper boxMapper;
+    @Mock private WmProductSalesLineMapper lineMapper;
     @Mock private RedisLockTemplate lockTemplate;
     @Mock private PlatformTransactionManager transactionManager;
 
@@ -182,5 +185,97 @@ class WmProductSalesBoxServiceImplTest
                 .isInstanceOf(ServiceException.class)
                 .hasMessageContaining("已发运的箱不可删除");
         verify(boxMapper, never()).deleteWmProductSalesBoxByBoxId(anyLong());
+    }
+
+    // ═══════════════ 装箱量 ≤ 已出库确认量 守卫 ═══════════════
+
+    private WmProductSalesLine buildLine(Long lineId, String posted) {
+        WmProductSalesLine l = new WmProductSalesLine();
+        l.setLineId(lineId);
+        l.setItemCode("P001");
+        l.setQuantityPosted(new BigDecimal(posted));
+        return l;
+    }
+
+    @Test
+    @DisplayName("insert - 装箱量超过已出库确认量拒绝")
+    void insert_overPosted_reject()
+    {
+        when(boxMapper.selectMaxBoxSeqBySalesId(215L)).thenReturn(0);
+        when(lineMapper.selectWmProductSalesLineByLineId(301L)).thenReturn(buildLine(301L, "5"));
+        when(boxMapper.selectWmProductSalesBoxList(any())).thenReturn(java.util.Collections.emptyList());
+
+        WmProductSalesBox box = new WmProductSalesBox();
+        box.setSalesId(215L);
+        box.setLineId(301L);
+        box.setQuantity(new BigDecimal("8")); // 8 > 5
+
+        assertThatThrownBy(() -> boxService.insertWmProductSalesBox(box))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("超过已出库确认量");
+        verify(boxMapper, never()).insertWmProductSalesBox(any());
+    }
+
+    @Test
+    @DisplayName("insert - 装箱量等于已出库确认量通过")
+    void insert_withinPosted_ok()
+    {
+        when(boxMapper.selectMaxBoxSeqBySalesId(215L)).thenReturn(0);
+        when(lineMapper.selectWmProductSalesLineByLineId(301L)).thenReturn(buildLine(301L, "5"));
+        when(boxMapper.selectWmProductSalesBoxList(any())).thenReturn(java.util.Collections.emptyList());
+        when(boxMapper.insertWmProductSalesBox(any())).thenReturn(1);
+
+        WmProductSalesBox box = new WmProductSalesBox();
+        box.setSalesId(215L);
+        box.setLineId(301L);
+        box.setQuantity(new BigDecimal("5"));
+        boxService.insertWmProductSalesBox(box);
+
+        verify(boxMapper).insertWmProductSalesBox(box);
+    }
+
+    @Test
+    @DisplayName("insert - 已有箱累计 + 本次超过已出库确认量拒绝")
+    void insert_accumulatedOverPosted_reject()
+    {
+        when(boxMapper.selectMaxBoxSeqBySalesId(215L)).thenReturn(1);
+        when(lineMapper.selectWmProductSalesLineByLineId(301L)).thenReturn(buildLine(301L, "5"));
+        // 已有一箱 3
+        WmProductSalesBox existed = new WmProductSalesBox();
+        existed.setBoxId(201L);
+        existed.setQuantity(new BigDecimal("3"));
+        when(boxMapper.selectWmProductSalesBoxList(any())).thenReturn(java.util.Collections.singletonList(existed));
+
+        WmProductSalesBox box = new WmProductSalesBox();
+        box.setSalesId(215L);
+        box.setLineId(301L);
+        box.setQuantity(new BigDecimal("3")); // 3+3=6 > 5
+
+        assertThatThrownBy(() -> boxService.insertWmProductSalesBox(box))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("超过已出库确认量");
+    }
+
+    @Test
+    @DisplayName("update - 非发运箱改数量超过已出库确认量拒绝（走锁+事务）")
+    void update_overPosted_reject()
+    {
+        WmProductSalesBox exist = new WmProductSalesBox();
+        exist.setBoxId(201L);
+        exist.setSalesId(215L);
+        exist.setLineId(301L);
+        exist.setStatus("PACKED");
+        when(boxMapper.selectWmProductSalesBoxByBoxId(201L)).thenReturn(exist);
+        when(lineMapper.selectWmProductSalesLineByLineId(301L)).thenReturn(buildLine(301L, "5"));
+        when(boxMapper.selectWmProductSalesBoxList(any())).thenReturn(java.util.Collections.emptyList());
+
+        WmProductSalesBox box = new WmProductSalesBox();
+        box.setBoxId(201L);
+        box.setQuantity(new BigDecimal("8"));
+
+        assertThatThrownBy(() -> boxService.updateWmProductSalesBox(box))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("超过已出库确认量");
+        verify(boxMapper, never()).updateWmProductSalesBox(any());
     }
 }

@@ -35,6 +35,7 @@ import com.ruoyi.system.mapper.mes.wm.WmProductSalesDetailMapper;
 import com.ruoyi.system.mapper.mes.wm.WmMaterialStockMapper;
 import com.ruoyi.system.mapper.mes.wm.WmTransactionMapper;
 import com.ruoyi.system.mapper.mes.pro.ProMaterialTraceMapper;
+import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
 import com.ruoyi.system.service.mes.sal.ISalOrderService;
 import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 import com.ruoyi.system.service.mes.wm.IWmProductSalesService;
@@ -58,6 +59,7 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
     @Autowired private WmMaterialStockMapper wmMaterialStockMapper;
     @Autowired private WmTransactionMapper wmTransactionMapper;
     @Autowired private ProMaterialTraceMapper proMaterialTraceMapper;
+    @Autowired private ProWorkorderMapper proWorkorderMapper;
     @Autowired private AutoCodeGenerator autoCodeGenerator;
     @Autowired private RedisLockTemplate lockTemplate;
     @Autowired private PlatformTransactionManager transactionManager;
@@ -544,9 +546,13 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
     }
 
     /**
-     * 订单行 → 出库行映射：按各仓库可用量自动拆行（FIFO，早入库的仓优先）。
-     * - 无库存：生成 1 行，warehouseId=null（前端红色提示「无库存」，由用户决定删行/保留）
-     * - 库存充足：按 FIFO 仓序逐仓分配，拆多行
+     * 订单行 → 出库行映射：工单反查精确制导 + 按各仓库可用量自动拆行（FIFO，早入库的仓优先）。
+     * <p>
+     * 候选产品解析（resolveProducedItemIds）：优先从销售行关联的工单反查 product_id（工单建变体后
+     * product_id 已是 SKU），确保"生产什么出什么"，不碰别单变体；无工单时回退到销售行 SPU。
+     * <p>
+     * - 无库存：生成 1 行（item=候选/SPU，warehouseId=null），前端红色提示「无库存」
+     * - 库存充足：按 FIFO 仓序逐仓分配，拆多行（item_id 来自库存归属的实际物料，可能是变体）
      * - 库存不足：剩余需求挂最后一行（availableQty < quantitySales，前端红标）
      */
     private List<WmProductSalesLine> mapOrderLinesToSalesLines(List<SalOrderLine> orderLines) {
@@ -554,38 +560,61 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         if (orderLines == null) return result;
         for (SalOrderLine ol : orderLines) {
             BigDecimal need = ol.getQuantity() != null ? ol.getQuantity() : BigDecimal.ZERO;
-            List<WmStockWarehouseSummary> stocks = wmMaterialStockMapper.selectStockWarehouseSummary(ol.getProductId());
-            if (stocks == null || stocks.isEmpty()) {
-                // 无库存：仓库留空，前端提示
-                result.add(buildSalesLine(ol, null, null, null, need, BigDecimal.ZERO));
+            // ★ 工单反查：解析该销售行实际产出的 product_id（可能是变体 SKU）
+            List<Long> candidateItemIds = resolveProducedItemIds(ol);
+            List<WmStockWarehouseSummary> stocks = (candidateItemIds == null || candidateItemIds.isEmpty())
+                    ? new ArrayList<>()
+                    : wmMaterialStockMapper.selectStockWarehouseSummary(candidateItemIds);
+            if (stocks.isEmpty()) {
+                // 无库存：item 回退到销售行 SPU，仓库留空，前端提示
+                result.add(buildSalesLine(ol, ol.getProductId(), ol.getProductCode(), ol.getProductName(),
+                        null, null, null, need, BigDecimal.ZERO));
                 continue;
             }
-            // FIFO 按可用量拆行
+            // FIFO 按可用量拆行（stocks 含 itemId，多物料×多仓混合按 create_time 排序）
             BigDecimal remaining = need;
             for (WmStockWarehouseSummary s : stocks) {
                 if (remaining.compareTo(BigDecimal.ZERO) <= 0) break;
                 BigDecimal take = remaining.min(s.getQuantityAvailable());
-                result.add(buildSalesLine(ol, s.getWarehouseId(), s.getWarehouseCode(),
-                        s.getWarehouseName(), take, s.getQuantityAvailable()));
+                result.add(buildSalesLine(ol, s.getItemId(), s.getItemCode(), s.getItemName(),
+                        s.getWarehouseId(), s.getWarehouseCode(), s.getWarehouseName(), take, s.getQuantityAvailable()));
                 remaining = remaining.subtract(take);
             }
             // 库存总量不足：剩余需求挂最后一仓（take > available，前端红标）
             if (remaining.compareTo(BigDecimal.ZERO) > 0) {
                 WmStockWarehouseSummary last = stocks.get(stocks.size() - 1);
-                result.add(buildSalesLine(ol, last.getWarehouseId(), last.getWarehouseCode(),
-                        last.getWarehouseName(), remaining, last.getQuantityAvailable()));
+                result.add(buildSalesLine(ol, last.getItemId(), last.getItemCode(), last.getItemName(),
+                        last.getWarehouseId(), last.getWarehouseCode(), last.getWarehouseName(), remaining, last.getQuantityAvailable()));
             }
         }
         return result;
     }
 
-    private WmProductSalesLine buildSalesLine(SalOrderLine ol, Long whId, String whCode,
+    /**
+     * 解析销售行实际产出的 product_id：优先工单反查（排除 CANCEL），无工单回退到行自身 SPU。
+     * 工单建变体后 product_id 已是 SKU，确保出库只查本订单实际产出物的库存。
+     */
+    private List<Long> resolveProducedItemIds(SalOrderLine ol) {
+        List<Long> workorderProductIds = proWorkorderMapper.selectProductIdsBySalesOrderLineId(ol.getLineId());
+        if (workorderProductIds != null && !workorderProductIds.isEmpty()) {
+            return workorderProductIds;
+        }
+        // 无工单：回退到销售行自身产品（SPU，覆盖未转工单/MTS 场景）
+        List<Long> fallback = new ArrayList<>();
+        if (ol.getProductId() != null) {
+            fallback.add(ol.getProductId());
+        }
+        return fallback;
+    }
+
+    private WmProductSalesLine buildSalesLine(SalOrderLine ol, Long itemId, String itemCode,
+                                              String itemName, Long whId, String whCode,
                                               String whName, BigDecimal qty, BigDecimal avail) {
         WmProductSalesLine sl = new WmProductSalesLine();
         sl.setSalesOrderLineId(ol.getLineId());
-        sl.setItemId(ol.getProductId());
-        sl.setItemCode(ol.getProductCode());
-        sl.setItemName(ol.getProductName());
+        sl.setItemId(itemId);
+        sl.setItemCode(itemCode);
+        sl.setItemName(itemName);
         sl.setSpecification(ol.getProductSpc());
         sl.setUnitOfMeasure(ol.getUnitOfMeasure());
         sl.setUnitName(ol.getUnitName());

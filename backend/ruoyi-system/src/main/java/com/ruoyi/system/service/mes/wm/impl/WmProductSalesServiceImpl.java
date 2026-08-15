@@ -36,6 +36,8 @@ import com.ruoyi.system.mapper.mes.wm.WmMaterialStockMapper;
 import com.ruoyi.system.mapper.mes.wm.WmTransactionMapper;
 import com.ruoyi.system.mapper.mes.pro.ProMaterialTraceMapper;
 import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
+import com.ruoyi.system.mapper.mes.md.MdItemMapper;
+import com.ruoyi.system.domain.mes.md.MdItem;
 import com.ruoyi.system.service.mes.sal.ISalOrderService;
 import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 import com.ruoyi.system.service.mes.wm.IWmProductSalesService;
@@ -60,6 +62,7 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
     @Autowired private WmTransactionMapper wmTransactionMapper;
     @Autowired private ProMaterialTraceMapper proMaterialTraceMapper;
     @Autowired private ProWorkorderMapper proWorkorderMapper;
+    @Autowired private MdItemMapper mdItemMapper;
     @Autowired private AutoCodeGenerator autoCodeGenerator;
     @Autowired private RedisLockTemplate lockTemplate;
     @Autowired private PlatformTransactionManager transactionManager;
@@ -566,9 +569,8 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
                     ? new ArrayList<>()
                     : wmMaterialStockMapper.selectStockWarehouseSummary(candidateItemIds);
             if (stocks == null || stocks.isEmpty()) {
-                // 无库存：item 回退到销售行 SPU，仓库留空，前端提示
-                result.add(buildSalesLine(ol, ol.getProductId(), ol.getProductCode(), ol.getProductName(),
-                        null, null, null, need, BigDecimal.ZERO));
+                // 无库存：保留工单产出的变体 itemId（生产什么出什么），仓库留空前端红标
+                result.add(buildNoStockLine(ol, candidateItemIds, need));
                 continue;
             }
             // FIFO 按可用量拆行（stocks 含 itemId，多物料×多仓混合按 create_time 排序）
@@ -577,6 +579,7 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
                 if (remaining.compareTo(BigDecimal.ZERO) <= 0) break;
                 BigDecimal take = remaining.min(s.getQuantityAvailable());
                 result.add(buildSalesLine(ol, s.getItemId(), s.getItemCode(), s.getItemName(),
+                        s.getSpecification(), s.getUnitOfMeasure(), s.getUnitName(),
                         s.getWarehouseId(), s.getWarehouseCode(), s.getWarehouseName(), take, s.getQuantityAvailable()));
                 remaining = remaining.subtract(take);
             }
@@ -584,10 +587,30 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
             if (remaining.compareTo(BigDecimal.ZERO) > 0) {
                 WmStockWarehouseSummary last = stocks.get(stocks.size() - 1);
                 result.add(buildSalesLine(ol, last.getItemId(), last.getItemCode(), last.getItemName(),
+                        last.getSpecification(), last.getUnitOfMeasure(), last.getUnitName(),
                         last.getWarehouseId(), last.getWarehouseCode(), last.getWarehouseName(), remaining, last.getQuantityAvailable()));
             }
         }
         return result;
+    }
+
+    /**
+     * 无库存红标行：保留工单产出的变体 itemId（不回退 SPU），查 md_item 取编码/规格/单位。
+     * 查不到或无候选时才回退到销售行 SPU。
+     */
+    private WmProductSalesLine buildNoStockLine(SalOrderLine ol, List<Long> candidateItemIds, BigDecimal need) {
+        if (candidateItemIds != null && !candidateItemIds.isEmpty()) {
+            MdItem item = mdItemMapper.selectMdItemById(candidateItemIds.get(0));
+            if (item != null) {
+                return buildSalesLine(ol, item.getItemId(), item.getItemCode(), item.getItemName(),
+                        item.getSpecification(), item.getUnitOfMeasure(), item.getUnitName(),
+                        null, null, null, need, BigDecimal.ZERO);
+            }
+        }
+        // 无候选或 md_item 丢失：回退销售行 SPU 快照
+        return buildSalesLine(ol, ol.getProductId(), ol.getProductCode(), ol.getProductName(),
+                ol.getProductSpc(), ol.getUnitOfMeasure(), ol.getUnitName(),
+                null, null, null, need, BigDecimal.ZERO);
     }
 
     /**
@@ -608,16 +631,17 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
     }
 
     private WmProductSalesLine buildSalesLine(SalOrderLine ol, Long itemId, String itemCode,
-                                              String itemName, Long whId, String whCode,
-                                              String whName, BigDecimal qty, BigDecimal avail) {
+                                              String itemName, String spec, String unit, String unitName,
+                                              Long whId, String whCode, String whName,
+                                              BigDecimal qty, BigDecimal avail) {
         WmProductSalesLine sl = new WmProductSalesLine();
         sl.setSalesOrderLineId(ol.getLineId());
         sl.setItemId(itemId);
         sl.setItemCode(itemCode);
         sl.setItemName(itemName);
-        sl.setSpecification(ol.getProductSpc());
-        sl.setUnitOfMeasure(ol.getUnitOfMeasure());
-        sl.setUnitName(ol.getUnitName());
+        sl.setSpecification(spec);
+        sl.setUnitOfMeasure(unit);
+        sl.setUnitName(unitName);
         sl.setQuantitySales(qty);
         sl.setQuantityPosted(BigDecimal.ZERO);
         sl.setWarehouseId(whId);

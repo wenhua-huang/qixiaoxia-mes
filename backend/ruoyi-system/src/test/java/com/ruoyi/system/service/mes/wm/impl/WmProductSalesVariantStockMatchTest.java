@@ -1,8 +1,10 @@
 package com.ruoyi.system.service.mes.wm.impl;
 
+import com.ruoyi.system.domain.mes.md.MdItem;
 import com.ruoyi.system.domain.mes.sal.SalOrderLine;
 import com.ruoyi.system.domain.mes.wm.WmProductSalesLine;
 import com.ruoyi.system.domain.mes.wm.vo.WmStockWarehouseSummary;
+import com.ruoyi.system.mapper.mes.md.MdItemMapper;
 import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
 import com.ruoyi.system.mapper.mes.wm.WmMaterialStockMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -35,6 +37,8 @@ class WmProductSalesVariantStockMatchTest {
     private ProWorkorderMapper proWorkorderMapper;
     @Mock
     private WmMaterialStockMapper wmMaterialStockMapper;
+    @Mock
+    private MdItemMapper mdItemMapper;
     @InjectMocks
     private WmProductSalesServiceImpl service;
 
@@ -48,12 +52,26 @@ class WmProductSalesVariantStockMatchTest {
         return ol;
     }
 
+    private MdItem mdItem(Long id, String code, String name) {
+        MdItem item = new MdItem();
+        item.setItemId(id);
+        item.setItemCode(code);
+        item.setItemName(name);
+        item.setSpecification("规格-" + code);
+        item.setUnitOfMeasure("个");
+        item.setUnitName("个");
+        return item;
+    }
+
     private WmStockWarehouseSummary stock(Long itemId, String itemCode, String itemName,
                                           Long whId, String whCode, BigDecimal avail) {
         WmStockWarehouseSummary s = new WmStockWarehouseSummary();
         s.setItemId(itemId);
         s.setItemCode(itemCode);
         s.setItemName(itemName);
+        s.setSpecification("规格-" + itemCode);
+        s.setUnitOfMeasure("个");
+        s.setUnitName("个");
         s.setWarehouseId(whId);
         s.setWarehouseCode(whCode);
         s.setWarehouseName("仓" + whCode);
@@ -72,10 +90,8 @@ class WmProductSalesVariantStockMatchTest {
     @DisplayName("工单产出变体 A-V1：出库行 item_id = A-V1（生产什么出什么）")
     void workorderVariant_shipsVariantStock() {
         SalOrderLine ol = orderLine(10L, 100L, "FIN-A", "产品A", new BigDecimal("500"));
-        // 工单反查：销售行关联的工单 product_id = A-V1(101)
         when(proWorkorderMapper.selectProductIdsBySalesOrderLineId(eq(10L)))
                 .thenReturn(Collections.singletonList(101L));
-        // A-V1 有库存
         when(wmMaterialStockMapper.selectStockWarehouseSummary(anyList()))
                 .thenReturn(Collections.singletonList(
                         stock(101L, "FIN-A-V1", "产品A-V1", 30L, "WH01", new BigDecimal("500"))));
@@ -83,8 +99,9 @@ class WmProductSalesVariantStockMatchTest {
         List<WmProductSalesLine> result = map(Collections.singletonList(ol));
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).getItemId()).isEqualTo(101L);        // 变体，不是 SPU
+        assertThat(result.get(0).getItemId()).isEqualTo(101L);
         assertThat(result.get(0).getItemCode()).isEqualTo("FIN-A-V1");
+        assertThat(result.get(0).getSpecification()).isEqualTo("规格-FIN-A-V1");
         assertThat(result.get(0).getQuantitySales()).isEqualByComparingTo("500");
     }
 
@@ -101,14 +118,13 @@ class WmProductSalesVariantStockMatchTest {
         List<WmProductSalesLine> result = map(Collections.singletonList(ol));
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).getItemId()).isEqualTo(100L);        // SPU
+        assertThat(result.get(0).getItemId()).isEqualTo(100L);
     }
 
     @Test
     @DisplayName("CANCEL 工单被排除：只取正常工单的 product_id")
     void cancelledWorkorderExcluded() {
         SalOrderLine ol = orderLine(10L, 100L, "FIN-A", "产品A", new BigDecimal("200"));
-        // Mapper SQL 已排除 CANCEL，这里模拟只返回正常工单的 product_id
         when(proWorkorderMapper.selectProductIdsBySalesOrderLineId(eq(10L)))
                 .thenReturn(Collections.singletonList(101L));
         when(wmMaterialStockMapper.selectStockWarehouseSummary(anyList()))
@@ -121,19 +137,60 @@ class WmProductSalesVariantStockMatchTest {
     }
 
     @Test
-    @DisplayName("无库存：出库行 item 回退 SPU、warehouse=null（前端红标）")
-    void noStock_redFlagLineWithSpu() {
+    @DisplayName("无库存但工单产出变体：红标行仍指变体 itemId（不回退 SPU）")
+    void noStock_keepsVariantItemId() {
         SalOrderLine ol = orderLine(10L, 100L, "FIN-A", "产品A", new BigDecimal("100"));
         when(proWorkorderMapper.selectProductIdsBySalesOrderLineId(eq(10L)))
                 .thenReturn(Collections.singletonList(101L));
         when(wmMaterialStockMapper.selectStockWarehouseSummary(anyList()))
                 .thenReturn(Collections.emptyList());
+        // 无库存时查 md_item 取变体编码/名称用于展示
+        when(mdItemMapper.selectMdItemById(eq(101L)))
+                .thenReturn(mdItem(101L, "FIN-A-V1", "产品A-V1"));
+
+        List<WmProductSalesLine> result = map(Collections.singletonList(ol));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getItemId()).isEqualTo(101L);        // 变体，不是 SPU
+        assertThat(result.get(0).getItemCode()).isEqualTo("FIN-A-V1");
+        assertThat(result.get(0).getWarehouseId()).isNull();          // 红标
+    }
+
+    @Test
+    @DisplayName("无库存且无工单：红标行指 SPU（MTS 无库存场景）")
+    void noStock_noWorkorder_fallsBackToSpu() {
+        SalOrderLine ol = orderLine(10L, 100L, "FIN-A", "产品A", new BigDecimal("100"));
+        when(proWorkorderMapper.selectProductIdsBySalesOrderLineId(eq(10L)))
+                .thenReturn(Collections.emptyList());
+        when(wmMaterialStockMapper.selectStockWarehouseSummary(anyList()))
+                .thenReturn(Collections.emptyList());
+        // 候选 = SPU 100，查 md_item
+        when(mdItemMapper.selectMdItemById(eq(100L)))
+                .thenReturn(mdItem(100L, "FIN-A", "产品A"));
+
+        List<WmProductSalesLine> result = map(Collections.singletonList(ol));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getItemId()).isEqualTo(100L);
+        assertThat(result.get(0).getWarehouseId()).isNull();
+    }
+
+    @Test
+    @DisplayName("无库存且 md_item 丢失：回退销售行 SPU 快照（防御孤儿数据）")
+    void noStock_mdItemMissing_fallsBackToOrderLine() {
+        SalOrderLine ol = orderLine(10L, 100L, "FIN-A", "产品A", new BigDecimal("100"));
+        when(proWorkorderMapper.selectProductIdsBySalesOrderLineId(eq(10L)))
+                .thenReturn(Collections.singletonList(999L));
+        when(wmMaterialStockMapper.selectStockWarehouseSummary(anyList()))
+                .thenReturn(Collections.emptyList());
+        when(mdItemMapper.selectMdItemById(eq(999L))).thenReturn(null);
 
         List<WmProductSalesLine> result = map(Collections.singletonList(ol));
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getItemId()).isEqualTo(100L);        // 回退 SPU
-        assertThat(result.get(0).getWarehouseId()).isNull();          // 红标
+        assertThat(result.get(0).getItemCode()).isEqualTo("FIN-A");
+        assertThat(result.get(0).getWarehouseId()).isNull();
     }
 
     @Test
@@ -173,7 +230,7 @@ class WmProductSalesVariantStockMatchTest {
         assertThat(result.get(0).getItemId()).isEqualTo(101L);
         assertThat(result.get(0).getQuantitySales()).isEqualByComparingTo("400");
         assertThat(result.get(1).getItemId()).isEqualTo(101L);
-        assertThat(result.get(1).getQuantitySales()).isEqualByComparingTo("600");       // 缺口
-        assertThat(result.get(1).getAvailableQty()).isEqualByComparingTo("400");        // 红标
+        assertThat(result.get(1).getQuantitySales()).isEqualByComparingTo("600");
+        assertThat(result.get(1).getAvailableQty()).isEqualByComparingTo("400");
     }
 }

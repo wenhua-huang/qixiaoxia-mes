@@ -17,6 +17,9 @@ public class WmStockWarehouseSummary
     private Long itemId;
     private String itemCode;
     private String itemName;
+    private String specification;
+    private String unitOfMeasure;
+    private String unitName;
     private Long warehouseId;
     private String warehouseCode;
     private String warehouseName;
@@ -28,6 +31,12 @@ public class WmStockWarehouseSummary
     public void setItemCode(String v) { this.itemCode = v; }
     public String getItemName() { return itemName; }
     public void setItemName(String v) { this.itemName = v; }
+    public String getSpecification() { return specification; }
+    public void setSpecification(String v) { this.specification = v; }
+    public String getUnitOfMeasure() { return unitOfMeasure; }
+    public void setUnitOfMeasure(String v) { this.unitOfMeasure = v; }
+    public String getUnitName() { return unitName; }
+    public void setUnitName(String v) { this.unitName = v; }
     public Long getWarehouseId() { return warehouseId; }
     public void setWarehouseId(Long v) { this.warehouseId = v; }
     public String getWarehouseCode() { return warehouseCode; }

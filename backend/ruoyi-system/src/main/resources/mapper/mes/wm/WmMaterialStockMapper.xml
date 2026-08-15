@@ -291,8 +291,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
          支持多 itemId（工单反查精确制导）；factory_id 由拦截器注入 -->
     <select id="selectStockWarehouseSummary" resultType="com.ruoyi.system.domain.mes.wm.vo.WmStockWarehouseSummary">
         select s.item_id as itemId,
-               max(i.item_code) as itemCode,
-               max(i.item_name) as itemName,
+               coalesce(max(i.item_code), max(s.item_code)) as itemCode,
+               coalesce(max(i.item_name), max(s.item_name)) as itemName,
+               coalesce(max(i.specification), max(s.specification)) as specification,
+               coalesce(max(i.unit_of_measure), max(s.unit_of_measure)) as unitOfMeasure,
+               coalesce(max(i.unit_name), max(s.unit_name)) as unitName,
                s.warehouse_id as warehouseId,
                max(s.warehouse_code) as warehouseCode,
                coalesce(max(s.warehouse_name), max(w.warehouse_name)) as warehouseName,

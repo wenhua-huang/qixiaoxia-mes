@@ -1,53 +1,83 @@
 import { parseQrPayload } from '@/utils/qrPayload'
 
 /**
- * 调起 uni 扫码，返回 Promise<rawString>。
- * 用户取消时 reject（调用方自行 catch）。
- */
-function scan() {
-  return new Promise((resolve, reject) => {
-    uni.scanCode({
-      onlyFromCamera: false,
-      scanType: ['barCode', 'qrCode'],
-      success: (res) => resolve(res.result),
-      fail: (err) => reject(err)
-    })
-  })
-}
-
-/**
- * 扫码并按 payload 前缀分发到对应页面。
- * P1 仅落地 CARD/WO；MAT/ROLL 待 P2/P3。
+ * 把扫到/手输的原始码解析成跳转目标。
+ * 纯函数，H5 输入页与 APP/小程序扫码共用，保证分发逻辑一致。
  *
- * @returns {Promise<{type:string, code:string}|null>} 解析后的 payload；
- *          用户取消返回 null；非系统码返回 {type:'RAW', code:raw}。
+ * @param {string} raw 原始码串
+ * @returns {{url: string|null, payload: object|null, toast: string|null}}
+ *   url    — 可跳转的报工页地址（含 query）；不支持的类型为 null
+ *   payload— parseQrPayload 结果；非系统码为 null
+ *   toast  — 不支持时需要提示用户的文案；url 非空时为 null
  */
-export async function scanAndDispatch() {
-  let raw
-  try {
-    raw = await scan()
-  } catch (e) {
-    return null // 用户取消
-  }
+export function resolveTarget(raw) {
   const payload = parseQrPayload(raw)
+  // 非本系统码：当作裸工单/卡号，交报工页处理
   if (!payload) {
-    // 非本系统码：当作裸工单/卡号，交报工页处理
-    uni.navigateTo({ url: '/pages/mes/pro/report?rawCode=' + encodeURIComponent(raw) })
-    return { type: 'RAW', code: raw }
+    return {
+      url: '/pages/mes/pro/report?rawCode=' + encodeURIComponent(raw),
+      payload: null,
+      toast: null
+    }
   }
   switch (payload.type) {
     case 'CARD':
-      uni.navigateTo({ url: '/pages/mes/pro/report?cardCode=' + encodeURIComponent(payload.code) })
-      break
+      return { url: '/pages/mes/pro/report?cardCode=' + encodeURIComponent(payload.code), payload, toast: null }
     case 'WO':
-      uni.navigateTo({ url: '/pages/mes/pro/report?workorderCode=' + encodeURIComponent(payload.code) })
-      break
+      return { url: '/pages/mes/pro/report?workorderCode=' + encodeURIComponent(payload.code), payload, toast: null }
     case 'MAT':
+      return { url: '/pages/mes/wm/issue/scan-query?batchCode=' + encodeURIComponent(payload.code), payload, toast: null }
     case 'ROLL':
-      uni.showToast({ icon: 'none', title: '该类型码待 P2/P3 支持' })
-      break
+      return { url: '/pages/mes/wm/issue/scan-query?rollCode=' + encodeURIComponent(payload.code), payload, toast: null }
     default:
-      uni.showToast({ icon: 'none', title: '暂不支持该类型码' })
+      return { url: null, payload, toast: '暂不支持该类型码' }
   }
-  return payload
 }
+
+// #ifdef H5
+/**
+ * H5 端：uni.scanCode 在浏览器里不被支持（返回 method not supported），
+ * 直接跳到手动输入页；由输入页调 resolveTarget 后再导航到报工页。
+ */
+export function scanAndDispatch() {
+  uni.navigateTo({ url: '/pages/mes/pro/scan' })
+  return Promise.resolve(null)
+}
+// #endif
+
+// #ifndef H5
+/**
+ * APP / 小程序端：调起原生扫码，按 payload 前缀分发。
+ * 区分"用户取消"与"真失败"，真失败给可见提示，不再静默吞错。
+ *
+ * @returns {Promise<{type:string,code:string}|null>} 解析后的 payload；
+ *          用户取消返回 null；非系统码返回 {type:'RAW', code:raw}。
+ */
+export function scanAndDispatch() {
+  return new Promise((resolve) => {
+    uni.scanCode({
+      onlyFromCamera: false,
+      scanType: ['barCode', 'qrCode'],
+      success: (res) => {
+        const target = resolveTarget(res.result)
+        if (target.url) {
+          uni.navigateTo({ url: target.url })
+        } else if (target.toast) {
+          uni.showToast({ icon: 'none', title: target.toast })
+        }
+        resolve(target.payload || (res.result ? { type: 'RAW', code: res.result } : null))
+      },
+      fail: (err) => {
+        const msg = (err && err.errMsg) || ''
+        // 用户主动取消（各端文案略有差异），静默
+        if (/cancel/i.test(msg)) {
+          resolve(null)
+          return
+        }
+        uni.showToast({ icon: 'none', title: '扫码失败：' + msg })
+        resolve(null)
+      }
+    })
+  })
+}
+// #endif

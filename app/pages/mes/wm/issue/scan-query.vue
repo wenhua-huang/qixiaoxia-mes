@@ -29,6 +29,22 @@
       <view v-if="itemInfo.specification" class="sub">规格：{{ itemInfo.specification }}</view>
     </view>
 
+    <!-- 纸卷信息（扫卷料码 ROLL） -->
+    <view v-if="rollInfo" class="info-card">
+      <view class="card-top">
+        <text class="code">{{ rollInfo.rollCode }}</text>
+        <text class="unit">{{ rollInfo.status || '' }}</text>
+      </view>
+      <text class="name">{{ rollInfo.itemName || '-' }}</text>
+      <view class="sub">仓库：{{ rollInfo.warehouseName || '-' }}</view>
+      <view class="sub">实际幅宽：{{ rollInfo.actualWidth || '-' }}</view>
+      <view class="sub">实际克重：{{ rollInfo.actualWeightGsm || '-' }}</view>
+      <view class="sub">实际重量：{{ rollInfo.actualWeight != null ? rollInfo.actualWeight : '-' }}</view>
+      <view class="sub">
+        剩余数量：<text class="roll-qty">{{ rollInfo.remainingQuantity != null ? rollInfo.remainingQuantity : '-' }}</text>
+      </view>
+    </view>
+
     <!-- 库存列表 -->
     <view v-if="stockList.length > 0" class="section-title">库存明细（{{ stockList.length }} 条）</view>
     <view v-for="(s, idx) in stockList" :key="idx" class="stock-card">
@@ -50,7 +66,9 @@
 
 <script setup>
 import { ref, getCurrentInstance } from 'vue'
-import { getItemStock } from '@/api/mes/wm/issue'
+import { onLoad } from '@dcloudio/uni-app'
+import { getItemStock, getStockByBatchCode, getRollByRollCode } from '@/api/mes/wm/issue'
+import { parseQrPayload } from '@/utils/qrPayload'
 // 显式引入 uni-ui 组件（绕过 HBuilderX 发行 H5 时 easycom 失效）
 import UniEasyInput from '@/uni_modules/uni-easyinput/components/uni-easyinput/uni-easyinput.vue'
 import UniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue'
@@ -58,16 +76,34 @@ import UniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue
 const { proxy } = getCurrentInstance()
 const itemCode = ref('')
 const itemInfo = ref(null)
+const rollInfo = ref(null)
 const stockList = ref([])
 const queried = ref(false)
+
+// 统一扫码分发带参进入：MAT → batchCode，ROLL → rollCode
+onLoad((options) => {
+  if (options && options.batchCode) {
+    queryByBatch(options.batchCode)
+  } else if (options && options.rollCode) {
+    queryRoll(options.rollCode)
+  }
+})
 
 function scanCode() {
   uni.scanCode({
     onlyFromCamera: false,
     scanType: ['barCode', 'qrCode'],
     success: (res) => {
-      itemCode.value = res.result
-      queryStock()
+      const payload = parseQrPayload(res.result)
+      if (payload && payload.type === 'MAT') {
+        queryByBatch(payload.code)
+      } else if (payload && payload.type === 'ROLL') {
+        queryRoll(payload.code)
+      } else {
+        // 裸条码/非系统码：当作物料编码走原逻辑
+        itemCode.value = res.result
+        queryStock()
+      }
     },
     fail: () => { proxy.$modal.msgError('扫码取消或失败') }
   })
@@ -76,6 +112,7 @@ function scanCode() {
 async function queryStock() {
   if (!itemCode.value) { proxy.$modal.msgError('请输入或扫描物料编码'); return }
   queried.value = true
+  rollInfo.value = null
   try {
     const res = await getItemStock(itemCode.value)
     const rows = res.rows || []
@@ -91,6 +128,41 @@ async function queryStock() {
     } else {
       itemInfo.value = null
     }
+  } catch (e) {}
+}
+
+// 按批次码查库存（MAT 码）：返回该批次的库存行
+async function queryByBatch(batchCode) {
+  queried.value = true
+  rollInfo.value = null
+  itemInfo.value = null
+  stockList.value = []
+  try {
+    const res = await getStockByBatchCode(batchCode)
+    const rows = res.data || []
+    stockList.value = rows
+    if (rows.length > 0) {
+      itemCode.value = rows[0].itemCode || itemCode.value
+      itemInfo.value = {
+        itemCode: rows[0].itemCode,
+        itemName: rows[0].itemName,
+        specification: rows[0].specification,
+        unitOfMeasure: rows[0].unitOfMeasure
+      }
+    }
+  } catch (e) {}
+}
+
+// 按纸卷码查卷料详情（ROLL 码）：单卷卡片，不走库存列表
+async function queryRoll(rollCode) {
+  queried.value = false
+  rollInfo.value = null
+  itemInfo.value = null
+  stockList.value = []
+  try {
+    const res = await getRollByRollCode(rollCode)
+    rollInfo.value = res.data || null
+    if (!rollInfo.value) { proxy.$modal.msgError('未查到该卷料信息') }
   } catch (e) {}
 }
 </script>
@@ -128,6 +200,7 @@ async function queryStock() {
   }
   .name { font-size: 28rpx; color: #606266; display: block; }
   .sub { font-size: 24rpx; color: #909399; display: block; margin-top: 8rpx; }
+  .roll-qty { font-size: 28rpx; font-weight: bold; color: #409eff; }
 }
 .section-title { font-size: 28rpx; font-weight: bold; color: #303133; padding: 16rpx 24rpx; }
 .stock-card {

@@ -324,9 +324,17 @@ function submitReceipt() {
     }
 
     // 单接口调用，后端原子完成：创建头 → 创建行 → 确认收货 → 回写PO
-    receiveItemRecpt(body).then(() => {
-      proxy.$modal.msgSuccess('收货确认成功！库存已更新')
-      setTimeout(() => { proxy.$tab.navigateBack() }, 1500)
+    receiveItemRecpt(body).then(res => {
+      // res.data = 收货详情（Task 2），lines[].batchCode 为生成的批次码（非批次管理物料为 null）
+      const batchCodes = [...new Set((res.data?.lines || []).map(l => l.batchCode).filter(Boolean))]
+      if (batchCodes.length) {
+        // toast 会截断多行文本，用 alert 弹窗展示批次码并引导 PC 打印
+        proxy.$modal.alert('本次生成批次码：\n' + batchCodes.join('\n') + '\n\n请在 PC【采购入库管理】打印批次标签', '收货成功')
+        setTimeout(() => { proxy.$tab.navigateBack() }, 2500)
+      } else {
+        proxy.$modal.msgSuccess('收货确认成功！库存已更新')
+        setTimeout(() => { proxy.$tab.navigateBack() }, 1500)
+      }
     }).catch(e => {
       proxy.$modal.msgError('收货失败：' + (typeof e === 'string' ? e : (e.msg || e.message || '未知错误')))
     }).finally(() => {

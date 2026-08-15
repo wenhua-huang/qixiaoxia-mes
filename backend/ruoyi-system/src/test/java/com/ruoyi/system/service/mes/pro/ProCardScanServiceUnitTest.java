@@ -134,7 +134,7 @@ class ProCardScanServiceUnitTest {
         assertThat(vo.getReason()).isEqualTo("NO_REPORTABLE_TASK");
     }
 
-    /** §6.2：任务工位为外协(VENDOR) → 排除，无可报任务 */
+    /** §6.2：任务工位为外协(VENDOR) → 排除可报、归入外协任务、原因=PROCESS_OUTSOURCED */
     @Test
     void activeCard_taskVendorWorkstation_excluded() {
         ProCard c = new ProCard();
@@ -157,6 +157,39 @@ class ProCardScanServiceUnitTest {
         CardScanResultVO vo = service.scanForReport("CRD1");
         assertThat(vo.isCanReport()).isFalse();
         assertThat(vo.getReportableTasks()).isEmpty();
-        assertThat(vo.getReason()).isEqualTo("NO_REPORTABLE_TASK");
+        assertThat(vo.getOutsourceTasks()).hasSize(1);
+        assertThat(vo.getOutsourceTasks().get(0).getTaskId()).isEqualTo(33L);
+        assertThat(vo.getReason()).isEqualTo("PROCESS_OUTSOURCED");
+    }
+
+    /** 真实数据场景：当前工序的外协任务已 COMPLETED（厂商做完等收货）→ 仍标记为外协工序 */
+    @Test
+    void activeCard_outsourceTaskCompleted_stillFlagged() {
+        ProCard c = new ProCard();
+        c.setCardId(1L);
+        c.setCardCode("CRD1");
+        c.setStatus("ACTIVE");
+        c.setWorkorderId(10L);
+        c.setCurrentProcessId(204L);
+        when(proCardMapper.selectProCardList(any())).thenReturn(List.of(c));
+
+        ProTask vendorDone = new ProTask();
+        vendorDone.setTaskId(570L);
+        vendorDone.setStatus("COMPLETED");
+        vendorDone.setWorkstationCode("VENDOR");
+        vendorDone.setProcessId(204L);
+        ProTask otherProcess = new ProTask();
+        otherProcess.setTaskId(572L);
+        otherProcess.setStatus("PRODUCING");
+        otherProcess.setWorkstationCode("AUTO");
+        otherProcess.setProcessId(200L); // 其它工序的厂内任务，不应出现
+        when(proTaskMapper.selectProTaskList(any())).thenReturn(List.of(vendorDone, otherProcess));
+        when(proFeedbackService.getDefaultConsume(10L)).thenReturn(Collections.emptyList());
+        when(proFeedbackMapper.sumAuditedQualifiedByCardAndProcess(1L, 204L)).thenReturn(BigDecimal.ZERO);
+
+        CardScanResultVO vo = service.scanForReport("CRD1");
+        assertThat(vo.isCanReport()).isFalse();
+        assertThat(vo.getReason()).isEqualTo("PROCESS_OUTSOURCED");
+        assertThat(vo.getOutsourceTasks()).extracting(ProTask::getTaskId).containsExactly(570L);
     }
 }

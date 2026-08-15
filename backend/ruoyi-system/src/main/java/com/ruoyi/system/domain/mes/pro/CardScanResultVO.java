@@ -14,6 +14,9 @@ public class CardScanResultVO {
     /** 当前可报任务（工单下、PRODUCING 状态、非外协工位的可报任务） */
     private List<ProTask> reportableTasks;
 
+    /** 当前工序的外协任务（VENDOR 工位，供 App 展示外协状态） */
+    private List<ProTask> outsourceTasks;
+
     /** BOM 消耗默认值 */
     private List<ProFeedbackConsume> consumeDefaults;
 
@@ -23,7 +26,7 @@ public class CardScanResultVO {
     /** 是否可报工 */
     private boolean canReport;
 
-    /** 不可报原因码：CARD_NOT_FOUND / CARD_COMPLETED / CARD_OUTSOURCING / CARD_SCRAPPED / NO_REPORTABLE_TASK */
+    /** 不可报原因码：CARD_NOT_FOUND / CARD_COMPLETED / CARD_OUTSOURCING / CARD_SCRAPPED / PROCESS_OUTSOURCED / NO_REPORTABLE_TASK */
     private String reason;
 
     public ProCard getCard() { return card; }
@@ -31,6 +34,9 @@ public class CardScanResultVO {
 
     public List<ProTask> getReportableTasks() { return reportableTasks; }
     public void setReportableTasks(List<ProTask> reportableTasks) { this.reportableTasks = reportableTasks; }
+
+    public List<ProTask> getOutsourceTasks() { return outsourceTasks; }
+    public void setOutsourceTasks(List<ProTask> outsourceTasks) { this.outsourceTasks = outsourceTasks; }
 
     public List<ProFeedbackConsume> getConsumeDefaults() { return consumeDefaults; }
     public void setConsumeDefaults(List<ProFeedbackConsume> consumeDefaults) { this.consumeDefaults = consumeDefaults; }

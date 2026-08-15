@@ -176,19 +176,19 @@ public class ProCardServiceImpl implements IProCardService
         // 3-5. 加载报工上下文（任务/BOM/已审核合格数）
         loadReportContext(card, vo);
 
-        // 6. 可报判定
+        // 6. 可报判定（当前工序是外协工序时给出明确原因，而非笼统的无可报任务）
         if (vo.getReportableTasks().isEmpty()) {
             vo.setCanReport(false);
-            vo.setReason("NO_REPORTABLE_TASK");
+            vo.setReason(vo.getOutsourceTasks().isEmpty() ? "NO_REPORTABLE_TASK" : "PROCESS_OUTSOURCED");
         } else {
             vo.setCanReport(true);
         }
         return vo;
     }
 
-    /** 加载报工上下文：工单下 PRODUCING+非外协工位任务、BOM 消耗默认值、已审核合格数 */
+    /** 加载报工上下文：工单下可报任务/外协任务、BOM 消耗默认值、已审核合格数 */
     private void loadReportContext(ProCard card, CardScanResultVO vo) {
-        // 3. 加载工单任务，筛可报（PRODUCING + 非外协工位）
+        // 3. 加载工单任务，筛可报（PRODUCING + 非外协工位）与外协（PRODUCING + VENDOR 工位）
         ProTask tq = new ProTask();
         tq.setWorkorderId(card.getWorkorderId());
         List<ProTask> all = proTaskMapper.selectProTaskList(tq);
@@ -199,6 +199,11 @@ public class ProCardServiceImpl implements IProCardService
                 .collect(Collectors.toList());
         fillPendingCount(reportable);
         vo.setReportableTasks(reportable);
+        List<ProTask> outsource = all.stream()
+                .filter(t -> ProConstants.WS_CODE_VENDOR.equals(t.getWorkstationCode()))
+                .filter(t -> card.getCurrentProcessId() == null || card.getCurrentProcessId().equals(t.getProcessId()))
+                .collect(Collectors.toList());
+        vo.setOutsourceTasks(outsource);
 
         // 4. BOM 消耗默认值（失败不阻断，置空列表）
         try {

@@ -129,17 +129,18 @@ public class WmItemRecptController extends BaseController
     }
 
     /**
-     * 一键收货（移动端）：创建入库单头+行+确认收货，单个事务原子完成。
+     * 一键收货（移动端）：创建入库单头+行+确认收货+过账，单个事务原子完成。
      *
      * 前端只需调这一个接口，无需分步调 add + addLine + confirm。
+     * 返回完成后的入库单详情（头 + 行，行含生成的批次码），供 App 收货完成页展示。
      */
     @PreAuthorize("@ss.hasPermi('mes:wm:item_recpt:add')")
     @Log(title = "移动端一键收货", businessType = BusinessType.INSERT)
     @PostMapping("/receive")
     public AjaxResult receive(@RequestBody ItemRecptReceiveBody body) {
         try {
-            wmItemRecptService.receiveWithLines(body);
-            return AjaxResult.success();
+            WmItemRecpt result = wmItemRecptService.receiveWithLines(body);
+            return AjaxResult.success(result);
         } catch (RuntimeException e) {
             return AjaxResult.error(e.getMessage());
         }

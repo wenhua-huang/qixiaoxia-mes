@@ -255,7 +255,7 @@ function reasonText(reason) {
     CARD_COMPLETED: '该流转卡已完工，无需报工',
     CARD_OUTSOURCING: '该流转卡外协中，请到外协收货页操作',
     CARD_SCRAPPED: '该流转卡已报废',
-    PROCESS_OUTSOURCED: '当前工序为外协工序，请在厂商端录结果或到「外协任务」处理',
+    PROCESS_OUTSOURCED: '下一道工序为外协工序，请在厂商端录结果或到「外协任务」处理',
     NO_REPORTABLE_TASK: '当前工序无可报工任务'
   }
   return map[reason] || '当前不可报工'
@@ -297,7 +297,14 @@ function scanByCard(cardCode) {
     reportedQualifiedSum.value = data.reportedQualifiedSum || 0
     if (!data.canReport) {
       // 先填充上下文再提示：外协工序时页面仍能看到工单信息与「外协任务」区块
-      proxy.$modal.alert(reasonText(data.reason), '无法报工')
+      let msg = reasonText(data.reason)
+      if (data.reason === 'PROCESS_OUTSOURCED') {
+        const doing = outsourceTaskList.value.find(t => t.status === 'PRODUCING')
+        if (doing && doing.processName) {
+          msg = '下一道工序「' + doing.processName + '」为外协工序（进行中），请在厂商端录结果或到「外协任务」处理'
+        }
+      }
+      proxy.$modal.alert(msg, '无法报工')
       return
     }
     // 单任务自动选中 → 直接进填数量步

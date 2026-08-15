@@ -1,7 +1,9 @@
 package com.ruoyi.system.service.mes.pro.impl;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -20,11 +22,13 @@ import com.ruoyi.common.core.redis.RedisLockTemplate;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.system.mapper.mes.pro.ProCardMapper;
 import com.ruoyi.system.mapper.mes.pro.ProFeedbackMapper;
+import com.ruoyi.system.mapper.mes.pro.ProRouteProcessMapper;
 import com.ruoyi.system.mapper.mes.pro.ProTaskMapper;
 import com.ruoyi.system.domain.mes.pro.CardScanResultVO;
 import com.ruoyi.system.domain.mes.pro.ProCard;
 import com.ruoyi.system.domain.mes.pro.ProConstants;
 import com.ruoyi.system.domain.mes.pro.ProFeedbackConsume;
+import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
 import com.ruoyi.system.domain.mes.pro.ProTask;
 import com.ruoyi.system.service.mes.pro.IProCardService;
 import com.ruoyi.system.service.mes.pro.IProFeedbackService;
@@ -53,6 +57,8 @@ public class ProCardServiceImpl implements IProCardService
     private ProTaskMapper proTaskMapper;
     @Autowired
     private ProFeedbackMapper proFeedbackMapper;
+    @Autowired
+    private ProRouteProcessMapper routeProcessMapper;
     @Autowired
     private IProFeedbackService proFeedbackService;
     private TransactionTemplate txTemplate;
@@ -186,22 +192,25 @@ public class ProCardServiceImpl implements IProCardService
         return vo;
     }
 
-    /** 加载报工上下文：工单下可报任务/外协任务、BOM 消耗默认值、已审核合格数 */
+    /** 加载报工上下文：按路线位置筛「当前工序(可续报)+下一波」的任务、BOM 消耗默认值、已审核合格数 */
     private void loadReportContext(ProCard card, CardScanResultVO vo) {
-        // 3. 加载工单任务，筛可报（PRODUCING + 非外协工位）与外协（PRODUCING + VENDOR 工位）
+        // 3. 加载工单任务，按路线位置筛应展示的工序（游标语义=最近完成的工序，见 advanceCardStatus）
         ProTask tq = new ProTask();
         tq.setWorkorderId(card.getWorkorderId());
         List<ProTask> all = proTaskMapper.selectProTaskList(tq);
-        List<ProTask> reportable = all.stream()
+        Long routeId = all.isEmpty() ? null : all.get(0).getRouteId();
+        Set<Long> dueProcessIds = resolveDueProcessIds(routeId, card.getCurrentProcessId());
+        List<ProTask> candidates = (dueProcessIds == null) ? all
+                : all.stream().filter(t -> dueProcessIds.contains(t.getProcessId())).collect(Collectors.toList());
+        List<ProTask> reportable = candidates.stream()
                 .filter(t -> ProConstants.TASK_STATUS_PRODUCING.equals(t.getStatus()))
                 .filter(t -> !ProConstants.WS_CODE_VENDOR.equals(t.getWorkstationCode()))
-                .filter(t -> card.getCurrentProcessId() == null || card.getCurrentProcessId().equals(t.getProcessId()))
                 .collect(Collectors.toList());
         fillPendingCount(reportable);
         vo.setReportableTasks(reportable);
-        List<ProTask> outsource = all.stream()
+        // 外协任务不限状态：进行中/已完成均展示（供 App 呈现外协进度）
+        List<ProTask> outsource = candidates.stream()
                 .filter(t -> ProConstants.WS_CODE_VENDOR.equals(t.getWorkstationCode()))
-                .filter(t -> card.getCurrentProcessId() == null || card.getCurrentProcessId().equals(t.getProcessId()))
                 .collect(Collectors.toList());
         vo.setOutsourceTasks(outsource);
 
@@ -220,6 +229,52 @@ public class ProCardServiceImpl implements IProCardService
         } else {
             vo.setReportedQualifiedSum(BigDecimal.ZERO);
         }
+    }
+
+    /**
+     * 计算扫码应展示的工序集合：当前工序（支持同工序多批续报）+ 路线上位置更靠后的最近一波工序。
+     * currentProcessId 语义为「最近完成的工序」（报工/外协收货后置为该工序，见 advanceCardStatus），
+     * 故下一波 = orderNum 严格更大且最小的节点（并行路线同一波 orderNum 相同会全部纳入）。
+     * 新卡（currentProcessId 为空或不在路线上）取第一波工序。
+     * 无法定位路线时返回 null（不过滤，由报工提交侧 validateProcessSequence 兜底）。
+     */
+    private Set<Long> resolveDueProcessIds(Long routeId, Long currentProcessId) {
+        if (routeId == null) {
+            return null;
+        }
+        List<ProRouteProcess> nodes = routeProcessMapper.selectProRouteProcessByRouteId(routeId);
+        if (nodes == null || nodes.isEmpty()) {
+            return null;
+        }
+        List<ProRouteProcess> ordered = new ArrayList<>(nodes);
+        ordered.sort(Comparator.comparing(rp -> rp.getOrderNum() != null ? rp.getOrderNum() : Integer.MAX_VALUE));
+        int currentIdx = -1;
+        if (currentProcessId != null) {
+            for (int i = 0; i < ordered.size(); i++) {
+                if (currentProcessId.equals(ordered.get(i).getProcessId())) {
+                    currentIdx = i;
+                    break;
+                }
+            }
+        }
+        int waveIdx = (currentIdx >= 0) ? currentIdx + 1 : 0;
+        Set<Long> due = new HashSet<>();
+        if (currentIdx >= 0) {
+            due.add(currentProcessId);
+        }
+        if (waveIdx < ordered.size()) {
+            Integer waveOrder = ordered.get(waveIdx).getOrderNum();
+            for (int i = waveIdx; i < ordered.size(); i++) {
+                ProRouteProcess rp = ordered.get(i);
+                if (rp.getOrderNum() != null && !rp.getOrderNum().equals(waveOrder)) {
+                    break;
+                }
+                if (rp.getProcessId() != null) {
+                    due.add(rp.getProcessId());
+                }
+            }
+        }
+        return due;
     }
 
     /** 卡状态 → 不可报原因码 */

@@ -64,7 +64,8 @@
 <script setup>
 import { ref, computed, getCurrentInstance } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { getIssueDetail, issueOut, availableBatches } from '@/api/mes/wm/issue'
+import { getIssueDetail, issueOut, availableBatches, getStockByBatchCode } from '@/api/mes/wm/issue'
+import { parseQrPayload } from '@/utils/qrPayload'
 // 显式引入 uni-ui 组件（绕过 HBuilderX 发行 H5 时 easycom 失效）
 import UniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue'
 import UniNumberBox from '@/uni_modules/uni-number-box/components/uni-number-box/uni-number-box.vue'
@@ -110,7 +111,16 @@ function scanCode() {
     success: (res) => {
       const code = res.result
       lastScanCode.value = code
-      matchItem(code)
+      // 系统二维码（QXX|TYPE|CODE）按类型分发
+      const payload = parseQrPayload(code)
+      if (payload && payload.type === 'MAT') {
+        matchByBatchCode(payload.code)
+      } else if (payload && payload.type === 'ROLL') {
+        proxy.$modal.msgError('卷料码请在分切投料使用')
+      } else {
+        // 裸条码/其他系统码：当作物料编码走原逻辑
+        matchItem(code)
+      }
     },
     fail: () => { proxy.$modal.msgError('扫码取消或失败') }
   })
@@ -128,6 +138,31 @@ function matchItem(code) {
     proxy.$modal.msgError('未匹配到领料行：' + code)
     return
   }
+  pushIssueItem(matched)
+}
+
+// 扫批次码（MAT）→ 查批次库存，按物料匹配领料行并预选该批次
+async function matchByBatchCode(batchCode) {
+  let rows = []
+  try {
+    const res = await getStockByBatchCode(batchCode)
+    rows = res.data || []
+  } catch (e) { return }
+  if (!rows.length) {
+    proxy.$modal.msgError('该批次无库存：' + batchCode)
+    return
+  }
+  const stock = rows[0]
+  const matched = lines.value.find(l => l.itemCode === stock.itemCode)
+  if (!matched) {
+    proxy.$modal.msgError('批次物料不在本领料单：' + stock.itemCode)
+    return
+  }
+  pushIssueItem(matched, stock)
+}
+
+// 校验领料行（未发完、未重复）后加入发料清单；stock 传入则预填批次四件套
+function pushIssueItem(matched, stock) {
   const remain = (matched.quantityIssue || 0) - (matched.quantityIssued || 0)
   if (remain <= 0) {
     proxy.$modal.msgError('该物料已发料完成：' + matched.itemCode)
@@ -149,14 +184,14 @@ function matchItem(code) {
     quantityIssue: matched.quantityIssue,
     remain: remain,
     quantity: remain,  // 默认发料全部未发量
-    batchId: null,
-    materialStockId: null,
-    batchCode: '',
-    _batchDisplay: '',
-    warehouseId: header.value.warehouseId,
+    batchId: stock ? stock.batchId : null,
+    materialStockId: stock ? stock.materialStockId : null,
+    batchCode: stock ? (stock.batchCode || '') : '',
+    _batchDisplay: stock ? (stock.batchCode || '无批次') : '',
+    warehouseId: (stock && stock.warehouseId) || header.value.warehouseId,
     _batchOptions: []
   })
-  // 预加载该物料的可选批次
+  // 加载该物料的可选批次（扫码预选后仍可点选切换）
   loadBatchOptions(issueList.value.length - 1)
   proxy.$modal.msgSuccess('已添加：' + matched.itemName)
 }

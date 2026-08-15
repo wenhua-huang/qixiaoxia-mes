@@ -17,3 +17,5 @@ export function parseQrPayload(raw: string): { type: QrType; code: string } | nu
 }
 
 export const buildCardPayload = (cardCode: string) => buildQrPayload('CARD', cardCode)
+
+export const buildMatPayload = (batchCode: string) => buildQrPayload('MAT', batchCode)

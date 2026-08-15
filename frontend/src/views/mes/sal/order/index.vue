@@ -298,7 +298,7 @@ export default {
       form: {}, lineList: [],
       lineEditOpen: false, editingLine: null,
       twOpen: false, twLines: [], twOrderCode: '', twAutoGenFlag: true,
-      twStep: 1, twRouteOptions: [], twProductId: null, twProductName: '',
+      twStep: 1, twRouteOptions: [], twProductId: null, twProductCode: '', twProductName: '',
       twProcessGroupList: [], twRouteProcesses: [], twActiveProcesses: [],
       twBomList: [], twParamList: [],
       twSkuDialogOpen: false, twSkuChoice: '', twDeviationList: [],
@@ -401,7 +401,7 @@ export default {
     handleDelete(row) { const ids = row.orderId || this.ids; this.$modal.confirm('是否确认删除销售订单 "' + ids + '" ?').then(() => delOrder(ids)).then(() => { this.getList(); this.$modal.msgSuccess('删除成功') }).catch(() => {}) },
     handleToWorkorder(row) {
       this.twOrderCode = row.orderCode; this.twOpen = true; this.twStep = 1; this.twAutoGenFlag = true
-      this.twLines = []; this.twRouteOptions = []; this.twProductId = null; this.twProductName = ''; this.twBomList = []; this.twParamList = []; this.twRouteProcesses = []
+      this.twLines = []; this.twRouteOptions = []; this.twProductId = null; this.twProductCode = ''; this.twProductName = ''; this.twBomList = []; this.twParamList = []; this.twRouteProcesses = []
       this.twForm = { lineId: null, quantity: undefined, workorderCode: '', workorderName: '', requestDate: row.requestDate ? row.requestDate + ' 00:00:00' : null, routeProductId: null, clientOrderCode: '', orderType: 'NEW', productSize: '', ropeSpec: '', printingReq: '', packageReq: '', createSkuVariant: false, skuCode: '', skuName: '', remark: '' }
       getOrderDetail(row.orderId).then(r => { this.twLines = r.data.lines || [] }).catch(() => {})
       this.twAutoGen()
@@ -417,7 +417,7 @@ export default {
       this.twForm.routeProductId = null; this.twForm.createSkuVariant = false; this.twForm.skuCode = ''; this.twForm.skuName = ''
       this.twForm.productSize = line.productSize || ''; this.twForm.ropeSpec = line.ropeSpec || ''; this.twForm.printingReq = line.printingReq || ''; this.twForm.packageReq = line.packageReq || ''; this.twForm.clientOrderCode = line.clientOrderCode || ''
       this.twBomList = []; this.twParamList = []; this.twRouteProcesses = []
-      this.twProductId = line.productId; this.twProductName = line.productName || ''
+      this.twProductId = line.productId; this.twProductCode = line.productCode || ''; this.twProductName = line.productName || ''
       this.twRouteOptions = []
       if (line.productId) {
         listRouteProduct({ itemId: line.productId, pageSize: 100 }).then(r => {
@@ -466,7 +466,7 @@ export default {
       this.twBomEditOpen = false
     },
     // SKU
-    twGenSkuCode(v) { if (v === false) { this.twForm.skuCode = ''; return } genSerialCode('SKU_CODE').then(r => { this.twForm.skuCode = r.data || '' }) },
+    twGenSkuCode(v) { if (v === false) { this.twForm.skuCode = ''; return } genSerialCode('SKU_CODE', this.twProductCode + '-V').then(r => { this.twForm.skuCode = r.data || '' }) },
     twAutoGen(v) { if (v === false) { this.twForm.workorderCode = ''; return } genSerialCode('WORKORDER_NO').then(r => { this.twForm.workorderCode = r.data }) },
     twConfirmSku() {
       if (this.twSkuChoice === 'yes') { this.twForm.createSkuVariant = true } else { this.twForm.createSkuVariant = false }
@@ -480,7 +480,7 @@ export default {
         const result = res.data
         if (result.hasDeviation && result.deviations && result.deviations.length > 0) {
           this.twDeviationList = result.deviations; this.twSkuChoice = ''
-          genSerialCode('SKU_CODE').then(r => { this.twForm.skuCode = (r.data || '').trim() })
+          genSerialCode('SKU_CODE', this.twProductCode + '-V').then(r => { this.twForm.skuCode = (r.data || '').trim() })
           this.twForm.skuName = ''; this.twSkuDialogOpen = true
         } else { this.doTwSubmit() }
       }).catch(() => { this.doTwSubmit() })

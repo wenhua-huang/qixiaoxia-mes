@@ -34,6 +34,7 @@ public class ProConstants
     public static final String WORKORDER_STATUS_PREPARE = "PREPARE";       // 待生产/未开工
     public static final String WORKORDER_STATUS_PRODUCING = "PRODUCING";   // 生产中/已开工
     public static final String WORKORDER_STATUS_COMPLETED = "COMPLETED";   // 已完工
+    public static final String WORKORDER_STATUS_CANCEL = "CANCEL";         // 已取消
 
     /** 排产默认值 */
     public static final int DEFAULT_DURATION_MINUTES = 60;

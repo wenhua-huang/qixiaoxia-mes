@@ -46,6 +46,9 @@ const request = config => {
         const code = res.data.code || 200
         const msg = errorCode[code] || res.data.msg || errorCode['default']
         if (code === 401) {
+          // 401 前先清除可能残留的全局 loading（如登录页的"登录中"），
+          // 否则 confirm 弹窗背后会盖着 loading，重新登录后也可能残留
+          uni.hideLoading()
           showConfirm('登录状态已过期，您可以继续留在该页面，或者重新登录?').then(res => {
             if (res.confirm) {
               useUserStore().logOut().then(res => {

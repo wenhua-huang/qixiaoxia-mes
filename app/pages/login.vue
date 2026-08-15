@@ -22,7 +22,7 @@
         </view>
       </view>
       <view class="action-btn">
-        <button @click="handleLogin" class="login-btn cu-btn block bg-blue lg round">登录</button>
+        <button @click="handleLogin" :disabled="logging" class="login-btn cu-btn block bg-blue lg round">登录</button>
       </view>
       <view class="reg text-center" v-if="register">
         <text class="text-grey1">没有账号？</text>
@@ -52,6 +52,8 @@
   const captchaEnabled = ref(true)
   // 用户注册开关
   const register = ref(false)
+  // 登录请求进行中标志：防止重复点击 + 保证 loading 只开关一次
+  const logging = ref(false)
   const loginForm = ref({
     username: "admin",
     password: "admin123",
@@ -89,6 +91,7 @@
 
   // 登录方法
   async function handleLogin() {
+    if (logging.value) return
     if (loginForm.value.username === "") {
       proxy.$modal.msgError("请输入账号")
     } else if (loginForm.value.password === "") {
@@ -96,31 +99,33 @@
     } else if (loginForm.value.code === "" && captchaEnabled.value) {
       proxy.$modal.msgError("请输入验证码")
     } else {
-      proxy.$modal.loading("登录中，请耐心等待...")
-      pwdLogin()
+      logging.value = true
+      // mask: true 阻止 loading 期间点击穿透导致重复登录
+      uni.showLoading({ title: "登录中，请耐心等待...", mask: true })
+      try {
+        await useUserStore().login(loginForm.value)
+        await loginSuccess()
+      } catch (e) {
+        // 失败必须关 loading：uni.showLoading 是全局模态、跨页面不消失，
+        // 不关会让"登录中，请耐心等待..."永久残留，遮住后续所有 toast（如收货校验提示）。
+        // request.js 已对网络/业务错误做了全局 toast，这里不再重复提示。
+        if (captchaEnabled.value) {
+          getCode()
+        }
+      } finally {
+        uni.hideLoading()
+        logging.value = false
+      }
     }
   }
 
-  // 密码登录
-  async function pwdLogin() {
-    useUserStore().login(loginForm.value).then(() => {
-      proxy.$modal.closeLoading()
-      loginSuccess()
-    }).catch(() => {
-      // 失败必须关 loading：uni.showLoading 是全局模态、跨页面不消失，
-      // 不关会让"登录中，请耐心等待..."永久残留，遮住后续所有 toast（如收货校验提示）
-      proxy.$modal.closeLoading()
-      if (captchaEnabled.value) {
-        getCode()
-      }
-    })
-  }
-
-  // 登录成功后，处理函数
-  function loginSuccess(result) {
-    // 设置用户信息
-    useUserStore().getInfo().then(res => {
+  // 登录成功后获取用户信息并跳转
+  function loginSuccess() {
+    return useUserStore().getInfo().then(() => {
       proxy.$tab.reLaunch('/pages/index')
+    }).catch(() => {
+      // getInfo 失败（网络异常等）不能让用户卡在登录页无反馈
+      proxy.$modal.msgError('获取用户信息失败，请重试')
     })
   }
 

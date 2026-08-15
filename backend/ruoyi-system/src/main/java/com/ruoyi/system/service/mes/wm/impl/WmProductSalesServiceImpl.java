@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import com.ruoyi.common.enums.WmProductSalesConstants;
+import com.ruoyi.common.enums.WmWarehouseConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
@@ -22,6 +23,7 @@ import com.ruoyi.system.domain.mes.wm.WmProductSalesDetail;
 import com.ruoyi.system.domain.mes.wm.WmProductSalesLine;
 import com.ruoyi.system.domain.mes.wm.WmMaterialStock;
 import com.ruoyi.system.domain.mes.wm.WmTransaction;
+import com.ruoyi.system.domain.mes.wm.WmWarehouse;
 import com.ruoyi.system.domain.mes.wm.vo.WmStockWarehouseSummary;
 import com.ruoyi.system.domain.mes.pro.ProMaterialTrace;
 import com.ruoyi.system.domain.mes.sal.SalOrder;
@@ -32,11 +34,15 @@ import com.ruoyi.system.mapper.mes.wm.WmProductSalesDetailMapper;
 import com.ruoyi.system.mapper.mes.wm.WmMaterialStockMapper;
 import com.ruoyi.system.mapper.mes.wm.WmTransactionMapper;
 import com.ruoyi.system.mapper.mes.pro.ProMaterialTraceMapper;
+import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
+import com.ruoyi.system.mapper.mes.md.MdItemMapper;
+import com.ruoyi.system.domain.mes.md.MdItem;
 import com.ruoyi.system.service.mes.sal.ISalOrderService;
 import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 import com.ruoyi.system.service.mes.wm.IWmProductSalesService;
 import com.ruoyi.system.service.mes.wm.IWmProductSalesShipmentService;
 import com.ruoyi.system.service.mes.wm.IWmProductSalesBoxService;
+import com.ruoyi.system.service.mes.wm.IWmWarehouseService;
 
 /**
  * 销售出库单业务层（状态机 + 出库确认扣库存 + FIFO 批次拣货）
@@ -54,12 +60,15 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
     @Autowired private WmMaterialStockMapper wmMaterialStockMapper;
     @Autowired private WmTransactionMapper wmTransactionMapper;
     @Autowired private ProMaterialTraceMapper proMaterialTraceMapper;
+    @Autowired private ProWorkorderMapper proWorkorderMapper;
+    @Autowired private MdItemMapper mdItemMapper;
     @Autowired private AutoCodeGenerator autoCodeGenerator;
     @Autowired private RedisLockTemplate lockTemplate;
     @Autowired private PlatformTransactionManager transactionManager;
     @Autowired private ISalOrderService salOrderService;
     @Autowired private IWmProductSalesShipmentService shipmentService;
     @Autowired private IWmProductSalesBoxService boxService;
+    @Autowired private IWmWarehouseService wmWarehouseService;
 
     private TransactionTemplate txTemplate;
 
@@ -173,6 +182,7 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
             throw new ServiceException("当前状态[" + header.getStatus() + "]不允许出库确认");
         }
         Map<Long, WmProductSalesLine> lineMap = buildLineMap(salesId);
+        validateClientWarehouseIsolation(header, details);
         BigDecimal postedThisTime = BigDecimal.ZERO;
         for (WmProductSalesDetail d : details) {
             BigDecimal qty = d.getQuantity() != null ? d.getQuantity() : BigDecimal.ZERO;
@@ -185,6 +195,30 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         }
         updateHeaderAfterPost(header, postedThisTime);
         return salesId;
+    }
+
+    /**
+     * 客户仓硬隔离：客户专属仓(ownership_type=CUSTOMER)的货只能发给归属客户。
+     * 决策B：出库目标仓库若是客户仓，要求出库单 clientId == 仓库 clientId，否则拦截。
+     * 公共仓(ownership_type!=CUSTOMER)不受限。
+     */
+    private void validateClientWarehouseIsolation(WmProductSales header, List<WmProductSalesDetail> details) {
+        java.util.Set<Long> whIds = new java.util.HashSet<>();
+        if (header.getWarehouseId() != null) whIds.add(header.getWarehouseId());
+        if (details != null) {
+            for (WmProductSalesDetail d : details) {
+                if (d.getWarehouseId() != null) whIds.add(d.getWarehouseId());
+            }
+        }
+        Long clientId = header.getClientId();
+        for (Long whId : whIds) {
+            WmWarehouse wh = wmWarehouseService.selectWmWarehouseByWarehouseId(whId);
+            if (wh != null && WmWarehouseConstants.OWNER_CUSTOMER.equals(wh.getOwnershipType())
+                    && (clientId == null || !clientId.equals(wh.getClientId()))) {
+                throw new ServiceException("仓库[" + wh.getWarehouseName()
+                        + "]为客户专属仓，不能给当前客户发货");
+            }
+        }
     }
 
     private Map<Long, WmProductSalesLine> buildLineMap(Long salesId) {
@@ -483,9 +517,13 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
     }
 
     /**
-     * 订单行 → 出库行映射：按各仓库可用量自动拆行（FIFO，早入库的仓优先）。
-     * - 无库存：生成 1 行，warehouseId=null（前端红色提示「无库存」，由用户决定删行/保留）
-     * - 库存充足：按 FIFO 仓序逐仓分配，拆多行
+     * 订单行 → 出库行映射：工单反查精确制导 + 按各仓库可用量自动拆行（FIFO，早入库的仓优先）。
+     * <p>
+     * 候选产品解析（resolveProducedItemIds）：优先从销售行关联的工单反查 product_id（工单建变体后
+     * product_id 已是 SKU），确保"生产什么出什么"，不碰别单变体；无工单时回退到销售行 SPU。
+     * <p>
+     * - 无库存：生成 1 行（item=候选/SPU，warehouseId=null），前端红色提示「无库存」
+     * - 库存充足：按 FIFO 仓序逐仓分配，拆多行（item_id 来自库存归属的实际物料，可能是变体）
      * - 库存不足：剩余需求挂最后一行（availableQty < quantitySales，前端红标）
      */
     private List<WmProductSalesLine> mapOrderLinesToSalesLines(List<SalOrderLine> orderLines) {
@@ -493,41 +531,85 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         if (orderLines == null) return result;
         for (SalOrderLine ol : orderLines) {
             BigDecimal need = ol.getQuantity() != null ? ol.getQuantity() : BigDecimal.ZERO;
-            List<WmStockWarehouseSummary> stocks = wmMaterialStockMapper.selectStockWarehouseSummary(ol.getProductId());
+            // ★ 工单反查：解析该销售行实际产出的 product_id（可能是变体 SKU）
+            List<Long> candidateItemIds = resolveProducedItemIds(ol);
+            List<WmStockWarehouseSummary> stocks = (candidateItemIds == null || candidateItemIds.isEmpty())
+                    ? new ArrayList<>()
+                    : wmMaterialStockMapper.selectStockWarehouseSummary(candidateItemIds);
             if (stocks == null || stocks.isEmpty()) {
-                // 无库存：仓库留空，前端提示
-                result.add(buildSalesLine(ol, null, null, null, need, BigDecimal.ZERO));
+                // 无库存：保留工单产出的变体 itemId（生产什么出什么），仓库留空前端红标
+                result.add(buildNoStockLine(ol, candidateItemIds, need));
                 continue;
             }
-            // FIFO 按可用量拆行
+            // FIFO 按可用量拆行（stocks 含 itemId，多物料×多仓混合按 create_time 排序）
             BigDecimal remaining = need;
             for (WmStockWarehouseSummary s : stocks) {
                 if (remaining.compareTo(BigDecimal.ZERO) <= 0) break;
                 BigDecimal take = remaining.min(s.getQuantityAvailable());
-                result.add(buildSalesLine(ol, s.getWarehouseId(), s.getWarehouseCode(),
-                        s.getWarehouseName(), take, s.getQuantityAvailable()));
+                result.add(buildSalesLine(ol, s.getItemId(), s.getItemCode(), s.getItemName(),
+                        s.getSpecification(), s.getUnitOfMeasure(), s.getUnitName(),
+                        s.getWarehouseId(), s.getWarehouseCode(), s.getWarehouseName(), take, s.getQuantityAvailable()));
                 remaining = remaining.subtract(take);
             }
             // 库存总量不足：剩余需求挂最后一仓（take > available，前端红标）
             if (remaining.compareTo(BigDecimal.ZERO) > 0) {
                 WmStockWarehouseSummary last = stocks.get(stocks.size() - 1);
-                result.add(buildSalesLine(ol, last.getWarehouseId(), last.getWarehouseCode(),
-                        last.getWarehouseName(), remaining, last.getQuantityAvailable()));
+                result.add(buildSalesLine(ol, last.getItemId(), last.getItemCode(), last.getItemName(),
+                        last.getSpecification(), last.getUnitOfMeasure(), last.getUnitName(),
+                        last.getWarehouseId(), last.getWarehouseCode(), last.getWarehouseName(), remaining, last.getQuantityAvailable()));
             }
         }
         return result;
     }
 
-    private WmProductSalesLine buildSalesLine(SalOrderLine ol, Long whId, String whCode,
-                                              String whName, BigDecimal qty, BigDecimal avail) {
+    /**
+     * 无库存红标行：保留工单产出的变体 itemId（不回退 SPU），查 md_item 取编码/规格/单位。
+     * 查不到或无候选时才回退到销售行 SPU。
+     */
+    private WmProductSalesLine buildNoStockLine(SalOrderLine ol, List<Long> candidateItemIds, BigDecimal need) {
+        if (candidateItemIds != null && !candidateItemIds.isEmpty()) {
+            MdItem item = mdItemMapper.selectMdItemById(candidateItemIds.get(0));
+            if (item != null) {
+                return buildSalesLine(ol, item.getItemId(), item.getItemCode(), item.getItemName(),
+                        item.getSpecification(), item.getUnitOfMeasure(), item.getUnitName(),
+                        null, null, null, need, BigDecimal.ZERO);
+            }
+        }
+        // 无候选或 md_item 丢失：回退销售行 SPU 快照
+        return buildSalesLine(ol, ol.getProductId(), ol.getProductCode(), ol.getProductName(),
+                ol.getProductSpc(), ol.getUnitOfMeasure(), ol.getUnitName(),
+                null, null, null, need, BigDecimal.ZERO);
+    }
+
+    /**
+     * 解析销售行实际产出的 product_id：优先工单反查（排除 CANCEL），无工单回退到行自身 SPU。
+     * 工单建变体后 product_id 已是 SKU，确保出库只查本订单实际产出物的库存。
+     */
+    private List<Long> resolveProducedItemIds(SalOrderLine ol) {
+        List<Long> workorderProductIds = proWorkorderMapper.selectProductIdsBySalesOrderLineId(ol.getLineId());
+        if (workorderProductIds != null && !workorderProductIds.isEmpty()) {
+            return workorderProductIds;
+        }
+        // 无工单：回退到销售行自身产品（SPU，覆盖未转工单/MTS 场景）
+        List<Long> fallback = new ArrayList<>();
+        if (ol.getProductId() != null) {
+            fallback.add(ol.getProductId());
+        }
+        return fallback;
+    }
+
+    private WmProductSalesLine buildSalesLine(SalOrderLine ol, Long itemId, String itemCode,
+                                              String itemName, String spec, String unit, String unitName,
+                                              Long whId, String whCode, String whName,
+                                              BigDecimal qty, BigDecimal avail) {
         WmProductSalesLine sl = new WmProductSalesLine();
         sl.setSalesOrderLineId(ol.getLineId());
-        sl.setItemId(ol.getProductId());
-        sl.setItemCode(ol.getProductCode());
-        sl.setItemName(ol.getProductName());
-        sl.setSpecification(ol.getProductSpc());
-        sl.setUnitOfMeasure(ol.getUnitOfMeasure());
-        sl.setUnitName(ol.getUnitName());
+        sl.setItemId(itemId);
+        sl.setItemCode(itemCode);
+        sl.setItemName(itemName);
+        sl.setSpecification(spec);
+        sl.setUnitOfMeasure(unit);
+        sl.setUnitName(unitName);
         sl.setQuantitySales(qty);
         sl.setQuantityPosted(BigDecimal.ZERO);
         sl.setWarehouseId(whId);

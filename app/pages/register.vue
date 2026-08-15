@@ -26,7 +26,7 @@
         </view>
       </view>
       <view class="action-btn">
-        <button @click="handleRegister()" class="register-btn cu-btn block bg-blue lg round">注册</button>
+        <button @click="handleRegister()" :disabled="registering" class="register-btn cu-btn block bg-blue lg round">注册</button>
       </view>
     </view>
     <view class="xieyi text-center">
@@ -45,6 +45,8 @@
   const codeUrl = ref("")
   // 验证码开关
   const captchaEnabled = ref(true)
+  // 注册请求进行中标志：防止重复点击 + 保证 loading 只开关一次
+  const registering = ref(false)
   const registerForm = ref({
     username: "",
     password: "",
@@ -71,6 +73,7 @@
 
   // 注册方法
   async function handleRegister() {
+    if (registering.value) return
     if (registerForm.value.username === "") {
       proxy.$modal.msgError("请输入您的账号")
     } else if (registerForm.value.password === "") {
@@ -82,31 +85,31 @@
     } else if (registerForm.value.code === "" && captchaEnabled.value) {
       proxy.$modal.msgError("请输入验证码")
     } else {
-      proxy.$modal.loading("注册中，请耐心等待...")
-      userRegister()
-    }
-  }
-
-  // 用户注册
-  async function userRegister() {
-    register(registerForm.value).then(res => {
-      proxy.$modal.closeLoading()
-      uni.showModal({
-        title: "系统提示",
-        content: "恭喜你，您的账号 " + registerForm.value.username + " 注册成功！",
-        success: function (res) {
-          if (res.confirm) {
+      registering.value = true
+      // mask: true 阻止 loading 期间点击穿透导致重复注册
+      uni.showLoading({ title: "注册中，请耐心等待...", mask: true })
+      try {
+        await register(registerForm.value)
+        uni.hideLoading()
+        uni.showModal({
+          title: "系统提示",
+          content: "恭喜你，您的账号 " + registerForm.value.username + " 注册成功！",
+          showCancel: false,
+          success: function () {
             uni.redirectTo({ url: `/pages/login` })
           }
+        })
+      } catch (e) {
+        // 失败必须关 loading，否则"注册中，请耐心等待..."会全局残留遮住后续提示。
+        // request.js 已对网络/业务错误做了全局 toast，这里不再重复提示。
+        if (captchaEnabled.value) {
+          getCode()
         }
-      })
-    }).catch(() => {
-      // 失败必须关 loading，否则"注册中，请耐心等待..."会全局残留遮住后续提示
-      proxy.$modal.closeLoading()
-      if (captchaEnabled.value) {
-        getCode()
+      } finally {
+        uni.hideLoading()
+        registering.value = false
       }
-    })
+    }
   }
 
   getCode()

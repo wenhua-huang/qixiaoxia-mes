@@ -256,4 +256,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where workorder_id = #{workorderId}
           and status = 'PRODUCING'
     </update>
+
+    <!-- 按销售订单行反查工单产出产品（排除 CANCEL）。factory_id 由拦截器注入 -->
+    <select id="selectProductIdsBySalesOrderLineId" parameterType="Long" resultType="java.lang.Long">
+        select distinct product_id from qxx_pro_workorder
+        where sales_order_line_id = #{salesOrderLineId}
+          and status != 'CANCEL'
+          and product_id is not null
+    </select>
 </mapper>

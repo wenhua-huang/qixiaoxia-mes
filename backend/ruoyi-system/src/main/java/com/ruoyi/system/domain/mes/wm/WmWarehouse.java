@@ -32,6 +32,20 @@ public class WmWarehouse extends BaseEntity
     @Excel(name = "仓库类型:RAW-原料仓")
     private String warehouseType;
 
+    /** 归属类型:PUBLIC-公共仓,CUSTOMER-客户仓,SUPPLIER-供应商仓 */
+    @Excel(name = "归属类型")
+    private String ownershipType;
+
+    /** 客户仓归属客户ID(ownership_type=CUSTOMER时必填) */
+    private Long clientId;
+    /** 供应商仓归属供应商ID(ownership_type=SUPPLIER时必填) */
+    private Long vendorId;
+
+    /** 客户名称（LEFT JOIN 查询，不持久化） */
+    private String clientName;
+    /** 供应商名称（LEFT JOIN 查询，不持久化） */
+    private String vendorName;
+
     @Excel(name = "仓库位置/地址")
     private String address;
 
@@ -58,6 +72,19 @@ public class WmWarehouse extends BaseEntity
 
     public String getWarehouseType() { return warehouseType; }
     public void setWarehouseType(String v) { this.warehouseType = v; }
+
+    public String getOwnershipType() { return ownershipType; }
+    public void setOwnershipType(String v) { this.ownershipType = v; }
+
+    public Long getClientId() { return clientId; }
+    public void setClientId(Long v) { this.clientId = v; }
+    public Long getVendorId() { return vendorId; }
+    public void setVendorId(Long v) { this.vendorId = v; }
+
+    public String getClientName() { return clientName; }
+    public void setClientName(String v) { this.clientName = v; }
+    public String getVendorName() { return vendorName; }
+    public void setVendorName(String v) { this.vendorName = v; }
 
     public String getAddress() { return address; }
     public void setAddress(String v) { this.address = v; }

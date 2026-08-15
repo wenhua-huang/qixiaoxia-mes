@@ -13,6 +13,10 @@
       </el-form-item>
     </el-form>
 
+    <el-row style="margin-bottom: 8px;">
+      <el-button type="primary" plain icon="Plus" size="small" @click="handleCreate" v-hasPermi="['mes:wm:warehouse:add']">新建客户/供应商仓</el-button>
+    </el-row>
+
     <el-table v-loading="loading" :data="list" highlight-current-row @row-dblclick="handleRowDbClick">
       <el-table-column width="50" align="center">
         <template #default="scope">
@@ -21,7 +25,11 @@
       </el-table-column>
       <el-table-column label="编码" align="center" prop="warehouseCode" width="120" />
       <el-table-column label="名称" align="center" prop="warehouseName" :show-overflow-tooltip="true" />
-      <el-table-column label="类型" align="center" prop="warehouseType" width="90" />
+      <el-table-column label="类型" align="center" width="100">
+        <template #default="scope">
+          <dict-tag :options="mes_warehouse_owner_type" :value="scope.row.ownershipType" />
+        </template>
+      </el-table-column>
       <el-table-column label="地址" align="center" prop="address" :show-overflow-tooltip="true" />
     </el-table>
 
@@ -31,6 +39,8 @@
       <el-button type="primary" @click="confirmSelect">确 定</el-button>
       <el-button @click="showFlag = false">取 消</el-button>
     </template>
+
+    <CreateWarehouseDialog ref="createRef" @onCreated="onWarehouseCreated" />
   </el-dialog>
 </template>
 
@@ -39,8 +49,11 @@ import { ref, reactive, toRefs } from 'vue'
 import { listWmWarehouse } from '@/api/mes/wm/warehouse'
 import type { WmWarehouse } from '@/types'
 import { ElMessage } from 'element-plus'
+import CreateWarehouseDialog from './CreateWarehouseDialog.vue'
 
 const emit = defineEmits<{ onSelected: [row: WmWarehouse] }>()
+
+const { mes_warehouse_owner_type } = useDict('mes_warehouse_owner_type')
 
 const showFlag = ref(false)
 const loading = ref(false)
@@ -49,6 +62,7 @@ const showSearch = ref(true)
 const selectedId = ref<number>()
 const selectedRow = ref<WmWarehouse>()
 const list = ref<WmWarehouse[]>([])
+const createRef = ref()
 
 const data = reactive({ queryParams: { pageNum: 1, pageSize: 10, enableFlag: '1' } as any })
 const { queryParams } = toRefs(data)
@@ -64,6 +78,14 @@ function handleRowDbClick(row: WmWarehouse) { selectedRow.value = row; emit('onS
 function confirmSelect() {
   if (!selectedRow.value) { ElMessage.warning('请选择一条数据'); return }
   emit('onSelected', selectedRow.value); showFlag.value = false
+}
+function handleCreate() { createRef.value?.open() }
+function onWarehouseCreated(row: WmWarehouse) {
+  getList()                       // 刷新列表，使新建仓可见
+  selectedId.value = row.warehouseId
+  selectedRow.value = row
+  emit('onSelected', row)         // 自动选中并回填到当前单据
+  showFlag.value = false
 }
 function open(id?: number) { showFlag.value = true; selectedId.value = id; if (!list.value.length) getList() }
 defineExpose({ open })

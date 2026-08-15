@@ -653,4 +653,74 @@ class WmIssueHeaderServiceUnitTest {
                 .isInstanceOf(ServiceException.class)
                 .hasMessageContaining("未选择");
     }
+
+    // ══════════════════════════════════════════════
+    // insertWmIssueHeader 工序级幂等测试
+    // ══════════════════════════════════════════════
+
+    @Test
+    @DisplayName("25. 创建领料单：有taskId时仍按processId查重，拦截排产前已存在的同工序单")
+    void testInsertBlocksDuplicateByProcessIdWhenTaskIdPresent() {
+        // 排产前已存在一张 DRAFT 单：processId=200, taskId=null
+        WmIssueHeader existingDraft = new WmIssueHeader();
+        existingDraft.setIssueId(99L);
+        existingDraft.setIssueCode("LL-EXISTING");
+        existingDraft.setStatus("DRAFT");
+
+        // 新单：排产后有了 taskId，但 processId 相同
+        WmIssueHeader newHeader = new WmIssueHeader();
+        newHeader.setIssueCode("LL-NEW");
+        newHeader.setWorkorderId(10L);
+        newHeader.setWorkorderCode("WO-001");
+        newHeader.setIssueType("PRODUCE");
+        newHeader.setWarehouseId(1L);
+        newHeader.setProcessId(200L);
+        newHeader.setProcessName("印刷");
+        newHeader.setTaskId(602L);
+
+        when(issueHeaderMapper.selectWmIssueHeaderList(any(WmIssueHeader.class)))
+                .thenReturn(List.of(existingDraft));
+
+        assertThatThrownBy(() -> service.insertWmIssueHeader(newHeader))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("已有进行中的领料单");
+
+        // 验证查询用的是 processId（不是 taskId），锁 key 也含 processId
+        ArgumentCaptor<WmIssueHeader> qCaptor = ArgumentCaptor.forClass(WmIssueHeader.class);
+        verify(issueHeaderMapper).selectWmIssueHeaderList(qCaptor.capture());
+        assertThat(qCaptor.getValue().getProcessId()).isEqualTo(200L);
+        assertThat(qCaptor.getValue().getTaskId()).isNull();
+
+        ArgumentCaptor<String> lockCaptor = ArgumentCaptor.forClass(String.class);
+        verify(lockTemplate).execute(lockCaptor.capture(), anyLong(), any(Runnable.class));
+        assertThat(lockCaptor.getValue()).contains(":p:200");
+
+        verify(issueHeaderMapper, never()).insertWmIssueHeader(any());
+    }
+
+    @Test
+    @DisplayName("26. 创建领料单：同processId已有单为终态(CANCELED)时允许重建")
+    void testInsertAllowsWhenExistingIsTerminal() {
+        WmIssueHeader canceled = new WmIssueHeader();
+        canceled.setIssueId(99L);
+        canceled.setIssueCode("LL-CANCELED");
+        canceled.setStatus("CANCELED"); // 终态
+
+        WmIssueHeader newHeader = new WmIssueHeader();
+        newHeader.setIssueCode("LL-NEW");
+        newHeader.setWorkorderId(10L);
+        newHeader.setWorkorderCode("WO-001");
+        newHeader.setIssueType("PRODUCE");
+        newHeader.setWarehouseId(1L);
+        newHeader.setProcessId(200L);
+        newHeader.setProcessName("印刷");
+
+        when(issueHeaderMapper.selectWmIssueHeaderList(any(WmIssueHeader.class)))
+                .thenReturn(List.of(canceled));
+
+        service.insertWmIssueHeader(newHeader);
+
+        // 终态单不阻断 → 执行了 insert
+        verify(issueHeaderMapper).insertWmIssueHeader(newHeader);
+    }
 }

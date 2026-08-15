@@ -37,6 +37,7 @@
       </el-table-column>
       <el-table-column label="入库名称" align="center" prop="recptName" :show-overflow-tooltip="true" width="180" />
       <el-table-column label="工单号" align="center" prop="workorderCode" width="160" />
+      <el-table-column label="客户" align="center" prop="clientName" :show-overflow-tooltip="true" width="140" />
       <el-table-column label="产品编码" align="center" prop="produceCode" width="140" />
       <el-table-column label="仓库" align="center" prop="warehouseName" width="120" />
       <el-table-column label="入库数量" align="center" prop="totalQuantity" width="100" />
@@ -85,6 +86,13 @@
             </el-form-item>
           </el-col>
         </el-row>
+        <el-row v-if="form.clientName">
+          <el-col :span="12">
+            <el-form-item label="客户">
+              <el-input v-model="form.clientName" readonly placeholder="—" />
+            </el-form-item>
+          </el-col>
+        </el-row>
         <el-row>
           <el-col :span="8">
             <el-form-item label="入库日期" prop="recptDate">
@@ -92,12 +100,22 @@
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item label="仓库" prop="warehouseName">
-              <el-input v-model="form.warehouseName" readonly placeholder="请选择仓库">
-                <template #append><el-button icon="Search" @click="handleSelectWarehouse" /></template>
-              </el-input>
+            <el-form-item label="仓库" prop="warehouseId">
+              <div style="display:flex;gap:6px;width:100%">
+                <el-input v-model="form.warehouseName" readonly placeholder="请选择仓库" style="flex:1">
+                  <template #append><el-button icon="Search" @click="handleSelectWarehouse" /></template>
+                </el-input>
+                <el-tooltip :content="form.clientId ? '新建该客户的专属仓' : '请先选择工单(带客户)'" placement="top">
+                  <span>
+                    <el-button icon="Plus" :disabled="!form.clientId"
+                               v-hasPermi="['mes:wm:warehouse:add']"
+                               @click="openCreateWarehouse" />
+                  </span>
+                </el-tooltip>
+              </div>
             </el-form-item>
             <WarehouseSelect ref="warehouseSelectRef" @onSelected="onWarehouseSelected" />
+            <CreateWarehouseDialog ref="createWarehouseRef" @onCreated="onWarehouseCreated" />
           </el-col>
           <el-col :span="8">
             <el-form-item label="总箱数" prop="totalBox">
@@ -128,7 +146,7 @@
       <template #footer>
         <div class="dialog-footer">
           <el-button type="primary" @click="submitForm">保存单据</el-button>
-          <el-button v-if="form.recptId && form.status === 'DRAFT'" type="warning" @click="handleConfirm(form as WmProductRecpt)">提交入库</el-button>
+          <el-button v-if="form.recptId && form.status === 'DRAFT'" type="warning" @click="handleConfirm()">提交入库</el-button>
           <el-button @click="cancel">关 闭</el-button>
         </div>
       </template>
@@ -151,11 +169,13 @@ import type { WmProductRecptQueryParams, WmProductRecpt } from '@/api/mes/wm/pro
 import { listWmProductRecpt, getWmProductRecpt, delWmProductRecpt, addWmProductRecpt, updateWmProductRecpt } from '@/api/mes/wm/product_recpt'
 import request from '@/utils/request'
 import WarehouseSelect from '@/components/warehouseSelect/single.vue'
+import CreateWarehouseDialog from '@/components/warehouseSelect/CreateWarehouseDialog.vue'
 import WorkorderSelect from '@/components/workorderSelect/single.vue'
 
 const { proxy } = getCurrentInstance() as any
 const { mes_itemrecpt_status } = useDict('mes_itemrecpt_status')
 const warehouseSelectRef = ref()
+const createWarehouseRef = ref()
 const woSelectRef = ref()
 
 const recptList = ref<WmProductRecpt[]>([])
@@ -250,17 +270,43 @@ function onWarehouseSelected(row: any) {
   form.value.warehouseName = row.warehouseName
   form.value.warehouseCode = row.warehouseCode
 }
+/** 快捷新建客户仓：默认带入工单对应的客户，新建后自动选中 */
+function openCreateWarehouse() {
+  if (!form.value.clientId) return
+  createWarehouseRef.value?.open('CUSTOMER', {
+    clientId: form.value.clientId,
+    clientName: form.value.clientName
+  })
+}
+function onWarehouseCreated(w: any) {
+  form.value.warehouseId = w.warehouseId
+  form.value.warehouseName = w.warehouseName
+  form.value.warehouseCode = w.warehouseCode
+}
 function handleExport() { proxy.download('/mes/wm/product_recpt/export', { ...queryParams.value }, `productrecpt_${Date.now()}.xlsx`) }
 function handleConfirm(row?: WmProductRecpt) {
+  const fromDialog = !row
   const target = row || form.value
   if (!target?.recptId || !target?.recptCode) return
-  proxy.$modal.confirm(`确认收货 "${target.recptCode}"？系统将更新库存。`).then(() => {
-    request({ url: `/mes/wm/product_recpt/confirm/${target.recptId}`, method: 'put' }).then(() => {
-      proxy.$modal.msgSuccess('收货确认成功，库存已更新')
-      open.value = false
-      getList()
+  // 从弹窗提交时：先校验表单（仓库必选），通过后保存再确认
+  const doConfirm = () => {
+    proxy.$modal.confirm(`确认收货 "${target.recptCode}"？系统将更新库存。`).then(() => {
+      request({ url: `/mes/wm/product_recpt/confirm/${target.recptId}`, method: 'put' }).then(() => {
+        proxy.$modal.msgSuccess('收货确认成功，库存已更新')
+        open.value = false
+        getList()
+      })
+    }).catch(() => {})
+  }
+  if (fromDialog) {
+    proxy.$refs['formRef'].validate((valid: boolean) => {
+      if (!valid) return
+      // 保存弹窗中可能修改的仓库等字段，再确认
+      updateWmProductRecpt(form.value).then(() => doConfirm())
     })
-  }).catch(() => {})
+  } else {
+    doConfirm()
+  }
 }
 function handlePost(row: WmProductRecpt) {
   proxy.$modal.confirm(`确认过账入库单 "${row.recptCode}"？`).then(() => {

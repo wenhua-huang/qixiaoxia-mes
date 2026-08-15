@@ -13,7 +13,7 @@ export function getWmWarehouse(warehouseId: number): Promise<AjaxResult<WmWareho
   return request({ url: '/mes/wm/warehouse/' + warehouseId, method: 'get' })
 }
 
-export function addWmWarehouse(d: WmWarehouse): Promise<AjaxResult> {
+export function addWmWarehouse(d: WmWarehouse): Promise<AjaxResult<WmWarehouse>> {
   return request({ url: '/mes/wm/warehouse', method: 'post', data: d })
 }
 

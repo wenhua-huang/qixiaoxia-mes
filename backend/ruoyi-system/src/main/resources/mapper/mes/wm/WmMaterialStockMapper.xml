@@ -300,9 +300,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         from qxx_wm_material_stock s
         left join qxx_wm_warehouse w on w.warehouse_id = s.warehouse_id
         left join qxx_md_item i on i.item_id = s.item_id
-        where s.item_id in
-        <foreach item="id" collection="itemIds" open="(" separator="," close=")">#{id}</foreach>
-          and s.quantity_available > 0
+        <where>
+            <choose>
+                <when test="itemIds != null and itemIds.size() > 0">
+                    s.item_id in
+                    <foreach item="id" collection="itemIds" open="(" separator="," close=")">#{id}</foreach>
+                </when>
+                <otherwise>1 = 0</otherwise>
+            </choose>
+            and s.quantity_available > 0
+        </where>
         group by s.item_id, s.warehouse_id
         order by min(s.create_time) asc
     </select>

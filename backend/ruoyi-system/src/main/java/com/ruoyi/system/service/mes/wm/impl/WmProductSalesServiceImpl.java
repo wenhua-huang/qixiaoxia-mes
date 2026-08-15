@@ -565,7 +565,7 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
             List<WmStockWarehouseSummary> stocks = (candidateItemIds == null || candidateItemIds.isEmpty())
                     ? new ArrayList<>()
                     : wmMaterialStockMapper.selectStockWarehouseSummary(candidateItemIds);
-            if (stocks.isEmpty()) {
+            if (stocks == null || stocks.isEmpty()) {
                 // 无库存：item 回退到销售行 SPU，仓库留空，前端提示
                 result.add(buildSalesLine(ol, ol.getProductId(), ol.getProductCode(), ol.getProductName(),
                         null, null, null, need, BigDecimal.ZERO));

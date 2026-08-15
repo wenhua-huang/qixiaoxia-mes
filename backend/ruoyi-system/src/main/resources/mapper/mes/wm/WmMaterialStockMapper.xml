@@ -287,17 +287,33 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by create_time asc
     </select>
 
-    <!-- 按 itemId 聚合各仓库可用量（建议出库仓库 / 按仓拆行用）FIFO：早入库的仓优先 -->
+    <!-- 按 itemId 集合聚合各仓库可用量（建议出库仓库 / 按仓拆行用）FIFO：早入库的仓优先。
+         支持多 itemId（工单反查精确制导）；factory_id 由拦截器注入 -->
     <select id="selectStockWarehouseSummary" resultType="com.ruoyi.system.domain.mes.wm.vo.WmStockWarehouseSummary">
-        select s.warehouse_id as warehouseId,
+        select s.item_id as itemId,
+               coalesce(max(i.item_code), max(s.item_code)) as itemCode,
+               coalesce(max(i.item_name), max(s.item_name)) as itemName,
+               coalesce(max(i.specification), max(s.specification)) as specification,
+               coalesce(max(i.unit_of_measure), max(s.unit_of_measure)) as unitOfMeasure,
+               coalesce(max(i.unit_name), max(s.unit_name)) as unitName,
+               s.warehouse_id as warehouseId,
                max(s.warehouse_code) as warehouseCode,
                coalesce(max(s.warehouse_name), max(w.warehouse_name)) as warehouseName,
                sum(s.quantity_available) as quantityAvailable
         from qxx_wm_material_stock s
         left join qxx_wm_warehouse w on w.warehouse_id = s.warehouse_id
-        where s.item_id = #{itemId}
-          and s.quantity_available > 0
-        group by s.warehouse_id
+        left join qxx_md_item i on i.item_id = s.item_id
+        <where>
+            <choose>
+                <when test="itemIds != null and itemIds.size() > 0">
+                    s.item_id in
+                    <foreach item="id" collection="itemIds" open="(" separator="," close=")">#{id}</foreach>
+                </when>
+                <otherwise>1 = 0</otherwise>
+            </choose>
+            and s.quantity_available > 0
+        </where>
+        group by s.item_id, s.warehouse_id
         order by min(s.create_time) asc
     </select>
 

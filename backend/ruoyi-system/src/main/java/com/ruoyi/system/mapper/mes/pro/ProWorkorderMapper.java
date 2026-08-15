@@ -12,6 +12,13 @@ public interface ProWorkorderMapper {
     int updateProWorkorder(ProWorkorder w);
     int deleteProWorkorderByWorkorderId(Long id);
     int deleteProWorkorderByWorkorderIds(Long[] ids);
+
+    /**
+     * 按销售订单行反查工单实际产出的 product_id 集合（排除已取消 CANCEL）。
+     * 用于出库草稿"工单反查精确制导"：只查本订单工单产出的物料库存（含变体），不碰别单的变体。
+     * factory_id 由拦截器注入。
+     */
+    List<Long> selectProductIdsBySalesOrderLineId(Long salesOrderLineId);
     /** 审核报工时原子增量更新工单已生产数量 */
     int addQuantityProduced(@org.apache.ibatis.annotations.Param("workorderId") Long workorderId,
             @org.apache.ibatis.annotations.Param("deltaProduced") BigDecimal deltaProduced);

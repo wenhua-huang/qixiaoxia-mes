@@ -49,10 +49,13 @@ public interface WmMaterialStockMapper
             @Param("qualityStatus") String qualityStatus);
 
     /**
-     * 按 itemId 聚合各仓库可用量（SUM quantity_available），用于「从销售订单生成」时建议出库仓库与按仓拆行。
+     * 按 itemId 集合聚合各仓库可用量（SUM quantity_available），用于「从销售订单生成」时建议出库仓库与按仓拆行。
+     * 支持多 itemId（工单反查精确制导：一个销售行可能关联多张工单产出多个变体），按 (item_id, warehouse_id) 分组。
      * 按 MIN(create_time) ASC 排序（FIFO：早入库的仓优先）。factory_id 由拦截器注入。
+     *
+     * @param itemIds 物料ID集合（空集合返回空列表）
      */
-    public List<WmStockWarehouseSummary> selectStockWarehouseSummary(@Param("itemId") Long itemId);
+    public List<WmStockWarehouseSummary> selectStockWarehouseSummary(@Param("itemIds") Collection<Long> itemIds);
 
     /**
      * 按 itemId 集合批量查库存（消除逐物料 N+1，factory_id 由拦截器注入）。

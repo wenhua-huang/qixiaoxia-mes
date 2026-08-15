@@ -44,6 +44,16 @@ public class WmRollDetailController extends BaseController
         return AjaxResult.success(list);
     }
 
+    /**
+     * 卷料码精确反查纸卷（扫码用）：roll_code 唯一，返回纸卷实体。
+     */
+    @PreAuthorize("@ss.hasPermi('mes:wm:roll_detail:query')")
+    @GetMapping("/scan/{rollCode}")
+    public AjaxResult scan(@PathVariable("rollCode") String rollCode)
+    {
+        return AjaxResult.success(wmRollDetailService.scanByRollCode(rollCode));
+    }
+
     @PreAuthorize("@ss.hasPermi('mes:wm:roll_detail:export')")
     @Log(title = "纸卷明细表", businessType = BusinessType.EXPORT)
     @PostMapping("/export")

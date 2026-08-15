@@ -4,6 +4,7 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.system.domain.mes.wm.WmRollDetail;
 import com.ruoyi.system.mapper.mes.wm.WmRollDetailMapper;
@@ -54,5 +55,16 @@ public class WmRollDetailServiceImpl implements IWmRollDetailService
     @Transactional
     public int deleteWmRollDetailByRollIds(Long[] rollIds) {
         return wmRollDetailMapper.deleteWmRollDetailByRollIds(rollIds);
+    }
+
+    /** 卷料码精确反查（扫码用）：roll_code 唯一，未找到抛业务异常 */
+    @Override
+    public WmRollDetail scanByRollCode(String rollCode) {
+        String code = rollCode == null ? "" : rollCode.trim();
+        WmRollDetail roll = wmRollDetailMapper.selectWmRollDetailByRollCode(code);
+        if (roll == null) {
+            throw new ServiceException("未找到纸卷：" + code);
+        }
+        return roll;
     }
 }

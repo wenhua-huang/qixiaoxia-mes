@@ -22,4 +22,9 @@ public interface WmRollDetailMapper
     public int markOutsourcedIfInStock(@Param("rollId") Long rollId,
                                        @Param("operator") String operator,
                                        @Param("now") Date now);
+
+    /**
+     * 按卷料码精确反查纸卷（扫码用）。roll_code 有唯一索引；factory_id 由拦截器注入。
+     */
+    public WmRollDetail selectWmRollDetailByRollCode(@Param("rollCode") String rollCode);
 }

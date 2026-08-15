@@ -239,4 +239,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </foreach>
     </delete>
 
+    <!-- 按卷料码精确反查纸卷（扫码用，roll_code 唯一索引）；factory_id 由拦截器注入 -->
+    <select id="selectWmRollDetailByRollCode" parameterType="String" resultMap="WmRollDetailResult">
+        <include refid="selectWmRollDetailVo"/>
+        where roll_code = #{rollCode}
+    </select>
+
 </mapper>

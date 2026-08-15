@@ -71,6 +71,16 @@ public class WmProductSalesController extends BaseController
         return AjaxResult.success(wmProductSalesService.getDetail(salesId));
     }
 
+    /** 按出库单编码查整单（移动端扫码查单）：聚合头+行+明细+发运+装箱 */
+    @PreAuthorize("@ss.hasPermi('mes:wm:sales:query')")
+    @GetMapping("/byCode")
+    public AjaxResult getDetailByCode(@RequestParam("salesCode") String salesCode)
+    {
+        WmProductSales detail = wmProductSalesService.getDetailBySalesCode(salesCode);
+        if (detail == null) return error("出库单不存在");
+        return AjaxResult.success(detail);
+    }
+
     @PreAuthorize("@ss.hasPermi('mes:wm:sales:add')")
     @Log(title = "销售出库单", businessType = BusinessType.INSERT)
     @PostMapping

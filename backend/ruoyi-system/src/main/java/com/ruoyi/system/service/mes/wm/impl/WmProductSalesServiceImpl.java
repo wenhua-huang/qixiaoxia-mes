@@ -163,6 +163,13 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         return header;
     }
 
+    @Override
+    public WmProductSales getDetailBySalesCode(String salesCode) {
+        WmProductSales header = wmProductSalesMapper.selectWmProductSalesBySalesCode(salesCode);
+        if (header == null) return null;
+        return getDetail(header.getSalesId());
+    }
+
     // ════════════════════ 出库确认（核心） ════════════════════
 
     @Override

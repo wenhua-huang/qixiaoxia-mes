@@ -19,6 +19,9 @@ public interface IWmProductSalesService
     /** 详情：聚合头+行+明细 */
     public WmProductSales getDetail(Long salesId);
 
+    /** 按出库单编码查详情（移动端扫码查单）：聚合头+行+明细+发运+装箱，找不到返回 null */
+    public WmProductSales getDetailBySalesCode(String salesCode);
+
     /** 出库确认：DRAFT/PARTIAL_POSTED → POSTED 或 PARTIAL_POSTED，扣减库存 */
     public int postOut(Long salesId, List<WmProductSalesDetail> details);
 

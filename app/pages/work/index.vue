@@ -108,6 +108,12 @@
             <text class="text">外协发料</text>
           </view>
         </uni-grid-item>
+        <uni-grid-item @click="goOutsourceList">
+          <view class="grid-item-box">
+            <uni-icons type="paperplane" size="30" color="#e6a23c"></uni-icons>
+            <text class="text">外协单</text>
+          </view>
+        </uni-grid-item>
         <uni-grid-item @click="goSlittingList">
           <view class="grid-item-box">
             <uni-icons type="list" size="30" color="#9c27b0"></uni-icons>
@@ -278,6 +284,10 @@
     proxy.$tab.navigateTo('/pages/mes/wm/outsource-list')
   }
   function goOutsourceHistory() {
+    proxy.$tab.navigateTo('/pages/mes/wm/outsource-list')
+  }
+  // 我方员工的外协单列表入口（收货入库/扫卡定位）
+  function goOutsourceList() {
     proxy.$tab.navigateTo('/pages/mes/wm/outsource-list')
   }
   function goProductRecpt() {

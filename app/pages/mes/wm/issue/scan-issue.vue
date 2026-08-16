@@ -116,14 +116,22 @@ function handleCode(code) {
   }
 }
 
-// 扫码（App/小程序可用；H5 平台 uni.scanCode 不支持，请用输入框粘贴二维码内容）
+// 扫码：H5 跳统一相机扫码页（html5-qrcode，回调取结果）；App/小程序用原生 uni.scanCode
 function scanCode() {
+  // #ifdef H5
+  uni.navigateTo({
+    url: '/pages/mes/pro/scan?callback=1',
+    events: { scanResult: (code) => handleCode(code) }
+  })
+  // #endif
+  // #ifndef H5
   uni.scanCode({
     onlyFromCamera: false,
     scanType: ['barCode', 'qrCode'],
     success: (res) => { handleCode(res.result) },
     fail: () => { proxy.$modal.msgError('扫码取消或失败') }
   })
+  // #endif
 }
 
 // 扫码后匹配领料行（按物料编码匹配）

@@ -103,12 +103,20 @@ function handleCode(code) {
 }
 
 function scanCode() {
+  // #ifdef H5
+  uni.navigateTo({
+    url: '/pages/mes/pro/scan?callback=1',
+    events: { scanResult: (code) => handleCode(code) }
+  })
+  // #endif
+  // #ifndef H5
   uni.scanCode({
     onlyFromCamera: false,
     scanType: ['barCode', 'qrCode'],
     success: (res) => { handleCode(res.result) },
     fail: () => { proxy.$modal.msgError('扫码取消或失败') }
   })
+  // #endif
 }
 
 // 手动输入/粘贴 → 统一走 handleCode（H5 无相机扫码，粘贴二维码文本是主要入口）

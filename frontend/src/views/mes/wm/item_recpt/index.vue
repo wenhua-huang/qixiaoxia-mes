@@ -47,6 +47,13 @@
           <dict-tag :options="mes_itemrecpt_status" :value="scope.row.status" />
         </template>
       </el-table-column>
+      <el-table-column label="检验状态" align="center" width="110">
+        <template #default="scope">
+          <el-tag v-if="scope.row.qcStatus && scope.row.qcStatus !== 'NONE'" size="small" :type="qcTagType(scope.row.qcStatus)"
+            style="cursor: pointer" @click="goIqc(scope.row)">{{ qcTagText(scope.row.qcStatus) }}</el-tag>
+          <span v-else>-</span>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" align="center" width="140" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-tooltip content="修改" placement="top" v-if="isEditable(scope.row)"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:itemrecpt:edit']"></el-button></el-tooltip>
@@ -68,6 +75,7 @@
 
 <script setup lang="ts" name="WmItemRecpt">
 import { ref, reactive, toRefs, getCurrentInstance } from 'vue'
+import { useRouter } from 'vue-router'
 import type { WmItemRecptQueryParams, WmItemRecpt } from '@/types/api/mes/wm/item_recpt'
 import type { PurOrder } from '@/types/api/mes/pur/order'
 import { listWmItemRecpt, delWmItemRecpt, buildFromPurOrder } from '@/api/mes/wm/item_recpt'
@@ -137,6 +145,20 @@ function onPurOrderSelected(row: PurOrder) {
     if (!r.data) return
     formDialogRef.value?.openAdd(r.data)
   })
+}
+
+// 检验状态 tag：点击跳转 IQC 列表页并按来源单据过滤
+const router = useRouter()
+const QC_TAG: Record<string, { type: string; text: string }> = {
+  PASSED: { type: 'success', text: '检验合格' },
+  CONCESSION: { type: 'warning', text: '让步接收' },
+  PENDING: { type: 'info', text: '待检验' },
+  FAILED: { type: 'danger', text: '检验不合格' }
+}
+function qcTagType(s: string) { return QC_TAG[s]?.type || 'info' }
+function qcTagText(s: string) { return QC_TAG[s]?.text || s }
+function goIqc(row: WmItemRecpt) {
+  router.push({ path: '/qc/qciqc', query: { sourceDocId: String(row.recptId) } })
 }
 
 getList()

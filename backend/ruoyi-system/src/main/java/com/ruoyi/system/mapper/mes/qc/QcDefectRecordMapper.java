@@ -29,4 +29,12 @@ public interface QcDefectRecordMapper
      * @return 删除行数
      */
     public int deleteByOrder(@Param("qcType") String qcType, @Param("qcId") Long qcId);
+
+    /**
+     * 批量插入缺陷记录（与检验行同款全删全插策略；factory_id 由拦截器注入）
+     *
+     * @param records 缺陷记录列表（qcType/qcId 由调用方回填）
+     * @return 插入行数
+     */
+    public int batchInsert(@Param("records") List<QcDefectRecord> records);
 }

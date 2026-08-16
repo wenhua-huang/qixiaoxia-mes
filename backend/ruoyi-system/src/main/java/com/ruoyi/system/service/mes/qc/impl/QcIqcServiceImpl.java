@@ -127,12 +127,37 @@ public class QcIqcServiceImpl implements IQcIqcService
         keepJudgementFields(qciqc, current);
         qciqc.setUpdateTime(DateUtils.getNowDate());
         int rows = qcIqcMapper.updateQcIqc(qciqc);
-        // 行集 null=本次未提交，不清空（与模板头行级联同一保护策略）
+        // 行集/缺陷集 null=本次未提交，不清空（与模板头行级联同一保护策略）
         if (qciqc.getLines() != null)
         {
             qcOrderLineService.replaceLines(QcConstants.TYPE_IQC, qciqc.getIqcId(), qciqc.getLines());
         }
+        if (qciqc.getDefectRecords() != null)
+        {
+            replaceDefectRecords(QcConstants.TYPE_IQC, qciqc.getIqcId(), qciqc.getDefectRecords());
+        }
         return rows;
+    }
+
+    /** 缺陷记录全删全插（编辑频度低，替换策略最简单且无孤儿行；null 语义在调用处判断） */
+    private void replaceDefectRecords(String qcType, Long qcId, List<QcDefectRecord> defects)
+    {
+        qcDefectRecordMapper.deleteByOrder(qcType, qcId);
+        if (defects == null || defects.isEmpty())
+        {
+            return;
+        }
+        for (QcDefectRecord defect : defects)
+        {
+            defect.setRecordId(null);
+            defect.setQcType(qcType);
+            defect.setQcId(qcId);
+            if (defect.getCreateTime() == null)
+            {
+                defect.setCreateTime(DateUtils.getNowDate());
+            }
+        }
+        qcDefectRecordMapper.batchInsert(defects);
     }
 
     /**

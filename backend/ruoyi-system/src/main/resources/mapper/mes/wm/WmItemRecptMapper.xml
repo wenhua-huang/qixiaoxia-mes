@@ -37,9 +37,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select recpt_id, factory_id, recpt_code, recpt_name, pur_order_id, pur_order_code, vendor_id, vendor_code, vendor_name, warehouse_id, warehouse_code, warehouse_name, recpt_date, recpt_type, total_quantity, workorder_id, workorder_code, iqc_id, iqc_code, status, remark, create_by, create_time, update_by, update_time from qxx_wm_item_recpt
     </sql>
 
-    <!-- 列表带 qcStatus 计算列：对本入库单全部 IQC 单状态汇总
-         （任一 COMPLETED+PASS→PASSED；COMPLETED+CONCESSION→CONCESSION；COMPLETED+FAIL→FAILED；
-           存在 PENDING/INSPECTING→PENDING；无单→NONE）。
+    <!-- 列表带 qcStatus 计算列：对本入库单全部 IQC 单状态汇总（最差优先，
+         任一 COMPLETED+FAIL→FAILED；COMPLETED+CONCESSION→CONCESSION；存在 PENDING/INSPECTING→PENDING；
+         全部 COMPLETED+PASS→PASSED；无单→NONE。与 confirm 拦截门判定口径一致，防列表显示 PASSED 但确认被拦）。
          注：外层恒真条件保证 WHERE 必渲染 — FactoryIdInterceptor 注入 factory_id 时
          不致误将子查询的 where 当作外层 where 导致注入点错位。 -->
     <select id="selectWmItemRecptList" parameterType="WmItemRecpt" resultMap="WmItemRecptResult">
@@ -49,10 +49,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                t.iqc_id, t.iqc_code, t.status, t.remark, t.create_by, t.create_time, t.update_by, t.update_time,
                (
                    select case
-                       when max(case when i.status = 'COMPLETED' and i.check_result = 'PASS' then 1 else 0 end) = 1 then 'PASSED'
-                       when max(case when i.status = 'COMPLETED' and i.check_result = 'CONCESSION' then 1 else 0 end) = 1 then 'CONCESSION'
                        when max(case when i.status = 'COMPLETED' and i.check_result = 'FAIL' then 1 else 0 end) = 1 then 'FAILED'
+                       when max(case when i.status = 'COMPLETED' and i.check_result = 'CONCESSION' then 1 else 0 end) = 1 then 'CONCESSION'
                        when max(case when i.status in ('PENDING', 'INSPECTING') then 1 else 0 end) = 1 then 'PENDING'
+                       when max(case when i.status = 'COMPLETED' and i.check_result = 'PASS' then 1 else 0 end) = 1 then 'PASSED'
                        else 'NONE'
                    end
                    from qxx_qc_iqc i

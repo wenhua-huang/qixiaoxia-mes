@@ -93,31 +93,38 @@ qc 模块目前 0 实现：无 Flyway 表、无后端包、无前端页面。已
 
 ### 4.1 IQC 来料检
 
+库存动作时机（已核实源码）：`confirmItemRecpt`（DRAFT→CONFIRMED）即增加库存，`postItemRecpt` 仅回写 PO。因此拦截点在 **confirm**，检验单生成提前到**创建（DRAFT）阶段**——形成标准 IQC 流程：收货建单 → 检验 → 判合格 → 入库。
+
 ```
-采购入库单(fromPurOrder/receive 收货, DRAFT)
-  → confirm 确认时：按行物料查 IQC 模板，有模板 → 自动生成 PENDING 检验单
+采购入库单创建(fromPurOrder / receive, DRAFT)
+  → 创建时：按行物料查 IQC 模板，有模板 → 自动生成 PENDING 检验单
      (source=item_recpt/line，回填单头 iqc_id/iqc_code 存首张)
   → 质检员录入行结果+缺陷 → 判定(COMPLETED, PASS/FAIL/CONCESSION)
-  → post 过账时：按 source 反查全部关联检验单，
-     需检物料均存在 COMPLETED 且 PASS/CONCESSION → 放行；否则拒绝并提示
+  → confirm 确认入库时（doConfirmItemRecpt 共享核心，天然覆盖 PC confirm
+     与移动端一键收货 receiveWithLines）：按 source 反查全部关联检验单，
+     需检物料均 COMPLETED 且 PASS/CONCESSION → 放行；否则拒绝并提示
   → FAIL 处置：引导走供应商退货 rt_vendor(现有功能，不自动生成)
 ```
+
+已知一期限制：需检物料走移动端"一键收货"会被 confirm 校验拒绝（整事务回滚），须在 PC 端完成检验后再确认；移动端检验录入为二期。
 
 ### 4.2 IPQC 工序检 + 完工检
 
 - **工序检生成**：报工确认（`ProFeedbackServiceImpl.confirm`，含 batchConfirm）时，若工序 `is_check='Y'` 且该物料(+工序)配了 IPQC 模板 → 生成 PENDING 检验单并回填 `card_process.ipqc_id/ipqc_code`。**弱拦截**：报工本身不阻断（报工已有 quantityUncheck 待检数量承接），流转卡流转下一工序时前端提示存在未完成检验。
 - **首检/巡检**：质检员在 IPQC 列表手工创建（选工单/流转卡/工序/检验类型），不依赖报工。
-- **完工检（LAST_CHECK）生成**：产品入库单 `confirm` 时按工单产品查 IPQC(LAST_CHECK) 模板生成，回填 `product_recpt.ipqc_id/ipqc_code`；`post` 过账拦截规则同 IQC。
+- **完工检（LAST_CHECK）生成**：产品入库单创建（`fromWorkorder`，DRAFT）时按工单产品查 IPQC(LAST_CHECK) 模板生成，回填 `product_recpt.ipqc_id/ipqc_code`；**confirm 确认入库时拦截**（confirm 与 mobileConfirm 两个入口，库存动作在 confirm），规则同 IQC。
 
 ### 4.3 OQC 出厂检
 
+库存动作时机（已核实源码）：`postOut`（出库确认）即扣减库存。
+
 ```
-销售出库单(product_sales)
-  → confirm 确认时：按行物料查 OQC 模板，有模板 → 生成 PENDING 检验单(按物料去重，多物料多张)
-  → post 过账时：需检物料均 COMPLETED 且 PASS/CONCESSION → 放行；否则拒绝
+销售出库单创建(fromSaleOrder / 手动新增, DRAFT)
+  → 创建时：按行物料查 OQC 模板，有模板 → 生成 PENDING 检验单(按物料去重，多物料多张)
+  → postOut 出库确认(扣库存)前：需检物料均 COMPLETED 且 PASS/CONCESSION → 放行；否则拒绝
 ```
 
-发运(shipment)不再重复拦截（过账已拦截，货已放行）。
+发运(shipment)不再重复拦截（出库确认已拦截，货已放行）。
 
 ### 4.4 RQC 退料检
 
@@ -164,9 +171,9 @@ qc 模块目前 0 实现：无 Flyway 表、无后端包、无前端页面。已
 ## 8. 测试策略
 
 - 后端单测：判定引擎规则（边界值/Ac/缺陷率/让步）全覆盖
-- Service 层集成测试：四类拦截点（item_recpt.post、product_recpt.post、product_sales.post、rt_issue.execute）放行与拒绝路径
+- Service 层集成测试：四类拦截点（item_recpt.confirm、product_recpt.confirm、product_sales.postOut、rt_issue.execute）放行与拒绝路径
 - E2E：按 run-tests skill 红线——后端改动必须 `mvn -pl ruoyi-admin -am package -DskipTests` + 重启 + token 实测接口；前端页面浏览器实测
-- 验收场景：①配模板来料 → 无检验单不能过账 → 检验 PASS 后过账成功；②未配模板来料直接过账；③FAIL → 让步改判 CONCESSION → 过账；④isCheck 工序报工生成 IPQC 并回填 card_process；⑤多物料出库单生成多张 OQC
+- 验收场景：①配模板来料 → 未完成检验不能确认入库 → 检验 PASS 后确认成功；②未配模板来料直接确认；③FAIL → 让步改判 CONCESSION → 确认成功；④isCheck 工序报工生成 IPQC 并回填 card_process；⑤多物料出库单生成多张 OQC
 
 ## 9. 实施波次
 
@@ -178,8 +185,8 @@ qc 模块目前 0 实现：无 Flyway 表、无后端包、无前端页面。已
 
 每波次完成后走后端验证红线（打包 → 重启 → 实测）；各波次同时包含对应下游单据页面的"检验状态"展示改造（见 §6）。
 
-改动的现有业务代码点（供确认，均为 Service 层注入校验/生成逻辑）：
-`WmItemRecptServiceImpl.confirm/post`、`WmProductRecptServiceImpl.confirm/post`、`WmProductSalesServiceImpl.confirm/post`、`WmRtIssueServiceImpl.execute`、`ProFeedbackServiceImpl.confirm/batchConfirm`。
+改动的现有业务代码点（供确认，均为 Service 层注入生成/校验逻辑）：
+`WmItemRecptServiceImpl.insertWmItemRecpt+receiveWithLines(生成)/doConfirmItemRecpt(拦截)`、`WmProductRecptServiceImpl.insertWmProductRecpt(生成)/confirmProductRecpt+mobileConfirmProductRecpt(拦截)`、`WmProductSalesServiceImpl.insertWmProductSales(生成)/postOut(拦截)`、`WmRtIssueServiceImpl(生成/execute 拦截)`、`ProFeedbackServiceImpl.confirm/batchConfirm(IPQC 工序检生成)`。
 
 ## 10. 二期展望（不在本期）
 

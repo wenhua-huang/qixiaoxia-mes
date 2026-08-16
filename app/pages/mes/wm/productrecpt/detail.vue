@@ -242,9 +242,19 @@ function handleConfirm() {
       }))
     }
 
-    mobileConfirmProductRecpt(header.value.recptId, body).then(() => {
-      proxy.$modal.msgSuccess('入库确认成功！库存已更新')
-      setTimeout(() => { proxy.$tab.navigateBack() }, 1500)
+    mobileConfirmProductRecpt(header.value.recptId, body).then((res) => {
+      // 确认接口返回入库详情：有批次物料展示成品批次码，引导去 PC 打印标签
+      const batchCodes = [...new Set((res.data?.lines || []).map(l => l.batchCode).filter(Boolean))]
+      if (batchCodes.length) {
+        proxy.$modal.alert(
+          '本次成品批次码：\n' + batchCodes.join('\n') + '\n\n请在 PC【产品入库】打印批次标签',
+          '入库成功'
+        )
+        setTimeout(() => { proxy.$tab.navigateBack() }, 2500)
+      } else {
+        proxy.$modal.msgSuccess('入库确认成功！库存已更新')
+        setTimeout(() => { proxy.$tab.navigateBack() }, 1500)
+      }
     }).catch(e => {
       // 注意：request.js 拦截器已 toast 过具体错误（如"仅草稿状态可确认收货"），
       // 这里只做兜底提示，避免覆盖拦截器的具体消息。

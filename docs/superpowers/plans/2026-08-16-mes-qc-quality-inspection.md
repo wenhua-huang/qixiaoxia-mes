@@ -6,7 +6,7 @@
 
 **Architecture:** 方案 C——4 张检验单头表 + 1 张统一行表（`qc_type+qc_id` 多态）+ 公共判定引擎/生成工厂/拦截门（各一套）；拦截校验全部注入 Service 层（库存动作时机：item_recpt 与 product_recpt 在 confirm，product_sales 在 postOut）。
 
-**Tech Stack:** Spring Boot 4.0.3 + MyBatis（RuoYi 架构，包 `com.ruoyi.*`）· Vue 3.5 + Element Plus · Flyway（下一版本 **V136**）· RedisLockTemplate · AutoCodeGenerator · JUnit5+Mockito（单测）/ BaseIntegrationTest+Testcontainers（IT）。
+**Tech Stack:** Spring Boot 4.0.3 + MyBatis（RuoYi 架构，包 `com.ruoyi.*`）· Vue 3.5 + Element Plus · Flyway（下一版本 **V137**，V136 已被兄弟 worktree qr-code-p1 占用于共享库）· RedisLockTemplate · AutoCodeGenerator · JUnit5+Mockito（单测）/ BaseIntegrationTest+Testcontainers（IT）。
 
 ## Global Constraints（每个任务隐含遵守）
 
@@ -51,10 +51,10 @@
 
 ## 波次一：配置层（Task 1-5）
 
-### Task 1: Flyway V136 — 11 表 + 字典 + 自动编码 + 菜单 + 种子
+### Task 1: Flyway V137 — 11 表 + 字典 + 自动编码 + 菜单 + 种子
 
 **Files:**
-- Create: `backend/ruoyi-admin/src/main/resources/db/migration/V136__qc_module_core.sql`
+- Create: `backend/ruoyi-admin/src/main/resources/db/migration/V137__qc_module_core.sql`
 
 **Interfaces:**
 - Produces: 11 张 `qxx_qc_*` 表、8 个 `mes_qc_*` 字典、4 条 `sys_auto_code_rule`（QC_IQC_CODE/QC_IPQC_CODE/QC_OQC_CODE/QC_RQC_CODE）、菜单 28900 目录 + 28901-28907 页面 + 按钮、检测项/缺陷/默认模板种子（**不预置 template_product**——绑定物料后才拦截，保证上线零影响）
@@ -607,7 +607,7 @@ AND NOT EXISTS (SELECT 1 FROM qxx_qc_template_index x WHERE x.template_id=@tid_i
 --   如原纸克重 stander_val 由物料决定留空，由用户在页面上按模板行编辑）
 ```
 
-> ⚠️ 实现注意：上述带注释概括的段（字典 27 条、编码 4 套、菜单按钮 32 条、检测项 19 条、缺陷 7 条、模板行 16 条）**必须全部展开成完整 SQL 后落盘**，禁止保留注释占位。
+> ⚠️ 实现注意：上述带注释概括的段（字典 30 条、编码 4 套、菜单按钮 39 条、检测项 17 条、缺陷 7 条、模板行 17 条，以简报明细枚举为准）**必须全部展开成完整 SQL 后落盘**，禁止保留注释占位。
 
 - [ ] **Step 2: 本地跑迁移验证**
 
@@ -617,7 +617,7 @@ cd backend && mvn -pl ruoyi-admin -am package -DskipTests -q
 TOKEN=$(python3 backend/scripts/get_token.py 2>/dev/null)
 curl -s http://localhost:8081/captchaImage -o /dev/null -w "%{http_code}\n"   # 期望 200
 docker exec qxx-mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e "show tables like 'qxx_qc_%'" mes   # 期望 11 行
-docker exec qxx-mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e "select count(*) from qxx_qc_index" mes   # 期望 19
+docker exec qxx-mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e "select count(*) from qxx_qc_index" mes   # 期望 17
 ```
 
 预期：Flyway 应用 V136 成功，启动日志无 `Migration checksum mismatch`。
@@ -625,7 +625,7 @@ docker exec qxx-mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e "select count(*) 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add backend/ruoyi-admin/src/main/resources/db/migration/V136__qc_module_core.sql
+git add backend/ruoyi-admin/src/main/resources/db/migration/V137__qc_module_core.sql
 git commit -m "feat(qc): V136 质检模块 11 表+字典+编码+菜单+种子"
 ```
 

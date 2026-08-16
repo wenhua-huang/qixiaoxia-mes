@@ -42,7 +42,7 @@ qc 模块目前 0 实现：无 Flyway 表、无后端包、无前端页面。已
 4. **`template_product` 增加可空 `process_id/process_code/process_name`**：IPQC 按工序配模板（印刷检色差、制袋检尺寸，同一产品不同工序不同检测项）。
 5. **检测项补 `dict_type`**：字典型检测值需指定字典来源。
 
-## 3. 数据模型（11 张表，Flyway V136）
+## 3. 数据模型（11 张表，Flyway V137）
 
 通用约定：所有表含 `factory_id`（业务 INSERT 不写，拦截器注入；Flyway 种子 INSERT 显式写）；审计四字段（create_by/create_time/update_by/update_time）；`utf8mb4_unicode_ci`。
 
@@ -177,7 +177,7 @@ qc 模块目前 0 实现：无 Flyway 表、无后端包、无前端页面。已
 
 ## 9. 实施波次
 
-1. **波次 1**：Flyway V136（11 表 + 菜单 + 字典 + 自动编码 + 预置检测项/默认模板种子）+ 配置层 5 个 CRUD（生成器 + 定制）
+1. **波次 1**：Flyway V137（11 表 + 菜单 + 字典 + 自动编码 + 预置检测项/默认模板种子）+ 配置层 5 个 CRUD（生成器 + 定制）
 2. **波次 2**：统一行表 + 判定引擎 + IQC 全流程（生成/录入/判定/待办/拦截）
 3. **波次 3**：OQC
 4. **波次 4**：IPQC（报工 hook + 完工检 + 手工首巡检）

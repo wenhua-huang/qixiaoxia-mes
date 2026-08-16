@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.qc.QcTemplateProductMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.qc.QcTemplateProduct" id="QcTemplateProductResult">
+        <result property="recordId"           column="record_id"           />
+        <result property="factoryId"          column="factory_id"          />
+        <result property="templateId"         column="template_id"         />
+        <result property="itemId"             column="item_id"             />
+        <result property="itemCode"           column="item_code"           />
+        <result property="itemName"           column="item_name"           />
+        <result property="specification"      column="specification"       />
+        <result property="unitOfMeasure"      column="unit_of_measure"     />
+        <result property="processId"          column="process_id"          />
+        <result property="processCode"        column="process_code"        />
+        <result property="processName"        column="process_name"        />
+        <result property="quantityCheck"      column="quantity_check"      />
+        <result property="quantityUnqualified" column="quantity_unqualified" />
+        <result property="crRate"             column="cr_rate"             />
+        <result property="majRate"            column="maj_rate"            />
+        <result property="minRate"            column="min_rate"            />
+        <result property="remark"             column="remark"              />
+        <result property="createBy"           column="create_by"           />
+        <result property="createTime"         column="create_time"         />
+        <result property="updateBy"           column="update_by"           />
+        <result property="updateTime"         column="update_time"         />
+    </resultMap>
+
+    <sql id="selectQcTemplateProductVo">
+        select record_id, factory_id, template_id, item_id, item_code, item_name, specification,
+               unit_of_measure, process_id, process_code, process_name, quantity_check,
+               quantity_unqualified, cr_rate, maj_rate, min_rate, remark,
+               create_by, create_time, update_by, update_time
+        from qxx_qc_template_product
+    </sql>
+
+    <select id="selectByTemplateId" parameterType="Long" resultMap="QcTemplateProductResult">
+        <include refid="selectQcTemplateProductVo"/>
+        where template_id = #{templateId}
+        order by item_code, record_id
+    </select>
+
+    <insert id="insertQcTemplateProduct" parameterType="com.ruoyi.system.domain.mes.qc.QcTemplateProduct" useGeneratedKeys="true" keyProperty="recordId">
+        insert into qxx_qc_template_product
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="templateId != null">template_id,</if>
+            <if test="itemId != null">item_id,</if>
+            <if test="itemCode != null and itemCode != ''">item_code,</if>
+            <if test="itemName != null and itemName != ''">item_name,</if>
+            <if test="specification != null">specification,</if>
+            <if test="unitOfMeasure != null">unit_of_measure,</if>
+            <if test="processId != null">process_id,</if>
+            <if test="processCode != null">process_code,</if>
+            <if test="processName != null">process_name,</if>
+            <if test="quantityCheck != null">quantity_check,</if>
+            <if test="quantityUnqualified != null">quantity_unqualified,</if>
+            <if test="crRate != null">cr_rate,</if>
+            <if test="majRate != null">maj_rate,</if>
+            <if test="minRate != null">min_rate,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="templateId != null">#{templateId},</if>
+            <if test="itemId != null">#{itemId},</if>
+            <if test="itemCode != null and itemCode != ''">#{itemCode},</if>
+            <if test="itemName != null and itemName != ''">#{itemName},</if>
+            <if test="specification != null">#{specification},</if>
+            <if test="unitOfMeasure != null">#{unitOfMeasure},</if>
+            <if test="processId != null">#{processId},</if>
+            <if test="processCode != null">#{processCode},</if>
+            <if test="processName != null">#{processName},</if>
+            <if test="quantityCheck != null">#{quantityCheck},</if>
+            <if test="quantityUnqualified != null">#{quantityUnqualified},</if>
+            <if test="crRate != null">#{crRate},</if>
+            <if test="majRate != null">#{majRate},</if>
+            <if test="minRate != null">#{minRate},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <delete id="deleteByTemplateId" parameterType="Long">
+        delete from qxx_qc_template_product where template_id = #{templateId}
+    </delete>
+
+    <!-- ════ 启用绑定查找（JOIN 头模板过滤 enable_flag + FIND_IN_SET 检验类型）════ -->
+    <sql id="enabledBindColumns">
+        select tp.record_id, tp.factory_id, tp.template_id, tp.item_id, tp.item_code, tp.item_name,
+               tp.specification, tp.unit_of_measure, tp.process_id, tp.process_code, tp.process_name,
+               tp.quantity_check, tp.quantity_unqualified, tp.cr_rate, tp.maj_rate, tp.min_rate,
+               tp.remark, tp.create_by, tp.create_time, tp.update_by, tp.update_time
+        from qxx_qc_template_product tp
+        join qxx_qc_template t on tp.template_id = t.template_id
+    </sql>
+
+    <!-- 工序级精确查找（IPQC 工序绑定优先） -->
+    <select id="selectEnabledBindExact" resultMap="QcTemplateProductResult">
+        <include refid="enabledBindColumns"/>
+        where t.enable_flag = '1'
+          and find_in_set(#{qcType}, t.qc_types)
+          and tp.item_id = #{itemId}
+          and tp.process_id = #{processId}
+        order by tp.record_id
+        limit 1
+    </select>
+
+    <!-- 通用绑定查找（未绑定工序的兜底） -->
+    <select id="selectEnabledBindCommon" resultMap="QcTemplateProductResult">
+        <include refid="enabledBindColumns"/>
+        where t.enable_flag = '1'
+          and find_in_set(#{qcType}, t.qc_types)
+          and tp.item_id = #{itemId}
+          and tp.process_id is null
+        order by tp.record_id
+        limit 1
+    </select>
+
+    <!-- 按检验类型+物料查全部启用绑定（可选工序过滤，波次 2 用） -->
+    <select id="selectEnabledByItem" resultMap="QcTemplateProductResult">
+        <include refid="enabledBindColumns"/>
+        where t.enable_flag = '1'
+          and find_in_set(#{qcType}, t.qc_types)
+          and tp.item_id = #{itemId}
+          <if test="processId != null"> and tp.process_id = #{processId}</if>
+        order by tp.process_id, tp.record_id
+    </select>
+
+    <!-- 保存前唯一性校验：本模板之外、同检验维度已存在的启用绑定数 -->
+    <select id="countEnabledBindExclude" resultType="int">
+        select count(1)
+        from qxx_qc_template_product tp
+        join qxx_qc_template t on tp.template_id = t.template_id
+        where t.enable_flag = '1'
+          and tp.item_id = #{itemId}
+          and (tp.process_id &lt;=&gt; #{processId})
+          and find_in_set(#{qcType}, t.qc_types)
+          and tp.template_id != #{templateId}
+          and tp.factory_id = #{factoryId}
+    </select>
+</mapper>

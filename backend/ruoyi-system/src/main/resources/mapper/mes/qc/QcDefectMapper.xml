@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.qc.QcDefectMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.qc.QcDefect" id="QcDefectResult">
+        <result property="defectId"       column="defect_id"       />
+        <result property="factoryId"      column="factory_id"      />
+        <result property="defectCode"     column="defect_code"     />
+        <result property="defectName"     column="defect_name"     />
+        <result property="indexType"      column="index_type"      />
+        <result property="defectLevel"    column="defect_level"    />
+        <result property="processMethod"  column="process_method"  />
+        <result property="enableFlag"     column="enable_flag"     />
+        <result property="remark"         column="remark"          />
+        <result property="createBy"       column="create_by"       />
+        <result property="createTime"     column="create_time"     />
+        <result property="updateBy"       column="update_by"       />
+        <result property="updateTime"     column="update_time"     />
+    </resultMap>
+
+    <sql id="selectQcDefectVo">
+        select defect_id, factory_id, defect_code, defect_name, index_type, defect_level,
+               process_method, enable_flag, remark, create_by, create_time, update_by, update_time
+        from qxx_qc_defect
+    </sql>
+
+    <select id="selectQcDefectList" parameterType="com.ruoyi.system.domain.mes.qc.QcDefect" resultMap="QcDefectResult">
+        <include refid="selectQcDefectVo"/>
+        <where>
+            <if test="defectCode != null and defectCode != ''"> and defect_code like concat('%', #{defectCode}, '%')</if>
+            <if test="defectName != null and defectName != ''"> and defect_name like concat('%', #{defectName}, '%')</if>
+            <if test="indexType != null and indexType != ''"> and index_type = #{indexType}</if>
+            <if test="defectLevel != null and defectLevel != ''"> and defect_level = #{defectLevel}</if>
+            <if test="enableFlag != null and enableFlag != ''"> and enable_flag = #{enableFlag}</if>
+            <if test="factoryId != null and factoryId != ''"> and factory_id = #{factoryId}</if>
+        </where>
+        order by defect_code
+    </select>
+
+    <select id="selectQcDefectByDefectId" parameterType="Long" resultMap="QcDefectResult">
+        <include refid="selectQcDefectVo"/>
+        where defect_id = #{defectId}
+    </select>
+
+    <select id="checkDefectCodeUnique" parameterType="String" resultMap="QcDefectResult">
+        <include refid="selectQcDefectVo"/>
+        where defect_code = #{defectCode} limit 1
+    </select>
+
+    <insert id="insertQcDefect" parameterType="com.ruoyi.system.domain.mes.qc.QcDefect" useGeneratedKeys="true" keyProperty="defectId">
+        insert into qxx_qc_defect
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="defectCode != null and defectCode != ''">defect_code,</if>
+            <if test="defectName != null and defectName != ''">defect_name,</if>
+            <if test="indexType != null and indexType != ''">index_type,</if>
+            <if test="defectLevel != null and defectLevel != ''">defect_level,</if>
+            <if test="processMethod != null">process_method,</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="defectCode != null and defectCode != ''">#{defectCode},</if>
+            <if test="defectName != null and defectName != ''">#{defectName},</if>
+            <if test="indexType != null and indexType != ''">#{indexType},</if>
+            <if test="defectLevel != null and defectLevel != ''">#{defectLevel},</if>
+            <if test="processMethod != null">#{processMethod},</if>
+            <if test="enableFlag != null and enableFlag != ''">#{enableFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateQcDefect" parameterType="com.ruoyi.system.domain.mes.qc.QcDefect">
+        update qxx_qc_defect
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="defectCode != null and defectCode != ''">defect_code = #{defectCode},</if>
+            <if test="defectName != null and defectName != ''">defect_name = #{defectName},</if>
+            <if test="indexType != null and indexType != ''">index_type = #{indexType},</if>
+            <if test="defectLevel != null and defectLevel != ''">defect_level = #{defectLevel},</if>
+            <if test="processMethod != null">process_method = #{processMethod},</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag = #{enableFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where defect_id = #{defectId}
+    </update>
+
+    <delete id="deleteQcDefectByDefectId" parameterType="Long">
+        delete from qxx_qc_defect where defect_id = #{defectId}
+    </delete>
+
+    <delete id="deleteQcDefectByDefectIds" parameterType="String">
+        delete from qxx_qc_defect where defect_id in
+        <foreach item="defectId" collection="array" open="(" separator="," close=")">
+            #{defectId}
+        </foreach>
+    </delete>
+</mapper>

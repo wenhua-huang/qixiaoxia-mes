@@ -77,6 +77,11 @@ public class FlywayConfig
                 .baselineOnMigrate(baselineOnMigrate)
                 .baselineVersion(org.flywaydb.core.api.MigrationVersion.fromVersion(baselineVersion))
                 .validateOnMigrate(true)  // history 已对齐，开启校验
+                // 多工作副本共享同一开发库：容忍"库已应用、本地无此文件"的迁移——
+                // 版本 ≤ 本地最大为 missing（如另一分支的 V131-V135），更高版本为 future
+                // （另一分支先行应用的 V137+）。仅放过这两类；本地存在文件的
+                // checksum/description 篡改仍会校验失败，合并分支后文件归位即恢复正常语义。
+                .ignoreMigrationPatterns("*:missing", "*:future")
                 .outOfOrder(outOfOrder)
                 .load();
         if (repairBeforeMigrate) {

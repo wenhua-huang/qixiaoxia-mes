@@ -47,6 +47,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where index_id = #{indexId}
     </select>
 
+    <select id="checkIndexCodeUnique" parameterType="String" resultMap="QcIndexResult">
+        <include refid="selectQcIndexVo"/>
+        where index_code = #{indexCode} limit 1
+    </select>
+
     <insert id="insertQcIndex" parameterType="com.ruoyi.system.domain.mes.qc.QcIndex" useGeneratedKeys="true" keyProperty="indexId">
         insert into qxx_qc_index
         <trim prefix="(" suffix=")" suffixOverrides=",">

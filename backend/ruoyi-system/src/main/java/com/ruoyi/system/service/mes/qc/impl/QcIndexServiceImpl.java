@@ -36,10 +36,8 @@ public class QcIndexServiceImpl implements IQcIndexService
     @Override
     public int insertQcIndex(QcIndex qcIndex)
     {
-        // 编码唯一校验
-        QcIndex query = new QcIndex();
-        query.setIndexCode(qcIndex.getIndexCode());
-        if (qcIndexMapper.selectQcIndexList(query).size() > 0)
+        // 编码唯一校验（精确等值匹配，避免 LIKE 子串误判）
+        if (qcIndexMapper.checkIndexCodeUnique(qcIndex.getIndexCode()) != null)
         {
             throw new ServiceException("检测项编码已存在");
         }

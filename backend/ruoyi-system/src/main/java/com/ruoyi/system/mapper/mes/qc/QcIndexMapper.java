@@ -15,6 +15,8 @@ public interface QcIndexMapper
 
     public QcIndex selectQcIndexByIndexId(Long indexId);
 
+    public QcIndex checkIndexCodeUnique(String indexCode);
+
     public int insertQcIndex(QcIndex qcIndex);
 
     public int updateQcIndex(QcIndex qcIndex);

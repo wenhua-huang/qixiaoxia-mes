@@ -16,7 +16,7 @@
         <input
           class="code-input"
           v-model="inputCode"
-          placeholder="扫码或输入物料编码"
+          placeholder="扫码、输入物料编码或粘贴二维码内容"
           confirm-type="search"
           @confirm="onInputConfirm"
         />
@@ -94,34 +94,34 @@ async function loadData() {
   } catch (e) {}
 }
 
-// 手动输入物料编码 → 匹配领料行
+// 手动输入/粘贴编码 → 统一走 handleCode（H5 无相机扫码，粘贴二维码文本是主要入口）
 function onInputConfirm() {
   const code = (inputCode.value || '').trim()
-  if (!code) { proxy.$modal.msgError('请输入物料编码'); return }
-  lastScanCode.value = code
-  matchItem(code)
+  if (!code) { proxy.$modal.msgError('请输入或粘贴编码'); return }
+  handleCode(code)
   inputCode.value = ''
 }
 
-// 扫码
+// 统一编码入口：扫码/手输/粘贴的二维码内容都走这里（识别 QXX|TYPE|CODE 载荷，裸码当物料编码）
+function handleCode(code) {
+  lastScanCode.value = code
+  const payload = parseQrPayload(code)
+  if (payload && payload.type === 'MAT') {
+    matchByBatchCode(payload.code)
+  } else if (payload && payload.type === 'ROLL') {
+    proxy.$modal.msgError('卷料码请在分切投料使用')
+  } else {
+    // 裸条码/其他系统码：当作物料编码走原逻辑
+    matchItem(code)
+  }
+}
+
+// 扫码（App/小程序可用；H5 平台 uni.scanCode 不支持，请用输入框粘贴二维码内容）
 function scanCode() {
   uni.scanCode({
     onlyFromCamera: false,
     scanType: ['barCode', 'qrCode'],
-    success: (res) => {
-      const code = res.result
-      lastScanCode.value = code
-      // 系统二维码（QXX|TYPE|CODE）按类型分发
-      const payload = parseQrPayload(code)
-      if (payload && payload.type === 'MAT') {
-        matchByBatchCode(payload.code)
-      } else if (payload && payload.type === 'ROLL') {
-        proxy.$modal.msgError('卷料码请在分切投料使用')
-      } else {
-        // 裸条码/其他系统码：当作物料编码走原逻辑
-        matchItem(code)
-      }
-    },
+    success: (res) => { handleCode(res.result) },
     fail: () => { proxy.$modal.msgError('扫码取消或失败') }
   })
 }

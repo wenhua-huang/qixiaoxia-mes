@@ -15,8 +15,8 @@
 
     <!-- 手动输入 -->
     <view class="manual-row">
-      <uni-easyinput v-model="itemCode" placeholder="或手动输入物料编码" clearable />
-      <button class="btn-search" @click="queryStock">查询</button>
+      <uni-easyinput v-model="itemCode" placeholder="或输入物料编码 / 粘贴二维码内容" clearable @confirm="onManualQuery" />
+      <button class="btn-search" @click="onManualQuery">查询</button>
     </view>
 
     <!-- 物料信息 -->
@@ -89,24 +89,33 @@ onLoad((options) => {
   }
 })
 
+// 统一编码入口：扫码/手输/粘贴（识别 QXX|TYPE|CODE 载荷，裸码当物料编码查询）
+function handleCode(code) {
+  const payload = parseQrPayload(code)
+  if (payload && payload.type === 'MAT') {
+    queryByBatch(payload.code)
+  } else if (payload && payload.type === 'ROLL') {
+    queryRoll(payload.code)
+  } else {
+    itemCode.value = code
+    queryStock()
+  }
+}
+
 function scanCode() {
   uni.scanCode({
     onlyFromCamera: false,
     scanType: ['barCode', 'qrCode'],
-    success: (res) => {
-      const payload = parseQrPayload(res.result)
-      if (payload && payload.type === 'MAT') {
-        queryByBatch(payload.code)
-      } else if (payload && payload.type === 'ROLL') {
-        queryRoll(payload.code)
-      } else {
-        // 裸条码/非系统码：当作物料编码走原逻辑
-        itemCode.value = res.result
-        queryStock()
-      }
-    },
+    success: (res) => { handleCode(res.result) },
     fail: () => { proxy.$modal.msgError('扫码取消或失败') }
   })
+}
+
+// 手动输入/粘贴 → 统一走 handleCode（H5 无相机扫码，粘贴二维码文本是主要入口）
+function onManualQuery() {
+  const code = (itemCode.value || '').trim()
+  if (!code) { proxy.$modal.msgError('请输入或扫描物料编码'); return }
+  handleCode(code)
 }
 
 async function queryStock() {

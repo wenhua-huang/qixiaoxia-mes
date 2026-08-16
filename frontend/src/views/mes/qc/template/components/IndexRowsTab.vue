@@ -82,8 +82,13 @@ function handleAddRow() {
   props.rows.push({ indexId: undefined, orderNum: props.rows.length + 1 })
 }
 
-/** 选择检测项后带出编码/名称/工具/值类型 */
+/** 选择检测项后带出编码/名称/工具/值类型；同模板内同一检测项不允许重复行 */
 function onIndexChange(row: QcTemplateIndexRow) {
+  if (row.indexId != null && props.rows.some(r => r !== row && r.indexId === row.indexId)) {
+    proxy.$modal.msgError('该检测项已添加')
+    row.indexId = undefined
+    return
+  }
   const opt = indexOptions.value.find(i => i.indexId === row.indexId)
   if (opt) {
     row.indexCode = opt.indexCode

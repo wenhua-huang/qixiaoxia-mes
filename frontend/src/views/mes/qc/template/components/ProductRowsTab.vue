@@ -28,17 +28,17 @@
       </el-table-column>
       <el-table-column label="致命缺陷率%" width="110" align="center">
         <template #default="scope">
-          <el-input-number v-model="scope.row.crRate" :min="0" :precision="2" :controls="false" size="small" style="width: 80px" />
+          <el-input-number v-model="scope.row.crRate" :min="0" :max="100" :precision="2" :controls="false" size="small" style="width: 80px" />
         </template>
       </el-table-column>
       <el-table-column label="严重缺陷率%" width="110" align="center">
         <template #default="scope">
-          <el-input-number v-model="scope.row.majRate" :min="0" :precision="2" :controls="false" size="small" style="width: 80px" />
+          <el-input-number v-model="scope.row.majRate" :min="0" :max="100" :precision="2" :controls="false" size="small" style="width: 80px" />
         </template>
       </el-table-column>
       <el-table-column label="轻微缺陷率%" width="110" align="center">
         <template #default="scope">
-          <el-input-number v-model="scope.row.minRate" :min="0" :precision="2" :controls="false" size="small" style="width: 80px" />
+          <el-input-number v-model="scope.row.minRate" :min="0" :max="100" :precision="2" :controls="false" size="small" style="width: 80px" />
         </template>
       </el-table-column>
       <el-table-column label="操作" width="70" align="center">
@@ -75,11 +75,16 @@ function handleSelectItem() {
   itemSelectRef.value?.open()
 }
 
-/** 选物料 → 追加绑定行（同物料+工序维度前端先查重，后端仍兜底校验） */
+/** 同物料+同工序维度查重（processId 为空 = 通用绑定维度，仅同物料同空才算重复；同物料绑不同工序是合法场景） */
+function isDuplicateRow(exclude: QcTemplateProductRow | null, itemId: any, processId: any): boolean {
+  const dim = (v: any) => v ?? null
+  return props.rows.some(r => r !== exclude && r.itemId === itemId && dim(r.processId) === dim(processId))
+}
+
+/** 选物料 → 追加通用绑定行（后端仍按 物料+工序 维度兜底校验） */
 function onItemSelected(row: any) {
-  const dup = props.rows.some(r => r.itemId === row.itemId)
-  if (dup) {
-    proxy.$modal.msgWarning(`物料[${row.itemName}]已绑定，请勿重复添加`)
+  if (isDuplicateRow(null, row.itemId, undefined)) {
+    proxy.$modal.msgWarning(`物料[${row.itemName}]已存在通用绑定(未指定工序)，请勿重复添加`)
     return
   }
   props.rows.push({
@@ -89,10 +94,16 @@ function onItemSelected(row: any) {
   })
 }
 
-/** 选择工序后带出编码/名称（清空时同步清除） */
+/** 选择工序后带出编码/名称（清空时同步清除）；落到已有绑定维度上时回退选择 */
 function onProcessChange(row: QcTemplateProductRow) {
   const p = processOptions.value.find(i => i.processId === row.processId)
   row.processCode = p?.processCode
   row.processName = p?.processName
+  if (row.processId != null && isDuplicateRow(row, row.itemId, row.processId)) {
+    proxy.$modal.msgError(`物料[${row.itemName || row.itemCode}]在该工序已存在绑定，请勿重复`)
+    row.processId = undefined
+    row.processCode = undefined
+    row.processName = undefined
+  }
 }
 </script>

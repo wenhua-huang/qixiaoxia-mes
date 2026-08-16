@@ -1,5 +1,5 @@
 <template>
-  <el-dialog title="过账出库（批次拣货）" v-model="show" width="960px" append-to-body @close="handleClose">
+  <el-dialog title="出库确认（批次拣货）" v-model="show" width="960px" append-to-body @close="handleClose">
     <el-alert v-if="header" :title="`出库单：${header.salesCode} | 客户：${header.clientName || '-'} | 仓库：${header.warehouseName || '-'}`"
               type="info" :closable="false" class="mb8" />
 
@@ -74,7 +74,7 @@
     </div>
 
     <template #footer>
-      <el-button type="primary" @click="handleConfirm" :loading="submitting">确认过账出库</el-button>
+      <el-button type="primary" @click="handleConfirm" :loading="submitting">确认出库</el-button>
       <el-button @click="show = false">取 消</el-button>
     </template>
   </el-dialog>
@@ -121,7 +121,7 @@ const insufficientHint = computed(() => {
     const a = availOf(l); return a != null && a < remain(l)
   })
   if (!lack.length) return ''
-  return `以下物料在仓库[${header.value?.warehouseName || ''}]可用库存不足：${lack.map((l: WmProductSalesLine) => l.itemCode).join('、')}。请先入库或调拨，否则过账将失败。`
+  return `以下物料在仓库[${header.value?.warehouseName || ''}]可用库存不足：${lack.map((l: WmProductSalesLine) => l.itemCode).join('、')}。请先入库或调拨，否则出库将失败。`
 })
 
 /** 拉取本单各 item 在指定仓库的可用量聚合 */
@@ -138,7 +138,7 @@ function loadAvail(warehouseId: number | undefined, items: WmProductSalesLine[])
   ))
 }
 
-/** 打开过账弹窗：传入出库单头，内部查详情 */
+/** 打开出库确认弹窗：传入出库单头，内部查详情 */
 function open(headerData: WmProductSales) {
   header.value = headerData
   details.value = []
@@ -208,7 +208,7 @@ function handleConfirm() {
   }
   submitting.value = true
   postOut(header.value!.salesId, valid).then(() => {
-    proxy.$modal.msgSuccess('过账出库成功')
+    proxy.$modal.msgSuccess('出库成功')
     show.value = false
     emit('success')
   }).catch((e: any) => {

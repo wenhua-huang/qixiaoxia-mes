@@ -13,7 +13,6 @@ import {
   updateShipment,
   delShipment,
   receiveShipment,
-  cancelShipment,
 } from '@/api/mes/wm/product_sales_shipment'
 import { listBoxBySales, addBox, updateBox, delBox } from '@/api/mes/wm/product_sales_box'
 
@@ -72,14 +71,6 @@ describe('销售发运单 API - 端点契约', () => {
     await receiveShipment(500, { receivedBy: '张三' } as any)
     expect(request).toHaveBeenCalledWith(expect.objectContaining({
       url: '/mes/wm/product_sales_shipment/receive/500',
-      method: 'put',
-    }))
-  })
-
-  it('cancelShipment -> PUT /mes/wm/product_sales_shipment/cancel/{id}', async () => {
-    await cancelShipment(500)
-    expect(request).toHaveBeenCalledWith(expect.objectContaining({
-      url: '/mes/wm/product_sales_shipment/cancel/500',
       method: 'put',
     }))
   })

@@ -71,6 +71,16 @@ public class WmProductSalesController extends BaseController
         return AjaxResult.success(wmProductSalesService.getDetail(salesId));
     }
 
+    /** 按出库单编码查整单（移动端扫码查单）：聚合头+行+明细+发运+装箱 */
+    @PreAuthorize("@ss.hasPermi('mes:wm:sales:query')")
+    @GetMapping("/byCode")
+    public AjaxResult getDetailByCode(@RequestParam("salesCode") String salesCode)
+    {
+        WmProductSales detail = wmProductSalesService.getDetailBySalesCode(salesCode);
+        if (detail == null) return error("出库单不存在");
+        return AjaxResult.success(detail);
+    }
+
     @PreAuthorize("@ss.hasPermi('mes:wm:sales:add')")
     @Log(title = "销售出库单", businessType = BusinessType.INSERT)
     @PostMapping
@@ -97,24 +107,14 @@ public class WmProductSalesController extends BaseController
 
     // ════════════════════ 业务生命周期端点 ════════════════════
 
-    /** 过账出库：扣减库存，DRAFT/PARTIAL_POSTED → POSTED/PARTIAL_POSTED */
+    /** 出库确认：扣减库存，DRAFT/PARTIAL_POSTED → POSTED/PARTIAL_POSTED */
     @PreAuthorize("@ss.hasPermi('mes:wm:sales:post')")
-    @Log(title = "销售出库过账", businessType = BusinessType.UPDATE)
+    @Log(title = "销售出库确认", businessType = BusinessType.UPDATE)
     @PutMapping("/post/{salesId}")
     public AjaxResult post(@PathVariable("salesId") Long salesId,
                            @RequestBody List<WmProductSalesDetail> details)
     {
         return toAjax(wmProductSalesService.postOut(salesId, details));
-    }
-
-    /** 发货：登记物流信息，POSTED/PARTIAL_POSTED → SHIPPED */
-    @PreAuthorize("@ss.hasPermi('mes:wm:sales:ship')")
-    @Log(title = "销售出库发货", businessType = BusinessType.UPDATE)
-    @PutMapping("/ship/{salesId}")
-    public AjaxResult ship(@PathVariable("salesId") Long salesId,
-                           @RequestBody WmProductSales info)
-    {
-        return toAjax(wmProductSalesService.ship(salesId, info));
     }
 
     /** 关闭：SHIPPED → CLOSED */

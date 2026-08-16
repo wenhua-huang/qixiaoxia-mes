@@ -50,7 +50,7 @@ public class WmProductSalesLine extends BaseEntity
     @Excel(name = "出库数量")
     private BigDecimal quantitySales;
 
-    @Excel(name = "已过账出库量")
+    @Excel(name = "已出库量")
     private BigDecimal quantityPosted;
 
     @Excel(name = "出库箱数")

@@ -29,10 +29,8 @@
       <el-table-column label="操作" width="180" align="center" fixed="right">
         <template #default="s">
           <el-button link type="primary" icon="View" @click="handleView(s.row)">明细</el-button>
-          <el-button v-if="s.row.status==='IN_TRANSIT' || s.row.status==='SHIPPING'" link type="success" icon="Check"
+          <el-button v-if="s.row.status==='IN_TRANSIT'" link type="success" icon="Check"
                      @click="handleReceive(s.row)" v-hasPermi="['mes:wm:sales:receive']">签收</el-button>
-          <el-button v-if="s.row.status==='SHIPPING'" link type="warning" icon="Close"
-                     @click="handleCancel(s.row)" v-hasPermi="['mes:wm:sales:ship']">取消</el-button>
           <el-button v-if="s.row.status!=='RECEIVED' && s.row.status!=='CANCELED'" link type="danger" icon="Delete"
                      @click="handleDel(s.row)" v-hasPermi="['mes:wm:sales:ship']">删</el-button>
         </template>
@@ -88,7 +86,7 @@
 <script setup lang="ts">
 import { ref, computed, getCurrentInstance } from 'vue'
 import { Document } from '@element-plus/icons-vue'
-import { getShipment, delShipment, cancelShipment } from '@/api/mes/wm/product_sales_shipment'
+import { getShipment, delShipment } from '@/api/mes/wm/product_sales_shipment'
 import type { WmProductSales, WmProductSalesShipment, WmProductSalesBox } from '@/types'
 import ShipmentForm from './ShipmentForm.vue'
 import ReceiveDialog from './ReceiveDialog.vue'
@@ -149,15 +147,9 @@ function handleView(row: WmProductSalesShipment) {
 }
 function handleReceive(row: WmProductSalesShipment) { receiveRef.value?.open(row) }
 
-function handleCancel(row: WmProductSalesShipment) {
-  proxy.$modal.confirm(`取消发运单[${row.shipmentCode}]？仅待发运状态可取消。`).then(() => cancelShipment(row.shipmentId))
-    .then(() => { proxy.$modal.msgSuccess('已取消'); emit('refresh') }).catch(() => {})
-}
 function handleDel(row: WmProductSalesShipment) {
-  const msg = row.status === 'IN_TRANSIT'
-    ? `删除发运单[${row.shipmentCode}]？将回滚关联箱状态和头表发运量。`
-    : `删除发运单[${row.shipmentCode}]？`
-  proxy.$modal.confirm(msg).then(() => delShipment(row.shipmentId))
+  proxy.$modal.confirm(`删除发运单[${row.shipmentCode}]？将回滚关联箱状态和头表发运量。`)
+    .then(() => delShipment(row.shipmentId))
     .then(() => { proxy.$modal.msgSuccess('已删除'); emit('refresh') }).catch(() => {})
 }
 </script>

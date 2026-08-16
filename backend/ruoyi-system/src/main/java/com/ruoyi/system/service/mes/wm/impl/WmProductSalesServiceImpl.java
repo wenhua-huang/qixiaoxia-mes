@@ -21,7 +21,6 @@ import org.springframework.stereotype.Service;
 import com.ruoyi.system.domain.mes.wm.WmProductSales;
 import com.ruoyi.system.domain.mes.wm.WmProductSalesDetail;
 import com.ruoyi.system.domain.mes.wm.WmProductSalesLine;
-import com.ruoyi.system.domain.mes.wm.WmProductSalesShipment;
 import com.ruoyi.system.domain.mes.wm.WmMaterialStock;
 import com.ruoyi.system.domain.mes.wm.WmTransaction;
 import com.ruoyi.system.domain.mes.wm.WmWarehouse;
@@ -46,7 +45,7 @@ import com.ruoyi.system.service.mes.wm.IWmProductSalesBoxService;
 import com.ruoyi.system.service.mes.wm.IWmWarehouseService;
 
 /**
- * 销售出库单业务层（状态机 + 过账扣库存 + FIFO 批次拣货）
+ * 销售出库单业务层（状态机 + 出库确认扣库存 + FIFO 批次拣货）
  * 参照 WmIssueHeaderServiceImpl 的锁+事务+扣减范式。
  *
  * @author qixiaoxia
@@ -164,7 +163,14 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         return header;
     }
 
-    // ════════════════════ 过账出库（核心） ════════════════════
+    @Override
+    public WmProductSales getDetailBySalesCode(String salesCode) {
+        WmProductSales header = wmProductSalesMapper.selectWmProductSalesBySalesCode(salesCode);
+        if (header == null) return null;
+        return getDetail(header.getSalesId());
+    }
+
+    // ════════════════════ 出库确认（核心） ════════════════════
 
     @Override
     public int postOut(Long salesId, List<WmProductSalesDetail> details) {
@@ -180,7 +186,7 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         WmProductSales header = wmProductSalesMapper.selectWmProductSalesBySalesId(salesId);
         if (header == null) throw new ServiceException("出库单不存在");
         if (!WmProductSalesConstants.isPostable(header.getStatus())) {
-            throw new ServiceException("当前状态[" + header.getStatus() + "]不允许过账");
+            throw new ServiceException("当前状态[" + header.getStatus() + "]不允许出库确认");
         }
         Map<Long, WmProductSalesLine> lineMap = buildLineMap(salesId);
         validateClientWarehouseIsolation(header, details);
@@ -262,7 +268,7 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
     }
 
     /**
-     * 过账出库执行（支持跨批次 FIFO）。
+     * 出库确认执行（支持跨批次 FIFO）。
      * detail 指定 batchId → 精确批次扣减；未指定 → 按 FIFO 跨批次逐条扣减直至满足 qty。
      * 每扣一个批次生成一条 detail/tx/trace，保持审计粒度。
      */
@@ -401,37 +407,6 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         proMaterialTraceMapper.insertProMaterialTrace(trace);
     }
 
-    // ════════════════════ 发货（委托发运单 Service，支持多次发运） ════════════════════
-
-    /**
-     * 发货（向后兼容入口）：将旧式「一次性发货」转为创建一条发运单。
-     * 新前端应直接走 /mes/wm/product_sales_shipment POST（支持勾选箱）。
-     * 旧前端 shipOut(salesId, info) 仍可用：把 info 的物流字段组装成 Shipment 落库。
-     */
-    @Override
-    public int ship(Long salesId, WmProductSales info) {
-        WmProductSales header = wmProductSalesMapper.selectWmProductSalesBySalesId(salesId);
-        if (header == null) throw new ServiceException("出库单不存在");
-        if (!WmProductSalesConstants.isShippable(header.getStatus())) {
-            throw new ServiceException("当前状态[" + header.getStatus() + "]不允许发货");
-        }
-        if (!WmProductSalesConstants.isShippableShipStatus(header.getShipStatus())) {
-            throw new ServiceException("发运已完成[" + header.getShipStatus() + "]，不可再发运");
-        }
-        WmProductSalesShipment ship = new WmProductSalesShipment();
-        ship.setSalesId(salesId);
-        ship.setShipMethod(WmProductSalesConstants.SHIP_METHOD_LOGISTICS);
-        ship.setLogisticsCompany(info.getLogisticsCompany());
-        ship.setTrackingNo(info.getTrackingNo());
-        ship.setLogisticsFee(info.getLogisticsFee());
-        ship.setReceiverName(info.getReceiverName());
-        ship.setReceiverTel(info.getReceiverTel());
-        ship.setShippingAddress(info.getShippingAddress());
-        ship.setPlanShipDate(info.getPlanShipDate());
-        // 不指定 boxes：发运单 Service 会自动取该单所有 PACKED 箱
-        return shipmentService.createShipment(ship);
-    }
-
     // ════════════════════ 关闭 ════════════════════
 
     @Override
@@ -468,7 +443,7 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         }
         if (WmProductSalesConstants.STATUS_POSTED.equals(header.getStatus())
                 || WmProductSalesConstants.STATUS_SHIPPED.equals(header.getStatus())) {
-            throw new ServiceException("已过账/已发货的出库单不能直接作废，请通过销售退货回库");
+            throw new ServiceException("已出库/已发运的出库单不能直接作废，请通过销售退货回库");
         }
         // PARTIAL_POSTED 需回滚已扣库存
         if (WmProductSalesConstants.STATUS_PARTIAL_POSTED.equals(header.getStatus())) {

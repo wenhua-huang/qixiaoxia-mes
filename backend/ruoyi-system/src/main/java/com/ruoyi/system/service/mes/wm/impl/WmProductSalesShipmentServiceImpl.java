@@ -26,10 +26,11 @@ import com.ruoyi.system.service.mes.wm.IWmProductSalesShipmentService;
 /**
  * 销售出库-发运单业务层（多次发运 + 装箱关联 + 签收回单）
  *
- * <p>发运单状态机：SHIPPING(待发运) → IN_TRANSIT(在途) → RECEIVED(已签收)；CANCELED(已取消)
+ * <p>发运单状态机：建单即 IN_TRANSIT(在途) → RECEIVED(已签收)；CANCELED 仅历史数据兼容。
+ * <p>撤销已建发运走 delete（回滚箱状态 + 头表发运量），不再有独立 cancel 状态路径。
  * <p>头表 ship_status：UN_SHIPPED → PARTIAL_SHIPPED → SHIPPED → RECEIVED
  *
- * <p>并发安全：createShipment/delete/receive/cancel 均走 Redis 锁 wm:salesout:lock:{salesId} + TransactionTemplate，
+ * <p>并发安全：createShipment/delete/receive 均走 Redis 锁 wm:salesout:lock:{salesId} + TransactionTemplate，
  * 防止并发发运导致头表 shipped_quantity 丢失更新。
  *
  * @author qixiaoxia
@@ -94,7 +95,7 @@ public class WmProductSalesShipmentServiceImpl implements IWmProductSalesShipmen
         WmProductSales header = salesMapper.selectWmProductSalesBySalesId(salesId);
         if (header == null) throw new ServiceException("出库单不存在");
         if (!WmProductSalesConstants.isShippable(header.getStatus())) {
-            throw new ServiceException("当前状态[" + header.getStatus() + "]不允许发运，请先完成过账出库");
+            throw new ServiceException("当前状态[" + header.getStatus() + "]不允许发运，请先完成出库确认");
         }
         if (!WmProductSalesConstants.isShippableShipStatus(header.getShipStatus())) {
             throw new ServiceException("发运已完成[" + header.getShipStatus() + "]，不可再发运");
@@ -113,6 +114,13 @@ public class WmProductSalesShipmentServiceImpl implements IWmProductSalesShipmen
         BigDecimal shippedQty = sumBoxQuantity(linkedBoxes);
         if (shippedQty.signum() <= 0) {
             throw new ServiceException("本次发运数量必须大于 0");
+        }
+        // 发运量不得超过已出库确认量（出库确认扣库存，发运只登记物流）
+        BigDecimal alreadyShipped = nz(header.getShippedQuantity());
+        BigDecimal posted = nz(header.getPostedQuantity());
+        if (alreadyShipped.add(shippedQty).compareTo(posted) > 0) {
+            throw new ServiceException("本次发运量(" + shippedQty + ")超过可发运量（已出库确认 "
+                    + posted + " / 已发运 " + alreadyShipped + "），请先完成出库确认");
         }
         entity.setShippedQuantity(shippedQty);
         entity.setBoxCount((long) linkedBoxes.size());
@@ -170,7 +178,7 @@ public class WmProductSalesShipmentServiceImpl implements IWmProductSalesShipmen
         }
     }
 
-    /** 累加 shipped_quantity 并推导 ship_status；不发运不扣库存（过账已扣） */
+    /** 累加 shipped_quantity 并推导 ship_status；不发运不扣库存（出库确认已扣） */
     private void updateHeaderAfterShip(WmProductSales header, BigDecimal shippedThisTime) {
         BigDecimal totalShipped = nz(header.getShippedQuantity()).add(shippedThisTime);
         header.setShippedQuantity(totalShipped);
@@ -196,11 +204,10 @@ public class WmProductSalesShipmentServiceImpl implements IWmProductSalesShipmen
     public int updateWmProductSalesShipment(WmProductSalesShipment entity) {
         WmProductSalesShipment exist = shipmentMapper.selectWmProductSalesShipmentByShipmentId(entity.getShipmentId());
         if (exist == null) throw new ServiceException("发运单不存在");
-        if (!WmProductSalesConstants.SHIPMENT_STATUS_SHIPPING.equals(exist.getStatus())
-                && !WmProductSalesConstants.SHIPMENT_STATUS_IN_TRANSIT.equals(exist.getStatus())) {
+        if (!WmProductSalesConstants.SHIPMENT_STATUS_IN_TRANSIT.equals(exist.getStatus())) {
             throw new ServiceException("当前状态[" + exist.getStatus() + "]不允许修改");
         }
-        // 系统计算字段不允许前端覆盖（shippedQuantity/boxCount 由装箱关联算出；status 走 receive/cancel 专用接口）
+        // 系统计算字段不允许前端覆盖（shippedQuantity/boxCount 由装箱关联算出；status 走 receive 专用接口）
         entity.setShippedQuantity(null);
         entity.setBoxCount(null);
         entity.setStatus(null);
@@ -211,7 +218,7 @@ public class WmProductSalesShipmentServiceImpl implements IWmProductSalesShipmen
         return shipmentMapper.updateWmProductSalesShipment(entity);
     }
 
-    // ════════════════════ 删除（仅 SHIPPING/IN_TRANSIT 可删，回滚箱 + 头表） ════════════════════
+    // ════════════════════ 删除（仅 IN_TRANSIT 可删，回滚箱 + 头表） ════════════════════
 
     @Override
     public int deleteWmProductSalesShipmentByShipmentId(Long shipmentId) {
@@ -278,8 +285,7 @@ public class WmProductSalesShipmentServiceImpl implements IWmProductSalesShipmen
     public int receive(Long shipmentId, WmProductSalesShipment info) {
         WmProductSalesShipment exist = shipmentMapper.selectWmProductSalesShipmentByShipmentId(shipmentId);
         if (exist == null) throw new ServiceException("发运单不存在");
-        if (!WmProductSalesConstants.SHIPMENT_STATUS_IN_TRANSIT.equals(exist.getStatus())
-                && !WmProductSalesConstants.SHIPMENT_STATUS_SHIPPING.equals(exist.getStatus())) {
+        if (!WmProductSalesConstants.SHIPMENT_STATUS_IN_TRANSIT.equals(exist.getStatus())) {
             throw new ServiceException("当前状态[" + exist.getStatus() + "]不可签收");
         }
         Long salesId = exist.getSalesId();
@@ -332,27 +338,6 @@ public class WmProductSalesShipmentServiceImpl implements IWmProductSalesShipmen
             }
         }
         return hasEffective;
-    }
-
-    // ════════════════════ 取消发运 ════════════════════
-
-    @Override
-    public int cancel(Long shipmentId) {
-        WmProductSalesShipment exist = shipmentMapper.selectWmProductSalesShipmentByShipmentId(shipmentId);
-        if (exist == null) throw new ServiceException("发运单不存在");
-        if (!WmProductSalesConstants.isCancelableShipment(exist.getStatus())) {
-            throw new ServiceException("发运单已发出，不可取消（请删除或走销售退货）");
-        }
-        Long salesId = exist.getSalesId();
-        lockTemplate.execute("wm:salesout:lock:" + salesId, 10,
-                () -> txTemplate.execute(status -> {
-                    exist.setStatus(WmProductSalesConstants.SHIPMENT_STATUS_CANCELED);
-                    exist.setUpdateTime(DateUtils.getNowDate());
-                    exist.setUpdateBy(SecurityUtils.getUsername());
-                    shipmentMapper.updateWmProductSalesShipment(exist);
-                    return null;
-                }));
-        return 1;
     }
 
     private static BigDecimal nz(BigDecimal v) {

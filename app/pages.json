@@ -134,6 +134,17 @@
       "navigationBarTitleText": "入库详情"
     }
   }, {
+    "path": "pages/mes/wm/sales/list",
+    "style": {
+      "navigationBarTitleText": "销售出库",
+      "enablePullDownRefresh": true
+    }
+  }, {
+    "path": "pages/mes/wm/sales/scan-out",
+    "style": {
+      "navigationBarTitleText": "扫码出库"
+    }
+  }, {
     "path": "pages/mes/pro/report",
     "style": {
       "navigationBarTitleText": "生产报工"

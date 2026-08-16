@@ -90,6 +90,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where sales_id = #{salesId}
     </select>
 
+    <select id="selectWmProductSalesBySalesCode" parameterType="String" resultMap="WmProductSalesResult">
+        <include refid="selectWmProductSalesVo"/>
+        where sales_code = #{salesCode}
+        order by create_time desc, sales_id desc
+        limit 1
+    </select>
+
     <insert id="insertWmProductSales" parameterType="WmProductSales" useGeneratedKeys="true" keyProperty="salesId">
         insert into qxx_wm_product_sales
         <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="salesCode != null">sales_code,</if>

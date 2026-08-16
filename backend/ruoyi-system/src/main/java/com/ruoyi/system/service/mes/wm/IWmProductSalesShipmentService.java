@@ -24,18 +24,18 @@ public interface IWmProductSalesShipmentService
     public List<WmProductSalesShipment> selectShipmentsBySalesId(Long salesId);
 
     /**
-     * 新增发运（核心）：SHIPPING → IN_TRANSIT
-     * - 校验出库单可发运（已过账、发运子状态未完成）
+     * 新增发运（核心）：建单即 IN_TRANSIT
+     * - 校验出库单可发运（已出库确认、发运子状态未完成、发运量不超过 postedQuantity）
      * - 勾选关联装箱（boxes），回写 box.shipment_id + status=SHIPPED
      * - 累加头表 shipped_quantity，推导 ship_status
      * - Redis 锁 wm:salesout:lock:{salesId} + TransactionTemplate
      */
     public int createShipment(WmProductSalesShipment entity);
 
-    /** 修改发运（仅 SHIPPING 可改） */
+    /** 修改发运（仅 IN_TRANSIT 可改） */
     public int updateWmProductSalesShipment(WmProductSalesShipment entity);
 
-    /** 删除发运（仅 SHIPPING 可删，回滚关联箱状态 + 头表 shipped_quantity） */
+    /** 删除发运（回滚关联箱状态 + 头表 shipped_quantity） */
     public int deleteWmProductSalesShipmentByShipmentId(Long shipmentId);
 
     /** 批量删除 */
@@ -43,7 +43,4 @@ public interface IWmProductSalesShipmentService
 
     /** 签收：IN_TRANSIT → RECEIVED，写签收时间/人/备注/回单附件 */
     public int receive(Long shipmentId, WmProductSalesShipment info);
-
-    /** 取消发运（仅 SHIPPING 可取消；IN_TRANSIT 之后不可取消，需走销售退货） */
-    public int cancel(Long shipmentId);
 }

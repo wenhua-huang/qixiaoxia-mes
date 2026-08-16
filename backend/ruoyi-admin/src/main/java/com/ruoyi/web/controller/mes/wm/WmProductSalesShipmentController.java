@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 /**
  * 销售出库-发运单 Controller（多次发运 + 签收回单）
- * 权限：mes:wm:sales:ship（发运/修改/删除/取消）、mes:wm:sales:receive（签收）
+ * 权限：mes:wm:sales:ship（发运/修改/删除）、mes:wm:sales:receive（签收）
  *
  * @author qixiaoxia
  * @date 2026-07-27
@@ -84,15 +84,6 @@ public class WmProductSalesShipmentController extends BaseController
                               @RequestBody WmProductSalesShipment info)
     {
         return toAjax(shipmentService.receive(shipmentId, info));
-    }
-
-    /** 取消发运（仅待发运可取消） */
-    @PreAuthorize("@ss.hasPermi('mes:wm:sales:ship')")
-    @Log(title = "销售发运取消", businessType = BusinessType.UPDATE)
-    @PutMapping("/cancel/{shipmentId}")
-    public AjaxResult cancel(@PathVariable("shipmentId") Long shipmentId)
-    {
-        return toAjax(shipmentService.cancel(shipmentId));
     }
 
     @PreAuthorize("@ss.hasPermi('mes:wm:sales:export')")

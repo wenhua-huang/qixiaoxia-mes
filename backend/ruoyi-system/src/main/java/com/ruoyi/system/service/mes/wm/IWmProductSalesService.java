@@ -19,11 +19,11 @@ public interface IWmProductSalesService
     /** 详情：聚合头+行+明细 */
     public WmProductSales getDetail(Long salesId);
 
-    /** 过账出库：DRAFT/PARTIAL_POSTED → POSTED 或 PARTIAL_POSTED，扣减库存 */
-    public int postOut(Long salesId, List<WmProductSalesDetail> details);
+    /** 按出库单编码查详情（移动端扫码查单）：聚合头+行+明细+发运+装箱，找不到返回 null */
+    public WmProductSales getDetailBySalesCode(String salesCode);
 
-    /** 发货：POSTED/PARTIAL_POSTED → SHIPPED，更新物流信息 */
-    public int ship(Long salesId, WmProductSales info);
+    /** 出库确认：DRAFT/PARTIAL_POSTED → POSTED 或 PARTIAL_POSTED，扣减库存 */
+    public int postOut(Long salesId, List<WmProductSalesDetail> details);
 
     /** 关闭：SHIPPED → CLOSED */
     public int close(Long salesId);

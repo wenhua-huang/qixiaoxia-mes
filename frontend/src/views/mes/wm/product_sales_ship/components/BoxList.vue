@@ -2,8 +2,10 @@
   <div>
     <el-row class="mb8" v-if="!readonly">
       <el-col :span="1.5"><el-button type="primary" plain icon="Plus" size="small" @click="handleAdd">新增装箱</el-button></el-col>
-      <el-col :span="20" class="hint">箱号留空自动生成 BOX-NNN；体积按长×宽×高(cm)÷1000000 自动计算</el-col>
+      <el-col :span="20" class="hint">箱号留空自动生成 BOX-NNN；体积按长×宽×高(cm)÷1000000 自动计算；装箱量不能超过已出库确认量</el-col>
     </el-row>
+    <el-alert v-if="!readonly && postedTotal === 0" title="请先在出库单上完成「出库确认」扣减库存后，再进行装箱发运"
+              type="warning" :closable="false" show-icon class="mb8" />
     <el-table :data="boxes" size="small" border show-summary :summary-method="getSummaries">
       <el-table-column label="箱号" prop="boxNo" width="100" />
       <el-table-column label="物料编码" prop="itemCode" width="120" />
@@ -72,7 +74,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, getCurrentInstance } from 'vue'
+import { ref, reactive, computed, getCurrentInstance } from 'vue'
 import { addBox, updateBox, delBox } from '@/api/mes/wm/product_sales_box'
 import type { WmProductSalesBox, WmProductSalesLine } from '@/types'
 
@@ -117,13 +119,17 @@ function onLineChange(lineId: number) {
   }
 }
 
-/** 该行剩余可装箱量 = 销售数量 - 已装箱数量（排除当前编辑的箱） */
+/** 该行剩余可装箱量 = 已出库确认量 - 已装箱数量（排除当前编辑的箱） */
 function remainQty(line: WmProductSalesLine): number {
   const packed = props.boxes
     .filter((b: WmProductSalesBox) => b.lineId === line.lineId && b.boxId !== form.boxId)
     .reduce((s: number, b: WmProductSalesBox) => s + Number(b.quantity || 0), 0)
-  return Math.max(0, Number(line.quantitySales || 0) - packed)
+  return Math.max(0, Number(line.quantityPosted || 0) - packed)
 }
+
+/** 整单已出库确认总量（未出库确认时不允许装箱） */
+const postedTotal = computed(() =>
+  props.lines.reduce((s: number, l: WmProductSalesLine) => s + Number(l.quantityPosted || 0), 0))
 
 function handleSubmit() {
   formRef.value?.validate((v: boolean) => {
@@ -131,7 +137,7 @@ function handleSubmit() {
     // 校验数量不超过该行剩余可装箱量
     const line = props.lines.find((l: WmProductSalesLine) => l.lineId === form.lineId)
     if (line && Number(form.quantity || 0) > remainQty(line)) {
-      proxy.$modal.msgError(`装箱数量超过该行剩余可装箱量（剩 ${remainQty(line)}）`)
+      proxy.$modal.msgError(`装箱数量超过该行可装箱量（已出库确认剩余 ${remainQty(line)}）`)
       return
     }
     submitting.value = true

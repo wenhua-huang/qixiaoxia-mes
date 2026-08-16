@@ -63,10 +63,13 @@ class SalOrderIT extends BaseIntegrationTest
         assertThat(createResp.getBody().get("code")).isEqualTo(200);
         Long orderId = ((Number) ((Map<?, ?>) createResp.getBody().get("data")).get("orderId")).longValue();
 
-        // 2. 确认
-        ResponseEntity<Map> confirmResp = restTemplate.exchange(
-                baseUrl() + "/confirm/" + orderId, HttpMethod.PUT, authRequest(), Map.class);
-        assertThat(confirmResp.getBody().get("code")).isEqualTo(200);
+        // 2. 确认（V124 状态机：PREPARE --提交--> PENDING --审核--> CONFIRMED）
+        ResponseEntity<Map> submitResp = restTemplate.exchange(
+                baseUrl() + "/submit/" + orderId, HttpMethod.PUT, authRequest(), Map.class);
+        assertThat(submitResp.getBody().get("code")).isEqualTo(200);
+        ResponseEntity<Map> approveResp = restTemplate.exchange(
+                baseUrl() + "/approve/" + orderId, HttpMethod.PUT, authRequest(), Map.class);
+        assertThat(approveResp.getBody().get("code")).isEqualTo(200);
 
         // 3. 详情 -> 取 lineId + 校验可转量=100
         ResponseEntity<Map> detailResp = restTemplate.exchange(
@@ -147,7 +150,8 @@ class SalOrderIT extends BaseIntegrationTest
         ResponseEntity<Map> createResp = restTemplate.postForEntity(
                 baseUrl() + "/createWithLines", authRequest(createReq), Map.class);
         Long orderId = ((Number) ((Map<String, Object>) createResp.getBody().get("data")).get("orderId")).longValue();
-        restTemplate.exchange(baseUrl() + "/confirm/" + orderId, HttpMethod.PUT, authRequest(), Map.class);
+        restTemplate.exchange(baseUrl() + "/submit/" + orderId, HttpMethod.PUT, authRequest(), Map.class);
+        restTemplate.exchange(baseUrl() + "/approve/" + orderId, HttpMethod.PUT, authRequest(), Map.class);
 
         Map<String, Object> twReq = new HashMap<>();
         twReq.put("lineId", getFirstLineId(orderId));

@@ -702,7 +702,7 @@ public class QcConstants {
 
 > 本项目所有 list SQL 必须带 `factory_id` 条件（拦截器注入参数值）：`<if test="factoryId != null and factoryId != ''"> and factory_id = #{factoryId}</if>`
 
-- [ ] **Step 4: 写 Service 接口 + 实现**（标准模式；`insertQcIndex` 加编码唯一校验：`QcIndex q = new QcIndex(); q.setIndexCode(...); if (mapper.selectQcIndexList(q).size()>0) throw new ServiceException("检测项编码已存在");`）
+- [ ] **Step 4: 写 Service 接口 + 实现**（标准模式；`insertQcIndex` 加编码唯一校验：Mapper 加 `checkIndexCodeUnique` 精确匹配语句（`where index_code = #{indexCode} limit 1`，照抄 `MdItemTypeMapper.xml` 的 checkItemTypeCodeUnique 模式），非空即抛 `ServiceException("检测项编码已存在")`。**禁止**用 LIKE 列表查询做唯一校验（子串误判））
 - [ ] **Step 5: 写 Controller**（`@RequestMapping("/mes/qc/index")`；list/getInfo/add(`@PreAuthorize("@ss.hasPermi('mes:qc:index:add')')`)/edit/remove/export 标准五端点）
 - [ ] **Step 6: 编译 + 红线验证**
 
@@ -737,7 +737,7 @@ curl -s -X POST "http://localhost:8081/mes/qc/index" -H "Authorization: Bearer $
   - `IQcTemplateService` 删除保护：`deleteQcTemplateByTemplateIds` 前校验该模板无 `qxx_qc_*` 单据引用（4 个单头 mapper 各 count template_id），有则抛"模板已被检验单引用，请停用而非删除"
   - `QcDefectService` 标准 CRUD
 
-- [ ] **Step 1: QcDefect 全套**（纯照抄 Task 2 模式换字段：defectCode 唯一校验同 indexCode）
+- [ ] **Step 1: QcDefect 全套**（纯照抄 Task 2 模式换字段：defectCode 唯一校验用 `checkDefectCodeUnique` 精确匹配，禁 LIKE）
 - [ ] **Step 2: QcTemplate 级联保存**（核心新逻辑，完整代码）：
 
 ```java

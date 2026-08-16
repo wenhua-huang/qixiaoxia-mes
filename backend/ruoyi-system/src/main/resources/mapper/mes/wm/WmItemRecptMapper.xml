@@ -161,4 +161,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </foreach>
     </delete>
 
+    <!-- 仅回写 IQC 挂点两列（factory 生成检验单后回填，避免并发覆盖整头） -->
+    <update id="updateWmItemRecptHeaderRefs">
+        update qxx_wm_item_recpt set iqc_id = #{iqcId}, iqc_code = #{iqcCode} where recpt_id = #{recptId}
+    </update>
+
 </mapper>

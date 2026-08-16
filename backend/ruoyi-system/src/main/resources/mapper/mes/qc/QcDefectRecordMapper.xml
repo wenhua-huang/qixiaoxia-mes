@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.qc.QcDefectRecordMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.qc.QcDefectRecord" id="QcDefectRecordResult">
+        <result property="recordId"        column="record_id"        />
+        <result property="factoryId"       column="factory_id"       />
+        <result property="qcType"          column="qc_type"          />
+        <result property="qcId"            column="qc_id"            />
+        <result property="lineId"          column="line_id"          />
+        <result property="defectId"        column="defect_id"        />
+        <result property="defectCode"      column="defect_code"      />
+        <result property="defectName"      column="defect_name"      />
+        <result property="defectLevel"     column="defect_level"     />
+        <result property="defectQuantity"  column="defect_quantity"  />
+        <result property="processMethod"   column="process_method"   />
+        <result property="defectImage"     column="defect_image"     />
+        <result property="remark"          column="remark"           />
+        <result property="createBy"        column="create_by"        />
+        <result property="createTime"      column="create_time"      />
+        <result property="updateBy"        column="update_by"        />
+        <result property="updateTime"      column="update_time"      />
+    </resultMap>
+
+    <sql id="selectQcDefectRecordVo">
+        select record_id, factory_id, qc_type, qc_id, line_id, defect_id, defect_code, defect_name,
+               defect_level, defect_quantity, process_method, defect_image, remark,
+               create_by, create_time, update_by, update_time
+        from qxx_qc_defect_record
+    </sql>
+
+    <select id="selectByOrder" resultMap="QcDefectRecordResult">
+        <include refid="selectQcDefectRecordVo"/>
+        where qc_type = #{qcType} and qc_id = #{qcId}
+        order by record_id
+    </select>
+
+    <delete id="deleteByOrder">
+        delete from qxx_qc_defect_record where qc_type = #{qcType} and qc_id = #{qcId}
+    </delete>
+</mapper>

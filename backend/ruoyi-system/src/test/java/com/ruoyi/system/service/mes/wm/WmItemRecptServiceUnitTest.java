@@ -12,6 +12,8 @@ import com.ruoyi.system.domain.mes.wm.WmBatch;
 import com.ruoyi.system.mapper.mes.pur.PurOrderLineMapper;
 import com.ruoyi.system.service.mes.pur.IPurOrderLineService;
 import com.ruoyi.system.service.mes.pur.IPurOrderService;
+import com.ruoyi.system.service.mes.qc.IQcFactoryService;
+import com.ruoyi.system.service.mes.qc.IQcGateService;
 import com.ruoyi.system.service.mes.wm.IWmBatchService;
 import com.ruoyi.system.service.mes.wm.IWmItemRecptLineService;
 import com.ruoyi.system.service.mes.wm.IWmStorageCoreService;
@@ -51,6 +53,8 @@ class WmItemRecptServiceUnitTest {
     @Mock private PurOrderLineMapper purOrderLineMapper;
     @Mock private IWmStorageCoreService storageCoreService;
     @Mock private IWmBatchService wmBatchService;
+    @Mock private IQcFactoryService qcFactoryService;
+    @Mock private IQcGateService qcGateService;
     @InjectMocks private WmItemRecptServiceImpl service;
 
     private MockedStatic<SecurityUtils> securityUtilsMock;

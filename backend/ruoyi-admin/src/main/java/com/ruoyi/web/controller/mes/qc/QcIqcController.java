@@ -1,6 +1,7 @@
 package com.ruoyi.web.controller.mes.qc;
 
 import java.util.List;
+import java.util.Map;
 import jakarta.servlet.http.HttpServletResponse;
 import com.ruoyi.system.service.mes.qc.IQcIqcService;
 import com.ruoyi.common.annotation.Log;
@@ -95,7 +96,7 @@ public class QcIqcController extends BaseController
     }
 
     /**
-     * 关闭（作废）来料检验单
+     * 关闭（作废）来料检验单（仅待检验/检验中可关；已判定单据不可关）
      */
     @PreAuthorize("@ss.hasPermi('mes:qc:iqc:edit')")
     @Log(title = "来料检验单", businessType = BusinessType.UPDATE)
@@ -103,6 +104,18 @@ public class QcIqcController extends BaseController
     public AjaxResult close(@PathVariable("iqcId") Long iqcId)
     {
         qcIqcService.closeIqc(iqcId);
+        return AjaxResult.success();
+    }
+
+    /**
+     * 执行判定（行值录入完成后触发；FAIL 可带让步理由升级为 CONCESSION）
+     */
+    @PreAuthorize("@ss.hasPermi('mes:qc:iqc:judge')")
+    @Log(title = "IQC判定", businessType = BusinessType.UPDATE)
+    @PutMapping("/judge/{iqcId}")
+    public AjaxResult judge(@PathVariable("iqcId") Long iqcId, @RequestBody Map<String, String> body)
+    {
+        qcIqcService.judgeIqc(iqcId, body == null ? null : body.get("concessionReason"));
         return AjaxResult.success();
     }
 

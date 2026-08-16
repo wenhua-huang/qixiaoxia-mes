@@ -25,6 +25,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="iqcId" column="iqc_id" />
         <result property="iqcCode" column="iqc_code" />
         <result property="status" column="status" />
+        <result property="qcStatus" column="qc_status" />
         <result property="remark" column="remark" />
         <result property="createBy" column="create_by" />
         <result property="createTime" column="create_time" />
@@ -36,28 +37,52 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select recpt_id, factory_id, recpt_code, recpt_name, pur_order_id, pur_order_code, vendor_id, vendor_code, vendor_name, warehouse_id, warehouse_code, warehouse_name, recpt_date, recpt_type, total_quantity, workorder_id, workorder_code, iqc_id, iqc_code, status, remark, create_by, create_time, update_by, update_time from qxx_wm_item_recpt
     </sql>
 
+    <!-- 列表带 qcStatus 计算列：对本入库单全部 IQC 单状态汇总
+         （任一 COMPLETED+PASS→PASSED；COMPLETED+CONCESSION→CONCESSION；COMPLETED+FAIL→FAILED；
+           存在 PENDING/INSPECTING→PENDING；无单→NONE）。
+         注：外层恒真条件保证 WHERE 必渲染 — FactoryIdInterceptor 注入 factory_id 时
+         不致误将子查询的 where 当作外层 where 导致注入点错位。 -->
     <select id="selectWmItemRecptList" parameterType="WmItemRecpt" resultMap="WmItemRecptResult">
-        <include refid="selectWmItemRecptVo"/>
-        <where>            <if test="recptCode != null and recptCode != ''"> and recpt_code like concat('%', #{recptCode}, '%')</if>
-            <if test="recptName != null and recptName != ''"> and recpt_name like concat('%', #{recptName}, '%')</if>
-            <if test="purOrderId != null"> and pur_order_id = #{purOrderId}</if>
-            <if test="purOrderCode != null and purOrderCode != ''"> and pur_order_code like concat('%', #{purOrderCode}, '%')</if>
-            <if test="vendorId != null"> and vendor_id = #{vendorId}</if>
-            <if test="vendorCode != null and vendorCode != ''"> and vendor_code like concat('%', #{vendorCode}, '%')</if>
-            <if test="vendorName != null and vendorName != ''"> and vendor_name like concat('%', #{vendorName}, '%')</if>
-            <if test="warehouseId != null"> and warehouse_id = #{warehouseId}</if>
-            <if test="warehouseCode != null and warehouseCode != ''"> and warehouse_code like concat('%', #{warehouseCode}, '%')</if>
-            <if test="warehouseName != null and warehouseName != ''"> and warehouse_name like concat('%', #{warehouseName}, '%')</if>
-            <if test="recptType != null and recptType != ''"> and recpt_type like concat('%', #{recptType}, '%')</if>
-            <if test="workorderId != null"> and workorder_id = #{workorderId}</if>
-            <if test="workorderCode != null and workorderCode != ''"> and workorder_code = #{workorderCode}</if>
-            <if test="iqcId != null"> and iqc_id = #{iqcId}</if>
-            <if test="iqcCode != null and iqcCode != ''"> and iqc_code like concat('%', #{iqcCode}, '%')</if>
-            <if test="status != null and status != ''"> and status like concat('%', #{status}, '%')</if>
-            <if test="createBy != null and createBy != ''"> and create_by like concat('%', #{createBy}, '%')</if>
-            <if test="updateBy != null and updateBy != ''"> and update_by like concat('%', #{updateBy}, '%')</if>
+        select t.recpt_id, t.factory_id, t.recpt_code, t.recpt_name, t.pur_order_id, t.pur_order_code,
+               t.vendor_id, t.vendor_code, t.vendor_name, t.warehouse_id, t.warehouse_code, t.warehouse_name,
+               t.recpt_date, t.recpt_type, t.total_quantity, t.workorder_id, t.workorder_code,
+               t.iqc_id, t.iqc_code, t.status, t.remark, t.create_by, t.create_time, t.update_by, t.update_time,
+               (
+                   select case
+                       when max(case when i.status = 'COMPLETED' and i.check_result = 'PASS' then 1 else 0 end) = 1 then 'PASSED'
+                       when max(case when i.status = 'COMPLETED' and i.check_result = 'CONCESSION' then 1 else 0 end) = 1 then 'CONCESSION'
+                       when max(case when i.status = 'COMPLETED' and i.check_result = 'FAIL' then 1 else 0 end) = 1 then 'FAILED'
+                       when max(case when i.status in ('PENDING', 'INSPECTING') then 1 else 0 end) = 1 then 'PENDING'
+                       else 'NONE'
+                   end
+                   from qxx_qc_iqc i
+                   where i.source_doc_type = 'wm_item_recpt'
+                     and i.source_doc_id = t.recpt_id
+                     and i.factory_id = t.factory_id
+               ) as qc_status
+        from qxx_wm_item_recpt t
+        <where>
+            t.recpt_id is not null
+            <if test="recptCode != null and recptCode != ''"> and t.recpt_code like concat('%', #{recptCode}, '%')</if>
+            <if test="recptName != null and recptName != ''"> and t.recpt_name like concat('%', #{recptName}, '%')</if>
+            <if test="purOrderId != null"> and t.pur_order_id = #{purOrderId}</if>
+            <if test="purOrderCode != null and purOrderCode != ''"> and t.pur_order_code like concat('%', #{purOrderCode}, '%')</if>
+            <if test="vendorId != null"> and t.vendor_id = #{vendorId}</if>
+            <if test="vendorCode != null and vendorCode != ''"> and t.vendor_code like concat('%', #{vendorCode}, '%')</if>
+            <if test="vendorName != null and vendorName != ''"> and t.vendor_name like concat('%', #{vendorName}, '%')</if>
+            <if test="warehouseId != null"> and t.warehouse_id = #{warehouseId}</if>
+            <if test="warehouseCode != null and warehouseCode != ''"> and t.warehouse_code like concat('%', #{warehouseCode}, '%')</if>
+            <if test="warehouseName != null and warehouseName != ''"> and t.warehouse_name like concat('%', #{warehouseName}, '%')</if>
+            <if test="recptType != null and recptType != ''"> and t.recpt_type = #{recptType}</if>
+            <if test="workorderId != null"> and t.workorder_id = #{workorderId}</if>
+            <if test="workorderCode != null and workorderCode != ''"> and t.workorder_code like concat('%', #{workorderCode}, '%')</if>
+            <if test="iqcId != null"> and t.iqc_id = #{iqcId}</if>
+            <if test="iqcCode != null and iqcCode != ''"> and t.iqc_code like concat('%', #{iqcCode}, '%')</if>
+            <if test="status != null and status != ''"> and t.status like concat('%', #{status}, '%')</if>
+            <if test="createBy != null and createBy != ''"> and t.create_by like concat('%', #{createBy}, '%')</if>
+            <if test="updateBy != null and updateBy != ''"> and t.update_by like concat('%', #{updateBy}, '%')</if>
         </where>
-        order by create_time desc
+        order by t.create_time desc
     </select>
 
     <select id="selectWmItemRecptAll" resultMap="WmItemRecptResult">

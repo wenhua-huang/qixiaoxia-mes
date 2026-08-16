@@ -36,6 +36,6 @@ public interface IQcIqcService
     /** 关闭（作废）检验单 */
     public void closeIqc(Long iqcId);
 
-    /** 执行判定（本任务为桩，完整实现在后续判定任务） */
+    /** 执行判定（FAIL+让步理由→CONCESSION；行结果/缺陷统计/合格数回写，状态置 COMPLETED） */
     public void judgeIqc(Long iqcId, String concessionReason);
 }

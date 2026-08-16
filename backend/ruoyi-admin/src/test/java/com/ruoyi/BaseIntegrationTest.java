@@ -88,9 +88,10 @@ public abstract class BaseIntegrationTest {
         registry.add("spring.datasource.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
 
         // SQL init 建基础表（sys_config 等），供 sysConfigServiceImpl @PostConstruct 在 Flyway 前查询
+        // test_sys_schema_patch.sql：补 ry 旧种子缺的 sys_user 列（Flyway baseline=136 跳过了 V70/V98 的加列）
         registry.add("spring.sql.init.mode", () -> "always");
         registry.add("spring.sql.init.schema-locations", () ->
-            "classpath:sql/ry_20260417.sql,classpath:sql/test_mes_ddl.sql,classpath:sql/manual_tables.sql");
+            "classpath:sql/ry_20260417.sql,classpath:sql/test_mes_ddl.sql,classpath:sql/manual_tables.sql,classpath:sql/test_sys_schema_patch.sql");
         registry.add("spring.sql.init.continue-on-error", () -> "true");
     }
 

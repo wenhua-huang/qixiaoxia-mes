@@ -78,6 +78,9 @@ public class WmItemRecpt extends BaseEntity
     @Excel(name = "状态:DRAFT-草稿")
     private String status;
 
+    /** 检验状态汇总(列表查询计算列，非表字段)：PASSED/CONCESSION/FAILED/PENDING/NONE(无单=免检) */
+    private String qcStatus;
+
     /** 入库单行列表（详情接口返回，非持久化字段） */
     private List<WmItemRecptLine> lines;
 
@@ -140,6 +143,9 @@ public class WmItemRecpt extends BaseEntity
 
     public String getStatus() { return status; }
     public void setStatus(String v) { this.status = v; }
+
+    public String getQcStatus() { return qcStatus; }
+    public void setQcStatus(String v) { this.qcStatus = v; }
 
     public List<WmItemRecptLine> getLines() { return lines; }
     public void setLines(List<WmItemRecptLine> lines) { this.lines = lines; }

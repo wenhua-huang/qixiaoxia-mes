@@ -11,6 +11,8 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.ruoyi.common.core.redis.RedisLockTemplate;
 import com.ruoyi.system.domain.mes.pro.ProFeedback;
@@ -31,8 +33,11 @@ import com.ruoyi.system.mapper.mes.qc.QcTemplateIndexMapper;
 import com.ruoyi.system.mapper.mes.qc.QcTemplateProductMapper;
 import com.ruoyi.system.mapper.mes.wm.WmItemRecptMapper;
 import com.ruoyi.system.service.mes.qc.IQcFactoryService;
+import com.ruoyi.system.service.mes.qc.QcCodeGenerator;
 import com.ruoyi.system.service.mes.qc.QcConstants;
 import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
+
+import jakarta.annotation.PostConstruct;
 
 /**
  * 检验单生成工厂实现（IQC 部分已实现，OQC/IPQC/RQC 见各桩方法注释的交付任务）
@@ -64,11 +69,31 @@ public class QcFactoryServiceImpl implements IQcFactoryService
     @Autowired
     private RedisLockTemplate lockTemplate;
 
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
+    private TransactionTemplate txTemplate;
+
+    @PostConstruct
+    void initTx()
+    {
+        this.txTemplate = new TransactionTemplate(transactionManager);
+        this.txTemplate.setTimeout(30);
+    }
+
     @Override
     public QcTemplateProduct resolveTemplate(String qcType, Long itemId, Long processId)
     {
-        QcTemplateProduct bind = bindMapper.selectEnabledBindExact(qcType, itemId, processId);
-        return bind != null ? bind : bindMapper.selectEnabledBindCommon(qcType, itemId);
+        if (processId != null)
+        {
+            QcTemplateProduct bind = bindMapper.selectEnabledBindExact(qcType, itemId, processId);
+            if (bind != null)
+            {
+                return bind;
+            }
+        }
+        // processId=null 时 Exact(process_id = null) 匹配不到行，直接查通用绑定
+        return bindMapper.selectEnabledBindCommon(qcType, itemId);
     }
 
     @Override
@@ -88,13 +113,25 @@ public class QcFactoryServiceImpl implements IQcFactoryService
             {
                 continue;  // 未绑定模板 = 免检
             }
-            String lockKey = QcConstants.LOCK_GENERATE + "iqc:" + header.getRecptId() + ":" + e.getKey();
-            lockTemplate.execute(lockKey, () -> generateOneIqc(header, e.getValue(), bind));
+            generateOneIqc(header, e.getValue(), bind);
         }
     }
 
-    /** 锁内生成单物料检验单：幂等检查 → 快照建单 → 建行 → 回填头挂点 */
+    /** 先锁后事务：锁防同单并发重入，事务保证 头/行/挂点 三写原子（防零行活动单卡死幂等检查） */
     private void generateOneIqc(WmItemRecpt header, List<WmItemRecptLine> group, QcTemplateProduct bind)
+    {
+        String lockKey = QcConstants.LOCK_GENERATE + "iqc:" + header.getRecptId() + ":" + group.get(0).getItemId();
+        // 块状 void lambda 显式绑定 Runnable 重载（表达式 lambda 会歧义绑定到 Supplier 重载）
+        lockTemplate.execute(lockKey, () -> {
+            txTemplate.execute(tx -> {
+                doGenerateOneIqc(header, group, bind);
+                return null;
+            });
+        });
+    }
+
+    /** 锁+事务内生成单物料检验单：幂等检查 → 快照建单 → 建行 → 回填头挂点 */
+    private void doGenerateOneIqc(WmItemRecpt header, List<WmItemRecptLine> group, QcTemplateProduct bind)
     {
         Long itemId = group.get(0).getItemId();
         List<QcIqc> exist = iqcMapper.selectBySource(QcConstants.SOURCE_ITEM_RECPT, header.getRecptId(), itemId);
@@ -117,7 +154,7 @@ public class QcFactoryServiceImpl implements IQcFactoryService
             .reduce(BigDecimal.ZERO, BigDecimal::add);
         Date now = new Date();
         QcIqc iqc = new QcIqc();
-        iqc.setIqcCode(genIqcCode());
+        iqc.setIqcCode(QcCodeGenerator.genIqcCode(autoCodeGenerator));
         iqc.setIqcName("来料检验-" + StringUtils.defaultString(first.getItemName()));
         iqc.setTemplateId(bind.getTemplateId());
         iqc.setSourceDocId(header.getRecptId());
@@ -248,15 +285,6 @@ public class QcFactoryServiceImpl implements IQcFactoryService
     {
         // 桩：RQC 单据 Mapper 在 Task 16 交付后实现
         throw new UnsupportedOperationException("generateRqcForRtIssue 待 Task 16 实现");
-    }
-
-    private String genIqcCode()
-    {
-        if (autoCodeGenerator != null)
-        {
-            return autoCodeGenerator.genSerialCode(QcConstants.CODE_RULE_IQC, null);
-        }
-        return "IQC" + System.currentTimeMillis();
     }
 
     private BigDecimal nvl(BigDecimal v)

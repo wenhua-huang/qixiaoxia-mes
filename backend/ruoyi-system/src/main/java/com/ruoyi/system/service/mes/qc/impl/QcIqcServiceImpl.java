@@ -1,7 +1,5 @@
 package com.ruoyi.system.service.mes.qc.impl;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.List;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
@@ -11,6 +9,7 @@ import com.ruoyi.system.mapper.mes.qc.QcDefectRecordMapper;
 import com.ruoyi.system.mapper.mes.qc.QcIqcMapper;
 import com.ruoyi.system.service.mes.qc.IQcIqcService;
 import com.ruoyi.system.service.mes.qc.IQcOrderLineService;
+import com.ruoyi.system.service.mes.qc.QcCodeGenerator;
 import com.ruoyi.system.service.mes.qc.QcConstants;
 import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,8 +28,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class QcIqcServiceImpl implements IQcIqcService
 {
-    /** 编码兜底随机器上界（%04d 四位随机） */
-    private static final int CODE_RANDOM_BOUND = 10000;
 
     @Autowired
     private QcIqcMapper qcIqcMapper;
@@ -146,7 +143,8 @@ public class QcIqcServiceImpl implements IQcIqcService
     }
 
     /**
-     * 生成或校验检验单编码：优先用 AutoCodeGenerator(QC_IQC_CODE)；失败/未配置则用 IQC+时间戳+4位随机。
+     * 生成或校验检验单编码：已带编码直接用；否则走 QcCodeGenerator（规则编码优先，
+     * 失败/未配置时 IQC+时间戳+4位随机兜底，与生成工厂共用同一语义）。
      * DB 唯一约束 uk_iqc_code 是最终防线，冲突时抛 ServiceException。
      */
     private void ensureIqcCode(QcIqc qciqc)
@@ -155,24 +153,6 @@ public class QcIqcServiceImpl implements IQcIqcService
         {
             return;
         }
-        if (autoCodeGenerator != null)
-        {
-            try
-            {
-                String code = autoCodeGenerator.genSerialCode(QcConstants.CODE_RULE_IQC, null);
-                if (code != null && !code.isEmpty())
-                {
-                    qciqc.setIqcCode(code);
-                    return;
-                }
-            }
-            catch (Exception ignored)
-            {
-                // fall through 到时间戳兜底
-            }
-        }
-        String ts = new SimpleDateFormat("yyyyMMddHHmmssSSS").format(new Date());
-        int rand = (int) (Math.random() * CODE_RANDOM_BOUND);
-        qciqc.setIqcCode("IQC" + ts + String.format("%04d", rand));
+        qciqc.setIqcCode(QcCodeGenerator.genIqcCode(autoCodeGenerator));
     }
 }

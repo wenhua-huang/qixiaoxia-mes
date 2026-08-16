@@ -14,6 +14,7 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import com.ruoyi.common.core.redis.RedisLockTemplate;
 import com.ruoyi.system.domain.mes.qc.QcIqc;
@@ -33,6 +34,8 @@ import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
@@ -58,6 +61,7 @@ class QcFactoryServiceImplTest {
     @Mock AutoCodeGenerator autoCodeGenerator;
     @Mock RedisLockTemplate lockTemplate;
     @Mock WmItemRecptMapper wmItemRecptMapper;
+    @Mock PlatformTransactionManager transactionManager;
     @InjectMocks QcFactoryServiceImpl service;
 
     @Captor ArgumentCaptor<QcIqc> iqcCaptor;
@@ -70,6 +74,9 @@ class QcFactoryServiceImplTest {
             ((Runnable) inv.getArgument(1)).run();
             return null;
         }).when(lockTemplate).execute(anyString(), any(Runnable.class));
+        // 用 mock 事务管理器构造真实 TransactionTemplate：execute 回调真实执行
+        // （getTransaction/commit 走 mock no-op），覆盖"锁内三写包事务"路径
+        service.initTx();
     }
 
     // ---- 测试数据构造 ----
@@ -137,7 +144,6 @@ class QcFactoryServiceImplTest {
     @Test
     @DisplayName("物料无模板绑定时跳过生成")
     void should_skip_when_no_template_bind() {
-        when(bindMapper.selectEnabledBindExact("IQC", 1L, null)).thenReturn(null);
         when(bindMapper.selectEnabledBindCommon("IQC", 1L)).thenReturn(null);
 
         service.generateIqcForItemRecpt(header(1L), Collections.singletonList(line(1L, 10)));
@@ -148,7 +154,7 @@ class QcFactoryServiceImplTest {
     @Test
     @DisplayName("同来源同物料已有未关闭检验单时不重复生成")
     void should_skip_when_active_order_exists() {
-        when(bindMapper.selectEnabledBindExact("IQC", 1L, null)).thenReturn(bind(10L));
+        when(bindMapper.selectEnabledBindCommon("IQC", 1L)).thenReturn(bind(10L));
         when(iqcMapper.selectBySource(QcConstants.SOURCE_ITEM_RECPT, 1L, 1L))
             .thenReturn(Collections.singletonList(orderWithStatus(QcConstants.STATUS_PENDING)));
 
@@ -162,7 +168,7 @@ class QcFactoryServiceImplTest {
     @DisplayName("生成时快照模板阈值并回填入库单头挂点")
     void should_snapshot_thresholds_and_backfill_header() {
         WmItemRecpt header = header(1L);
-        when(bindMapper.selectEnabledBindExact("IQC", 1L, null)).thenReturn(bind(10L));
+        when(bindMapper.selectEnabledBindCommon("IQC", 1L)).thenReturn(bind(10L));
         when(iqcMapper.selectBySource(QcConstants.SOURCE_ITEM_RECPT, 1L, 1L))
             .thenReturn(Collections.emptyList());
         when(templateIndexMapper.selectByTemplateId(10L))
@@ -222,7 +228,7 @@ class QcFactoryServiceImplTest {
     @Test
     @DisplayName("多行同物料合并为一张检验单")
     void should_merge_same_item_lines_into_one_order() {
-        when(bindMapper.selectEnabledBindExact("IQC", 1L, null)).thenReturn(bind(10L));
+        when(bindMapper.selectEnabledBindCommon("IQC", 1L)).thenReturn(bind(10L));
         when(iqcMapper.selectBySource(QcConstants.SOURCE_ITEM_RECPT, 1L, 1L))
             .thenReturn(Collections.emptyList());
         when(templateIndexMapper.selectByTemplateId(10L)).thenReturn(Collections.emptyList());
@@ -271,5 +277,46 @@ class QcFactoryServiceImplTest {
 
         verify(iqcMapper, never()).selectBySource(anyString(), any(), any());
         verify(iqcMapper, never()).updateQcIqc(any());
+    }
+
+    @Test
+    @DisplayName("resolveTemplate 有工序时精确绑定命中即返回且不再查通用")
+    void should_prefer_exact_bind_when_process_present() {
+        QcTemplateProduct exact = bind(10L);
+        when(bindMapper.selectEnabledBindExact("IPQC", 1L, 5L)).thenReturn(exact);
+
+        assertSame(exact, service.resolveTemplate("IPQC", 1L, 5L));
+
+        verify(bindMapper, never()).selectEnabledBindCommon(any(), any());
+    }
+
+    @Test
+    @DisplayName("resolveTemplate 无工序时跳过精确查询直查通用绑定")
+    void should_skip_exact_query_when_no_process() {
+        assertNull(service.resolveTemplate("IQC", 1L, null));
+
+        verify(bindMapper, never()).selectEnabledBindExact(any(), any(), any());
+        verify(bindMapper).selectEnabledBindCommon("IQC", 1L);
+    }
+
+    @Test
+    @DisplayName("编码规则异常时兜底生成时间戳编码不打断创建")
+    void should_fallback_code_when_rule_broken() {
+        when(bindMapper.selectEnabledBindCommon("IQC", 1L)).thenReturn(bind(10L));
+        when(iqcMapper.selectBySource(QcConstants.SOURCE_ITEM_RECPT, 1L, 1L))
+            .thenReturn(Collections.emptyList());
+        when(templateIndexMapper.selectByTemplateId(10L)).thenReturn(Collections.emptyList());
+        when(autoCodeGenerator.genSerialCode(QcConstants.CODE_RULE_IQC, null))
+            .thenThrow(new RuntimeException("编码规则[QC_IQC_CODE]不存在！"));
+        when(iqcMapper.insertQcIqc(any())).thenAnswer(inv -> {
+            ((QcIqc) inv.getArgument(0)).setIqcId(100L);
+            return 1;
+        });
+
+        service.generateIqcForItemRecpt(header(1L), Collections.singletonList(line(1L, 10)));
+
+        verify(iqcMapper).insertQcIqc(iqcCaptor.capture());
+        assertTrue(iqcCaptor.getValue().getIqcCode().matches("IQC\\d{17}\\d{4}"),
+            "兜底编码应为 IQC+17位时间戳+4位随机，实际=" + iqcCaptor.getValue().getIqcCode());
     }
 }

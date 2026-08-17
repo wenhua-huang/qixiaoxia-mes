@@ -15,14 +15,14 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.system.domain.mes.qc.QcDefectRecord;
-import com.ruoyi.system.domain.mes.qc.QcIqc;
 import com.ruoyi.system.domain.mes.qc.QcJudgeConfig;
 import com.ruoyi.system.domain.mes.qc.QcJudgeResult;
+import com.ruoyi.system.domain.mes.qc.QcOqc;
 import com.ruoyi.system.domain.mes.qc.QcOrderLine;
 import com.ruoyi.system.mapper.mes.qc.QcDefectRecordMapper;
-import com.ruoyi.system.mapper.mes.qc.QcIqcMapper;
-import com.ruoyi.system.service.mes.qc.IQcIqcService;
+import com.ruoyi.system.mapper.mes.qc.QcOqcMapper;
 import com.ruoyi.system.service.mes.qc.IQcJudgeService;
+import com.ruoyi.system.service.mes.qc.IQcOqcService;
 import com.ruoyi.system.service.mes.qc.IQcOrderLineService;
 import com.ruoyi.system.service.mes.qc.QcCodeGenerator;
 import com.ruoyi.system.service.mes.qc.QcConstants;
@@ -31,20 +31,20 @@ import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 import jakarta.annotation.PostConstruct;
 
 /**
- * 来料检验单Service业务层处理（factory_id 由 FactoryIdInterceptor 自动注入）
+ * 出货检验单Service业务层处理（factory_id 由 FactoryIdInterceptor 自动注入）
  *
  * 头表 + 检验行级联：行采用全删全插（null=本次未提交行集，不清空，防仅改头字段时误删行）。
- * 判定(judgeIqc)：锁+事务内复用 IQcJudgeService，COMPLETED 后判定域字段不可再编辑。
+ * 判定(judgeOqc)：锁+事务内复用 IQcJudgeService，COMPLETED 后判定域字段不可再编辑。
  *
  * @author qixiaoxia
  * @date 2026-08-16
  */
 @Service
-public class QcIqcServiceImpl implements IQcIqcService
+public class QcOqcServiceImpl implements IQcOqcService
 {
 
     @Autowired
-    private QcIqcMapper qcIqcMapper;
+    private QcOqcMapper qcOqcMapper;
 
     @Autowired
     private QcDefectRecordMapper qcDefectRecordMapper;
@@ -74,47 +74,47 @@ public class QcIqcServiceImpl implements IQcIqcService
     }
 
     @Override
-    public List<QcIqc> selectQcIqcList(QcIqc qciqc)
+    public List<QcOqc> selectQcOqcList(QcOqc qcoqc)
     {
-        return qcIqcMapper.selectQcIqcList(qciqc);
+        return qcOqcMapper.selectQcOqcList(qcoqc);
     }
 
     @Override
-    public QcIqc selectQcIqcByIqcId(Long iqcId)
+    public QcOqc selectQcOqcByOqcId(Long oqcId)
     {
-        QcIqc iqc = qcIqcMapper.selectQcIqcByIqcId(iqcId);
-        if (iqc != null)
+        QcOqc oqc = qcOqcMapper.selectQcOqcByOqcId(oqcId);
+        if (oqc != null)
         {
-            iqc.setLines(qcOrderLineService.selectByOrder(QcConstants.TYPE_IQC, iqcId));
-            iqc.setDefectRecords(qcDefectRecordMapper.selectByOrder(QcConstants.TYPE_IQC, iqcId));
+            oqc.setLines(qcOrderLineService.selectByOrder(QcConstants.TYPE_OQC, oqcId));
+            oqc.setDefectRecords(qcDefectRecordMapper.selectByOrder(QcConstants.TYPE_OQC, oqcId));
         }
-        return iqc;
+        return oqc;
     }
 
     @Override
     @Transactional
-    public int insertQcIqc(QcIqc qciqc)
+    public int insertQcOqc(QcOqc qcoqc)
     {
-        ensureIqcCode(qciqc);
-        if (qcIqcMapper.checkIqcCodeUnique(qciqc.getIqcCode()) != null)
+        ensureOqcCode(qcoqc);
+        if (qcOqcMapper.checkOqcCodeUnique(qcoqc.getOqcCode()) != null)
         {
             throw new ServiceException("检验单编码已存在");
         }
-        qciqc.setCreateTime(DateUtils.getNowDate());
-        int rows = qcIqcMapper.insertQcIqc(qciqc);
-        qcOrderLineService.replaceLines(QcConstants.TYPE_IQC, qciqc.getIqcId(), qciqc.getLines());
+        qcoqc.setCreateTime(DateUtils.getNowDate());
+        int rows = qcOqcMapper.insertQcOqc(qcoqc);
+        qcOrderLineService.replaceLines(QcConstants.TYPE_OQC, qcoqc.getOqcId(), qcoqc.getLines());
         return rows;
     }
 
     @Override
     @Transactional
-    public int updateQcIqc(QcIqc qciqc)
+    public int updateQcOqc(QcOqc qcoqc)
     {
-        if (qciqc.getIqcId() == null)
+        if (qcoqc.getOqcId() == null)
         {
             throw new ServiceException("检验单主键不能为空");
         }
-        QcIqc current = qcIqcMapper.selectQcIqcByIqcId(qciqc.getIqcId());
+        QcOqc current = qcOqcMapper.selectQcOqcByOqcId(qcoqc.getOqcId());
         if (current == null)
         {
             throw new ServiceException("检验单不存在");
@@ -124,17 +124,17 @@ public class QcIqcServiceImpl implements IQcIqcService
         {
             throw new ServiceException("已判定的检验单不可编辑");
         }
-        keepJudgementFields(qciqc, current);
-        qciqc.setUpdateTime(DateUtils.getNowDate());
-        int rows = qcIqcMapper.updateQcIqc(qciqc);
+        keepJudgementFields(qcoqc, current);
+        qcoqc.setUpdateTime(DateUtils.getNowDate());
+        int rows = qcOqcMapper.updateQcOqc(qcoqc);
         // 行集/缺陷集 null=本次未提交，不清空（与模板头行级联同一保护策略）
-        if (qciqc.getLines() != null)
+        if (qcoqc.getLines() != null)
         {
-            qcOrderLineService.replaceLines(QcConstants.TYPE_IQC, qciqc.getIqcId(), qciqc.getLines());
+            qcOrderLineService.replaceLines(QcConstants.TYPE_OQC, qcoqc.getOqcId(), qcoqc.getLines());
         }
-        if (qciqc.getDefectRecords() != null)
+        if (qcoqc.getDefectRecords() != null)
         {
-            replaceDefectRecords(QcConstants.TYPE_IQC, qciqc.getIqcId(), qciqc.getDefectRecords());
+            replaceDefectRecords(QcConstants.TYPE_OQC, qcoqc.getOqcId(), qcoqc.getDefectRecords());
         }
         return rows;
     }
@@ -164,7 +164,7 @@ public class QcIqcServiceImpl implements IQcIqcService
      * 判定域+模板快照字段服务端强制以 DB 现值为准（edit 请求中传入的值一律忽略），
      * 防止绕过 judge 流程篡改判定结果/状态，及判定前篡改 Ac 值/三率阈值放宽标准。
      */
-    private void keepJudgementFields(QcIqc target, QcIqc current)
+    private void keepJudgementFields(QcOqc target, QcOqc current)
     {
         target.setStatus(current.getStatus());
         target.setCheckResult(current.getCheckResult());
@@ -186,119 +186,120 @@ public class QcIqcServiceImpl implements IQcIqcService
 
     @Override
     @Transactional
-    public int deleteQcIqcByIqcId(Long iqcId)
+    public int deleteQcOqcByOqcId(Long oqcId)
     {
-        qcOrderLineService.deleteByOrder(QcConstants.TYPE_IQC, iqcId);
-        qcDefectRecordMapper.deleteByOrder(QcConstants.TYPE_IQC, iqcId);
-        return qcIqcMapper.deleteQcIqcByIqcId(iqcId);
+        qcOrderLineService.deleteByOrder(QcConstants.TYPE_OQC, oqcId);
+        qcDefectRecordMapper.deleteByOrder(QcConstants.TYPE_OQC, oqcId);
+        return qcOqcMapper.deleteQcOqcByOqcId(oqcId);
     }
 
     @Override
     @Transactional
-    public int deleteQcIqcByIqcIds(Long[] iqcIds)
+    public int deleteQcOqcByOqcIds(Long[] oqcIds)
     {
         int rows = 0;
-        for (Long iqcId : iqcIds)
+        for (Long oqcId : oqcIds)
         {
-            rows += deleteQcIqcByIqcId(iqcId);
+            rows += deleteQcOqcByOqcId(oqcId);
         }
         return rows;
     }
 
     @Override
-    public List<QcIqc> listBySource(String sourceDocType, Long sourceDocId)
+    public List<QcOqc> listBySource(String sourceDocType, Long sourceDocId)
     {
-        return qcIqcMapper.selectBySource(sourceDocType, sourceDocId, null);
+        return qcOqcMapper.selectBySource(sourceDocType, sourceDocId, null);
     }
 
     @Override
-    public void closeIqc(Long iqcId)
+    public void closeOqc(Long oqcId)
     {
-        QcIqc iqc = qcIqcMapper.selectQcIqcByIqcId(iqcId);
-        if (iqc == null)
+        QcOqc oqc = qcOqcMapper.selectQcOqcByOqcId(oqcId);
+        if (oqc == null)
         {
             throw new ServiceException("检验单不存在");
         }
-        if (QcConstants.STATUS_CLOSED.equals(iqc.getStatus()))
+        if (QcConstants.STATUS_CLOSED.equals(oqc.getStatus()))
         {
             return;  // 幂等：已关闭直接返回
         }
-        if (QcConstants.STATUS_COMPLETED.equals(iqc.getStatus()))
+        if (QcConstants.STATUS_COMPLETED.equals(oqc.getStatus()))
         {
-            throw new ServiceException("已判定的检验单不可关闭（判定结果可能已驱动下游入库）");
+            throw new ServiceException("已判定的检验单不可关闭（判定结果可能已驱动下游出库）");
         }
-        QcIqc update = new QcIqc();
-        update.setIqcId(iqcId);
+        QcOqc update = new QcOqc();
+        update.setOqcId(oqcId);
         update.setStatus(QcConstants.STATUS_CLOSED);
         update.setUpdateBy(SecurityUtils.getUsername());
         update.setUpdateTime(DateUtils.getNowDate());
-        qcIqcMapper.updateQcIqc(update);
+        qcOqcMapper.updateQcOqc(update);
     }
 
     /**
      * 执行判定：先锁后事务（锁防并发重复判定，事务保证 行回填+头回写 原子）。
      * FAIL 可携带让步理由升级为 CONCESSION；CONCESSION 必填理由。
+     * 头回写只动 inspectDate/inspector 与判定汇总，outDate（出货日期）保持不变。
      */
     @Override
-    public void judgeIqc(Long iqcId, String concessionReason)
+    public void judgeOqc(Long oqcId, String concessionReason)
     {
-        String lockKey = QcConstants.LOCK_JUDGE + "IQC:" + iqcId;
+        String lockKey = QcConstants.LOCK_JUDGE + "OQC:" + oqcId;
         // 块状 void lambda 显式绑定 Runnable 重载（表达式 lambda 会歧义绑定到 Supplier 重载）
         lockTemplate.execute(lockKey, () -> {
             txTemplate.execute(tx -> {
-                doJudgeIqc(iqcId, concessionReason);
+                doJudgeOqc(oqcId, concessionReason);
                 return null;
             });
         });
     }
 
     /** 锁+事务内判定：守卫 → 载入行/缺陷 → 引擎判定 → 让步处理 → 行结果回填 → 头回写 */
-    private void doJudgeIqc(Long iqcId, String concessionReason)
+    private void doJudgeOqc(Long oqcId, String concessionReason)
     {
-        QcIqc iqc = qcIqcMapper.selectQcIqcByIqcId(iqcId);
-        if (iqc == null)
+        QcOqc oqc = qcOqcMapper.selectQcOqcByOqcId(oqcId);
+        if (oqc == null)
         {
             throw new ServiceException("检验单不存在");
         }
-        if (QcConstants.STATUS_COMPLETED.equals(iqc.getStatus())
-            || QcConstants.STATUS_CLOSED.equals(iqc.getStatus()))
+        if (QcConstants.STATUS_COMPLETED.equals(oqc.getStatus())
+            || QcConstants.STATUS_CLOSED.equals(oqc.getStatus()))
         {
             throw new ServiceException("已完成或已关闭的检验单不可判定");
         }
-        List<QcOrderLine> lines = qcOrderLineService.selectByOrder(QcConstants.TYPE_IQC, iqcId);
+        List<QcOrderLine> lines = qcOrderLineService.selectByOrder(QcConstants.TYPE_OQC, oqcId);
         if (lines.isEmpty())
         {
             throw new ServiceException("检验单无检测项");
         }
-        List<QcDefectRecord> defects = qcDefectRecordMapper.selectByOrder(QcConstants.TYPE_IQC, iqcId);
-        QcJudgeResult r = qcJudgeService.judge(lines, defects, buildJudgeConfig(iqc));
+        List<QcDefectRecord> defects = qcDefectRecordMapper.selectByOrder(QcConstants.TYPE_OQC, oqcId);
+        QcJudgeResult r = qcJudgeService.judge(lines, defects, buildJudgeConfig(oqc));
         String finalResult = resolveFinalResult(r.getResult(), concessionReason);
-        qcOrderLineService.replaceLines(QcConstants.TYPE_IQC, iqcId, lines);   // 回填行结果
-        iqc.setCheckResult(finalResult);
-        iqc.setConcessionReason(QcConstants.RESULT_CONCESSION.equals(finalResult) ? concessionReason : null);
-        iqc.setQuantityUnqualified(r.getQuantityUnqualified());
-        iqc.setQuantityQualified(Math.max(nvl(iqc.getQuantityCheck()) - r.getQuantityUnqualified(), 0));
-        iqc.setCrQuantity(r.getCrQuantity());
-        iqc.setMajQuantity(r.getMajQuantity());
-        iqc.setMinQuantity(r.getMinQuantity());
-        iqc.setCrRate(BigDecimal.valueOf(r.getCrRate()));
-        iqc.setMajRate(BigDecimal.valueOf(r.getMajRate()));
-        iqc.setMinRate(BigDecimal.valueOf(r.getMinRate()));
-        iqc.setStatus(QcConstants.STATUS_COMPLETED);
-        iqc.setInspectDate(DateUtils.getNowDate());
-        iqc.setInspector(SecurityUtils.getUsername());
-        qcIqcMapper.updateQcIqc(iqc);
+        qcOrderLineService.replaceLines(QcConstants.TYPE_OQC, oqcId, lines);   // 回填行结果
+        oqc.setCheckResult(finalResult);
+        oqc.setConcessionReason(QcConstants.RESULT_CONCESSION.equals(finalResult) ? concessionReason : null);
+        oqc.setQuantityUnqualified(r.getQuantityUnqualified());
+        oqc.setQuantityQualified(Math.max(nvl(oqc.getQuantityCheck()) - r.getQuantityUnqualified(), 0));
+        oqc.setCrQuantity(r.getCrQuantity());
+        oqc.setMajQuantity(r.getMajQuantity());
+        oqc.setMinQuantity(r.getMinQuantity());
+        oqc.setCrRate(BigDecimal.valueOf(r.getCrRate()));
+        oqc.setMajRate(BigDecimal.valueOf(r.getMajRate()));
+        oqc.setMinRate(BigDecimal.valueOf(r.getMinRate()));
+        oqc.setStatus(QcConstants.STATUS_COMPLETED);
+        oqc.setInspectDate(DateUtils.getNowDate());
+        oqc.setInspector(SecurityUtils.getUsername());
+        qcOqcMapper.updateQcOqc(oqc);
     }
 
-    /** 判定配置取 IQC 头快照（Ac 值/三档缺陷率阈值）+ 实际检测数 */
-    private QcJudgeConfig buildJudgeConfig(QcIqc iqc)
+    /** 判定配置取 OQC 头快照（Ac 值/三档缺陷率阈值）+ 实际检测数 */
+    private QcJudgeConfig buildJudgeConfig(QcOqc oqc)
     {
         QcJudgeConfig cfg = new QcJudgeConfig();
-        cfg.setQuantityCheck(iqc.getQuantityCheck());
-        cfg.setAcQuantity(iqc.getQuantityMaxUnqualified());
-        cfg.setCrRateLimit(dbl(iqc.getCrRateLimit()));
-        cfg.setMajRateLimit(dbl(iqc.getMajRateLimit()));
-        cfg.setMinRateLimit(dbl(iqc.getMinRateLimit()));
+        cfg.setQuantityCheck(oqc.getQuantityCheck());
+        cfg.setAcQuantity(oqc.getQuantityMaxUnqualified());
+        cfg.setCrRateLimit(dbl(oqc.getCrRateLimit()));
+        cfg.setMajRateLimit(dbl(oqc.getMajRateLimit()));
+        cfg.setMinRateLimit(dbl(oqc.getMinRateLimit()));
         return cfg;
     }
 
@@ -328,15 +329,15 @@ public class QcIqcServiceImpl implements IQcIqcService
 
     /**
      * 生成或校验检验单编码：已带编码直接用；否则走 QcCodeGenerator（规则编码优先，
-     * 失败/未配置时 IQC+时间戳+4位随机兜底，与生成工厂共用同一语义）。
-     * DB 唯一约束 uk_iqc_code 是最终防线，冲突时抛 ServiceException。
+     * 失败/未配置时 OQC+时间戳+4位随机兜底，与生成工厂共用同一语义）。
+     * DB 唯一约束 uk_oqc_code 是最终防线，冲突时抛 ServiceException。
      */
-    private void ensureIqcCode(QcIqc qciqc)
+    private void ensureOqcCode(QcOqc qcoqc)
     {
-        if (qciqc.getIqcCode() != null && !qciqc.getIqcCode().isEmpty())
+        if (qcoqc.getOqcCode() != null && !qcoqc.getOqcCode().isEmpty())
         {
             return;
         }
-        qciqc.setIqcCode(QcCodeGenerator.genIqcCode(autoCodeGenerator));
+        qcoqc.setOqcCode(QcCodeGenerator.genOqcCode(autoCodeGenerator));
     }
 }

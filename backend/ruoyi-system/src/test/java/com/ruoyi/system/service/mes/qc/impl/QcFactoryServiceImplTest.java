@@ -18,16 +18,21 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 import com.ruoyi.common.core.redis.RedisLockTemplate;
 import com.ruoyi.system.domain.mes.qc.QcIqc;
+import com.ruoyi.system.domain.mes.qc.QcOqc;
 import com.ruoyi.system.domain.mes.qc.QcOrderLine;
 import com.ruoyi.system.domain.mes.qc.QcTemplateIndex;
 import com.ruoyi.system.domain.mes.qc.QcTemplateProduct;
 import com.ruoyi.system.domain.mes.wm.WmItemRecpt;
 import com.ruoyi.system.domain.mes.wm.WmItemRecptLine;
+import com.ruoyi.system.domain.mes.wm.WmProductSales;
+import com.ruoyi.system.domain.mes.wm.WmProductSalesLine;
 import com.ruoyi.system.mapper.mes.qc.QcIqcMapper;
+import com.ruoyi.system.mapper.mes.qc.QcOqcMapper;
 import com.ruoyi.system.mapper.mes.qc.QcOrderLineMapper;
 import com.ruoyi.system.mapper.mes.qc.QcTemplateIndexMapper;
 import com.ruoyi.system.mapper.mes.qc.QcTemplateProductMapper;
 import com.ruoyi.system.mapper.mes.wm.WmItemRecptMapper;
+import com.ruoyi.system.mapper.mes.wm.WmProductSalesMapper;
 import com.ruoyi.system.service.mes.qc.QcConstants;
 import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 
@@ -53,18 +58,22 @@ import static org.mockito.Mockito.when;
 class QcFactoryServiceImplTest {
 
     private static final String IQC_CODE = "IQC20260816-001";
+    private static final String OQC_CODE = "OQC20260816-001";
 
     @Mock QcTemplateProductMapper bindMapper;
     @Mock QcIqcMapper iqcMapper;
+    @Mock QcOqcMapper oqcMapper;
     @Mock QcOrderLineMapper lineMapper;
     @Mock QcTemplateIndexMapper templateIndexMapper;
     @Mock AutoCodeGenerator autoCodeGenerator;
     @Mock RedisLockTemplate lockTemplate;
     @Mock WmItemRecptMapper wmItemRecptMapper;
+    @Mock WmProductSalesMapper wmProductSalesMapper;
     @Mock PlatformTransactionManager transactionManager;
     @InjectMocks QcFactoryServiceImpl service;
 
     @Captor ArgumentCaptor<QcIqc> iqcCaptor;
+    @Captor ArgumentCaptor<QcOqc> oqcCaptor;
     @Captor ArgumentCaptor<List<QcOrderLine>> linesCaptor;
 
     @BeforeEach
@@ -273,10 +282,12 @@ class QcFactoryServiceImplTest {
     @Test
     @DisplayName("closeBySource 对未实现的来源类型当前为 no-op")
     void should_noop_close_for_unimplemented_source_type() {
-        service.closeBySource(QcConstants.SOURCE_PRODUCT_SALES, 5L);
+        service.closeBySource(QcConstants.SOURCE_RT_ISSUE, 5L);
 
         verify(iqcMapper, never()).selectBySource(anyString(), any(), any());
         verify(iqcMapper, never()).updateQcIqc(any());
+        verify(oqcMapper, never()).selectBySource(anyString(), any(), any());
+        verify(oqcMapper, never()).updateQcOqc(any());
     }
 
     @Test
@@ -318,5 +329,128 @@ class QcFactoryServiceImplTest {
         verify(iqcMapper).insertQcIqc(iqcCaptor.capture());
         assertTrue(iqcCaptor.getValue().getIqcCode().matches("IQC\\d{17}\\d{4}"),
             "兜底编码应为 IQC+17位时间戳+4位随机，实际=" + iqcCaptor.getValue().getIqcCode());
+    }
+
+    // ==================== OQC（销售出库）====================
+
+    private WmProductSales salesHeader(Long salesId) {
+        WmProductSales h = new WmProductSales();
+        h.setSalesId(salesId);
+        h.setSalesCode("SAL001");
+        h.setClientId(8L);
+        h.setClientCode("C001");
+        h.setClientName("客户A");
+        return h;
+    }
+
+    private WmProductSalesLine salesLine(Long itemId, double qty) {
+        WmProductSalesLine l = new WmProductSalesLine();
+        l.setItemId(itemId);
+        l.setItemCode("ITEM-" + itemId);
+        l.setItemName("物料" + itemId);
+        l.setSpecification("5mm");
+        l.setUnitOfMeasure("件");
+        l.setQuantitySales(BigDecimal.valueOf(qty));
+        return l;
+    }
+
+    private QcOqc oqcWithStatus(String status) {
+        QcOqc o = new QcOqc();
+        o.setOqcId(300L);
+        o.setOqcCode("OQC-EXIST");
+        o.setStatus(status);
+        return o;
+    }
+
+    @Test
+    @DisplayName("OQC：物料无模板绑定时跳过生成")
+    void should_skip_oqc_when_no_template_bind() {
+        when(bindMapper.selectEnabledBindCommon("OQC", 1L)).thenReturn(null);
+
+        service.generateOqcForProductSales(salesHeader(1L), Collections.singletonList(salesLine(1L, 10)));
+
+        verify(oqcMapper, never()).insertQcOqc(any());
+    }
+
+    @Test
+    @DisplayName("OQC：同来源同物料已有未关闭检验单时不重复生成")
+    void should_skip_oqc_when_active_order_exists() {
+        when(bindMapper.selectEnabledBindCommon("OQC", 1L)).thenReturn(bind(10L));
+        when(oqcMapper.selectBySource(QcConstants.SOURCE_PRODUCT_SALES, 1L, 1L))
+            .thenReturn(Collections.singletonList(oqcWithStatus(QcConstants.STATUS_PENDING)));
+
+        service.generateOqcForProductSales(salesHeader(1L), Collections.singletonList(salesLine(1L, 10)));
+
+        verify(oqcMapper, never()).insertQcOqc(any());
+        verify(lineMapper, never()).batchInsert(any());
+    }
+
+    @Test
+    @DisplayName("OQC：生成时快照模板阈值、客户三件套取头、发货数量求和并回填出库单头挂点")
+    void should_snapshot_oqc_thresholds_and_backfill_sales_header() {
+        WmProductSales header = salesHeader(1L);
+        when(bindMapper.selectEnabledBindCommon("OQC", 1L)).thenReturn(bind(10L));
+        when(oqcMapper.selectBySource(QcConstants.SOURCE_PRODUCT_SALES, 1L, 1L))
+            .thenReturn(Collections.emptyList());
+        when(templateIndexMapper.selectByTemplateId(10L))
+            .thenReturn(Collections.singletonList(index(11L, "IDX-1")));
+        when(autoCodeGenerator.genSerialCode(QcConstants.CODE_RULE_OQC, null)).thenReturn(OQC_CODE);
+        when(oqcMapper.insertQcOqc(any())).thenAnswer(inv -> {
+            ((QcOqc) inv.getArgument(0)).setOqcId(200L);
+            return 1;
+        });
+
+        service.generateOqcForProductSales(header, Arrays.asList(salesLine(1L, 3), salesLine(1L, 4)));
+
+        verify(oqcMapper).insertQcOqc(oqcCaptor.capture());
+        QcOqc saved = oqcCaptor.getValue();
+        assertEquals(5, saved.getQuantityMinCheck());
+        assertEquals(1, saved.getQuantityMaxUnqualified());
+        assertEquals(0, BigDecimal.valueOf(2.0).compareTo(saved.getMajRateLimit()));
+        assertEquals(QcConstants.STATUS_PENDING, saved.getStatus());
+        assertEquals(OQC_CODE, saved.getOqcCode());
+        assertEquals(QcConstants.SOURCE_PRODUCT_SALES, saved.getSourceDocType());
+        assertEquals(Long.valueOf(1L), saved.getSourceDocId());
+        assertEquals("SAL001", saved.getSourceDocCode());
+        assertEquals(Long.valueOf(1L), saved.getItemId());
+        // 同物料多行并一单：quantity_out=行数量和
+        assertEquals(0, BigDecimal.valueOf(7).compareTo(saved.getQuantityOut()));
+        // 客户三件套从出库单头快照
+        assertEquals(Long.valueOf(8L), saved.getClientId());
+        assertEquals("C001", saved.getClientCode());
+        assertEquals("客户A", saved.getClientName());
+        assertNotNull(saved.getOutDate());
+
+        assertEquals(Long.valueOf(200L), header.getOqcId());
+        assertEquals(OQC_CODE, header.getOqcCode());
+        verify(wmProductSalesMapper).updateSalesHeaderRefs(1L, 200L, OQC_CODE);
+
+        verify(lineMapper).batchInsert(linesCaptor.capture());
+        assertEquals(QcConstants.TYPE_OQC, linesCaptor.getValue().get(0).getQcType());
+        assertEquals(Long.valueOf(200L), linesCaptor.getValue().get(0).getQcId());
+    }
+
+    @Test
+    @DisplayName("OQC：closeBySource 关闭 wm_product_sales 来源的 PENDING/INSPECTING 单并跳过 COMPLETED/CLOSED")
+    void should_close_active_oqc_orders_by_source() {
+        QcOqc pending = oqcWithStatus(QcConstants.STATUS_PENDING);
+        pending.setOqcId(301L);
+        QcOqc completed = oqcWithStatus(QcConstants.STATUS_COMPLETED);
+        completed.setOqcId(302L);
+        QcOqc inspecting = oqcWithStatus(QcConstants.STATUS_INSPECTING);
+        inspecting.setOqcId(303L);
+        when(oqcMapper.selectBySource(QcConstants.SOURCE_PRODUCT_SALES, 5L, null))
+            .thenReturn(Arrays.asList(pending, completed, inspecting));
+
+        service.closeBySource(QcConstants.SOURCE_PRODUCT_SALES, 5L);
+
+        ArgumentCaptor<QcOqc> cap = ArgumentCaptor.forClass(QcOqc.class);
+        verify(oqcMapper, times(2)).updateQcOqc(cap.capture());
+        assertEquals(Long.valueOf(301L), cap.getAllValues().get(0).getOqcId());
+        assertEquals(QcConstants.STATUS_CLOSED, cap.getAllValues().get(0).getStatus());
+        assertEquals(Long.valueOf(303L), cap.getAllValues().get(1).getOqcId());
+        assertEquals(QcConstants.STATUS_CLOSED, cap.getAllValues().get(1).getStatus());
+        // IQC 侧不受影响
+        verify(iqcMapper, never()).selectBySource(anyString(), any(), any());
     }
 }

@@ -38,6 +38,9 @@ import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
 import com.ruoyi.system.mapper.mes.md.MdItemMapper;
 import com.ruoyi.system.domain.mes.md.MdItem;
 import com.ruoyi.system.service.mes.sal.ISalOrderService;
+import com.ruoyi.system.service.mes.qc.IQcFactoryService;
+import com.ruoyi.system.service.mes.qc.IQcGateService;
+import com.ruoyi.system.service.mes.qc.QcConstants;
 import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 import com.ruoyi.system.service.mes.wm.IWmProductSalesService;
 import com.ruoyi.system.service.mes.wm.IWmProductSalesShipmentService;
@@ -69,6 +72,8 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
     @Autowired private IWmProductSalesShipmentService shipmentService;
     @Autowired private IWmProductSalesBoxService boxService;
     @Autowired private IWmWarehouseService wmWarehouseService;
+    @Autowired private IQcFactoryService qcFactoryService;
+    @Autowired private IQcGateService qcGateService;
 
     private TransactionTemplate txTemplate;
 
@@ -110,6 +115,11 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         entity.setCreateTime(DateUtils.getNowDate());
         wmProductSalesMapper.insertWmProductSales(entity);
         saveLines(entity);
+        // OQC 生成 hook：PC 手工新增/从销售订单生成(save 后 fromSaleOrder 草稿提交)的出库单头+行落库后
+        // 生成出货待检单（工厂内部锁+事务保证原子，随本方法外层事务与出库单创建同生共死）
+        if (entity.getLines() != null && !entity.getLines().isEmpty()) {
+            qcFactoryService.generateOqcForProductSales(entity, entity.getLines());
+        }
         return 1;
     }
 
@@ -188,6 +198,9 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         if (!WmProductSalesConstants.isPostable(header.getStatus())) {
             throw new ServiceException("当前状态[" + header.getStatus() + "]不允许出库确认");
         }
+        // OQC 拦截 hook：出库确认即扣库存，出货检验必须前置（需检物料必须有 COMPLETED+PASS/CONCESSION
+        // 检验单，否则抛 ServiceException 阻断，事务整体回滚 → 库存不扣、单据保持原状态）
+        qcGateService.assertProductSalesPostable(header);
         Map<Long, WmProductSalesLine> lineMap = buildLineMap(salesId);
         validateClientWarehouseIsolation(header, details);
         BigDecimal postedThisTime = BigDecimal.ZERO;
@@ -423,7 +436,11 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         header.setStatus(WmProductSalesConstants.STATUS_CLOSED);
         header.setUpdateTime(DateUtils.getNowDate());
         header.setUpdateBy(SecurityUtils.getUsername());
-        return wmProductSalesMapper.updateWmProductSales(header);
+        int rows = wmProductSalesMapper.updateWmProductSales(header);
+        // QC 联动作废：关闭时把该来源仍处 PENDING/INSPECTING 的检验单置 CLOSED
+        // （COMPLETED 单是质量档案保留不关）
+        qcFactoryService.closeBySource(QcConstants.SOURCE_PRODUCT_SALES, salesId);
+        return rows;
     }
 
     // ════════════════════ 作废（PARTIAL_POSTED 需回滚库存） ════════════════════
@@ -453,6 +470,8 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         header.setUpdateTime(DateUtils.getNowDate());
         header.setUpdateBy(SecurityUtils.getUsername());
         wmProductSalesMapper.updateWmProductSales(header);
+        // QC 联动作废：作废时把该来源仍处 PENDING/INSPECTING 的检验单置 CLOSED（随本事务原子）
+        qcFactoryService.closeBySource(QcConstants.SOURCE_PRODUCT_SALES, salesId);
         return salesId;
     }
 

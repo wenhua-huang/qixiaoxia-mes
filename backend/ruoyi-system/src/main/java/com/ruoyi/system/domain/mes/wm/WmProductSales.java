@@ -122,6 +122,9 @@ public class WmProductSales extends BaseEntity
     @Excel(name = "计划发货日期")
     private Date planShipDate;
 
+    /** 出货检验状态汇总（列表计算列，非DB字段：PASSED/FAILED/CONCESSION/PENDING/NONE） */
+    private String qcStatus;
+
     /** 行列表（详情接口聚合，非DB字段） */
     private java.util.List<WmProductSalesLine> lines;
 
@@ -238,6 +241,9 @@ public class WmProductSales extends BaseEntity
 
     public Date getPlanShipDate() { return planShipDate; }
     public void setPlanShipDate(Date v) { this.planShipDate = v; }
+
+    public String getQcStatus() { return qcStatus; }
+    public void setQcStatus(String v) { this.qcStatus = v; }
 
     public java.util.List<WmProductSalesLine> getLines() { return lines; }
     public void setLines(java.util.List<WmProductSalesLine> v) { this.lines = v; }

@@ -17,6 +17,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.ruoyi.common.core.redis.RedisLockTemplate;
 import com.ruoyi.system.domain.mes.pro.ProFeedback;
 import com.ruoyi.system.domain.mes.qc.QcIqc;
+import com.ruoyi.system.domain.mes.qc.QcOqc;
 import com.ruoyi.system.domain.mes.qc.QcOrderLine;
 import com.ruoyi.system.domain.mes.qc.QcTemplateIndex;
 import com.ruoyi.system.domain.mes.qc.QcTemplateProduct;
@@ -28,10 +29,12 @@ import com.ruoyi.system.domain.mes.wm.WmProductSalesLine;
 import com.ruoyi.system.domain.mes.wm.WmRtIssue;
 import com.ruoyi.system.domain.mes.wm.WmRtIssueLine;
 import com.ruoyi.system.mapper.mes.qc.QcIqcMapper;
+import com.ruoyi.system.mapper.mes.qc.QcOqcMapper;
 import com.ruoyi.system.mapper.mes.qc.QcOrderLineMapper;
 import com.ruoyi.system.mapper.mes.qc.QcTemplateIndexMapper;
 import com.ruoyi.system.mapper.mes.qc.QcTemplateProductMapper;
 import com.ruoyi.system.mapper.mes.wm.WmItemRecptMapper;
+import com.ruoyi.system.mapper.mes.wm.WmProductSalesMapper;
 import com.ruoyi.system.service.mes.qc.IQcFactoryService;
 import com.ruoyi.system.service.mes.qc.QcCodeGenerator;
 import com.ruoyi.system.service.mes.qc.QcConstants;
@@ -40,7 +43,7 @@ import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 import jakarta.annotation.PostConstruct;
 
 /**
- * 检验单生成工厂实现（IQC 部分已实现，OQC/IPQC/RQC 见各桩方法注释的交付任务）
+ * 检验单生成工厂实现（IQC/OQC 已实现，IPQC/RQC 见各桩方法注释的交付任务）
  *
  * @author qixiaoxia
  * @date 2026-08-16
@@ -53,6 +56,12 @@ public class QcFactoryServiceImpl implements IQcFactoryService
 
     @Autowired
     private QcIqcMapper iqcMapper;
+
+    @Autowired
+    private QcOqcMapper oqcMapper;
+
+    @Autowired
+    private WmProductSalesMapper wmProductSalesMapper;
 
     @Autowired
     private QcOrderLineMapper lineMapper;
@@ -232,15 +241,25 @@ public class QcFactoryServiceImpl implements IQcFactoryService
     @Override
     public void closeBySource(String sourceDocType, Long sourceDocId)
     {
-        if (!QcConstants.SOURCE_ITEM_RECPT.equals(sourceDocType))
+        if (QcConstants.SOURCE_ITEM_RECPT.equals(sourceDocType))
         {
-            return;  // 其余来源类型（成品入库/销售出库/退料）由 Task 12/14/16 扩展
+            List<QcIqc> orders = iqcMapper.selectBySource(sourceDocType, sourceDocId, null);
+            for (QcIqc order : orders)
+            {
+                closeIfActive(order);
+            }
+            return;
         }
-        List<QcIqc> orders = iqcMapper.selectBySource(sourceDocType, sourceDocId, null);
-        for (QcIqc order : orders)
+        if (QcConstants.SOURCE_PRODUCT_SALES.equals(sourceDocType))
         {
-            closeIfActive(order);
+            List<QcOqc> orders = oqcMapper.selectBySource(sourceDocType, sourceDocId, null);
+            for (QcOqc order : orders)
+            {
+                closeIfActive(order);
+            }
+            return;
         }
+        // 其余来源类型（成品入库/退料）由 Task 14/16 扩展
     }
 
     /** 仅 PENDING/INSPECTING 置 CLOSED；COMPLETED 是质量档案保留 */
@@ -259,11 +278,117 @@ public class QcFactoryServiceImpl implements IQcFactoryService
         iqcMapper.updateQcIqc(update);
     }
 
+    /** OQC 版 closeIfActive：同 IQC 语义（仅 PENDING/INSPECTING 置 CLOSED） */
+    private void closeIfActive(QcOqc order)
+    {
+        boolean active = QcConstants.STATUS_PENDING.equals(order.getStatus())
+            || QcConstants.STATUS_INSPECTING.equals(order.getStatus());
+        if (!active)
+        {
+            return;
+        }
+        QcOqc update = new QcOqc();
+        update.setOqcId(order.getOqcId());
+        update.setStatus(QcConstants.STATUS_CLOSED);
+        update.setUpdateTime(new Date());
+        oqcMapper.updateQcOqc(update);
+    }
+
     @Override
     public void generateOqcForProductSales(WmProductSales header, List<WmProductSalesLine> lines)
     {
-        // 桩：OQC 单据 Mapper 在 Task 12 交付后实现
-        throw new UnsupportedOperationException("generateOqcForProductSales 待 Task 12 实现");
+        if (header == null || lines == null || lines.isEmpty())
+        {
+            return;
+        }
+        // 多行同物料合并为一组 → 一张检验单（与 IQC 同范式）
+        Map<Long, List<WmProductSalesLine>> byItem = lines.stream()
+            .filter(l -> l.getItemId() != null)
+            .collect(Collectors.groupingBy(WmProductSalesLine::getItemId, LinkedHashMap::new, Collectors.toList()));
+        for (Map.Entry<Long, List<WmProductSalesLine>> e : byItem.entrySet())
+        {
+            QcTemplateProduct bind = resolveTemplate(QcConstants.TYPE_OQC, e.getKey(), null);
+            if (bind == null)
+            {
+                continue;  // 未绑定模板 = 免检
+            }
+            generateOneOqc(header, e.getValue(), bind);
+        }
+    }
+
+    /** 先锁后事务：锁防同单并发重入，事务保证 头/行/挂点 三写原子（防零行活动单卡死幂等检查） */
+    private void generateOneOqc(WmProductSales header, List<WmProductSalesLine> group, QcTemplateProduct bind)
+    {
+        String lockKey = QcConstants.LOCK_GENERATE + "oqc:" + header.getSalesId() + ":" + group.get(0).getItemId();
+        // 块状 void lambda 显式绑定 Runnable 重载（表达式 lambda 会歧义绑定到 Supplier 重载）
+        lockTemplate.execute(lockKey, () -> {
+            txTemplate.execute(tx -> {
+                doGenerateOneOqc(header, group, bind);
+                return null;
+            });
+        });
+    }
+
+    /** 锁+事务内生成单物料 OQC：幂等检查 → 快照建单 → 建行 → 回填头挂点 */
+    private void doGenerateOneOqc(WmProductSales header, List<WmProductSalesLine> group, QcTemplateProduct bind)
+    {
+        Long itemId = group.get(0).getItemId();
+        List<QcOqc> exist = oqcMapper.selectBySource(QcConstants.SOURCE_PRODUCT_SALES, header.getSalesId(), itemId);
+        boolean hasActive = exist.stream().anyMatch(o -> !QcConstants.STATUS_CLOSED.equals(o.getStatus()));
+        if (hasActive)
+        {
+            return;  // 幂等：同来源+物料已有未关闭单
+        }
+        QcOqc oqc = buildOqc(header, group, bind);
+        oqcMapper.insertQcOqc(oqc);
+        lineMapper.batchInsert(buildLinesFromTemplate(bind.getTemplateId(), QcConstants.TYPE_OQC, oqc.getOqcId()));
+        backfillSalesHeaderRefs(header, oqc);
+    }
+
+    /** 按绑定快照阈值构建 OQC 单头（客户三件套取出库单头，quantity_out=行数量和） */
+    private QcOqc buildOqc(WmProductSales header, List<WmProductSalesLine> group, QcTemplateProduct bind)
+    {
+        WmProductSalesLine first = group.get(0);
+        BigDecimal quantityOut = group.stream().map(WmProductSalesLine::getQuantitySales).map(this::nvl)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        Date now = new Date();
+        QcOqc oqc = new QcOqc();
+        oqc.setOqcCode(QcCodeGenerator.genOqcCode(autoCodeGenerator));
+        oqc.setOqcName("出货检验-" + StringUtils.defaultString(first.getItemName()));
+        oqc.setTemplateId(bind.getTemplateId());
+        oqc.setSourceDocId(header.getSalesId());
+        oqc.setSourceDocType(QcConstants.SOURCE_PRODUCT_SALES);
+        oqc.setSourceDocCode(header.getSalesCode());
+        oqc.setClientId(header.getClientId());
+        oqc.setClientCode(header.getClientCode());
+        oqc.setClientName(header.getClientName());
+        oqc.setItemId(first.getItemId());
+        oqc.setItemCode(first.getItemCode());
+        oqc.setItemName(first.getItemName());
+        oqc.setSpecification(first.getSpecification());
+        oqc.setUnitOfMeasure(first.getUnitOfMeasure());
+        oqc.setQuantityOut(quantityOut);
+        oqc.setQuantityMinCheck(bind.getQuantityCheck());
+        oqc.setQuantityMaxUnqualified(bind.getQuantityUnqualified());
+        oqc.setCrRateLimit(bind.getCrRate());
+        oqc.setMajRateLimit(bind.getMajRate());
+        oqc.setMinRateLimit(bind.getMinRate());
+        oqc.setOutDate(now);
+        oqc.setCreateTime(now);
+        oqc.setStatus(QcConstants.STATUS_PENDING);
+        return oqc;
+    }
+
+    /** 回填出库单头 OQC 挂点（仅首张；两列专用 UPDATE 避免并发覆盖整头） */
+    private void backfillSalesHeaderRefs(WmProductSales header, QcOqc oqc)
+    {
+        if (header.getOqcId() != null)
+        {
+            return;
+        }
+        header.setOqcId(oqc.getOqcId());
+        header.setOqcCode(oqc.getOqcCode());
+        wmProductSalesMapper.updateSalesHeaderRefs(header.getSalesId(), oqc.getOqcId(), oqc.getOqcCode());
     }
 
     @Override

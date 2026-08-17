@@ -40,6 +40,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="salesOrderId" column="sales_order_id" />
         <result property="salesOrderCode" column="sales_order_code" />
         <result property="status" column="status" />
+        <result property="qcStatus" column="qc_status" />
         <result property="remark" column="remark" />
         <result property="createBy" column="create_by" />
         <result property="createTime" column="create_time" />
@@ -51,34 +52,61 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select sales_id, factory_id, sales_code, sales_name, client_id, client_code, client_name, client_order_code, salesperson, warehouse_id, warehouse_code, warehouse_name, sales_date, total_quantity, posted_quantity, shipped_quantity, ship_status, plan_ship_date, total_box, total_volume, total_weight, logistics_company, tracking_no, logistics_fee, shipping_address, receiver_name, receiver_tel, pallet_flag, box_label, sales_type, oqc_id, oqc_code, sales_order_id, sales_order_code, status, remark, create_by, create_time, update_by, update_time from qxx_wm_product_sales
     </sql>
 
+    <!-- 列表带 qcStatus 计算列：对本出库单全部 OQC 单状态汇总（最差优先，
+         任一 COMPLETED+FAIL→FAILED；COMPLETED+CONCESSION→CONCESSION；存在 PENDING/INSPECTING→PENDING；
+         全部 COMPLETED+PASS→PASSED；无单→NONE。与出库确认拦截门判定口径一致，防列表显示 PASSED 但出库被拦）。
+         注：外层恒真条件保证 WHERE 必渲染 — FactoryIdInterceptor 注入 factory_id 时
+         不致误将子查询的 where 当作外层 where 导致注入点错位。 -->
     <select id="selectWmProductSalesList" parameterType="WmProductSales" resultMap="WmProductSalesResult">
-        <include refid="selectWmProductSalesVo"/>
-        <where>            <if test="salesCode != null and salesCode != ''"> and sales_code like concat('%', #{salesCode}, '%')</if>
-            <if test="salesName != null and salesName != ''"> and sales_name like concat('%', #{salesName}, '%')</if>
-            <if test="clientId != null"> and client_id = #{clientId}</if>
-            <if test="clientCode != null and clientCode != ''"> and client_code like concat('%', #{clientCode}, '%')</if>
-            <if test="clientName != null and clientName != ''"> and client_name like concat('%', #{clientName}, '%')</if>
-            <if test="clientOrderCode != null and clientOrderCode != ''"> and client_order_code like concat('%', #{clientOrderCode}, '%')</if>
-            <if test="salesperson != null and salesperson != ''"> and salesperson like concat('%', #{salesperson}, '%')</if>
-            <if test="warehouseId != null"> and warehouse_id = #{warehouseId}</if>
-            <if test="warehouseCode != null and warehouseCode != ''"> and warehouse_code like concat('%', #{warehouseCode}, '%')</if>
-            <if test="warehouseName != null and warehouseName != ''"> and warehouse_name like concat('%', #{warehouseName}, '%')</if>
-            <if test="totalBox != null"> and total_box = #{totalBox}</if>
-            <if test="logisticsCompany != null and logisticsCompany != ''"> and logistics_company like concat('%', #{logisticsCompany}, '%')</if>
-            <if test="trackingNo != null and trackingNo != ''"> and tracking_no like concat('%', #{trackingNo}, '%')</if>
-            <if test="shippingAddress != null and shippingAddress != ''"> and shipping_address like concat('%', #{shippingAddress}, '%')</if>
-            <if test="receiverName != null and receiverName != ''"> and receiver_name like concat('%', #{receiverName}, '%')</if>
-            <if test="receiverTel != null and receiverTel != ''"> and receiver_tel like concat('%', #{receiverTel}, '%')</if>
-            <if test="palletFlag != null and palletFlag != ''"> and pallet_flag like concat('%', #{palletFlag}, '%')</if>
-            <if test="boxLabel != null and boxLabel != ''"> and box_label like concat('%', #{boxLabel}, '%')</if>
-            <if test="salesType != null and salesType != ''"> and sales_type like concat('%', #{salesType}, '%')</if>
-            <if test="oqcId != null"> and oqc_id = #{oqcId}</if>
-            <if test="oqcCode != null and oqcCode != ''"> and oqc_code like concat('%', #{oqcCode}, '%')</if>
-            <if test="status != null and status != ''"> and status like concat('%', #{status}, '%')</if>
-            <if test="createBy != null and createBy != ''"> and create_by like concat('%', #{createBy}, '%')</if>
-            <if test="updateBy != null and updateBy != ''"> and update_by like concat('%', #{updateBy}, '%')</if>
+        select t.sales_id, t.factory_id, t.sales_code, t.sales_name, t.client_id, t.client_code, t.client_name,
+               t.client_order_code, t.salesperson, t.warehouse_id, t.warehouse_code, t.warehouse_name,
+               t.sales_date, t.total_quantity, t.posted_quantity, t.shipped_quantity, t.ship_status,
+               t.plan_ship_date, t.total_box, t.total_volume, t.total_weight, t.logistics_company,
+               t.tracking_no, t.logistics_fee, t.shipping_address, t.receiver_name, t.receiver_tel,
+               t.pallet_flag, t.box_label, t.sales_type, t.oqc_id, t.oqc_code, t.sales_order_id,
+               t.sales_order_code, t.status, t.remark, t.create_by, t.create_time, t.update_by, t.update_time,
+               (
+                   select case
+                       when max(case when o.status = 'COMPLETED' and o.check_result = 'FAIL' then 1 else 0 end) = 1 then 'FAILED'
+                       when max(case when o.status = 'COMPLETED' and o.check_result = 'CONCESSION' then 1 else 0 end) = 1 then 'CONCESSION'
+                       when max(case when o.status in ('PENDING', 'INSPECTING') then 1 else 0 end) = 1 then 'PENDING'
+                       when max(case when o.status = 'COMPLETED' and o.check_result = 'PASS' then 1 else 0 end) = 1 then 'PASSED'
+                       else 'NONE'
+                   end
+                   from qxx_qc_oqc o
+                   where o.source_doc_type = 'wm_product_sales'
+                     and o.source_doc_id = t.sales_id
+                     and o.factory_id = t.factory_id
+               ) as qc_status
+        from qxx_wm_product_sales t
+        <where>
+            t.sales_id is not null
+            <if test="salesCode != null and salesCode != ''"> and t.sales_code like concat('%', #{salesCode}, '%')</if>
+            <if test="salesName != null and salesName != ''"> and t.sales_name like concat('%', #{salesName}, '%')</if>
+            <if test="clientId != null"> and t.client_id = #{clientId}</if>
+            <if test="clientCode != null and clientCode != ''"> and t.client_code like concat('%', #{clientCode}, '%')</if>
+            <if test="clientName != null and clientName != ''"> and t.client_name like concat('%', #{clientName}, '%')</if>
+            <if test="clientOrderCode != null and clientOrderCode != ''"> and t.client_order_code like concat('%', #{clientOrderCode}, '%')</if>
+            <if test="salesperson != null and salesperson != ''"> and t.salesperson like concat('%', #{salesperson}, '%')</if>
+            <if test="warehouseId != null"> and t.warehouse_id = #{warehouseId}</if>
+            <if test="warehouseCode != null and warehouseCode != ''"> and t.warehouse_code like concat('%', #{warehouseCode}, '%')</if>
+            <if test="warehouseName != null and warehouseName != ''"> and t.warehouse_name like concat('%', #{warehouseName}, '%')</if>
+            <if test="totalBox != null"> and t.total_box = #{totalBox}</if>
+            <if test="logisticsCompany != null and logisticsCompany != ''"> and t.logistics_company like concat('%', #{logisticsCompany}, '%')</if>
+            <if test="trackingNo != null and trackingNo != ''"> and t.tracking_no like concat('%', #{trackingNo}, '%')</if>
+            <if test="shippingAddress != null and shippingAddress != ''"> and t.shipping_address like concat('%', #{shippingAddress}, '%')</if>
+            <if test="receiverName != null and receiverName != ''"> and t.receiver_name like concat('%', #{receiverName}, '%')</if>
+            <if test="receiverTel != null and receiverTel != ''"> and t.receiver_tel like concat('%', #{receiverTel}, '%')</if>
+            <if test="palletFlag != null and palletFlag != ''"> and t.pallet_flag = #{palletFlag}</if>
+            <if test="boxLabel != null and boxLabel != ''"> and t.box_label = #{boxLabel}</if>
+            <if test="salesType != null and salesType != ''"> and t.sales_type = #{salesType}</if>
+            <if test="oqcId != null"> and t.oqc_id = #{oqcId}</if>
+            <if test="oqcCode != null and oqcCode != ''"> and t.oqc_code like concat('%', #{oqcCode}, '%')</if>
+            <if test="status != null and status != ''"> and t.status like concat('%', #{status}, '%')</if>
+            <if test="createBy != null and createBy != ''"> and t.create_by like concat('%', #{createBy}, '%')</if>
+            <if test="updateBy != null and updateBy != ''"> and t.update_by like concat('%', #{updateBy}, '%')</if>
         </where>
-        order by create_time desc
+        order by t.create_time desc
     </select>
 
     <select id="selectWmProductSalesAll" resultMap="WmProductSalesResult">
@@ -226,6 +254,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <delete id="deleteWmProductSalesBySalesId" parameterType="Long">
         delete from qxx_wm_product_sales where sales_id = #{salesId}
     </delete>
+
+    <!-- 仅回写 OQC 挂点两列（factory 生成出货检验单后回填，避免并发覆盖整头） -->
+    <update id="updateSalesHeaderRefs">
+        update qxx_wm_product_sales set oqc_id = #{oqcId}, oqc_code = #{oqcCode} where sales_id = #{salesId}
+    </update>
 
     <delete id="deleteWmProductSalesBySalesIds" parameterType="String">
         delete from qxx_wm_product_sales where sales_id in

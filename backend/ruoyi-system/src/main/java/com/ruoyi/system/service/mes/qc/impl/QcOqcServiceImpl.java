@@ -26,6 +26,7 @@ import com.ruoyi.system.service.mes.qc.IQcOqcService;
 import com.ruoyi.system.service.mes.qc.IQcOrderLineService;
 import com.ruoyi.system.service.mes.qc.QcCodeGenerator;
 import com.ruoyi.system.service.mes.qc.QcConstants;
+import com.ruoyi.system.service.mes.qc.QcTodoHelper;
 import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 
 import jakarta.annotation.PostConstruct;
@@ -54,6 +55,9 @@ public class QcOqcServiceImpl implements IQcOqcService
 
     @Autowired
     private IQcJudgeService qcJudgeService;
+
+    @Autowired
+    private QcTodoHelper qcTodoHelper;
 
     @Autowired
     private RedisLockTemplate lockTemplate;
@@ -289,6 +293,7 @@ public class QcOqcServiceImpl implements IQcOqcService
         oqc.setInspectDate(DateUtils.getNowDate());
         oqc.setInspector(SecurityUtils.getUsername());
         qcOqcMapper.updateQcOqc(oqc);
+        qcTodoHelper.completeTodo(QcConstants.TYPE_OQC, oqcId, finalResult);
     }
 
     /** 判定配置取 OQC 头快照（Ac 值/三档缺陷率阈值）+ 实际检测数 */

@@ -24,6 +24,8 @@ public final class QcCodeGenerator
 
     private static final String IPQC_CODE_PREFIX = "IPQC";
 
+    private static final String RQC_CODE_PREFIX = "RQC";
+
     private QcCodeGenerator()
     {
     }
@@ -59,6 +61,17 @@ public final class QcCodeGenerator
     public static String genIpqcCode(AutoCodeGenerator autoCodeGenerator)
     {
         return genCode(autoCodeGenerator, QcConstants.CODE_RULE_IPQC, IPQC_CODE_PREFIX);
+    }
+
+    /**
+     * 生成 RQC 退料检验单编码
+     *
+     * @param autoCodeGenerator 自动编码生成器（可 null：未配置时直接走兜底）
+     * @return 规则编码或 RQC+yyyyMMddHHmmssSSS+4位随机 兜底编码
+     */
+    public static String genRqcCode(AutoCodeGenerator autoCodeGenerator)
+    {
+        return genCode(autoCodeGenerator, QcConstants.CODE_RULE_RQC, RQC_CODE_PREFIX);
     }
 
     /** 规则编码优先，失败/未配置时 前缀+时间戳+4位随机兜底，保证不阻断业务建单 */

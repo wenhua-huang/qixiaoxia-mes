@@ -20,4 +20,14 @@ public interface SysTodoListMapper
     public List<Map<String, Object>> countByStatus(@Param("userId") Long userId);
     public int deleteSysTodoListByTodoId(Long todoId);
     public int deleteSysTodoListByTodoIds(Long[] todoIds);
+
+    /**
+     * 按业务来源查待处理（PENDING/PROCESSING）待办（质检判定完成后回写用）
+     *
+     * @param sourceDocType 业务类型（IQC/IPQC/OQC/RQC）
+     * @param sourceDocId   业务单据ID（检验单主键）
+     * @return 待办列表
+     */
+    public List<SysTodoList> selectPendingBySource(@Param("sourceDocType") String sourceDocType,
+                                                   @Param("sourceDocId") Long sourceDocId);
 }

@@ -39,6 +39,15 @@ public class QcConstants {
     public static final String IPQC_TOUR = "TOUR_CHECK";
     public static final String IPQC_LAST = "LAST_CHECK";
     public static final String IPQC_SPOT = "SPOT_CHECK";
+    // RQC 退料类型
+    public static final String RQC_TYPE_PROD_RETURN = "PROD_RETURN";
+    public static final String RQC_TYPE_PURCHASE_RETURN = "PURCHASE_RETURN";
+    public static final String RQC_TYPE_QC_REJECT = "QC_REJECT";
+    // RQC 责任归属
+    public static final String RQC_RESP_SUPPLIER = "SUPPLIER";
+    public static final String RQC_RESP_PRODUCTION = "PRODUCTION";
+    public static final String RQC_RESP_STORAGE = "STORAGE";
+    public static final String RQC_RESP_OTHER = "OTHER";
     // 来源单据类型（gate/factory 反查用）
     public static final String SOURCE_ITEM_RECPT = "wm_item_recpt";
     public static final String SOURCE_PRODUCT_RECPT = "wm_product_recpt";
@@ -48,4 +57,11 @@ public class QcConstants {
     // 判定锁 key 前缀
     public static final String LOCK_JUDGE = "qc:judge:";
     public static final String LOCK_GENERATE = "qc:generate:";
+    // QC_CHECK 待办：优先级/状态/处理结果（类型用 TodoTypeEnum.QC_CHECK，与 sys_todo_list 字典口径一致）
+    public static final String TODO_PRIORITY_NORMAL = "NORMAL";
+    public static final String TODO_STATUS_PENDING = "PENDING";
+    public static final String TODO_STATUS_COMPLETED = "COMPLETED";
+    public static final String TODO_RESULT_PASS = "检验合格";
+    public static final String TODO_RESULT_FAIL = "检验不合格";
+    public static final String TODO_RESULT_CONCESSION = "让步接收";
 }

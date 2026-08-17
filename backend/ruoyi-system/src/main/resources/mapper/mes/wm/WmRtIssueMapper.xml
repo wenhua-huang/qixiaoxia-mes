@@ -27,6 +27,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="rqcId"    column="rqc_id"    />
         <result property="rqcCode"    column="rqc_code"    />
         <result property="status"    column="status"    />
+        <result property="qcStatus"    column="qc_status"    />
         <result property="remark"    column="remark"    />
         <result property="createBy"    column="create_by"    />
         <result property="createTime"    column="create_time"    />
@@ -38,19 +39,43 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select rt_id, factory_id, rt_code, rt_name, issue_id, issue_code, workorder_id, workorder_code, workorder_name, workstation_id, workstation_code, workstation_name, warehouse_id, warehouse_code, warehouse_name, rt_date, total_quantity, unit_of_measure, unit_name, rqc_id, rqc_code, status, remark, create_by, create_time, update_by, update_time from qxx_wm_rt_issue
     </sql>
 
+    <!-- 列表带 qcStatus 计算列：对本退料单全部 RQC 检验单状态汇总（最差优先，
+         任一 COMPLETED+FAIL→FAILED；COMPLETED+CONCESSION→CONCESSION；存在 PENDING/INSPECTING→PENDING；
+         全部 COMPLETED+PASS→PASSED；无单→NONE。与执行退料拦截门判定口径一致，防列表显示 PASSED 但执行被拦）。
+         注：外层恒真条件保证 WHERE 必渲染 — FactoryIdInterceptor 注入 factory_id 时
+         不致误将子查询的 where 当作外层 where 导致注入点错位。 -->
     <select id="selectWmRtIssueList" parameterType="WmRtIssue" resultMap="WmRtIssueResult">
-        <include refid="selectWmRtIssueVo"/>
+        select t.rt_id, t.factory_id, t.rt_code, t.rt_name, t.issue_id, t.issue_code,
+               t.workorder_id, t.workorder_code, t.workorder_name, t.workstation_id, t.workstation_code,
+               t.workstation_name, t.warehouse_id, t.warehouse_code, t.warehouse_name, t.rt_date,
+               t.total_quantity, t.unit_of_measure, t.unit_name, t.rqc_id, t.rqc_code, t.status,
+               t.remark, t.create_by, t.create_time, t.update_by, t.update_time,
+               (
+                   select case
+                       when max(case when r.status = 'COMPLETED' and r.check_result = 'FAIL' then 1 else 0 end) = 1 then 'FAILED'
+                       when max(case when r.status = 'COMPLETED' and r.check_result = 'CONCESSION' then 1 else 0 end) = 1 then 'CONCESSION'
+                       when max(case when r.status in ('PENDING', 'INSPECTING') then 1 else 0 end) = 1 then 'PENDING'
+                       when max(case when r.status = 'COMPLETED' and r.check_result = 'PASS' then 1 else 0 end) = 1 then 'PASSED'
+                       else 'NONE'
+                   end
+                   from qxx_qc_rqc r
+                   where r.source_doc_type = 'wm_rt_issue'
+                     and r.source_doc_id = t.rt_id
+                     and r.factory_id = t.factory_id
+               ) as qc_status
+        from qxx_wm_rt_issue t
         <where>
-            <if test="rtCode != null  and rtCode != ''"> and rt_code = #{rtCode}</if>
-            <if test="rtName != null  and rtName != ''"> and rt_name like concat('%', #{rtName}, '%')</if>
-            <if test="workorderId != null"> and workorder_id = #{workorderId}</if>
-            <if test="workorderCode != null  and workorderCode != ''"> and workorder_code = #{workorderCode}</if>
-            <if test="workorderName != null  and workorderName != ''"> and workorder_name like concat('%', #{workorderName}, '%')</if>
-            <if test="issueId != null"> and issue_id = #{issueId}</if>
-            <if test="issueCode != null  and issueCode != ''"> and issue_code = #{issueCode}</if>
-            <if test="status != null  and status != ''"> and status = #{status}</if>
+            t.rt_id is not null
+            <if test="rtCode != null  and rtCode != ''"> and t.rt_code = #{rtCode}</if>
+            <if test="rtName != null  and rtName != ''"> and t.rt_name like concat('%', #{rtName}, '%')</if>
+            <if test="workorderId != null"> and t.workorder_id = #{workorderId}</if>
+            <if test="workorderCode != null  and workorderCode != ''"> and t.workorder_code = #{workorderCode}</if>
+            <if test="workorderName != null  and workorderName != ''"> and t.workorder_name = #{workorderName}</if>
+            <if test="issueId != null"> and t.issue_id = #{issueId}</if>
+            <if test="issueCode != null  and issueCode != ''"> and t.issue_code = #{issueCode}</if>
+            <if test="status != null  and status != ''"> and t.status = #{status}</if>
         </where>
-        order by rt_id desc
+        order by t.rt_id desc
     </select>
 
     <select id="selectWmRtIssueByRtId" parameterType="Long" resultMap="WmRtIssueResult">
@@ -152,4 +177,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             #{rtId}
         </foreach>
     </delete>
+
+    <update id="updateRtIssueHeaderRefs">
+        update qxx_wm_rt_issue
+        set rqc_id = #{rqcId}, rqc_code = #{rqcCode}
+        where rt_id = #{rtId} and rqc_id is null
+    </update>
 </mapper>

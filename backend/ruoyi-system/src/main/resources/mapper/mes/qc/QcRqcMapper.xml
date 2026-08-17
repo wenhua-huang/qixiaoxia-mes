@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.qc.QcRqcMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.qc.QcRqc" id="QcRqcResult">
+        <result property="rqcId"                  column="rqc_id"                  />
+        <result property="factoryId"              column="factory_id"              />
+        <result property="rqcCode"                column="rqc_code"                />
+        <result property="rqcName"                column="rqc_name"                />
+        <result property="rqcType"                column="rqc_type"                />
+        <result property="templateId"             column="template_id"             />
+        <result property="sourceDocId"            column="source_doc_id"           />
+        <result property="sourceDocType"          column="source_doc_type"         />
+        <result property="sourceDocCode"          column="source_doc_code"         />
+        <result property="sourceLineId"           column="source_line_id"          />
+        <result property="workorderId"            column="workorder_id"            />
+        <result property="workorderCode"          column="workorder_code"          />
+        <result property="vendorId"               column="vendor_id"               />
+        <result property="vendorCode"             column="vendor_code"             />
+        <result property="vendorName"             column="vendor_name"             />
+        <result property="itemId"                 column="item_id"                 />
+        <result property="itemCode"               column="item_code"               />
+        <result property="itemName"               column="item_name"               />
+        <result property="specification"          column="specification"           />
+        <result property="unitOfMeasure"          column="unit_of_measure"         />
+        <result property="batchCode"              column="batch_code"              />
+        <result property="quantityCheck"          column="quantity_check"          />
+        <result property="quantityMinCheck"       column="quantity_min_check"      />
+        <result property="quantityMaxUnqualified" column="quantity_max_unqualified"/>
+        <result property="quantityQualified"      column="quantity_qualified"      />
+        <result property="quantityUnqualified"    column="quantity_unqualified"    />
+        <result property="crRateLimit"            column="cr_rate_limit"           />
+        <result property="majRateLimit"           column="maj_rate_limit"          />
+        <result property="minRateLimit"           column="min_rate_limit"          />
+        <result property="crQuantity"             column="cr_quantity"             />
+        <result property="majQuantity"            column="maj_quantity"            />
+        <result property="minQuantity"            column="min_quantity"            />
+        <result property="crRate"                 column="cr_rate"                 />
+        <result property="majRate"                column="maj_rate"                />
+        <result property="minRate"                column="min_rate"                />
+        <result property="checkResult"            column="check_result"            />
+        <result property="concessionReason"       column="concession_reason"       />
+        <result property="returnReason"           column="return_reason"           />
+        <result property="responsibility"         column="responsibility"          />
+        <result property="inspectDate"            column="inspect_date"            />
+        <result property="inspector"              column="inspector"               />
+        <result property="status"                 column="status"                  />
+        <result property="remark"                 column="remark"                  />
+        <result property="createBy"               column="create_by"               />
+        <result property="createTime"             column="create_time"             />
+        <result property="updateBy"               column="update_by"               />
+        <result property="updateTime"             column="update_time"             />
+    </resultMap>
+
+    <sql id="selectQcRqcVo">
+        select rqc_id, factory_id, rqc_code, rqc_name, rqc_type, template_id, source_doc_id,
+               source_doc_type, source_doc_code, source_line_id, workorder_id, workorder_code,
+               vendor_id, vendor_code, vendor_name, item_id, item_code, item_name, specification,
+               unit_of_measure, batch_code, quantity_check, quantity_min_check, quantity_max_unqualified,
+               quantity_qualified, quantity_unqualified, cr_rate_limit, maj_rate_limit, min_rate_limit,
+               cr_quantity, maj_quantity, min_quantity, cr_rate, maj_rate, min_rate, check_result,
+               concession_reason, return_reason, responsibility, inspect_date, inspector, status,
+               remark, create_by, create_time, update_by, update_time
+        from qxx_qc_rqc
+    </sql>
+
+    <select id="selectQcRqcList" parameterType="com.ruoyi.system.domain.mes.qc.QcRqc" resultMap="QcRqcResult">
+        <include refid="selectQcRqcVo"/>
+        <where>
+            <if test="rqcCode != null and rqcCode != ''"> and rqc_code like concat('%', #{rqcCode}, '%')</if>
+            <if test="rqcName != null and rqcName != ''"> and rqc_name like concat('%', #{rqcName}, '%')</if>
+            <if test="rqcType != null and rqcType != ''"> and rqc_type = #{rqcType}</if>
+            <if test="templateId != null"> and template_id = #{templateId}</if>
+            <if test="sourceDocType != null and sourceDocType != ''"> and source_doc_type = #{sourceDocType}</if>
+            <if test="sourceDocId != null"> and source_doc_id = #{sourceDocId}</if>
+            <if test="workorderId != null"> and workorder_id = #{workorderId}</if>
+            <if test="workorderCode != null and workorderCode != ''"> and workorder_code like concat('%', #{workorderCode}, '%')</if>
+            <if test="vendorId != null"> and vendor_id = #{vendorId}</if>
+            <if test="itemId != null"> and item_id = #{itemId}</if>
+            <if test="itemCode != null and itemCode != ''"> and item_code like concat('%', #{itemCode}, '%')</if>
+            <if test="itemName != null and itemName != ''"> and item_name like concat('%', #{itemName}, '%')</if>
+            <if test="checkResult != null and checkResult != ''"> and check_result = #{checkResult}</if>
+            <if test="responsibility != null and responsibility != ''"> and responsibility = #{responsibility}</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+            <if test="inspector != null and inspector != ''"> and inspector = #{inspector}</if>
+        </where>
+        order by rqc_id desc
+    </select>
+
+    <select id="selectQcRqcByRqcId" parameterType="Long" resultMap="QcRqcResult">
+        <include refid="selectQcRqcVo"/>
+        where rqc_id = #{rqcId}
+    </select>
+
+    <select id="checkRqcCodeUnique" parameterType="String" resultMap="QcRqcResult">
+        <include refid="selectQcRqcVo"/>
+        where rqc_code = #{rqcCode} limit 1
+    </select>
+
+    <select id="selectBySource" resultMap="QcRqcResult">
+        <include refid="selectQcRqcVo"/>
+        where source_doc_type = #{sourceDocType} and source_doc_id = #{sourceDocId}
+        <if test="itemId != null"> and item_id = #{itemId}</if>
+        order by rqc_id desc
+    </select>
+
+    <insert id="insertQcRqc" parameterType="com.ruoyi.system.domain.mes.qc.QcRqc" useGeneratedKeys="true" keyProperty="rqcId">
+        insert into qxx_qc_rqc
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="rqcCode != null and rqcCode != ''">rqc_code,</if>
+            <if test="rqcName != null">rqc_name,</if>
+            <if test="rqcType != null and rqcType != ''">rqc_type,</if>
+            <if test="templateId != null">template_id,</if>
+            <if test="sourceDocId != null">source_doc_id,</if>
+            <if test="sourceDocType != null">source_doc_type,</if>
+            <if test="sourceDocCode != null">source_doc_code,</if>
+            <if test="sourceLineId != null">source_line_id,</if>
+            <if test="workorderId != null">workorder_id,</if>
+            <if test="workorderCode != null">workorder_code,</if>
+            <if test="vendorId != null">vendor_id,</if>
+            <if test="vendorCode != null">vendor_code,</if>
+            <if test="vendorName != null">vendor_name,</if>
+            <if test="itemId != null">item_id,</if>
+            <if test="itemCode != null">item_code,</if>
+            <if test="itemName != null">item_name,</if>
+            <if test="specification != null">specification,</if>
+            <if test="unitOfMeasure != null">unit_of_measure,</if>
+            <if test="batchCode != null">batch_code,</if>
+            <if test="quantityCheck != null">quantity_check,</if>
+            <if test="quantityMinCheck != null">quantity_min_check,</if>
+            <if test="quantityMaxUnqualified != null">quantity_max_unqualified,</if>
+            <if test="quantityQualified != null">quantity_qualified,</if>
+            <if test="quantityUnqualified != null">quantity_unqualified,</if>
+            <if test="crRateLimit != null">cr_rate_limit,</if>
+            <if test="majRateLimit != null">maj_rate_limit,</if>
+            <if test="minRateLimit != null">min_rate_limit,</if>
+            <if test="crQuantity != null">cr_quantity,</if>
+            <if test="majQuantity != null">maj_quantity,</if>
+            <if test="minQuantity != null">min_quantity,</if>
+            <if test="crRate != null">cr_rate,</if>
+            <if test="majRate != null">maj_rate,</if>
+            <if test="minRate != null">min_rate,</if>
+            <if test="checkResult != null">check_result,</if>
+            <if test="concessionReason != null">concession_reason,</if>
+            <if test="returnReason != null">return_reason,</if>
+            <if test="responsibility != null">responsibility,</if>
+            <if test="inspectDate != null">inspect_date,</if>
+            <if test="inspector != null">inspector,</if>
+            <if test="status != null and status != ''">status,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="rqcCode != null and rqcCode != ''">#{rqcCode},</if>
+            <if test="rqcName != null">#{rqcName},</if>
+            <if test="rqcType != null and rqcType != ''">#{rqcType},</if>
+            <if test="templateId != null">#{templateId},</if>
+            <if test="sourceDocId != null">#{sourceDocId},</if>
+            <if test="sourceDocType != null">#{sourceDocType},</if>
+            <if test="sourceDocCode != null">#{sourceDocCode},</if>
+            <if test="sourceLineId != null">#{sourceLineId},</if>
+            <if test="workorderId != null">#{workorderId},</if>
+            <if test="workorderCode != null">#{workorderCode},</if>
+            <if test="vendorId != null">#{vendorId},</if>
+            <if test="vendorCode != null">#{vendorCode},</if>
+            <if test="vendorName != null">#{vendorName},</if>
+            <if test="itemId != null">#{itemId},</if>
+            <if test="itemCode != null">#{itemCode},</if>
+            <if test="itemName != null">#{itemName},</if>
+            <if test="specification != null">#{specification},</if>
+            <if test="unitOfMeasure != null">#{unitOfMeasure},</if>
+            <if test="batchCode != null">#{batchCode},</if>
+            <if test="quantityCheck != null">#{quantityCheck},</if>
+            <if test="quantityMinCheck != null">#{quantityMinCheck},</if>
+            <if test="quantityMaxUnqualified != null">#{quantityMaxUnqualified},</if>
+            <if test="quantityQualified != null">#{quantityQualified},</if>
+            <if test="quantityUnqualified != null">#{quantityUnqualified},</if>
+            <if test="crRateLimit != null">#{crRateLimit},</if>
+            <if test="majRateLimit != null">#{majRateLimit},</if>
+            <if test="minRateLimit != null">#{minRateLimit},</if>
+            <if test="crQuantity != null">#{crQuantity},</if>
+            <if test="majQuantity != null">#{majQuantity},</if>
+            <if test="minQuantity != null">#{minQuantity},</if>
+            <if test="crRate != null">#{crRate},</if>
+            <if test="majRate != null">#{majRate},</if>
+            <if test="minRate != null">#{minRate},</if>
+            <if test="checkResult != null">#{checkResult},</if>
+            <if test="concessionReason != null">#{concessionReason},</if>
+            <if test="returnReason != null">#{returnReason},</if>
+            <if test="responsibility != null">#{responsibility},</if>
+            <if test="inspectDate != null">#{inspectDate},</if>
+            <if test="inspector != null">#{inspector},</if>
+            <if test="status != null and status != ''">#{status},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateQcRqc" parameterType="com.ruoyi.system.domain.mes.qc.QcRqc">
+        update qxx_qc_rqc
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="rqcCode != null and rqcCode != ''">rqc_code = #{rqcCode},</if>
+            <if test="rqcName != null">rqc_name = #{rqcName},</if>
+            <if test="rqcType != null and rqcType != ''">rqc_type = #{rqcType},</if>
+            <if test="templateId != null">template_id = #{templateId},</if>
+            <if test="sourceDocId != null">source_doc_id = #{sourceDocId},</if>
+            <if test="sourceDocType != null">source_doc_type = #{sourceDocType},</if>
+            <if test="sourceDocCode != null">source_doc_code = #{sourceDocCode},</if>
+            <if test="sourceLineId != null">source_line_id = #{sourceLineId},</if>
+            <if test="workorderId != null">workorder_id = #{workorderId},</if>
+            <if test="workorderCode != null">workorder_code = #{workorderCode},</if>
+            <if test="vendorId != null">vendor_id = #{vendorId},</if>
+            <if test="vendorCode != null">vendor_code = #{vendorCode},</if>
+            <if test="vendorName != null">vendor_name = #{vendorName},</if>
+            <if test="itemId != null">item_id = #{itemId},</if>
+            <if test="itemCode != null">item_code = #{itemCode},</if>
+            <if test="itemName != null">item_name = #{itemName},</if>
+            <if test="specification != null">specification = #{specification},</if>
+            <if test="unitOfMeasure != null">unit_of_measure = #{unitOfMeasure},</if>
+            <if test="batchCode != null">batch_code = #{batchCode},</if>
+            <if test="quantityCheck != null">quantity_check = #{quantityCheck},</if>
+            <if test="quantityMinCheck != null">quantity_min_check = #{quantityMinCheck},</if>
+            <if test="quantityMaxUnqualified != null">quantity_max_unqualified = #{quantityMaxUnqualified},</if>
+            <if test="quantityQualified != null">quantity_qualified = #{quantityQualified},</if>
+            <if test="quantityUnqualified != null">quantity_unqualified = #{quantityUnqualified},</if>
+            <if test="crRateLimit != null">cr_rate_limit = #{crRateLimit},</if>
+            <if test="majRateLimit != null">maj_rate_limit = #{majRateLimit},</if>
+            <if test="minRateLimit != null">min_rate_limit = #{minRateLimit},</if>
+            <if test="crQuantity != null">cr_quantity = #{crQuantity},</if>
+            <if test="majQuantity != null">maj_quantity = #{majQuantity},</if>
+            <if test="minQuantity != null">min_quantity = #{minQuantity},</if>
+            <if test="crRate != null">cr_rate = #{crRate},</if>
+            <if test="majRate != null">maj_rate = #{majRate},</if>
+            <if test="minRate != null">min_rate = #{minRate},</if>
+            <if test="checkResult != null">check_result = #{checkResult},</if>
+            <if test="concessionReason != null">concession_reason = #{concessionReason},</if>
+            <if test="returnReason != null">return_reason = #{returnReason},</if>
+            <if test="responsibility != null">responsibility = #{responsibility},</if>
+            <if test="inspectDate != null">inspect_date = #{inspectDate},</if>
+            <if test="inspector != null">inspector = #{inspector},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where rqc_id = #{rqcId}
+    </update>
+
+    <delete id="deleteQcRqcByRqcId" parameterType="Long">
+        delete from qxx_qc_rqc where rqc_id = #{rqcId}
+    </delete>
+
+    <delete id="deleteQcRqcByRqcIds" parameterType="String">
+        delete from qxx_qc_rqc where rqc_id in
+        <foreach item="rqcId" collection="array" open="(" separator="," close=")">
+            #{rqcId}
+        </foreach>
+    </delete>
+</mapper>

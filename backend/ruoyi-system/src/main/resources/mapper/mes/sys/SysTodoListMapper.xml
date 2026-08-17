@@ -55,6 +55,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where todo_id = #{todoId}
     </select>
 
+    <!-- 按业务来源查待处理待办：恒真条件保证 WHERE 必渲染，供 FactoryIdInterceptor 追加 factory_id -->
+    <select id="selectPendingBySource" resultMap="SysTodoListResult">
+        <include refid="selectSysTodoListVo"/>
+        where source_doc_type = #{sourceDocType}
+          and source_doc_id = #{sourceDocId}
+          and status in ('PENDING', 'PROCESSING')
+        order by todo_id desc
+    </select>
+
     <insert id="insertSysTodoList" parameterType="com.ruoyi.system.domain.mes.sys.SysTodoList" useGeneratedKeys="true" keyProperty="todoId">
         insert into sys_todo_list
         <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="userId != null">user_id,</if>

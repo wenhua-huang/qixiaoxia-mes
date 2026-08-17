@@ -326,4 +326,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </foreach>
     </select>
 
+    <!-- 按批次码精确反查库存（扫码用，batch_code 唯一索引）；factory_id 由拦截器注入 -->
+    <select id="selectWmMaterialStockByExactBatchCode" resultMap="WmMaterialStockResult">
+        <include refid="selectWmMaterialStockVo"/>
+        where batch_code = #{batchCode}
+    </select>
+
 </mapper>

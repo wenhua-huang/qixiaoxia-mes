@@ -34,6 +34,7 @@ public interface IWmProductRecptService
     /**
      * 移动端确认入库 — 更新行数量 + 确认 + 更新库存，单接口原子完成。
      * 仅支持 DRAFT 状态的入库单。
+     * 返回确认后的详情（头 + 行，行含批次码），供 App 收货完成页展示。
      */
-    public void mobileConfirmProductRecpt(Long recptId, WmProductRecptMobileBody body);
+    public WmProductRecpt mobileConfirmProductRecpt(Long recptId, WmProductRecptMobileBody body);
 }

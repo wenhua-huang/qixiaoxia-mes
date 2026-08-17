@@ -3,6 +3,7 @@ package com.ruoyi.system.service.mes.wm;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.system.domain.mes.wm.WmProductRecpt;
 import com.ruoyi.system.domain.mes.wm.WmProductRecptLine;
+import com.ruoyi.system.domain.mes.wm.WmProductRecptMobileBody;
 import com.ruoyi.system.domain.mes.wm.tx.ProductRecptTxBean;
 import com.ruoyi.system.mapper.mes.pro.ProDocGenerationLogMapper;
 import com.ruoyi.system.mapper.mes.wm.WmProductRecptMapper;
@@ -29,7 +30,7 @@ import static org.mockito.Mockito.*;
 
 /**
  * 产品入库单收货确认 + 过账 单元测试
- * 覆盖：confirmProductRecpt / postProductRecpt + TxBean 构建
+ * 覆盖：confirmProductRecpt / postProductRecpt / mobileConfirmProductRecpt + TxBean 构建
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("产品入库单收货确认单元测试")
@@ -187,6 +188,37 @@ class WmProductRecptServiceUnitTest {
         assertThatThrownBy(() -> service.confirmProductRecpt(1L))
             .hasMessageContaining("未选择入库仓库");
         verify(storageCoreService, never()).processProductRecpt(any());
+    }
+
+    @Test
+    @DisplayName("10. 移动端确认：返回入库单详情(头+行批次码)")
+    void testMobileConfirmReturnsDetailWithBatchCode() {
+        WmProductRecpt header = draftRecpt();
+        WmProductRecptLine line = newLine(201L, "ITEM-001", "产品A", new BigDecimal("100"));
+        line.setWarehouseId(1L);
+
+        WmProductRecptMobileBody.MobileLineItem item = new WmProductRecptMobileBody.MobileLineItem();
+        item.setLineId(1L);
+        item.setQuantityRecpt(new BigDecimal("100"));
+        item.setQuantityBox(2);
+        item.setBatchCode("BAT20260816001");
+        WmProductRecptMobileBody body = new WmProductRecptMobileBody();
+        body.setLines(Collections.singletonList(item));
+
+        when(wmProductRecptMapper.selectWmProductRecptByRecptId(1L)).thenReturn(header);
+        when(wmProductRecptLineService.selectWmProductRecptLineList(any())).thenReturn(Collections.singletonList(line));
+        when(wmProductRecptLineService.updateWmProductRecptLine(any())).thenReturn(1);
+        when(wmProductRecptMapper.updateWmProductRecpt(any())).thenReturn(1);
+
+        WmProductRecpt result = service.mobileConfirmProductRecpt(1L, body);
+
+        verify(storageCoreService).processProductRecpt(any());
+        // 返回的详情：头 + 行，行携带批次码，供 App 收货完成页展示
+        assertThat(result).isNotNull();
+        assertThat(result.getRecptId()).isEqualTo(1L);
+        assertThat(result.getStatus()).isEqualTo("CONFIRMED");
+        assertThat(result.getLines()).hasSize(1);
+        assertThat(result.getLines().get(0).getBatchCode()).isEqualTo("BAT20260816001");
     }
 
     private WmProductRecpt draftRecpt() {

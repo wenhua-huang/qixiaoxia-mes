@@ -319,7 +319,7 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
      */
     @Override
     @Transactional
-    public void receiveWithLines(ItemRecptReceiveBody body) {
+    public WmItemRecpt receiveWithLines(ItemRecptReceiveBody body) {
         WmItemRecpt header = body.getHeader();
         List<WmItemRecptLine> lines = body.getLines();
         if (header == null) throw new RuntimeException("入库单头信息不能为空");
@@ -344,6 +344,9 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
         // 3. 确认收货 + 过账入库（直接传入已加载对象，避免重复 DB 查询）
         doConfirmItemRecpt(header, lines);
         doPostItemRecpt(header);
+
+        // 4. 返回详情（头 + 行，行含生成的批次码），供 App 收货完成页展示
+        return selectWmItemRecptDetail(header.getRecptId());
     }
 
     /**

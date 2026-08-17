@@ -142,8 +142,8 @@ public class WmProductRecptController extends BaseController
     public AjaxResult mobileConfirm(@PathVariable("recptId") Long recptId,
                                     @RequestBody WmProductRecptMobileBody body) {
         try {
-            wmProductRecptService.mobileConfirmProductRecpt(recptId, body);
-            return AjaxResult.success();
+            WmProductRecpt result = wmProductRecptService.mobileConfirmProductRecpt(recptId, body);
+            return AjaxResult.success(result);
         } catch (RuntimeException e) {
             return AjaxResult.error(e.getMessage());
         }

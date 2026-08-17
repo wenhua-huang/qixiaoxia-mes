@@ -17,6 +17,7 @@ import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.system.domain.mes.pro.ProCard;
+import com.ruoyi.system.domain.mes.pro.CardScanResultVO;
 import com.ruoyi.system.service.mes.pro.IProCardService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.page.TableDataInfo;
@@ -54,6 +55,15 @@ public class ProCardController extends BaseController
     @PreAuthorize("@ss.hasPermi('mes:pro:card:query')")
     @GetMapping(value = "/{cardId}")
     public AjaxResult getInfo(@PathVariable("cardId") Long cardId) { return success(proCardService.selectProCardByCardId(cardId)); }
+
+    /**
+     * 扫流转卡码反查报工上下文（App 扫码报工入口）
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:card:query')")
+    @GetMapping("/scan/{cardCode}")
+    public AjaxResult scanForReport(@PathVariable("cardCode") String cardCode) {
+        return success(proCardService.scanForReport(cardCode));
+    }
 
     @PreAuthorize("@ss.hasPermi('mes:pro:card:add')")
     @Log(title = "流转卡", businessType = BusinessType.INSERT)

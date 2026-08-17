@@ -16,7 +16,7 @@
         <input
           class="code-input"
           v-model="inputCode"
-          placeholder="扫码或输入物料编码"
+          placeholder="扫码、输入物料编码或粘贴二维码内容"
           confirm-type="search"
           @confirm="onInputConfirm"
         />
@@ -64,7 +64,8 @@
 <script setup>
 import { ref, computed, getCurrentInstance } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { getIssueDetail, issueOut, availableBatches } from '@/api/mes/wm/issue'
+import { getIssueDetail, issueOut, availableBatches, getStockByBatchCode } from '@/api/mes/wm/issue'
+import { parseQrPayload } from '@/utils/qrPayload'
 // 显式引入 uni-ui 组件（绕过 HBuilderX 发行 H5 时 easycom 失效）
 import UniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue'
 import UniNumberBox from '@/uni_modules/uni-number-box/components/uni-number-box/uni-number-box.vue'
@@ -93,27 +94,44 @@ async function loadData() {
   } catch (e) {}
 }
 
-// 手动输入物料编码 → 匹配领料行
+// 手动输入/粘贴编码 → 统一走 handleCode（H5 无相机扫码，粘贴二维码文本是主要入口）
 function onInputConfirm() {
   const code = (inputCode.value || '').trim()
-  if (!code) { proxy.$modal.msgError('请输入物料编码'); return }
-  lastScanCode.value = code
-  matchItem(code)
+  if (!code) { proxy.$modal.msgError('请输入或粘贴编码'); return }
+  handleCode(code)
   inputCode.value = ''
 }
 
-// 扫码
+// 统一编码入口：扫码/手输/粘贴的二维码内容都走这里（识别 QXX|TYPE|CODE 载荷，裸码当物料编码）
+function handleCode(code) {
+  lastScanCode.value = code
+  const payload = parseQrPayload(code)
+  if (payload && payload.type === 'MAT') {
+    matchByBatchCode(payload.code)
+  } else if (payload && payload.type === 'ROLL') {
+    proxy.$modal.msgError('卷料码请在分切投料使用')
+  } else {
+    // 裸条码/其他系统码：当作物料编码走原逻辑
+    matchItem(code)
+  }
+}
+
+// 扫码：H5 跳统一相机扫码页（html5-qrcode，回调取结果）；App/小程序用原生 uni.scanCode
 function scanCode() {
+  // #ifdef H5
+  uni.navigateTo({
+    url: '/pages/mes/pro/scan?callback=1',
+    events: { scanResult: (code) => handleCode(code) }
+  })
+  // #endif
+  // #ifndef H5
   uni.scanCode({
     onlyFromCamera: false,
     scanType: ['barCode', 'qrCode'],
-    success: (res) => {
-      const code = res.result
-      lastScanCode.value = code
-      matchItem(code)
-    },
+    success: (res) => { handleCode(res.result) },
     fail: () => { proxy.$modal.msgError('扫码取消或失败') }
   })
+  // #endif
 }
 
 // 扫码后匹配领料行（按物料编码匹配）
@@ -128,6 +146,31 @@ function matchItem(code) {
     proxy.$modal.msgError('未匹配到领料行：' + code)
     return
   }
+  pushIssueItem(matched)
+}
+
+// 扫批次码（MAT）→ 查批次库存，按物料匹配领料行并预选该批次
+async function matchByBatchCode(batchCode) {
+  let rows = []
+  try {
+    const res = await getStockByBatchCode(batchCode)
+    rows = res.data || []
+  } catch (e) { return }
+  if (!rows.length) {
+    proxy.$modal.msgError('该批次无库存：' + batchCode)
+    return
+  }
+  const stock = rows[0]
+  const matched = lines.value.find(l => l.itemCode === stock.itemCode)
+  if (!matched) {
+    proxy.$modal.msgError('批次物料不在本领料单：' + stock.itemCode)
+    return
+  }
+  pushIssueItem(matched, stock)
+}
+
+// 校验领料行（未发完、未重复）后加入发料清单；stock 传入则预填批次四件套
+function pushIssueItem(matched, stock) {
   const remain = (matched.quantityIssue || 0) - (matched.quantityIssued || 0)
   if (remain <= 0) {
     proxy.$modal.msgError('该物料已发料完成：' + matched.itemCode)
@@ -149,14 +192,14 @@ function matchItem(code) {
     quantityIssue: matched.quantityIssue,
     remain: remain,
     quantity: remain,  // 默认发料全部未发量
-    batchId: null,
-    materialStockId: null,
-    batchCode: '',
-    _batchDisplay: '',
-    warehouseId: header.value.warehouseId,
+    batchId: stock ? stock.batchId : null,
+    materialStockId: stock ? stock.materialStockId : null,
+    batchCode: stock ? (stock.batchCode || '') : '',
+    _batchDisplay: stock ? (stock.batchCode || '无批次') : '',
+    warehouseId: (stock && stock.warehouseId) || header.value.warehouseId,
     _batchOptions: []
   })
-  // 预加载该物料的可选批次
+  // 加载该物料的可选批次（扫码预选后仍可点选切换）
   loadBatchOptions(issueList.value.length - 1)
   proxy.$modal.msgSuccess('已添加：' + matched.itemName)
 }

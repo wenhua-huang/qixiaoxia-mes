@@ -64,4 +64,10 @@ public interface WmMaterialStockMapper
      * @return 匹配的库存记录
      */
     public List<WmMaterialStock> selectByItemIds(@Param("itemIds") Collection<Long> itemIds);
+
+    /**
+     * 按批次码精确反查库存记录（扫码用；batch_code 冗余在库存表，无需 join）。
+     * batch_code 有唯一索引；factory_id 由拦截器注入。
+     */
+    public List<WmMaterialStock> selectWmMaterialStockByExactBatchCode(@Param("batchCode") String batchCode);
 }

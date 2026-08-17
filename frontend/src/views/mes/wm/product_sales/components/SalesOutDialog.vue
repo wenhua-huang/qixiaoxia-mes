@@ -3,6 +3,14 @@
     <el-alert v-if="header" :title="`出库单：${header.salesCode} | 客户：${header.clientName || '-'} | 仓库：${header.warehouseName || '-'}`"
               type="info" :closable="false" class="mb8" />
 
+    <!-- 批次码识别：USB 扫码枪=键盘输入回车触发，也支持手输 -->
+    <div class="mb8 scan-bar">
+      <el-input ref="scanInputRef" v-model="scanCode" size="small" clearable style="width:320px"
+                placeholder="扫描/输入批次码（QXX|MAT|xxx 或裸批次码）" @keyup.enter="handleScan" />
+      <el-button type="success" plain icon="Search" size="small" @click="handleScan">识别批次</el-button>
+      <span class="scan-tip">识别后自动匹配待出库物料并预填一条明细</span>
+    </div>
+
     <!-- 待出库行 -->
     <el-table :data="lines" size="small" border class="mb8">
       <el-table-column label="物料编码" prop="itemCode" width="130" />
@@ -42,7 +50,7 @@
       </el-table-column>
       <el-table-column label="批次编码" width="150">
         <template #default="scope">
-          <el-input v-model="scope.row.batchCode" size="small" placeholder="留空=系统匹配" />
+          <el-input v-model="scope.row.batchCode" size="small" placeholder="留空=系统匹配(FIFO)，填写=精确扣减该批次" />
         </template>
       </el-table-column>
       <el-table-column label="本次出库量" width="130">
@@ -81,12 +89,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { getCurrentInstance } from 'vue'
-import { postOut } from '@/api/mes/wm/product_sales'
-import { getSalesDetail } from '@/api/mes/wm/product_sales'
-import { listWmMaterialStock } from '@/api/mes/wm/material_stock'
-import type { WmProductSales, WmProductSalesLine, WmProductSalesDetail } from '@/types'
+import { ref, computed, getCurrentInstance } from 'vue'
+import { postOut, getSalesDetail } from '@/api/mes/wm/product_sales'
+import { listWmMaterialStock, getStockByBatchCode } from '@/api/mes/wm/material_stock'
+import { parseQrPayload } from '@/utils/qrPayload'
+import type { WmProductSales, WmProductSalesLine, WmProductSalesDetail, WmMaterialStock } from '@/types'
 
 const proxy = getCurrentInstance()?.proxy as any
 const emit = defineEmits<{ success: [] }>()
@@ -99,6 +106,9 @@ const details = ref<WmProductSalesDetail[]>([])
 const historyDetails = ref<WmProductSalesDetail[]>([])
 // itemId → 可用量（本仓库聚合）
 const availMap = ref<Record<number, number>>({})
+// 批次码识别输入（扫码枪/手输）
+const scanCode = ref('')
+const scanInputRef = ref()
 
 const postableLines = computed(() => lines.value.filter((l: WmProductSalesLine) => remain(l) > 0))
 
@@ -196,7 +206,62 @@ function autoFifoAll() {
   else proxy.$modal.msgSuccess('已按 FIFO 填充，批次由系统自动匹配')
 }
 
-function handleConfirm() {
+/** 从扫码原文提取批次码：QXX|MAT|xxx → xxx；其余按裸批次码处理，非 MAT 码返回 null */
+function extractBatchCode(raw: string): string | null {
+  const parsed = parseQrPayload(raw)
+  return parsed ? (parsed.type === 'MAT' ? parsed.code : null) : raw
+}
+
+/** 该批次多仓时取出库仓库内可用量最大的一行；批次不在出库仓库返回 null */
+function pickStockRow(rows: WmMaterialStock[]): WmMaterialStock | null {
+  const inWh = rows.filter(r => r.warehouseId === header.value?.warehouseId)
+  if (!inWh.length) return null
+  return inWh.reduce((best, r) => Number(r.quantityOnhand || 0) > Number(best.quantityOnhand || 0) ? r : best)
+}
+
+/** 批次码识别：反查库存 → 按 itemCode 匹配待出库行 → 自动添加并预填一条明细 */
+async function handleScan() {
+  const raw = scanCode.value.trim()
+  if (!raw) return
+  const code = extractBatchCode(raw)
+  if (!code) { proxy.$modal.msgError(`二维码非物料批次码（MAT）：${raw}`); scanCode.value = ''; return }
+  try {
+    const res = await getStockByBatchCode(code)
+    const rows = res.data || []
+    if (!rows.length) { proxy.$modal.msgError(`批次[${code}]不存在或无库存记录`); return }
+    const row = pickStockRow(rows)
+    if (!row) { proxy.$modal.msgError(`批次[${code}]在出库仓库[${header.value?.warehouseName || ''}]无库存`); return }
+    if (Number(row.quantityOnhand || 0) <= 0) { proxy.$modal.msgError(`批次[${code}]库存量为 0，无法出库`); return }
+    const line = postableLines.value.find(l => l.itemCode === row.itemCode)
+    if (!line) { proxy.$modal.msgError(`批次[${code}]物料[${row.itemCode}]不在待出库行或已出库完成`); return }
+    const qty = Math.min(remain(line), Number(row.quantityOnhand || 0))
+    details.value.push({
+      lineId: line.lineId, itemId: line.itemId, itemCode: line.itemCode, itemName: line.itemName,
+      unitOfMeasure: line.unitOfMeasure, unitName: line.unitName,
+      batchId: row.batchId, batchCode: row.batchCode || code, quantity: qty
+    } as unknown as WmProductSalesDetail)
+    proxy.$modal.msgSuccess(`已添加：${line.itemCode} × ${qty}（批次 ${row.batchCode || code}）`)
+  } finally {
+    scanCode.value = ''
+    scanInputRef.value?.focus?.()
+  }
+}
+
+/** 提交前补齐"有 batchCode 无 batchId"明细的 batchId，使其走后端精确批次扣减（修存量 bug）；全部可补齐返回 true */
+async function fillMissingBatchIds(valid: WmProductSalesDetail[]): Promise<boolean> {
+  const lack = valid.filter(d => d.batchCode && !d.batchId)
+  if (!lack.length) return true
+  const resList = await Promise.all(lack.map(d =>
+    getStockByBatchCode(d.batchCode as string).then(r => ({ d, rows: r.data || [] }))))
+  for (const { d, rows } of resList) {
+    const row = pickStockRow(rows)
+    if (!row || row.itemId !== d.itemId) { proxy.$modal.msgError(`批次[${d.batchCode}]在出库仓库[${header.value?.warehouseName || ''}]不存在或不属于物料[${d.itemCode}]，无法出库`); return false }
+    d.batchId = row.batchId
+  }
+  return true
+}
+
+async function handleConfirm() {
   const valid = details.value.filter((d: WmProductSalesDetail) => d.lineId && Number(d.quantity) > 0)
   if (!valid.length) { proxy.$modal.msgError('请添加有效的出库明细'); return }
   for (const d of valid) {
@@ -207,17 +272,19 @@ function handleConfirm() {
     }
   }
   submitting.value = true
-  postOut(header.value!.salesId, valid).then(() => {
-    proxy.$modal.msgSuccess('出库成功')
+  try {
+    if (!await fillMissingBatchIds(valid)) return
+    await postOut(header.value!.salesId, valid)
+    proxy.$modal.msgSuccess('过账出库成功')
     show.value = false
     emit('success')
-  }).catch((e: any) => {
+  } catch (e: any) {
     // 后端会返回具体批次/库存不足信息，统一 toast 已由 axios 拦截器处理；此处可补充刷新可用量
     loadAvail(header.value?.warehouseId, lines.value)
-  }).finally(() => { submitting.value = false })
+  } finally { submitting.value = false }
 }
 
-function handleClose() { details.value = []; historyDetails.value = [] }
+function handleClose() { details.value = []; historyDetails.value = []; scanCode.value = '' }
 
 defineExpose({ open })
 </script>
@@ -226,4 +293,6 @@ defineExpose({ open })
 .mb8 { margin-bottom: 8px; }
 .ml8 { margin-left: 8px; }
 .mt8 { margin-top: 8px; }
+.scan-bar { display: flex; align-items: center; gap: 8px; }
+.scan-tip { color: #909399; font-size: 12px; }
 </style>

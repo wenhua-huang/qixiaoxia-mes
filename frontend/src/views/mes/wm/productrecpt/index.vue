@@ -47,11 +47,12 @@
           <dict-tag :options="mes_itemrecpt_status" :value="scope.row.status" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="160" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="190" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-tooltip content="修改" placement="top" v-if="isEditable(scope.row)"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:product_recpt:edit']"></el-button></el-tooltip>
           <el-tooltip content="删除" placement="top" v-if="isEditable(scope.row)"><el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:wm:product_recpt:remove']"></el-button></el-tooltip>
           <el-tooltip content="确认收货" placement="top" v-if="scope.row.status === 'DRAFT'"><el-button link type="success" icon="Check" @click="handleConfirm(scope.row)"></el-button></el-tooltip>
+          <el-tooltip content="打印批次标签" placement="top" v-if="['CONFIRMED', 'POSTED'].includes(scope.row.status)"><el-button link type="primary" icon="Printer" @click="handlePrintLabels(scope.row)"></el-button></el-tooltip>
           <el-button v-if="scope.row.status === 'CONFIRMED'" link type="warning" size="small" @click="handlePost(scope.row)" v-hasPermi="['mes:wm:product_recpt:edit']">过账</el-button>
         </template>
       </el-table-column>
@@ -165,9 +166,11 @@
 
 <script setup lang="ts" name="WmProductRecpt">
 import { ref, reactive, toRefs, getCurrentInstance } from 'vue'
-import type { WmProductRecptQueryParams, WmProductRecpt } from '@/api/mes/wm/product_recpt'
+import type { WmProductRecptQueryParams, WmProductRecpt, WmProductRecptLine } from '@/api/mes/wm/product_recpt'
 import { listWmProductRecpt, getWmProductRecpt, delWmProductRecpt, addWmProductRecpt, updateWmProductRecpt } from '@/api/mes/wm/product_recpt'
 import request from '@/utils/request'
+import { buildMatPayload } from '@/utils/qrPayload'
+import QRCode from 'qrcode'
 import WarehouseSelect from '@/components/warehouseSelect/single.vue'
 import CreateWarehouseDialog from '@/components/warehouseSelect/CreateWarehouseDialog.vue'
 import WorkorderSelect from '@/components/workorderSelect/single.vue'
@@ -295,6 +298,7 @@ function handleConfirm(row?: WmProductRecpt) {
         proxy.$modal.msgSuccess('收货确认成功，库存已更新')
         open.value = false
         getList()
+        proxy.$modal.confirm('收货成功，是否打印批次标签？').then(() => handlePrintLabels(target)).catch(() => {})
       })
     }).catch(() => {})
   }
@@ -315,6 +319,43 @@ function handlePost(row: WmProductRecpt) {
       getList()
     })
   }).catch(() => {})
+}
+
+// ==================== 成品批次标签打印 ====================
+async function handlePrintLabels(row: WmProductRecpt) {
+  if (!row?.recptId) return
+  const r = await getWmProductRecpt(row.recptId)
+  const lines = (r.data?.lines || []).filter((l: WmProductRecptLine) => l.batchCode)
+  if (!lines.length) { proxy.$modal.msgWarning('该单无批次产品'); return }
+  openPrintWindow(await buildBatchLabelHtml(lines, row))
+}
+
+async function buildBatchLabelHtml(lines: WmProductRecptLine[], recpt: WmProductRecpt): Promise<string> {
+  const blocks = await Promise.all(lines.map(async l => {
+    const dataUrl = await QRCode.toDataURL(buildMatPayload(l.batchCode!), { width: 160, margin: 1 })
+    return `<div class="card">
+      <h2>${l.batchCode || ''}</h2>
+      <img src="${dataUrl}" />
+      <p>${l.itemName || ''} ${l.specification || ''}</p>
+      <p>数量: ${l.quantityRecpt ?? ''} ${l.unitName || ''}</p>
+      <p>入库单: ${recpt.recptCode || ''}</p>
+      <p>仓库: ${recpt.warehouseName || ''}</p>
+    </div>`
+  }))
+  return `<html><head><title>成品批次标签打印</title><style>
+    body{margin:0;font-family:sans-serif}
+    .sheet{display:flex;flex-wrap:wrap}
+    .card{width:50%;box-sizing:border-box;padding:20px;border:1px dashed #bbb;text-align:center;page-break-inside:avoid}
+    img{width:160px;height:160px} h2{margin:8px 0} p{margin:4px 0;font-size:14px;color:#333}
+  </style></head><body><div class="sheet">${blocks.join('')}</div>
+  <script>window.onload=function(){window.print()}<\/script></body></html>`
+}
+
+function openPrintWindow(html: string) {
+  const w = window.open('', '_blank')
+  if (!w) { proxy.$modal.msgError('请允许浏览器弹出窗口'); return }
+  w.document.write(html)
+  w.document.close()
 }
 
 getList()

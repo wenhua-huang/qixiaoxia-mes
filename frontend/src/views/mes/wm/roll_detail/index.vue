@@ -32,8 +32,9 @@
       <el-table-column label="物料名称" align="center" prop="itemName" width="180" :show-overflow-tooltip="true" />
       <el-table-column label="批次编码" align="center" prop="batchCode" width="180" :show-overflow-tooltip="true" />
       <el-table-column label="供应商编码" align="center" prop="vendorCode" width="180" :show-overflow-tooltip="true" />
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="160">
+      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="210">
         <template #default="scope">
+          <el-button link type="primary" icon="Grid" @click="handleQrCode(scope.row)">二维码</el-button>
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:roll_detail:edit']">修改</el-button>
           <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:wm:roll_detail:remove']">删除</el-button>
         </template>
@@ -148,6 +149,19 @@
         </div>
       </template>
     </el-dialog>
+
+    <el-dialog title="纸卷二维码" v-model="qrOpen" width="340px" append-to-body>
+      <div v-if="qrRow" style="text-align:center">
+        <QrCode :payload="buildQrPayload('ROLL', qrRow.rollCode)" :size="240" />
+        <div style="margin-top:12px;font-size:18px;font-weight:bold">{{ qrRow.rollCode }}</div>
+        <div style="color:#999;margin-top:4px">{{ qrRow.itemName }} {{ qrRow.specification }}</div>
+        <div style="color:#999;margin-top:2px">剩余 {{ qrRow.remainingQuantity ?? '-' }} {{ qrRow.unitOfMeasure || '' }} · {{ qrRow.status }}</div>
+      </div>
+      <template #footer>
+        <el-button @click="handlePrintRoll" icon="Printer">打印</el-button>
+        <el-button @click="qrOpen = false">关 闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -155,6 +169,9 @@
 import { ref, reactive, toRefs, getCurrentInstance } from 'vue'
 import type { WmRollDetailQueryParams, WmRollDetail } from '@/types/api/mes/wm/roll_detail'
 import { listWmRollDetail, getWmRollDetail, delWmRollDetail, addWmRollDetail, updateWmRollDetail } from '@/api/mes/wm/roll_detail'
+import QrCode from '@/components/QrCode/index.vue'
+import { buildQrPayload } from '@/utils/qrPayload'
+import QRCode from 'qrcode'
 
 const { proxy } = getCurrentInstance() as any
 const dicts = proxy.useDict('sys_yes_no')
@@ -209,6 +226,38 @@ function handleDelete(row?: WmRollDetail) {
   proxy.$modal.confirm('是否确认删除？').then(() => delWmRollDetail(_ids)).then(() => { getList(); proxy.$modal.msgSuccess('删除成功') })
 }
 function handleExport() { proxy.download('/mes/wm/roll_detail/export', { ...queryParams.value }, `rolldetail_${Date.now()}.xlsx`) }
+
+// ==================== 纸卷二维码（扫一扫 → 纸卷信息） ====================
+const qrOpen = ref(false)
+const qrRow = ref<WmRollDetail | null>(null)
+
+function handleQrCode(row: WmRollDetail) {
+  qrRow.value = row
+  qrOpen.value = true
+}
+
+async function buildRollPrintHtml(r: WmRollDetail): Promise<string> {
+  const dataUrl = await QRCode.toDataURL(buildQrPayload('ROLL', r.rollCode || ''), { width: 160, margin: 1 })
+  return `<html><head><title>纸卷标签打印</title><style>
+    body{margin:0;font-family:sans-serif}
+    .label{box-sizing:border-box;padding:20px;border:1px dashed #bbb;text-align:center;page-break-inside:avoid}
+    img{width:160px;height:160px} h2{margin:8px 0} p{margin:4px 0;font-size:14px;color:#333}
+  </style></head><body><div class="label">
+    <h2>${r.rollCode || ''}</h2><img src="${dataUrl}" />
+    <p>${r.itemName || ''} ${r.specification || ''}</p>
+    <p>剩余: ${r.remainingQuantity ?? ''} ${r.unitOfMeasure || ''}</p>
+    <p>仓库: ${r.warehouseName || ''} · 状态: ${r.status || ''}</p>
+  </div>
+  <script>window.onload=function(){window.print()}<\/script></body></html>`
+}
+
+async function handlePrintRoll() {
+  if (!qrRow.value) return
+  const w = window.open('', '_blank')
+  if (!w) { proxy.$modal.msgError('请允许浏览器弹出窗口'); return }
+  w.document.write(await buildRollPrintHtml(qrRow.value))
+  w.document.close()
+}
 
 getList()
 </script>

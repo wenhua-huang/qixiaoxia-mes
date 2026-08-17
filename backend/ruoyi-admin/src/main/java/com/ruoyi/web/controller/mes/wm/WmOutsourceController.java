@@ -1,4 +1,4 @@
-package com.ruoyi.system.web.controller.mes.wm;
+package com.ruoyi.web.controller.mes.wm;
 
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;

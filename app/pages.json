@@ -150,6 +150,11 @@
       "navigationBarTitleText": "生产报工"
     }
   }, {
+    "path": "pages/mes/pro/scan",
+    "style": {
+      "navigationBarTitleText": "扫一扫"
+    }
+  }, {
     "path": "pages/mes/pro/history",
     "style": {
       "navigationBarTitleText": "报工历史",

@@ -158,7 +158,10 @@
         <div style="color:#999;margin-top:2px">剩余 {{ qrRow.remainingQuantity ?? '-' }} {{ qrRow.unitOfMeasure || '' }} · {{ qrRow.status }}</div>
       </div>
       <template #footer>
-        <el-button @click="handlePrintRoll" icon="Printer">打印</el-button>
+        <el-select v-model="labelSpecKey" size="small" style="width: 110px" title="标签纸规格">
+          <el-option v-for="s in LABEL_SPECS" :key="s.key" :value="s.key" :label="s.label" />
+        </el-select>
+        <el-button type="primary" @click="handlePrintRoll" icon="Printer">打印</el-button>
         <el-button @click="qrOpen = false">关 闭</el-button>
       </template>
     </el-dialog>
@@ -171,7 +174,7 @@ import type { WmRollDetailQueryParams, WmRollDetail } from '@/types/api/mes/wm/r
 import { listWmRollDetail, getWmRollDetail, delWmRollDetail, addWmRollDetail, updateWmRollDetail } from '@/api/mes/wm/roll_detail'
 import QrCode from '@/components/QrCode/index.vue'
 import { buildQrPayload } from '@/utils/qrPayload'
-import QRCode from 'qrcode'
+import { printQrLabels, LABEL_SPECS, labelSpecKey } from '@/utils/labelPrint'
 
 const { proxy } = getCurrentInstance() as any
 const dicts = proxy.useDict('sys_yes_no')
@@ -236,27 +239,22 @@ function handleQrCode(row: WmRollDetail) {
   qrOpen.value = true
 }
 
-async function buildRollPrintHtml(r: WmRollDetail): Promise<string> {
-  const dataUrl = await QRCode.toDataURL(buildQrPayload('ROLL', r.rollCode || ''), { width: 160, margin: 1 })
-  return `<html><head><title>纸卷标签打印</title><style>
-    body{margin:0;font-family:sans-serif}
-    .label{box-sizing:border-box;padding:20px;border:1px dashed #bbb;text-align:center;page-break-inside:avoid}
-    img{width:160px;height:160px} h2{margin:8px 0} p{margin:4px 0;font-size:14px;color:#333}
-  </style></head><body><div class="label">
-    <h2>${r.rollCode || ''}</h2><img src="${dataUrl}" />
-    <p>${r.itemName || ''} ${r.specification || ''}</p>
-    <p>剩余: ${r.remainingQuantity ?? ''} ${r.unitOfMeasure || ''}</p>
-    <p>仓库: ${r.warehouseName || ''} · 状态: ${r.status || ''}</p>
-  </div>
-  <script>window.onload=function(){window.print()}<\/script></body></html>`
-}
-
 async function handlePrintRoll() {
   if (!qrRow.value) return
-  const w = window.open('', '_blank')
-  if (!w) { proxy.$modal.msgError('请允许浏览器弹出窗口'); return }
-  w.document.write(await buildRollPrintHtml(qrRow.value))
-  w.document.close()
+  const r = qrRow.value
+  const channel = await printQrLabels({
+    title: '纸卷标签打印',
+    items: [{
+      payload: buildQrPayload('ROLL', r.rollCode || ''),
+      headline: r.rollCode || '',
+      fields: [
+        `${r.itemName || ''} ${r.specification || ''}`.trim(),
+        `剩余: ${r.remainingQuantity ?? ''} ${r.unitOfMeasure || ''}`,
+        `仓库: ${r.warehouseName || ''} · 状态: ${r.status || ''}`
+      ]
+    }]
+  })
+  if (channel === 'clodop') proxy.$modal.msgSuccess('已发送到标签打印机')
 }
 
 getList()

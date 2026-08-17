@@ -75,7 +75,7 @@ import type { PurOrder } from '@/types/api/mes/pur/order'
 import { listWmItemRecpt, delWmItemRecpt, buildFromPurOrder } from '@/api/mes/wm/item_recpt'
 import { listWmItemRecptLine } from '@/api/mes/wm/item_recpt_line'
 import { buildMatPayload } from '@/utils/qrPayload'
-import QRCode from 'qrcode'
+import { printQrLabels } from '@/utils/labelPrint'
 import request from '@/utils/request'
 import ItemRecptFormDialog from './components/ItemRecptFormDialog.vue'
 import PurOrderSelect from '@/components/purOrderSelect/single.vue'
@@ -151,35 +151,20 @@ async function handlePrintLabels(row: WmItemRecpt) {
   const r = await listWmItemRecptLine({ recptId: row.recptId, pageNum: 1, pageSize: 100 } as any)
   const lines = (r.rows || []).filter((l: WmItemRecptLine) => l.batchCode)
   if (!lines.length) { proxy.$modal.msgWarning('该单无批次物料'); return }
-  openPrintWindow(await buildBatchLabelHtml(lines, row))
-}
-
-async function buildBatchLabelHtml(lines: WmItemRecptLine[], recpt: WmItemRecpt): Promise<string> {
-  const blocks = await Promise.all(lines.map(async l => {
-    const dataUrl = await QRCode.toDataURL(buildMatPayload(l.batchCode!), { width: 160, margin: 1 })
-    return `<div class="card">
-      <h2>${l.batchCode || ''}</h2>
-      <img src="${dataUrl}" />
-      <p>${l.itemName || ''} ${l.specification || ''}</p>
-      <p>数量: ${l.quantityRecpt ?? ''} ${l.unitName || ''}</p>
-      <p>入库单: ${recpt.recptCode || ''}</p>
-      <p>仓库: ${l.warehouseName || recpt.warehouseName || ''}</p>
-    </div>`
-  }))
-  return `<html><head><title>批次标签打印</title><style>
-    body{margin:0;font-family:sans-serif}
-    .sheet{display:flex;flex-wrap:wrap}
-    .card{width:50%;box-sizing:border-box;padding:20px;border:1px dashed #bbb;text-align:center;page-break-inside:avoid}
-    img{width:160px;height:160px} h2{margin:8px 0} p{margin:4px 0;font-size:14px;color:#333}
-  </style></head><body><div class="sheet">${blocks.join('')}</div>
-  <script>window.onload=function(){window.print()}<\/script></body></html>`
-}
-
-function openPrintWindow(html: string) {
-  const w = window.open('', '_blank')
-  if (!w) { proxy.$modal.msgError('请允许浏览器弹出窗口'); return }
-  w.document.write(html)
-  w.document.close()
+  const channel = await printQrLabels({
+    title: '批次标签打印',
+    items: lines.map(l => ({
+      payload: buildMatPayload(l.batchCode!),
+      headline: l.batchCode!,
+      fields: [
+        `${l.itemName || ''} ${l.specification || ''}`.trim(),
+        `数量: ${l.quantityRecpt ?? ''} ${l.unitName || ''}`,
+        `入库单: ${row.recptCode || ''}`,
+        `仓库: ${l.warehouseName || row.warehouseName || ''}`
+      ]
+    }))
+  })
+  if (channel === 'clodop') proxy.$modal.msgSuccess('已发送到标签打印机')
 }
 
 getList()

@@ -162,8 +162,11 @@ ${labelCss(spec)}
 .label:last-child{page-break-after:auto}
 </style></head><body>${blocks.join('')}</body></html>`
 
+  // 用移出屏幕但保持可渲染的 iframe（不能 visibility:hidden / display:none，
+  // 否则 Safari 等浏览器对不可见 iframe 的 print() 不弹对话框——表现为"点了没反应"）
   const iframe = document.createElement('iframe')
-  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden'
+  iframe.style.cssText = `position:fixed;left:-10000px;top:0;width:${spec.widthMm + 10}mm;height:${spec.heightMm + 10}mm;border:0`
+  iframe.setAttribute('aria-hidden', 'true')
   document.body.appendChild(iframe)
   const doc = iframe.contentDocument
   const win = iframe.contentWindow
@@ -178,16 +181,32 @@ ${labelCss(spec)}
       img.complete ? Promise.resolve() : new Promise<void>(r => { img.onload = () => r(); img.onerror = () => r() })
     )
   )
+
+  const cleanup = () => setTimeout(() => iframe.remove(), 2000)
   // 延迟触发，避开点击事件栈内调起打印被部分浏览器拦截的问题
   setTimeout(() => {
     try {
       win.focus()
       win.print()
-    } finally {
-      // 打印对话框关闭后再移除容器（部分浏览器 print 为阻塞调用）
-      setTimeout(() => iframe.remove(), 2000)
+      cleanup()
+    } catch {
+      // iframe 打印被拦截的极端情况：退回新窗口打印，保证至少有反应
+      fallbackWindowPrint(html)
+      cleanup()
     }
   }, 120)
+}
+
+/** iframe 打印失败时的兜底：新窗口写入同样内容并触发打印 */
+function fallbackWindowPrint(html: string): void {
+  const w = window.open('', '_blank')
+  if (!w) { ElMessage.error('请允许浏览器弹出窗口后重试'); return }
+  w.document.open()
+  w.document.write(html)
+  w.document.close()
+  const trigger = () => { try { w.focus(); w.print() } catch { /* 用户手动在新窗口打印 */ } }
+  if (w.document.readyState === 'complete') trigger()
+  else w.onload = trigger
 }
 
 /**

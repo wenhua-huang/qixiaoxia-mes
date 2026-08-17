@@ -100,15 +100,15 @@
               </view>
               <view class="field">
                 <text class="field-label">生产日期</text>
-                <picker mode="date" :value="line.produceDate" @change="(e) => line.produceDate = e.detail.value">
+                <UniDatetimePicker type="date" v-model="line.produceDate">
                   <view class="date-picker-box" :class="{ 'is-placeholder': !line.produceDate }">{{ line.produceDate || '请选择' }}</view>
-                </picker>
+                </UniDatetimePicker>
               </view>
               <view class="field">
                 <text class="field-label">有效期</text>
-                <picker mode="date" :value="line.expireDate" @change="(e) => line.expireDate = e.detail.value">
+                <UniDatetimePicker type="date" v-model="line.expireDate">
                   <view class="date-picker-box" :class="{ 'is-placeholder': !line.expireDate }">{{ line.expireDate || '请选择' }}</view>
-                </picker>
+                </UniDatetimePicker>
               </view>
             </view>
           </view>
@@ -139,8 +139,9 @@
 
 <script setup>
 import { ref, reactive, computed, getCurrentInstance } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { onLoad, onShow } from '@dcloudio/uni-app'
 import { getOutsource, recordOutsourceResult, completeOutsource, shipOutsource } from '@/api/mes/wm/outsource'
+import UniDatetimePicker from '@/uni_modules/uni-datetime-picker/components/uni-datetime-picker/uni-datetime-picker.vue'
 
 const { proxy } = getCurrentInstance()
 
@@ -288,6 +289,11 @@ onLoad((options) => {
     // 已有收货行（PROCESSING/FINISHED）只读展示在"已录明细"中；
     // 不回填到可编辑表单，避免厂商误把旧明细重复提交
   }).catch(() => { loading.value = false })
+})
+
+onShow(() => {
+  // 防御性清理：上个页面残留的全局 loading 会遮住本页 toast
+  uni.hideLoading()
 })
 </script>
 

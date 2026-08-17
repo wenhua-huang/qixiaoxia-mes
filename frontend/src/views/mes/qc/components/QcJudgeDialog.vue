@@ -50,7 +50,7 @@
 <script setup lang="ts" name="QcJudgeDialog">
 import { ref, watch, computed } from 'vue'
 import { getCurrentInstance } from 'vue'
-import type { QcOrderLine, QcDefectRecord } from '@/api/mes/qc/iqc'
+import type { QcOrderLine, QcDefectRecord } from '@/api/mes/qc/common'
 
 const props = defineProps<{
   visible: boolean

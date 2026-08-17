@@ -60,7 +60,7 @@
 
 <script setup lang="ts" name="QcDefectDialog">
 import { ref, watch } from 'vue'
-import type { QcDefectRecord, QcOrderLine } from '@/api/mes/qc/iqc'
+import type { QcDefectRecord, QcOrderLine } from '@/api/mes/qc/common'
 import type { QcDefect } from '@/api/mes/qc/defect'
 import { listDefect } from '@/api/mes/qc/defect'
 

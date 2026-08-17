@@ -43,6 +43,13 @@
       <el-table-column label="状态" align="center" prop="status" width="90">
         <template #default="scope"><dict-tag :options="sales_status" :value="scope.row.status" /></template>
       </el-table-column>
+      <el-table-column label="检验状态" align="center" width="110">
+        <template #default="scope">
+          <el-tag v-if="scope.row.qcStatus && scope.row.qcStatus !== 'NONE'" size="small" :type="qcTagType(scope.row.qcStatus)"
+            style="cursor: pointer" @click="goOqc(scope.row)">{{ qcTagText(scope.row.qcStatus) }}</el-tag>
+          <span v-else>-</span>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" align="center" width="240" fixed="right" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-tooltip content="查看" placement="top"><el-button link type="primary" icon="View" @click="handleView(scope.row)" /></el-tooltip>
@@ -161,6 +168,19 @@ function onOrderSelected(row: any) {
       lines: draft.lines
     } as WmProductSales)
   })
+}
+
+// 检验状态 tag：点击跳转 OQC 列表页并按来源单据过滤
+const QC_TAG: Record<string, { type: string; text: string }> = {
+  PASSED: { type: 'success', text: '检验合格' },
+  CONCESSION: { type: 'warning', text: '让步接收' },
+  PENDING: { type: 'info', text: '待检验' },
+  FAILED: { type: 'danger', text: '检验不合格' }
+}
+function qcTagType(s: string) { return QC_TAG[s]?.type || 'info' }
+function qcTagText(s: string) { return QC_TAG[s]?.text || s }
+function goOqc(row: WmProductSales) {
+  router.push({ path: '/qc/qcoqc', query: { sourceDocId: String(row.salesId) } })
 }
 
 getList()

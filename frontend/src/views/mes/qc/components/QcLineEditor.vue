@@ -64,7 +64,7 @@
 </template>
 
 <script setup lang="ts" name="QcLineEditor">
-import type { QcOrderLine } from '@/api/mes/qc/iqc'
+import type { QcOrderLine } from '@/api/mes/qc/common'
 
 const props = defineProps<{ lines: QcOrderLine[]; readonly?: boolean }>()
 

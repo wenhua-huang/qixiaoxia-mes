@@ -68,6 +68,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         limit 1
     </select>
 
+    <!-- IPQC 工序检 isCheck 判定：按路线+工序唯一定位（factory_id 由 FactoryIdInterceptor 自动注入） -->
+    <select id="selectByRouteAndProcess" resultMap="ProRouteProcessResult">
+        <include refid="selectProRouteProcessVo"/>
+        where route_id = #{routeId} and process_id = #{processId}
+        limit 1
+    </select>
+
     <insert id="insertProRouteProcess" parameterType="ProRouteProcess" useGeneratedKeys="true" keyProperty="recordId">
         insert into qxx_pro_route_process
         <trim prefix="(" suffix=")" suffixOverrides=",">

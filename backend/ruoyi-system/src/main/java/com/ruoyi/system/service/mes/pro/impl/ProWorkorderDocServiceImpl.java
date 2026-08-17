@@ -63,6 +63,7 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
     @Autowired private com.ruoyi.system.mapper.mes.md.MdItemVendorMapper mdItemVendorMapper;
     @Autowired private com.ruoyi.system.service.mes.wm.OutsourceIssueHelper outsourceIssueHelper;
     @Autowired private com.ruoyi.system.mapper.mes.wm.WmOutsourceOrderMapper wmOutsourceOrderMapper;
+    @Autowired private com.ruoyi.system.service.mes.qc.IQcFactoryService qcFactoryService;
 
     // ---- 单据类型常量 ----
     private static final String DOC_ISSUE = "ISSUE";
@@ -781,6 +782,11 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
         }
         // 写幂等日志 (DuplicateKeyException 已由 insertLog 统一兜底转 ServiceException)
         insertLog(workorderId, DOC_RECPT, recpt.getRecptId(), recptCode, feedbackId, batch);
+
+        // IPQC 完工检生成 hook：入库单头+行落库后生成待检单（fromWorkorder 手动补录与
+        // onFeedbackAudited 报工自动生成两路径均经此覆盖；工厂内部锁+事务，
+        // 随本方法所在事务同生共死；产品未绑 IPQC 模板免检跳过）
+        qcFactoryService.generateIpqcForProductRecpt(recpt);
 
         List<Map<String, Object>> result = new ArrayList<>();
         Map<String, Object> info = new HashMap<>();

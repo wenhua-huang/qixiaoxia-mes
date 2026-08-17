@@ -67,6 +67,7 @@ class ProWorkorderDocServiceReceiptTest {
     @Mock private IWmWarehouseService wmWarehouseService;
     @Mock private IPurOrderService purOrderService;
     @Mock private IPurOrderLineService purOrderLineService;
+    @Mock private com.ruoyi.system.service.mes.qc.IQcFactoryService qcFactoryService;
     @Mock private com.ruoyi.system.mapper.mes.md.MdItemVendorMapper mdItemVendorMapper;
     @Mock private RedisLockTemplate lockTemplate;
     @Mock private PlatformTransactionManager txManager;

@@ -968,6 +968,7 @@ CREATE TABLE IF NOT EXISTS `qxx_pro_feedback` (
   `workorder_id` bigint NOT NULL COMMENT '生产工单ID(关联qxx_pro_workorder)',
   `workorder_code` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '生产工单编码',
   `workorder_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '生产工单名称',
+  `card_id` bigint DEFAULT NULL COMMENT '流转卡ID(关联qxx_pro_card)',
   `route_id` bigint NOT NULL COMMENT '工艺路线ID(关联qxx_pro_route)',
   `route_code` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '工艺路线编码',
   `process_id` bigint NOT NULL COMMENT '工序ID(关联qxx_pro_process)',

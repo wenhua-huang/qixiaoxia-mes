@@ -9,24 +9,28 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.system.domain.mes.qc.QcIpqc;
 import com.ruoyi.system.domain.mes.qc.QcIqc;
 import com.ruoyi.system.domain.mes.qc.QcOqc;
 import com.ruoyi.system.domain.mes.wm.WmItemRecpt;
 import com.ruoyi.system.domain.mes.wm.WmItemRecptLine;
 import com.ruoyi.system.domain.mes.wm.WmProductRecpt;
+import com.ruoyi.system.domain.mes.wm.WmProductRecptLine;
 import com.ruoyi.system.domain.mes.wm.WmProductSales;
 import com.ruoyi.system.domain.mes.wm.WmProductSalesLine;
 import com.ruoyi.system.domain.mes.wm.WmRtIssue;
 import com.ruoyi.system.domain.mes.wm.WmRtIssueLine;
+import com.ruoyi.system.mapper.mes.qc.QcIpqcMapper;
 import com.ruoyi.system.mapper.mes.qc.QcIqcMapper;
 import com.ruoyi.system.mapper.mes.qc.QcOqcMapper;
+import com.ruoyi.system.mapper.mes.wm.WmProductRecptLineMapper;
 import com.ruoyi.system.mapper.mes.wm.WmProductSalesLineMapper;
 import com.ruoyi.system.service.mes.qc.IQcFactoryService;
 import com.ruoyi.system.service.mes.qc.IQcGateService;
 import com.ruoyi.system.service.mes.qc.QcConstants;
 
 /**
- * 质检拦截门实现（IQC/OQC 已实现，IPQC/RQC 见各桩方法注释的交付任务）
+ * 质检拦截门实现（IQC/OQC/IPQC 已实现，RQC 见桩方法注释的交付任务）
  *
  * @author qixiaoxia
  * @date 2026-08-16
@@ -45,6 +49,12 @@ public class QcGateServiceImpl implements IQcGateService
 
     @Autowired
     private WmProductSalesLineMapper wmProductSalesLineMapper;
+
+    @Autowired
+    private QcIpqcMapper ipqcMapper;
+
+    @Autowired
+    private WmProductRecptLineMapper wmProductRecptLineMapper;
 
     @Override
     public void assertItemRecptConfirmable(WmItemRecpt header, List<WmItemRecptLine> lines)
@@ -99,8 +109,59 @@ public class QcGateServiceImpl implements IQcGateService
     @Override
     public void assertProductRecptConfirmable(WmProductRecpt header)
     {
-        // 桩：成品入库 IQC 联动在 Task 14 交付后实现
-        throw new UnsupportedOperationException("assertProductRecptConfirmable 待 Task 14 实现");
+        if (header == null || header.getRecptId() == null)
+        {
+            return;
+        }
+        WmProductRecptLine query = new WmProductRecptLine();
+        query.setRecptId(header.getRecptId());
+        List<WmProductRecptLine> lines = wmProductRecptLineMapper.selectWmProductRecptLineList(query);
+        if (lines == null || lines.isEmpty())
+        {
+            return;
+        }
+        Set<Long> items = lines.stream().map(WmProductRecptLine::getItemId)
+            .filter(Objects::nonNull).collect(Collectors.toSet());
+        for (Long itemId : items)
+        {
+            checkProductInspected(header, lines, itemId);
+        }
+    }
+
+    /** 单产品校验：需检产品（绑定了 IPQC 模板）必须有 COMPLETED 且 PASS/CONCESSION 的完工检验单 */
+    private void checkProductInspected(WmProductRecpt header, List<WmProductRecptLine> lines, Long itemId)
+    {
+        if (factoryService.resolveTemplate(QcConstants.TYPE_IPQC, itemId, null) == null)
+        {
+            return;  // 未绑定模板 = 免检
+        }
+        List<QcIpqc> orders = ipqcMapper.selectBySource(QcConstants.SOURCE_PRODUCT_RECPT, header.getRecptId(), itemId);
+        boolean passed = orders.stream().anyMatch(o -> QcConstants.STATUS_COMPLETED.equals(o.getStatus())
+            && (QcConstants.RESULT_PASS.equals(o.getCheckResult())
+                || QcConstants.RESULT_CONCESSION.equals(o.getCheckResult())));
+        if (passed)
+        {
+            return;
+        }
+        throw new ServiceException("物料[" + recptItemCodeOf(lines, itemId) + "]需完工检验合格后方可确认入库（"
+            + ipqcHintOf(orders) + "）");
+    }
+
+    private String recptItemCodeOf(List<WmProductRecptLine> lines, Long itemId)
+    {
+        return lines.stream().filter(l -> itemId.equals(l.getItemId())).findFirst()
+            .map(WmProductRecptLine::getItemCode).orElse(String.valueOf(itemId));
+    }
+
+    /** 未生成检验单 / 检验单未完成的差异提示 */
+    private String ipqcHintOf(List<QcIpqc> orders)
+    {
+        if (orders.isEmpty())
+        {
+            return "未生成检验单";
+        }
+        QcIpqc first = orders.get(0);
+        return "检验单[" + first.getIpqcCode() + "]状态:" + first.getStatus() + "/" + first.getCheckResult();
     }
 
     @Override

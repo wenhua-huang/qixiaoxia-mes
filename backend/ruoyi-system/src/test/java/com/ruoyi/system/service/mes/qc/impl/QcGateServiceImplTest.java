@@ -11,15 +11,20 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.system.domain.mes.qc.QcIpqc;
 import com.ruoyi.system.domain.mes.qc.QcIqc;
 import com.ruoyi.system.domain.mes.qc.QcOqc;
 import com.ruoyi.system.domain.mes.qc.QcTemplateProduct;
 import com.ruoyi.system.domain.mes.wm.WmItemRecpt;
 import com.ruoyi.system.domain.mes.wm.WmItemRecptLine;
+import com.ruoyi.system.domain.mes.wm.WmProductRecpt;
+import com.ruoyi.system.domain.mes.wm.WmProductRecptLine;
 import com.ruoyi.system.domain.mes.wm.WmProductSales;
 import com.ruoyi.system.domain.mes.wm.WmProductSalesLine;
+import com.ruoyi.system.mapper.mes.qc.QcIpqcMapper;
 import com.ruoyi.system.mapper.mes.qc.QcIqcMapper;
 import com.ruoyi.system.mapper.mes.qc.QcOqcMapper;
+import com.ruoyi.system.mapper.mes.wm.WmProductRecptLineMapper;
 import com.ruoyi.system.mapper.mes.wm.WmProductSalesLineMapper;
 import com.ruoyi.system.service.mes.qc.IQcFactoryService;
 import com.ruoyi.system.service.mes.qc.QcConstants;
@@ -44,7 +49,9 @@ class QcGateServiceImplTest {
     @Mock IQcFactoryService factoryService;
     @Mock QcIqcMapper iqcMapper;
     @Mock QcOqcMapper oqcMapper;
+    @Mock QcIpqcMapper ipqcMapper;
     @Mock WmProductSalesLineMapper wmProductSalesLineMapper;
+    @Mock WmProductRecptLineMapper wmProductRecptLineMapper;
     @InjectMocks QcGateServiceImpl service;
 
     private WmItemRecpt header(Long recptId) {
@@ -262,5 +269,117 @@ class QcGateServiceImplTest {
 
         assertTrue(ex.getMessage().contains("OQC001"));
         assertTrue(ex.getMessage().contains(QcConstants.STATUS_PENDING));
+    }
+
+    // ==================== IPQC 成品入库确认拦截 ====================
+
+    private WmProductRecpt recptHeader(Long recptId) {
+        WmProductRecpt h = new WmProductRecpt();
+        h.setRecptId(recptId);
+        h.setRecptCode("PR001");
+        h.setProduceId(2L);
+        return h;
+    }
+
+    private WmProductRecptLine recptLine(Long itemId) {
+        WmProductRecptLine l = new WmProductRecptLine();
+        l.setRecptId(1L);
+        l.setItemId(itemId);
+        l.setItemCode("ITEM-" + itemId);
+        l.setQuantityRecpt(BigDecimal.TEN);
+        return l;
+    }
+
+    private QcIpqc ipqcOrder(String status, String result) {
+        QcIpqc o = new QcIpqc();
+        o.setIpqcId(400L);
+        o.setIpqcCode("IPQC001");
+        o.setStatus(status);
+        o.setCheckResult(result);
+        return o;
+    }
+
+    /** 产品 1 绑定了 IPQC 模板（需完工检）并加载入库行 */
+    private void needIpqcInspect() {
+        when(wmProductRecptLineMapper.selectWmProductRecptLineList(any()))
+            .thenReturn(Collections.singletonList(recptLine(1L)));
+        when(factoryService.resolveTemplate(eq(QcConstants.TYPE_IPQC), eq(1L), any()))
+            .thenReturn(new QcTemplateProduct());
+    }
+
+    @Test
+    @DisplayName("IPQC：需检产品无完工检验单时抛异常且消息含物料编码与完工检验提示")
+    void should_throw_ipqc_when_no_order_for_inspected_product() {
+        needIpqcInspect();
+        when(ipqcMapper.selectBySource(QcConstants.SOURCE_PRODUCT_RECPT, 1L, 1L))
+            .thenReturn(Collections.emptyList());
+
+        ServiceException ex = assertThrows(ServiceException.class,
+            () -> service.assertProductRecptConfirmable(recptHeader(1L)));
+
+        assertTrue(ex.getMessage().contains("ITEM-1"));
+        assertTrue(ex.getMessage().contains("需完工检验合格后方可确认入库"));
+        assertTrue(ex.getMessage().contains("未生成检验单"));
+    }
+
+    @Test
+    @DisplayName("IPQC：存在 COMPLETED 且 PASS 的完工检验单时放行")
+    void should_pass_ipqc_when_completed_pass_order_exists() {
+        needIpqcInspect();
+        when(ipqcMapper.selectBySource(QcConstants.SOURCE_PRODUCT_RECPT, 1L, 1L))
+            .thenReturn(Collections.singletonList(ipqcOrder(QcConstants.STATUS_COMPLETED, QcConstants.RESULT_PASS)));
+
+        assertDoesNotThrow(() -> service.assertProductRecptConfirmable(recptHeader(1L)));
+    }
+
+    @Test
+    @DisplayName("IPQC：COMPLETED 且 CONCESSION 让步接收单放行")
+    void should_pass_ipqc_when_concession_order_exists() {
+        needIpqcInspect();
+        when(ipqcMapper.selectBySource(QcConstants.SOURCE_PRODUCT_RECPT, 1L, 1L))
+            .thenReturn(Collections.singletonList(ipqcOrder(QcConstants.STATUS_COMPLETED, QcConstants.RESULT_CONCESSION)));
+
+        assertDoesNotThrow(() -> service.assertProductRecptConfirmable(recptHeader(1L)));
+    }
+
+    @Test
+    @DisplayName("IPQC：仅有 FAIL 判定单时抛异常且消息含检验单编码与结果")
+    void should_throw_ipqc_when_only_fail_order_exists() {
+        needIpqcInspect();
+        when(ipqcMapper.selectBySource(QcConstants.SOURCE_PRODUCT_RECPT, 1L, 1L))
+            .thenReturn(Collections.singletonList(ipqcOrder(QcConstants.STATUS_COMPLETED, QcConstants.RESULT_FAIL)));
+
+        ServiceException ex = assertThrows(ServiceException.class,
+            () -> service.assertProductRecptConfirmable(recptHeader(1L)));
+
+        assertTrue(ex.getMessage().contains("IPQC001"));
+        assertTrue(ex.getMessage().contains(QcConstants.RESULT_FAIL));
+    }
+
+    @Test
+    @DisplayName("IPQC：待检单仍在 PENDING 未完成时抛异常")
+    void should_throw_ipqc_when_order_not_completed() {
+        needIpqcInspect();
+        when(ipqcMapper.selectBySource(QcConstants.SOURCE_PRODUCT_RECPT, 1L, 1L))
+            .thenReturn(Collections.singletonList(ipqcOrder(QcConstants.STATUS_PENDING, null)));
+
+        ServiceException ex = assertThrows(ServiceException.class,
+            () -> service.assertProductRecptConfirmable(recptHeader(1L)));
+
+        assertTrue(ex.getMessage().contains("IPQC001"));
+        assertTrue(ex.getMessage().contains(QcConstants.STATUS_PENDING));
+    }
+
+    @Test
+    @DisplayName("IPQC：未绑定模板的产品免检放行且不查检验单")
+    void should_pass_ipqc_when_product_not_bound() {
+        when(wmProductRecptLineMapper.selectWmProductRecptLineList(any()))
+            .thenReturn(Collections.singletonList(recptLine(1L)));
+        when(factoryService.resolveTemplate(eq(QcConstants.TYPE_IPQC), eq(1L), any()))
+            .thenReturn(null);
+
+        assertDoesNotThrow(() -> service.assertProductRecptConfirmable(recptHeader(1L)));
+
+        verify(ipqcMapper, never()).selectBySource(anyString(), any(), any());
     }
 }

@@ -73,6 +73,7 @@ class ProWorkorderDocServiceUnitTest {
     // ====== Purchase Services ======
     @Mock private IPurOrderService purOrderService;
     @Mock private IPurOrderLineService purOrderLineService;
+    @Mock private com.ruoyi.system.service.mes.qc.IQcFactoryService qcFactoryService;
     @Mock private com.ruoyi.system.mapper.mes.md.MdItemVendorMapper mdItemVendorMapper;
 
     // ====== Infrastructure ======

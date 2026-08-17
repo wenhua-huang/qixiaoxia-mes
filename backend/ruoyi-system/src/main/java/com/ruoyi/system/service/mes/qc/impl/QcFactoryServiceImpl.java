@@ -12,10 +12,14 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.ruoyi.common.core.redis.RedisLockTemplate;
+import com.ruoyi.system.domain.mes.pro.ProCardProcess;
 import com.ruoyi.system.domain.mes.pro.ProFeedback;
+import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
+import com.ruoyi.system.domain.mes.qc.QcIpqc;
 import com.ruoyi.system.domain.mes.qc.QcIqc;
 import com.ruoyi.system.domain.mes.qc.QcOqc;
 import com.ruoyi.system.domain.mes.qc.QcOrderLine;
@@ -24,16 +28,22 @@ import com.ruoyi.system.domain.mes.qc.QcTemplateProduct;
 import com.ruoyi.system.domain.mes.wm.WmItemRecpt;
 import com.ruoyi.system.domain.mes.wm.WmItemRecptLine;
 import com.ruoyi.system.domain.mes.wm.WmProductRecpt;
+import com.ruoyi.system.domain.mes.wm.WmProductRecptLine;
 import com.ruoyi.system.domain.mes.wm.WmProductSales;
 import com.ruoyi.system.domain.mes.wm.WmProductSalesLine;
 import com.ruoyi.system.domain.mes.wm.WmRtIssue;
 import com.ruoyi.system.domain.mes.wm.WmRtIssueLine;
+import com.ruoyi.system.mapper.mes.pro.ProCardProcessMapper;
+import com.ruoyi.system.mapper.mes.pro.ProRouteProcessMapper;
+import com.ruoyi.system.mapper.mes.qc.QcIpqcMapper;
 import com.ruoyi.system.mapper.mes.qc.QcIqcMapper;
 import com.ruoyi.system.mapper.mes.qc.QcOqcMapper;
 import com.ruoyi.system.mapper.mes.qc.QcOrderLineMapper;
 import com.ruoyi.system.mapper.mes.qc.QcTemplateIndexMapper;
 import com.ruoyi.system.mapper.mes.qc.QcTemplateProductMapper;
 import com.ruoyi.system.mapper.mes.wm.WmItemRecptMapper;
+import com.ruoyi.system.mapper.mes.wm.WmProductRecptLineMapper;
+import com.ruoyi.system.mapper.mes.wm.WmProductRecptMapper;
 import com.ruoyi.system.mapper.mes.wm.WmProductSalesMapper;
 import com.ruoyi.system.service.mes.qc.IQcFactoryService;
 import com.ruoyi.system.service.mes.qc.QcCodeGenerator;
@@ -43,7 +53,7 @@ import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 import jakarta.annotation.PostConstruct;
 
 /**
- * 检验单生成工厂实现（IQC/OQC 已实现，IPQC/RQC 见各桩方法注释的交付任务）
+ * 检验单生成工厂实现（IQC/OQC/IPQC 已实现，RQC 见桩方法注释的交付任务）
  *
  * @author qixiaoxia
  * @date 2026-08-16
@@ -62,6 +72,21 @@ public class QcFactoryServiceImpl implements IQcFactoryService
 
     @Autowired
     private WmProductSalesMapper wmProductSalesMapper;
+
+    @Autowired
+    private QcIpqcMapper ipqcMapper;
+
+    @Autowired
+    private ProRouteProcessMapper proRouteProcessMapper;
+
+    @Autowired
+    private ProCardProcessMapper proCardProcessMapper;
+
+    @Autowired
+    private WmProductRecptMapper wmProductRecptMapper;
+
+    @Autowired
+    private WmProductRecptLineMapper wmProductRecptLineMapper;
 
     @Autowired
     private QcOrderLineMapper lineMapper;
@@ -83,11 +108,22 @@ public class QcFactoryServiceImpl implements IQcFactoryService
 
     private TransactionTemplate txTemplate;
 
+    /**
+     * 独立新事务模板（REQUIRES_NEW）：专供报工触发的工序检生成等"弱拦截"链路。
+     * confirmFeedback 以 try-catch 包裹生成调用并要求失败不阻断报工；若用 REQUIRED 加入外层
+     * @Transactional，生成抛异常会把外层事务标记 rollback-only，即使被 catch 提交时仍抛
+     * UnexpectedRollbackException，弱拦截失效。独立事务自管提交/回滚，与报工确认解耦。
+     */
+    private TransactionTemplate txTemplateRequiresNew;
+
     @PostConstruct
     void initTx()
     {
         this.txTemplate = new TransactionTemplate(transactionManager);
         this.txTemplate.setTimeout(30);
+        this.txTemplateRequiresNew = new TransactionTemplate(transactionManager);
+        this.txTemplateRequiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.txTemplateRequiresNew.setTimeout(30);
     }
 
     @Override
@@ -259,7 +295,16 @@ public class QcFactoryServiceImpl implements IQcFactoryService
             }
             return;
         }
-        // 其余来源类型（成品入库/退料）由 Task 14/16 扩展
+        if (QcConstants.SOURCE_PRODUCT_RECPT.equals(sourceDocType))
+        {
+            List<QcIpqc> orders = ipqcMapper.selectBySource(sourceDocType, sourceDocId, null);
+            for (QcIpqc order : orders)
+            {
+                closeIfActive(order);
+            }
+            return;
+        }
+        // 其余来源类型（退料）由 Task 16 扩展
     }
 
     /** 仅 PENDING/INSPECTING 置 CLOSED；COMPLETED 是质量档案保留 */
@@ -292,6 +337,22 @@ public class QcFactoryServiceImpl implements IQcFactoryService
         update.setStatus(QcConstants.STATUS_CLOSED);
         update.setUpdateTime(new Date());
         oqcMapper.updateQcOqc(update);
+    }
+
+    /** IPQC 版 closeIfActive：同 IQC/OQC 语义（仅 PENDING/INSPECTING 置 CLOSED） */
+    private void closeIfActive(QcIpqc order)
+    {
+        boolean active = QcConstants.STATUS_PENDING.equals(order.getStatus())
+            || QcConstants.STATUS_INSPECTING.equals(order.getStatus());
+        if (!active)
+        {
+            return;
+        }
+        QcIpqc update = new QcIpqc();
+        update.setIpqcId(order.getIpqcId());
+        update.setStatus(QcConstants.STATUS_CLOSED);
+        update.setUpdateTime(new Date());
+        ipqcMapper.updateQcIpqc(update);
     }
 
     @Override
@@ -394,15 +455,156 @@ public class QcFactoryServiceImpl implements IQcFactoryService
     @Override
     public void generateIpqcForProductRecpt(WmProductRecpt header)
     {
-        // 桩：IPQC 单据 Mapper 在 Task 14 交付后实现
-        throw new UnsupportedOperationException("generateIpqcForProductRecpt 待 Task 14 实现");
+        if (header == null || header.getRecptId() == null || header.getProduceId() == null)
+        {
+            return;
+        }
+        QcTemplateProduct bind = resolveTemplate(QcConstants.TYPE_IPQC, header.getProduceId(), null);
+        if (bind == null)
+        {
+            return;  // 产品未绑定 IPQC 模板 = 免检
+        }
+        String lockKey = QcConstants.LOCK_GENERATE + "ipqc:pr:" + header.getRecptId();
+        // 块状 void lambda 显式绑定 Runnable 重载（表达式 lambda 会歧义绑定到 Supplier 重载）
+        lockTemplate.execute(lockKey, () -> {
+            txTemplate.execute(tx -> {
+                doGenerateRecptIpqc(header, bind);
+                return null;
+            });
+        });
+    }
+
+    /** 锁+事务内生成完工检 IPQC：幂等检查 → 快照建单（物料信息取首行）→ 建行 → 回填入库单头挂点 */
+    private void doGenerateRecptIpqc(WmProductRecpt header, QcTemplateProduct bind)
+    {
+        List<QcIpqc> exist = ipqcMapper.selectBySource(
+            QcConstants.SOURCE_PRODUCT_RECPT, header.getRecptId(), header.getProduceId());
+        if (exist.stream().anyMatch(o -> !QcConstants.STATUS_CLOSED.equals(o.getStatus())))
+        {
+            return;  // 幂等：同入库单+产品已有未关闭单
+        }
+        WmProductRecptLine first = firstRecptLine(header.getRecptId());
+        String itemName = first != null && first.getItemName() != null ? first.getItemName() : header.getProduceCode();
+        Date now = new Date();
+        QcIpqc ipqc = new QcIpqc();
+        ipqc.setIpqcCode(QcCodeGenerator.genIpqcCode(autoCodeGenerator));
+        ipqc.setIpqcName("完工检-" + StringUtils.defaultString(itemName));
+        ipqc.setIpqcType(QcConstants.IPQC_LAST);
+        ipqc.setTemplateId(bind.getTemplateId());
+        ipqc.setSourceDocId(header.getRecptId());
+        ipqc.setSourceDocType(QcConstants.SOURCE_PRODUCT_RECPT);
+        ipqc.setSourceDocCode(header.getRecptCode());
+        ipqc.setWorkorderId(header.getWorkorderId());
+        ipqc.setWorkorderCode(header.getWorkorderCode());
+        ipqc.setItemId(header.getProduceId());
+        ipqc.setItemCode(first != null ? first.getItemCode() : header.getProduceCode());
+        ipqc.setItemName(itemName);
+        ipqc.setSpecification(first != null ? first.getSpecification() : null);
+        ipqc.setUnitOfMeasure(first != null ? first.getUnitOfMeasure() : null);
+        snapshotBind(ipqc, bind);
+        ipqc.setStatus(QcConstants.STATUS_PENDING);
+        ipqc.setCreateTime(now);
+        ipqcMapper.insertQcIpqc(ipqc);
+        lineMapper.batchInsert(buildLinesFromTemplate(bind.getTemplateId(), QcConstants.TYPE_IPQC, ipqc.getIpqcId()));
+        if (header.getIpqcId() == null)
+        {
+            header.setIpqcId(ipqc.getIpqcId());
+            header.setIpqcCode(ipqc.getIpqcCode());
+            wmProductRecptMapper.updateProductRecptHeaderRefs(header.getRecptId(), ipqc.getIpqcId(), ipqc.getIpqcCode());
+        }
+    }
+
+    /** 取入库单首行（完工检单头物料四件套快照来源；无行时返回 null 用头字段兜底） */
+    private WmProductRecptLine firstRecptLine(Long recptId)
+    {
+        WmProductRecptLine query = new WmProductRecptLine();
+        query.setRecptId(recptId);
+        List<WmProductRecptLine> lines = wmProductRecptLineMapper.selectWmProductRecptLineList(query);
+        return lines.isEmpty() ? null : lines.get(0);
     }
 
     @Override
     public String generateIpqcForFeedback(ProFeedback feedback)
     {
-        // 桩：IPQC 单据 Mapper 在 Task 14 交付后实现；返回 null=未生成
-        throw new UnsupportedOperationException("generateIpqcForFeedback 待 Task 14 实现");
+        if (feedback == null || feedback.getRouteId() == null || feedback.getProcessId() == null
+            || feedback.getItemId() == null || feedback.getCardId() == null)
+        {
+            return null;
+        }
+        ProRouteProcess rp = proRouteProcessMapper.selectByRouteAndProcess(feedback.getRouteId(), feedback.getProcessId());
+        if (rp == null || !"Y".equals(rp.getIsCheck()))
+        {
+            return null;  // 非检验工序不生成
+        }
+        QcTemplateProduct bind = resolveTemplate(QcConstants.TYPE_IPQC, feedback.getItemId(), feedback.getProcessId());
+        if (bind == null)
+        {
+            return null;  // 未绑定模板 = 免检
+        }
+        ProCardProcess cp = proCardProcessMapper.selectByCardAndProcess(feedback.getCardId(), feedback.getProcessId());
+        if (cp == null)
+        {
+            return null;  // 流转卡工序记录缺失（如非流转卡报工）
+        }
+        String lockKey = QcConstants.LOCK_GENERATE + "ipqc:cp:" + cp.getRecordId();
+        // 报工链路是弱拦截（confirmFeedback try-catch 吞异常仅告警），必须用独立新事务，
+        // 否则生成失败会标记外层报工事务 rollback-only 导致提交时 UnexpectedRollbackException。
+        return lockTemplate.execute(lockKey, () ->
+            txTemplateRequiresNew.execute(tx -> doGenerateFeedbackIpqc(feedback, cp, bind)));
+    }
+
+    /** 锁+事务内生成工序检 IPQC：幂等检查 → 快照建单 → 建行 → 回填流转卡工序挂点；返回编码或 null */
+    private String doGenerateFeedbackIpqc(ProFeedback feedback, ProCardProcess cp, QcTemplateProduct bind)
+    {
+        List<QcIpqc> exist = ipqcMapper.selectBySource(QcConstants.SOURCE_CARD_PROCESS, cp.getRecordId(), null);
+        if (exist.stream().anyMatch(o -> !QcConstants.STATUS_CLOSED.equals(o.getStatus())))
+        {
+            return null;  // 幂等：同流转卡工序已有未关闭单
+        }
+        Date now = new Date();
+        QcIpqc ipqc = new QcIpqc();
+        ipqc.setIpqcCode(QcCodeGenerator.genIpqcCode(autoCodeGenerator));
+        ipqc.setIpqcName("工序检-" + StringUtils.defaultString(feedback.getProcessName()));
+        ipqc.setIpqcType(QcConstants.IPQC_LAST);   // 报工确认触发的工序完成检
+        ipqc.setTemplateId(bind.getTemplateId());
+        ipqc.setSourceDocId(cp.getRecordId());
+        ipqc.setSourceDocType(QcConstants.SOURCE_CARD_PROCESS);
+        ipqc.setSourceDocCode(cp.getCardCode());
+        ipqc.setWorkorderId(feedback.getWorkorderId());
+        ipqc.setWorkorderCode(feedback.getWorkorderCode());
+        ipqc.setWorkorderName(feedback.getWorkorderName());
+        ipqc.setCardId(feedback.getCardId());
+        ipqc.setCardCode(cp.getCardCode());
+        ipqc.setTaskId(feedback.getTaskId());
+        ipqc.setTaskCode(feedback.getTaskCode());
+        ipqc.setProcessId(feedback.getProcessId());
+        ipqc.setProcessCode(feedback.getProcessCode());
+        ipqc.setProcessName(feedback.getProcessName());
+        ipqc.setWorkstationId(feedback.getWorkstationId());
+        ipqc.setWorkstationCode(feedback.getWorkstationCode());
+        ipqc.setWorkstationName(feedback.getWorkstationName());
+        ipqc.setItemId(feedback.getItemId());
+        ipqc.setItemCode(feedback.getItemCode());
+        ipqc.setItemName(feedback.getItemName());
+        ipqc.setSpecification(feedback.getSpecification());
+        ipqc.setUnitOfMeasure(feedback.getUnitOfMeasure());
+        snapshotBind(ipqc, bind);
+        ipqc.setStatus(QcConstants.STATUS_PENDING);
+        ipqc.setCreateTime(now);
+        ipqcMapper.insertQcIpqc(ipqc);
+        lineMapper.batchInsert(buildLinesFromTemplate(bind.getTemplateId(), QcConstants.TYPE_IPQC, ipqc.getIpqcId()));
+        proCardProcessMapper.updateCardProcessRefs(cp.getRecordId(), ipqc.getIpqcId(), ipqc.getIpqcCode());
+        return ipqc.getIpqcCode();
+    }
+
+    /** 按绑定快照 IPQC 头阈值：样本量/Ac 值/三档缺陷率（与 IQC/OQC 建单同一快照口径） */
+    private void snapshotBind(QcIpqc ipqc, QcTemplateProduct bind)
+    {
+        ipqc.setQuantityMinCheck(bind.getQuantityCheck());
+        ipqc.setQuantityMaxUnqualified(bind.getQuantityUnqualified());
+        ipqc.setCrRateLimit(bind.getCrRate());
+        ipqc.setMajRateLimit(bind.getMajRate());
+        ipqc.setMinRateLimit(bind.getMinRate());
     }
 
     @Override

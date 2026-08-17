@@ -179,3 +179,19 @@ SET @sql = IF(@col_exists = 0,
     'ALTER TABLE qxx_sal_order ADD COLUMN approve_remark varchar(500) DEFAULT NULL COMMENT ''审核意见/驳回原因'' AFTER approve_time',
     'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- V129 给 qxx_wm_product_recpt 加的成品归属客户列（WmProductRecptMapper list JOIN qxx_md_client 引用）
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'qxx_wm_product_recpt' AND column_name = 'client_id');
+SET @sql = IF(@col_exists = 0,
+    'ALTER TABLE qxx_wm_product_recpt ADD COLUMN client_id bigint(20) DEFAULT NULL COMMENT ''成品归属客户ID(来源工单)'' AFTER workorder_code',
+    'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- V67 给 qxx_pro_doc_generation_log 加的触发报工列（WmProductRecptServiceImpl.writeProduceStockinTrace JOIN 引用）
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'qxx_pro_doc_generation_log' AND column_name = 'source_feedback_id');
+SET @sql = IF(@col_exists = 0,
+    'ALTER TABLE qxx_pro_doc_generation_log ADD COLUMN source_feedback_id bigint DEFAULT NULL COMMENT ''触发单据的报工record_id''',
+    'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

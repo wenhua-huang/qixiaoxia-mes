@@ -74,6 +74,12 @@ const docTree = ref<DocGroup[]>([
     ]
   },
   {
+    title: '操作指南',
+    items: [
+      { file: 'qr-code-scan.md', title: '二维码扫码作业指南' }
+    ]
+  },
+  {
     title: '开放接口',
     items: [
       { file: 'crm-order-api.md', title: '销售订单 API 对接指南' }

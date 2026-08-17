@@ -107,10 +107,11 @@ const C_LODOP_URLS = [
 function loadScript(url: string, timeoutMs = 800): Promise<void> {
   return new Promise((resolve, reject) => {
     const el = document.createElement('script')
-    const timer = setTimeout(() => { el.remove(); reject(new Error('timeout')) }, timeoutMs)
+    const done = () => el.remove()
+    const timer = setTimeout(() => { done(); reject(new Error('timeout')) }, timeoutMs)
     el.src = url
-    el.onload = () => { clearTimeout(timer); resolve() }
-    el.onerror = () => { clearTimeout(timer); el.remove(); reject(new Error('load error')) }
+    el.onload = () => { clearTimeout(timer); done(); resolve() }
+    el.onerror = () => { clearTimeout(timer); done(); reject(new Error('load error')) }
     document.head.appendChild(el)
   })
 }
@@ -140,22 +141,23 @@ export function getCLodop(): Promise<any> {
 
 function printViaClodop(lodop: any, title: string, spec: LabelSpec, blocks: string[]): void {
   lodop.PRINT_INIT(title)
-  // 页宽页高单位 0.1mm；1 = 纵向按指定宽高
-  lodop.SET_PRINT_PAGESIZE(1, spec.widthMm * 10, spec.heightMm * 10, '')
+  // intOrient=3：按设定的自定义纸张宽高（1=纵向用打印机默认纸会忽略宽高，标签尺寸不生效）
+  // 宽高单位 0.1mm
+  lodop.SET_PRINT_PAGESIZE(3, spec.widthMm * 10, spec.heightMm * 10, '')
   blocks.forEach((html, i) => {
-    if (i) lodop.NEWPAGEA()
+    if (i) lodop.NEWPAGE()
     lodop.ADD_PRINT_HTM(0, 0, '100%', '100%', `<style>${labelCss(spec)}</style>${html}`)
   })
   lodop.PRINT()
 }
 
-async function printViaBrowser(spec: LabelSpec, blocks: string[]): Promise<void> {
+async function printViaBrowser(spec: LabelSpec, blocks: string[], title: string): Promise<void> {
   // 用新窗口打印（离屏 iframe 在部分 Chrome 配置下 print() 不弹对话框，会表现为"点了没反应"）。
   // 窗口在用户点击链路内同步打开，避免被弹窗拦截。
   const w = window.open('', '_blank')
   if (!w) throw new Error('浏览器拦截了打印窗口，请允许本站弹出窗口后重试')
 
-  const html = `<html><head><title>标签打印</title><style>
+  const html = `<html><head><title>${esc(title)}</title><style>
 @page{size:${spec.widthMm}mm ${spec.heightMm}mm;margin:0}
 ${labelCss(spec)}
 .label{page-break-after:always}
@@ -173,15 +175,16 @@ ${labelCss(spec)}
     )
   )
 
-  // print() 在 Chrome/Edge 中会阻塞到对话框关闭，之后关闭这个临时窗口；Safari 异步则延迟关闭
+  // 打印对话框关闭后（打印或取消）关闭这个临时标签页。
+  // 用 onafterprint（跨浏览器在打印结束后触发），不用固定延时——Safari/Firefox 的 print() 异步返回，
+  // 固定延时可能在用户操作完之前就关窗。
+  let closed = false
+  const closeWin = () => { if (!closed && !w.closed) { closed = true; w.close() } }
+  w.onafterprint = closeWin
   setTimeout(() => {
-    try {
-      w.focus()
-      w.print()
-      setTimeout(() => !w.closed && w.close(), 500)
-    } catch {
-      /* 用户可在已打开的标签页手动打印 */
-    }
+    try { w.focus(); w.print() } catch { /* 用户可在已打开的标签页手动打印 */ }
+    // onafterprint 未触发的兜底（部分老浏览器）
+    setTimeout(closeWin, 60000)
   }, 150)
 }
 
@@ -206,7 +209,7 @@ export async function printQrLabels(opts: {
       printViaClodop(lodop, opts.title, spec, blocks)
       return 'clodop'
     }
-    await printViaBrowser(spec, blocks)
+    await printViaBrowser(spec, blocks, opts.title)
     return 'browser'
   } catch (e: any) {
     ElMessage.error(e?.message || '打印失败')

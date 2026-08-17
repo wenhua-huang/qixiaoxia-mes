@@ -138,10 +138,11 @@ function handleContentClick(e: MouseEvent) {
   const link = (e.target as HTMLElement)?.closest?.('a')
   if (!link) return
   const href = link.getAttribute('href') || ''
-  // 只处理站内相对 md 链接，外链/锚点保持默认行为
-  if (!href.endsWith('.md') || /^(https?:)?\/\//.test(href)) return
+  // 去掉 hash 片段后再判断是否为站内 md 文档链接
+  const bareHref = href.split('#')[0]
+  if (!bareHref.endsWith('.md') || /^(https?:)?\/\//.test(href)) return
   e.preventDefault()
-  const file = href.split('/').pop() as string
+  const file = bareHref.split('/').pop() as string
   if (findTitle(file)) {
     handleSelect(file)
   } else {

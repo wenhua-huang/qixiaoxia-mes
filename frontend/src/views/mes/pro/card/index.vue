@@ -241,7 +241,10 @@
         <div style="color:#999;margin-top:4px">{{ qrRow.itemName }}</div>
       </div>
       <template #footer>
-        <el-button @click="handlePrintOne" icon="Printer">打印</el-button>
+        <el-select v-model="labelSpecKey" size="small" style="width: 110px" title="标签纸规格">
+          <el-option v-for="s in LABEL_SPECS" :key="s.key" :value="s.key" :label="s.label" />
+        </el-select>
+        <el-button type="primary" @click="handlePrintOne" icon="Printer">打印</el-button>
         <el-button @click="qrOpen = false">关 闭</el-button>
       </template>
     </el-dialog>
@@ -256,7 +259,7 @@ import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import workorderSelect from '@/components/workorderSelect/single.vue'
 import QrCode from '@/components/QrCode/index.vue'
 import { buildCardPayload } from '@/utils/qrPayload'
-import QRCode from 'qrcode'
+import { printQrLabels, LABEL_SPECS, labelSpecKey } from '@/utils/labelPrint'
 
 const { proxy } = getCurrentInstance() as any
 
@@ -541,42 +544,30 @@ function handleQrCode(row: any) {
   qrOpen.value = true
 }
 
-async function buildCardPrintHtml(rows: any[]): Promise<string> {
-  const blocks = await Promise.all(rows.map(async c => {
-    const dataUrl = await QRCode.toDataURL(buildCardPayload(c.cardCode), { width: 160, margin: 1 })
-    return `<div class="card">
-      <h2>${c.cardCode || ''}</h2>
-      <img src="${dataUrl}" />
-      <p>${c.itemName || ''} ${c.specification || ''}</p>
-      <p>数量: ${c.quantityTransfered ?? ''} ${c.unitName || ''}</p>
-      <p>当前工序: ${c.currentProcessName || ''}</p>
-      <p>工单: ${c.workorderCode || ''}</p>
-    </div>`
+function cardLabelItems(rows: any[]) {
+  return rows.map(c => ({
+    payload: buildCardPayload(c.cardCode),
+    headline: c.cardCode || '',
+    fields: [
+      `${c.itemName || ''} ${c.specification || ''}`.trim(),
+      `数量: ${c.quantityTransfered ?? ''} ${c.unitName || ''}`,
+      `当前工序: ${c.currentProcessName || ''}`,
+      `工单: ${c.workorderCode || ''}`
+    ]
   }))
-  return `<html><head><title>流转卡打印</title><style>
-    body{margin:0;font-family:sans-serif}
-    .sheet{display:flex;flex-wrap:wrap}
-    .card{width:50%;box-sizing:border-box;padding:20px;border:1px dashed #bbb;text-align:center;page-break-inside:avoid}
-    img{width:160px;height:160px} h2{margin:8px 0} p{margin:4px 0;font-size:14px;color:#333}
-  </style></head><body><div class="sheet">${blocks.join('')}</div>
-  <script>window.onload=function(){window.print()}<\/script></body></html>`
-}
-
-function openPrintWindow(html: string) {
-  const w = window.open('', '_blank')
-  if (!w) { proxy.$modal.msgError('请允许浏览器弹出窗口'); return }
-  w.document.write(html)
-  w.document.close()
 }
 
 async function handleBatchPrint() {
   if (!ids.value.length) { proxy.$modal.msgWarning('请勾选要打印的流转卡'); return }
   const rows = dataList.value.filter((r: any) => ids.value.includes(r.cardId))
-  openPrintWindow(await buildCardPrintHtml(rows))
+  const channel = await printQrLabels({ title: '流转卡打印', items: cardLabelItems(rows) })
+  if (channel === 'clodop') proxy.$modal.msgSuccess('已发送到标签打印机')
 }
 
 async function handlePrintOne() {
-  if (qrRow.value) openPrintWindow(await buildCardPrintHtml([qrRow.value]))
+  if (!qrRow.value) return
+  const channel = await printQrLabels({ title: '流转卡打印', items: cardLabelItems([qrRow.value]) })
+  if (channel === 'clodop') proxy.$modal.msgSuccess('已发送到标签打印机')
 }
 
 // 初始化

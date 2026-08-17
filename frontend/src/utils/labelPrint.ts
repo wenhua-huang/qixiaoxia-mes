@@ -104,7 +104,7 @@ const C_LODOP_URLS = [
   'https://localhost:8443/CLodopfuncs.js?priority=2'
 ]
 
-function loadScript(url: string, timeoutMs = 1600): Promise<void> {
+function loadScript(url: string, timeoutMs = 800): Promise<void> {
   return new Promise((resolve, reject) => {
     const el = document.createElement('script')
     const timer = setTimeout(() => { el.remove(); reject(new Error('timeout')) }, timeoutMs)
@@ -118,22 +118,17 @@ function loadScript(url: string, timeoutMs = 1600): Promise<void> {
 let lodopProbe: Promise<any> | null = null
 
 function probeCLodop(): Promise<any> {
-  const tryUrls = async (): Promise<any> => {
-    for (const url of C_LODOP_URLS) {
-      try {
-        await loadScript(url)
-        if (typeof window.getCLodop === 'function') {
-          const lodop = window.getCLodop()
-          if (lodop) return lodop
-        }
-      } catch {
-        /* 未安装或服务未启动，尝试下一个地址 */
+  // 两个端口并行探测，谁先成功用谁；全部失败（未安装控件）则很快返回 null
+  return Promise.any(
+    C_LODOP_URLS.map(async url => {
+      await loadScript(url)
+      if (typeof window.getCLodop === 'function') {
+        const lodop = window.getCLodop()
+        if (lodop) return lodop
       }
-    }
-    return null
-  }
-  // 检测结果进程内缓存：装了控件的电脑后续打印不再重复探测
-  return tryUrls()
+      throw new Error('not available')
+    })
+  ).catch(() => null)
 }
 
 export function getCLodop(): Promise<any> {
@@ -155,58 +150,39 @@ function printViaClodop(lodop: any, title: string, spec: LabelSpec, blocks: stri
 }
 
 async function printViaBrowser(spec: LabelSpec, blocks: string[]): Promise<void> {
-  const html = `<html><head><style>
+  // 用新窗口打印（离屏 iframe 在部分 Chrome 配置下 print() 不弹对话框，会表现为"点了没反应"）。
+  // 窗口在用户点击链路内同步打开，避免被弹窗拦截。
+  const w = window.open('', '_blank')
+  if (!w) throw new Error('浏览器拦截了打印窗口，请允许本站弹出窗口后重试')
+
+  const html = `<html><head><title>标签打印</title><style>
 @page{size:${spec.widthMm}mm ${spec.heightMm}mm;margin:0}
 ${labelCss(spec)}
 .label{page-break-after:always}
 .label:last-child{page-break-after:auto}
 </style></head><body>${blocks.join('')}</body></html>`
 
-  // 用移出屏幕但保持可渲染的 iframe（不能 visibility:hidden / display:none，
-  // 否则 Safari 等浏览器对不可见 iframe 的 print() 不弹对话框——表现为"点了没反应"）
-  const iframe = document.createElement('iframe')
-  iframe.style.cssText = `position:fixed;left:-10000px;top:0;width:${spec.widthMm + 10}mm;height:${spec.heightMm + 10}mm;border:0`
-  iframe.setAttribute('aria-hidden', 'true')
-  document.body.appendChild(iframe)
-  const doc = iframe.contentDocument
-  const win = iframe.contentWindow
-  if (!doc || !win) { iframe.remove(); throw new Error('打印容器创建失败') }
-  doc.open()
-  doc.write(html)
-  doc.close()
+  w.document.open()
+  w.document.write(html)
+  w.document.close()
 
   // 等二维码（data URL）解码完成再触发打印，避免打出空图
   await Promise.all(
-    Array.from(doc.images).map(img =>
+    Array.from(w.document.images).map(img =>
       img.complete ? Promise.resolve() : new Promise<void>(r => { img.onload = () => r(); img.onerror = () => r() })
     )
   )
 
-  const cleanup = () => setTimeout(() => iframe.remove(), 2000)
-  // 延迟触发，避开点击事件栈内调起打印被部分浏览器拦截的问题
+  // print() 在 Chrome/Edge 中会阻塞到对话框关闭，之后关闭这个临时窗口；Safari 异步则延迟关闭
   setTimeout(() => {
     try {
-      win.focus()
-      win.print()
-      cleanup()
+      w.focus()
+      w.print()
+      setTimeout(() => !w.closed && w.close(), 500)
     } catch {
-      // iframe 打印被拦截的极端情况：退回新窗口打印，保证至少有反应
-      fallbackWindowPrint(html)
-      cleanup()
+      /* 用户可在已打开的标签页手动打印 */
     }
-  }, 120)
-}
-
-/** iframe 打印失败时的兜底：新窗口写入同样内容并触发打印 */
-function fallbackWindowPrint(html: string): void {
-  const w = window.open('', '_blank')
-  if (!w) { ElMessage.error('请允许浏览器弹出窗口后重试'); return }
-  w.document.open()
-  w.document.write(html)
-  w.document.close()
-  const trigger = () => { try { w.focus(); w.print() } catch { /* 用户手动在新窗口打印 */ } }
-  if (w.document.readyState === 'complete') trigger()
-  else w.onload = trigger
+  }, 150)
 }
 
 /**

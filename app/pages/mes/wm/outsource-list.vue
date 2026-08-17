@@ -195,7 +195,7 @@ function handleScan() {
     onlyFromCamera: false,
     scanType: ['barCode', 'qrCode'],
     success: (res) => { handleCode(res.result) },
-    fail: (err) => { console.log('扫码取消:', err) }
+    fail: () => {} // 用户取消扫码，静默返回
   })
   // #endif
 }

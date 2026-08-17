@@ -1,8 +1,11 @@
 package com.ruoyi.common.utils.qr;
 
 /**
- * 二维码 payload 构造与解析工具。格式：QXX|TYPE|CODE
- * 设计文档 §3.1。
+ * 二维码 payload 构造与解析工具。格式：QXX|TYPE|CODE，设计文档 §3.1。
+ *
+ * <p>当前二维码由前端渲染（后端不存图片），后端暂无生产调用方；本类作为
+ * 三端统一的格式契约锚点保留（单测锁定分隔/管道语义），供后端生成 payload
+ * 的场景（如包装码、打印计数）复用。
  */
 public final class QrPayloadUtil {
 

@@ -101,16 +101,25 @@ function onVisibleChange(v: boolean) {
   emit('update:visible', v)
 }
 
-/** 行判定（NUMBER 按区间公式，其余取行结果），与 QcJudgeServiceImpl.judgeLine 同公式 */
+/** 行判定（NUMBER 按区间公式；DICT 取选项；TEXT/COUNT/FILE 填了实测值即合格），与 QcJudgeServiceImpl.judgeLine 同公式 */
 function judgeLine(line: QcOrderLine): 'PASS' | 'FAIL' | null {
-  if (line.qcResultType !== 'NUMBER') return (line.lineResult as 'PASS' | 'FAIL') || null
-  if (!line.checkValText) return null
-  const val = Number(line.checkValText)
-  if (Number.isNaN(val)) return null
-  const std = line.standerVal
-  const lo = std != null && line.thresholdMin != null ? std + line.thresholdMin : line.thresholdMin
-  const hi = std != null && line.thresholdMax != null ? std + line.thresholdMax : line.thresholdMax
-  return (lo != null && val < lo) || (hi != null && val > hi) ? 'FAIL' : 'PASS'
+  if (line.qcResultType === 'NUMBER') {
+    if (!line.checkValText) return null
+    const val = Number(line.checkValText)
+    if (Number.isNaN(val)) return null
+    const std = line.standerVal
+    const lo = std != null && line.thresholdMin != null ? std + line.thresholdMin : line.thresholdMin
+    const hi = std != null && line.thresholdMax != null ? std + line.thresholdMax : line.thresholdMax
+    return (lo != null && val < lo) || (hi != null && val > hi) ? 'FAIL' : 'PASS'
+  }
+  if (line.qcResultType === 'DICT') {
+    if (!line.checkValText) return null
+    return line.checkValText === 'PASS' ? 'PASS' : 'FAIL'
+  }
+  // TEXT/COUNT/FILE：检验员显式选了行结果以其为准；否则填了实测值即视为合格
+  if (line.lineResult) return line.lineResult as 'PASS' | 'FAIL'
+  if (line.checkValText) return 'PASS'
+  return null
 }
 
 /** 整单预判：镜像服务端引擎（Ac/致命缺陷/三档缺陷率），未录入实测值时拦截 */

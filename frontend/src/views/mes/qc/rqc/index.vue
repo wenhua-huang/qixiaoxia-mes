@@ -106,7 +106,7 @@
 </template>
 
 <script setup lang="ts" name="QcRqc">
-import { ref, onMounted, getCurrentInstance } from 'vue'
+import { ref, onMounted, nextTick, getCurrentInstance } from 'vue'
 import { useRoute } from 'vue-router'
 import type { QcRqc } from '@/api/mes/qc/rqc'
 import { listRqc, delRqc, closeRqc } from '@/api/mes/qc/rqc'
@@ -199,6 +199,11 @@ onMounted(() => {
     queryParams.value.sourceDocId = Number(sid)
   }
   getList()
+  // 首页待办跳转：携带 openId 自动打开检验抽屉
+  const oid = route.query.openId as string
+  if (oid) {
+    nextTick(() => drawerRef.value?.open(Number(oid), route.query.ro === '1'))
+  }
 })
 </script>
 

@@ -101,7 +101,7 @@
 </template>
 
 <script setup lang="ts" name="QcIpqc">
-import { ref, onMounted, getCurrentInstance } from 'vue'
+import { ref, onMounted, nextTick, getCurrentInstance } from 'vue'
 import { useRoute } from 'vue-router'
 import type { QcIpqc } from '@/api/mes/qc/ipqc'
 import { listIpqc, delIpqc, closeIpqc } from '@/api/mes/qc/ipqc'
@@ -182,6 +182,11 @@ onMounted(() => {
     queryParams.value.sourceDocId = Number(sid)
   }
   getList()
+  // 首页待办跳转：携带 openId 自动打开检验抽屉
+  const oid = route.query.openId as string
+  if (oid) {
+    nextTick(() => drawerRef.value?.open(Number(oid), route.query.ro === '1'))
+  }
 })
 </script>
 

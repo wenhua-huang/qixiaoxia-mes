@@ -74,7 +74,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="clientName != null and clientName != ''"> and client_name like concat('%', #{clientName}, '%')</if>
             <if test="itemId != null"> and item_id = #{itemId}</if>
             <if test="itemCode != null and itemCode != ''"> and item_code like concat('%', #{itemCode}, '%')</if>
-            <if test="itemName != null and itemName != ''"> and (item_code like concat('%', #{itemName}, '%') or item_name like concat('%', #{itemName}, '%'))</if>
+            <if test="itemName != null and itemName != ''"> and concat(item_code, ' ', item_name) like concat('%', replace(#{itemName}, ' ', '%'), '%')</if>
             <if test="checkResult != null and checkResult != ''"> and check_result = #{checkResult}</if>
             <if test="status != null and status != ''"> and status = #{status}</if>
             <if test="inspector != null and inspector != ''"> and inspector = #{inspector}</if>

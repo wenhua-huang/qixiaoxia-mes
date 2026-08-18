@@ -18,25 +18,40 @@ public class QcJudgeServiceImpl implements IQcJudgeService {
 
     @Override
     public String judgeLine(QcOrderLine line) {
-        if (!QcConstants.RESULT_TYPE_NUMBER.equals(line.getQcResultType())) {
+        String type = line.getQcResultType();
+        if (QcConstants.RESULT_TYPE_NUMBER.equals(type)) {
+            if (StringUtils.isBlank(line.getCheckValText())) {
+                return null;
+            }
+            double val;
+            try {
+                val = Double.parseDouble(line.getCheckValText().trim());
+            } catch (NumberFormatException e) {
+                throw new ServiceException("检测项[" + line.getIndexName() + "]实测值不是数字：" + line.getCheckValText());
+            }
+            BigDecimal std = line.getStanderVal();
+            BigDecimal lo = line.getThresholdMin();
+            BigDecimal hi = line.getThresholdMax();
+            Double lower = (std != null) ? (lo != null ? std.add(lo).doubleValue() : null) : (lo != null ? lo.doubleValue() : null);
+            Double upper = (std != null) ? (hi != null ? std.add(hi).doubleValue() : null) : (hi != null ? hi.doubleValue() : null);
+            boolean fail = (lower != null && val < lower) || (upper != null && val > upper);
+            return fail ? QcConstants.LINE_FAIL : QcConstants.LINE_PASS;
+        }
+        // DICT：实测值本身即 PASS/FAIL
+        if (QcConstants.RESULT_TYPE_DICT.equals(type)) {
+            if (StringUtils.isBlank(line.getCheckValText())) {
+                return null;
+            }
+            return QcConstants.LINE_PASS.equals(line.getCheckValText()) ? QcConstants.LINE_PASS : QcConstants.LINE_FAIL;
+        }
+        // TEXT/COUNT/FILE：检验员显式选了行结果以其为准；否则填了实测值即视为合格
+        if (StringUtils.isNotBlank(line.getLineResult())) {
             return line.getLineResult();
         }
-        if (StringUtils.isBlank(line.getCheckValText())) {
-            return null;
+        if (StringUtils.isNotBlank(line.getCheckValText())) {
+            return QcConstants.LINE_PASS;
         }
-        double val;
-        try {
-            val = Double.parseDouble(line.getCheckValText().trim());
-        } catch (NumberFormatException e) {
-            throw new ServiceException("检测项[" + line.getIndexName() + "]实测值不是数字：" + line.getCheckValText());
-        }
-        BigDecimal std = line.getStanderVal();
-        BigDecimal lo = line.getThresholdMin();
-        BigDecimal hi = line.getThresholdMax();
-        Double lower = (std != null) ? (lo != null ? std.add(lo).doubleValue() : null) : (lo != null ? lo.doubleValue() : null);
-        Double upper = (std != null) ? (hi != null ? std.add(hi).doubleValue() : null) : (hi != null ? hi.doubleValue() : null);
-        boolean fail = (lower != null && val < lower) || (upper != null && val > upper);
-        return fail ? QcConstants.LINE_FAIL : QcConstants.LINE_PASS;
+        return null;
     }
 
     @Override

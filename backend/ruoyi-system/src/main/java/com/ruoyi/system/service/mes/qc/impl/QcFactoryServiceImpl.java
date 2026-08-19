@@ -16,6 +16,8 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.ruoyi.common.core.redis.RedisLockTemplate;
+import com.ruoyi.common.utils.SecurityUtils;
+import com.ruoyi.system.domain.mes.pro.ProCard;
 import com.ruoyi.system.domain.mes.pro.ProCardProcess;
 import com.ruoyi.system.domain.mes.pro.ProFeedback;
 import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
@@ -34,6 +36,7 @@ import com.ruoyi.system.domain.mes.wm.WmProductSales;
 import com.ruoyi.system.domain.mes.wm.WmProductSalesLine;
 import com.ruoyi.system.domain.mes.wm.WmRtIssue;
 import com.ruoyi.system.domain.mes.wm.WmRtIssueLine;
+import com.ruoyi.system.mapper.mes.pro.ProCardMapper;
 import com.ruoyi.system.mapper.mes.pro.ProCardProcessMapper;
 import com.ruoyi.system.mapper.mes.pro.ProRouteProcessMapper;
 import com.ruoyi.system.mapper.mes.qc.QcIpqcMapper;
@@ -85,6 +88,9 @@ public class QcFactoryServiceImpl implements IQcFactoryService
 
     @Autowired
     private ProCardProcessMapper proCardProcessMapper;
+
+    @Autowired
+    private ProCardMapper proCardMapper;
 
     @Autowired
     private WmProductRecptMapper wmProductRecptMapper;
@@ -581,16 +587,49 @@ public class QcFactoryServiceImpl implements IQcFactoryService
         {
             return null;  // 未绑定模板 = 免检
         }
-        ProCardProcess cp = proCardProcessMapper.selectByCardAndProcess(feedback.getCardId(), feedback.getProcessId());
-        if (cp == null)
-        {
-            return null;  // 流转卡工序记录缺失（如非流转卡报工）
-        }
-        String lockKey = QcConstants.LOCK_GENERATE + "ipqc:cp:" + cp.getRecordId();
+        String lockKey = QcConstants.LOCK_GENERATE + "ipqc:cp:" + feedback.getCardId() + ":" + feedback.getProcessId();
         // 报工链路是弱拦截（confirmFeedback try-catch 吞异常仅告警），必须用独立新事务，
         // 否则生成失败会标记外层报工事务 rollback-only 导致提交时 UnexpectedRollbackException。
+        // 锁+事务内"查或建"流转卡工序记录，保证并发报工不重复播种。
         return lockTemplate.execute(lockKey, () ->
-            txTemplateRequiresNew.execute(tx -> doGenerateFeedbackIpqc(feedback, cp, bind)));
+            txTemplateRequiresNew.execute(tx -> {
+                ProCardProcess cp = proCardProcessMapper.selectByCardAndProcess(feedback.getCardId(), feedback.getProcessId());
+                if (cp == null) {
+                    cp = createCardProcess(feedback, rp);
+                }
+                return doGenerateFeedbackIpqc(feedback, cp, bind);
+            }));
+    }
+
+    /**
+     * 惰性补建流转卡工序记录（历史卡建卡时未播种工序）。字段取报工数据与工艺路线工序，
+     * 不与报工产出数量强绑定——card_process 是追溯挂点，数量以 feedback 为准。
+     */
+    private ProCardProcess createCardProcess(ProFeedback feedback, ProRouteProcess rp) {
+        ProCard card = proCardMapper.selectProCardByCardId(feedback.getCardId());
+        ProCardProcess cp = new ProCardProcess();
+        cp.setCardId(feedback.getCardId());
+        cp.setCardCode(card != null ? card.getCardCode() : null);
+        cp.setSeqNum(rp != null && rp.getOrderNum() != null ? rp.getOrderNum() : 0);
+        cp.setProcessId(feedback.getProcessId());
+        cp.setProcessCode(feedback.getProcessCode());
+        cp.setProcessName(feedback.getProcessName());
+        cp.setTaskId(feedback.getTaskId());
+        cp.setTaskCode(feedback.getTaskCode());
+        cp.setWorkstationId(feedback.getWorkstationId());
+        cp.setWorkstationCode(feedback.getWorkstationCode());
+        cp.setWorkstationName(feedback.getWorkstationName());
+        cp.setUserId(SecurityUtils.getUserId());
+        cp.setUserName(feedback.getRecordUser());
+        cp.setNickName(feedback.getRecordNick());
+        cp.setFeedbackId(feedback.getRecordId());
+        cp.setOutputTime(feedback.getFeedbackTime());
+        cp.setQuantityOutput(feedback.getQuantityQualified());
+        cp.setQuantityUnqualified(feedback.getQuantityUnqualified());
+        cp.setCreateBy(feedback.getRecordUser());
+        cp.setCreateTime(new Date());
+        proCardProcessMapper.insertProCardProcess(cp);
+        return cp;
     }
 
     /** 锁+事务内生成工序检 IPQC：幂等检查 → 快照建单 → 建行 → 回填流转卡工序挂点；返回编码或 null */

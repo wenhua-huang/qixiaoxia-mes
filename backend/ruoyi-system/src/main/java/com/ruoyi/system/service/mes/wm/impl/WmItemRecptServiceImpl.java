@@ -4,9 +4,14 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import com.ruoyi.common.core.redis.RedisLockTemplate;
+import com.ruoyi.common.utils.StringUtils;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.exception.ServiceException;
@@ -25,6 +30,7 @@ import com.ruoyi.system.service.mes.pur.IPurOrderLineService;
 import com.ruoyi.system.service.mes.pur.IPurOrderService;
 import com.ruoyi.system.service.mes.qc.IQcFactoryService;
 import com.ruoyi.system.service.mes.qc.IQcGateService;
+import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 import com.ruoyi.system.service.mes.wm.IWmBatchService;
 import com.ruoyi.system.service.mes.wm.IWmItemRecptLineService;
 import com.ruoyi.system.service.mes.wm.IWmItemRecptService;
@@ -78,7 +84,30 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
     @Autowired
     private IQcGateService qcGateService;
 
+    @Autowired
+    private AutoCodeGenerator autoCodeGenerator;
+
+    @Autowired
+    private RedisLockTemplate lockTemplate;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
+    private TransactionTemplate txTemplate;
+
     private static final Logger log = LoggerFactory.getLogger(WmItemRecptServiceImpl.class);
+
+    /** 入库单号编码规则（RCVT+yyyyMMdd+3位流水，按日循环） */
+    private static final String CODE_RULE_RECEIPT = "RECEIPT_NO";
+    /** 按单号加锁，防双击/并发重复提交 */
+    private static final String LOCK_PREFIX = "wm:itemrecpt:";
+    private static final long LOCK_WAIT_SEC = 10;
+
+    @PostConstruct
+    void initTx() {
+        this.txTemplate = new TransactionTemplate(transactionManager);
+        this.txTemplate.setTimeout(30);
+    }
 
     @Override
     public List<WmItemRecpt> selectWmItemRecptList(WmItemRecpt entity) {
@@ -106,8 +135,17 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
     }
 
     @Override
-    @Transactional
     public int insertWmItemRecpt(WmItemRecpt entity) {
+        // recptCode 为空时服务端兜底生成（前端已取号，此处防御取号失败/未取号）；
+        // 按单号加 Redisson 锁串行化同号创建，锁内查重+insert，杜绝双击/并发重复落库。
+        String code = ensureRecptCode(entity);
+        lockTemplate.execute(LOCK_PREFIX + code, LOCK_WAIT_SEC,
+                () -> txTemplate.execute(status -> doInsertWmItemRecpt(entity)));
+        return 1;
+    }
+
+    private int doInsertWmItemRecpt(WmItemRecpt entity) {
+        assertRecptCodeNotExists(entity.getRecptCode());
         entity.setCreateTime(DateUtils.getNowDate());
         entity.setCreateBy(SecurityUtils.getUsername());
         if (entity.getStatus() == null || entity.getStatus().isEmpty()) {
@@ -118,7 +156,6 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
         if (entity.getLines() != null && !entity.getLines().isEmpty()) {
             saveRecptLines(entity, entity.getLines());
             // IQC 生成 hook：PC 手工新增/从采购订单生成的入库单头+行落库后生成来料待检单
-            // （工厂内部锁+事务保证原子，随本方法外层事务与入库单创建同生共死）
             qcFactoryService.generateIqcForItemRecpt(entity, entity.getLines());
         }
         return 1;
@@ -329,19 +366,29 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
     }
 
     /**
-     * 一键收货（移动端）：创建入库单头+行+确认收货+过账，单个事务原子完成。
+     * 到货登记（移动端）：创建 DRAFT 入库单头+行，生成批次号与 IQC 待检单，不增库存、不过账。
      *
-     * 注：本方法使用 @Transactional 保证多步操作的原子性（header+lines+confirm+post）。
-     * 库存变更通过 WmTransactionServiceImpl.processTransaction() 内部使用 Redisson 锁 + TransactionTemplate 保证并发安全。
+     * <p>语义对齐 PC 端 insertWmItemRecpt：app 只做"货到登记"，IQC 判定、确认入库（confirm 增库存+推 PO→RECEIVING）、
+     * 过账（post 累加已收量）全部在 PC 端完成。这样需检物料登记后生成的 PENDING 检验单不会被同一事务内的 confirm 自相矛盾地拒绝。
+     * PO 状态在登记阶段保持 ORDERED，支持分批到货多次登记。
      */
     @Override
-    @Transactional
     public WmItemRecpt receiveWithLines(ItemRecptReceiveBody body) {
         WmItemRecpt header = body.getHeader();
         List<WmItemRecptLine> lines = body.getLines();
-        if (header == null) throw new RuntimeException("入库单头信息不能为空");
-        if (lines == null || lines.isEmpty()) throw new RuntimeException("入库单行不能为空");
+        if (header == null) throw new ServiceException("入库单头信息不能为空");
+        if (lines == null || lines.isEmpty()) throw new ServiceException("入库单行不能为空");
+        // recptCode 为空时服务端兜底生成（移动端常传 RCP- 临时号，为空则走编码规则）；
+        // 按单号加锁串行化，锁内查重+insert，防重复登记。
+        String code = ensureRecptCode(header);
+        Long recptId = lockTemplate.executeWithResult(LOCK_PREFIX + code, LOCK_WAIT_SEC,
+                () -> txTemplate.execute(status -> doReceiveWithLines(header, lines)));
+        // 事务提交、锁释放后回读详情（头+行批次码），供 App 登记完成页展示
+        return selectWmItemRecptDetail(recptId);
+    }
 
+    private Long doReceiveWithLines(WmItemRecpt header, List<WmItemRecptLine> lines) {
+        assertRecptCodeNotExists(header.getRecptCode());
         // 1. 创建入库单头 — 若 header 未指定仓库，取第一行仓库
         if (header.getWarehouseId() == null) {
             WmItemRecptLine firstLine = lines.get(0);
@@ -355,19 +402,28 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
         header.setCreateBy(SecurityUtils.getUsername());
         wmItemRecptMapper.insertWmItemRecpt(header);
 
-        // 2. 创建入库单行（公共逻辑，与 PC 端从采购订单生成共享）
+        // 2. 创建入库单行（公共逻辑，与 PC 端从采购订单生成共享）：回填 PO 行、自动生成批次号
         saveRecptLines(header, lines);
 
-        // 2.5 IQC 生成 hook：需检物料生成待检单（下方 confirm 校验对 PENDING 单拒绝 → 本事务整体回滚，
-        // 移动端一键收货被拒属预期行为——一期检验仅 PC 端操作）
+        // 2.5 IQC 生成 hook：需检物料生成待检单，状态 PENDING；PC 端判定合格后再确认入库
         qcFactoryService.generateIqcForItemRecpt(header, lines);
+        return header.getRecptId();
+    }
 
-        // 3. 确认收货 + 过账入库（直接传入已加载对象，避免重复 DB 查询）
-        doConfirmItemRecpt(header, lines);
-        doPostItemRecpt(header);
+    /** recptCode 为空时按编码规则服务端生成，返回最终单号 */
+    private String ensureRecptCode(WmItemRecpt entity) {
+        if (StringUtils.isEmpty(entity.getRecptCode())) {
+            entity.setRecptCode(autoCodeGenerator.genSerialCode(CODE_RULE_RECEIPT, ""));
+        }
+        return entity.getRecptCode();
+    }
 
-        // 4. 返回详情（头 + 行，行含生成的批次码），供 App 收货完成页展示
-        return selectWmItemRecptDetail(header.getRecptId());
+    /** 同工厂内单号查重（factory_id 由拦截器自动注入）；DB 唯一索引兜底 */
+    private void assertRecptCodeNotExists(String recptCode) {
+        WmItemRecpt existing = wmItemRecptMapper.selectByRecptCode(recptCode);
+        if (existing != null) {
+            throw new ServiceException("入库单号[" + recptCode + "]已存在，请勿重复提交");
+        }
     }
 
     /**

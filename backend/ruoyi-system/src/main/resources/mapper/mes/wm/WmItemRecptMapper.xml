@@ -94,6 +94,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where recpt_id = #{recptId}
     </select>
 
+    <select id="selectByRecptCode" resultMap="WmItemRecptResult">
+        <include refid="selectWmItemRecptVo"/>
+        where recpt_code = #{recptCode} limit 1
+    </select>
+
     <insert id="insertWmItemRecpt" parameterType="WmItemRecpt" useGeneratedKeys="true" keyProperty="recptId">
         insert into qxx_wm_item_recpt
         <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="recptCode != null">recpt_code,</if>

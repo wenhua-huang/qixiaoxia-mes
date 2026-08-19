@@ -1,5 +1,6 @@
 package com.ruoyi.system.service.mes.wm;
 
+import com.ruoyi.common.core.redis.RedisLockTemplate;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.system.domain.mes.pur.PurOrder;
 import com.ruoyi.system.domain.mes.pur.PurOrderLine;
@@ -14,6 +15,7 @@ import com.ruoyi.system.service.mes.pur.IPurOrderLineService;
 import com.ruoyi.system.service.mes.pur.IPurOrderService;
 import com.ruoyi.system.service.mes.qc.IQcFactoryService;
 import com.ruoyi.system.service.mes.qc.IQcGateService;
+import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 import com.ruoyi.system.service.mes.wm.IWmBatchService;
 import com.ruoyi.system.service.mes.wm.IWmItemRecptLineService;
 import com.ruoyi.system.service.mes.wm.IWmStorageCoreService;
@@ -30,10 +32,14 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import static org.mockito.ArgumentMatchers.eq;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -55,6 +61,9 @@ class WmItemRecptServiceUnitTest {
     @Mock private IWmBatchService wmBatchService;
     @Mock private IQcFactoryService qcFactoryService;
     @Mock private IQcGateService qcGateService;
+    @Mock private AutoCodeGenerator autoCodeGenerator;
+    @Mock private RedisLockTemplate lockTemplate;
+    @Mock private PlatformTransactionManager transactionManager;
     @InjectMocks private WmItemRecptServiceImpl service;
 
     private MockedStatic<SecurityUtils> securityUtilsMock;
@@ -63,6 +72,16 @@ class WmItemRecptServiceUnitTest {
     void setUp() {
         securityUtilsMock = mockStatic(SecurityUtils.class);
         securityUtilsMock.when(SecurityUtils::getUsername).thenReturn("tester");
+
+        // Mock lockTemplate：直接执行传入动作（绕过 Redis），覆盖 Runnable 与 Supplier 两种重载
+        lenient().doAnswer(inv -> { Runnable action = inv.getArgument(2); action.run(); return null; })
+                .when(lockTemplate).execute(anyString(), anyLong(), any(Runnable.class));
+        lenient().doAnswer(inv -> { Supplier<?> action = inv.getArgument(2); return action.get(); })
+                .when(lockTemplate).executeWithResult(anyString(), anyLong(), any(Supplier.class));
+
+        // 手动创建 txTemplate（@PostConstruct 在 Mockito 下不触发）；mock 的 transactionManager 使回调直接执行
+        TransactionTemplate tt = new TransactionTemplate(transactionManager);
+        ReflectionTestUtils.setField(service, "txTemplate", tt);
     }
 
     @AfterEach
@@ -283,13 +302,13 @@ class WmItemRecptServiceUnitTest {
     }
 
     @Nested
-    @DisplayName("receiveWithLines — 一键收货 + 仓库传播")
+    @DisplayName("receiveWithLines — 到货登记 + 仓库传播")
     class ReceiveWithLinesTests {
 
         /**
-         * 为 confirmItemRecpt 调用设置通用 mock，避免 NPE。
+         * 为末尾详情回读（selectWmItemRecptDetail → loadRecptLines）设置通用 mock。
          */
-        private void stubConfirmMocks(WmItemRecpt header) {
+        private void stubDetailReadMocks(WmItemRecpt header) {
             WmItemRecptLine line = new WmItemRecptLine();
             line.setItemId(201L);
             line.setQuantityRecpt(new BigDecimal("10.0000"));
@@ -343,7 +362,7 @@ class WmItemRecptServiceUnitTest {
             when(wmItemRecptMapper.insertWmItemRecpt(any())).thenReturn(1);
             when(wmItemRecptMapper.updateWmItemRecpt(any())).thenReturn(1);
             when(wmItemRecptLineService.insertWmItemRecptLine(any())).thenReturn(1);
-            stubConfirmMocks(header);
+            stubDetailReadMocks(header);
 
             service.receiveWithLines(body);
 
@@ -360,7 +379,9 @@ class WmItemRecptServiceUnitTest {
 
             // 验证行 insert 被调用2次
             verify(wmItemRecptLineService, times(2)).insertWmItemRecptLine(any());
-            verify(storageCoreService).processItemRecpt(any());
+            // 到货登记只建 DRAFT，不增库存/不确认/不过账
+            verify(storageCoreService, never()).processItemRecpt(any());
+            assertThat(header.getStatus()).isEqualTo("DRAFT");
         }
 
         @Test
@@ -388,7 +409,7 @@ class WmItemRecptServiceUnitTest {
             when(wmItemRecptMapper.insertWmItemRecpt(any())).thenReturn(1);
             when(wmItemRecptMapper.updateWmItemRecpt(any())).thenReturn(1);
             when(wmItemRecptLineService.insertWmItemRecptLine(any())).thenReturn(1);
-            stubConfirmMocks(header);
+            stubDetailReadMocks(header);
 
             service.receiveWithLines(body);
 
@@ -447,7 +468,7 @@ class WmItemRecptServiceUnitTest {
             when(wmItemRecptMapper.insertWmItemRecpt(any())).thenReturn(1);
             when(wmItemRecptMapper.updateWmItemRecpt(any())).thenReturn(1);
             when(wmItemRecptLineService.insertWmItemRecptLine(any())).thenReturn(1);
-            stubConfirmMocks(header);
+            stubDetailReadMocks(header);
             // 测试专用 PO 行（itemId=208→lineId=555）必须在 stubConfirmMocks 之后，
             // 否则会被其通用 stub（itemId=201）覆盖，导致 backfill 匹配不到
             when(purOrderLineService.selectPurOrderLineList(any())).thenReturn(Collections.singletonList(poLine));
@@ -479,7 +500,7 @@ class WmItemRecptServiceUnitTest {
             when(wmItemRecptMapper.insertWmItemRecpt(any())).thenReturn(1);
             when(wmItemRecptMapper.updateWmItemRecpt(any())).thenReturn(1);
             when(wmItemRecptLineService.insertWmItemRecptLine(any())).thenReturn(1);
-            stubConfirmMocks(header);
+            stubDetailReadMocks(header);
 
             service.receiveWithLines(body);
 
@@ -494,7 +515,7 @@ class WmItemRecptServiceUnitTest {
     @DisplayName("receiveWithLines — 批次号自动生成")
     class BatchCodeTests {
 
-        private void stubConfirmMocks(WmItemRecpt header) {
+        private void stubDetailReadMocks(WmItemRecpt header) {
             WmItemRecptLine line = new WmItemRecptLine();
             line.setItemId(201L);
             line.setQuantityRecpt(new BigDecimal("10.0000"));
@@ -527,7 +548,7 @@ class WmItemRecptServiceUnitTest {
             when(wmItemRecptMapper.updateWmItemRecpt(any())).thenReturn(1);
             when(wmItemRecptLineService.insertWmItemRecptLine(any())).thenReturn(1);
             when(wmBatchService.getOrGenerateBatchCode(any())).thenReturn(generated);
-            stubConfirmMocks(header);
+            stubDetailReadMocks(header);
 
             service.receiveWithLines(body);
 
@@ -553,7 +574,7 @@ class WmItemRecptServiceUnitTest {
             when(wmItemRecptMapper.insertWmItemRecpt(any())).thenReturn(1);
             when(wmItemRecptMapper.updateWmItemRecpt(any())).thenReturn(1);
             when(wmItemRecptLineService.insertWmItemRecptLine(any())).thenReturn(1);
-            stubConfirmMocks(header);
+            stubDetailReadMocks(header);
 
             service.receiveWithLines(body);
 
@@ -578,7 +599,7 @@ class WmItemRecptServiceUnitTest {
             when(wmItemRecptMapper.updateWmItemRecpt(any())).thenReturn(1);
             when(wmItemRecptLineService.insertWmItemRecptLine(any())).thenReturn(1);
             when(wmBatchService.getOrGenerateBatchCode(any())).thenReturn(null);
-            stubConfirmMocks(header);
+            stubDetailReadMocks(header);
 
             service.receiveWithLines(body);
 
@@ -606,16 +627,16 @@ class WmItemRecptServiceUnitTest {
             when(wmItemRecptMapper.updateWmItemRecpt(any())).thenReturn(1);
             when(wmItemRecptLineService.insertWmItemRecptLine(any())).thenReturn(1);
             when(wmBatchService.getOrGenerateBatchCode(any())).thenReturn(generated);
-            stubConfirmMocks(header);
+            stubDetailReadMocks(header);
             // 详情回读(loadRecptLines)返回真实行对象（已带生成批次码），替代 stubConfirmMocks 的通用行
             when(wmItemRecptLineService.selectWmItemRecptLineList(any())).thenReturn(Collections.singletonList(line));
 
             WmItemRecpt result = service.receiveWithLines(body);
 
-            // 返回的详情：头 + 行，行携带生成的批次码，供 App 收货完成页展示
+            // 返回的详情：头（DRAFT）+ 行，行携带生成的批次码，供 App 登记完成页展示
             assertThat(result).isNotNull();
             assertThat(result.getRecptId()).isEqualTo(1L);
-            assertThat(result.getStatus()).isEqualTo("POSTED");
+            assertThat(result.getStatus()).isEqualTo("DRAFT");
             assertThat(result.getLines()).hasSize(1);
             assertThat(result.getLines().get(0).getBatchId()).isEqualTo(500L);
             assertThat(result.getLines().get(0).getBatchCode()).isEqualTo("BAT20260707001");
@@ -629,5 +650,46 @@ class WmItemRecptServiceUnitTest {
         recpt.setStatus("DRAFT");
         recpt.setWarehouseId(1L);
         return recpt;
+    }
+
+    @Nested
+    @DisplayName("insertWmItemRecpt — 单号防重")
+    class InsertCodeGuardTests {
+
+        @Test
+        @DisplayName("18. 同号已存在 → 拒绝重复提交，不 insert")
+        void shouldRejectDuplicateRecptCode() {
+            WmItemRecpt entity = new WmItemRecpt();
+            entity.setRecptCode("00RCVT20260819001");
+            entity.setStatus("DRAFT");
+            entity.setWarehouseId(1L);
+
+            WmItemRecpt existing = new WmItemRecpt();
+            existing.setRecptId(218L);
+            existing.setRecptCode("00RCVT20260819001");
+            when(wmItemRecptMapper.selectByRecptCode("00RCVT20260819001")).thenReturn(existing);
+
+            assertThatThrownBy(() -> service.insertWmItemRecpt(entity))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("已存在");
+            verify(wmItemRecptMapper, never()).insertWmItemRecpt(any());
+        }
+
+        @Test
+        @DisplayName("19. recptCode 为空 → 服务端调用编码器生成")
+        void shouldGenerateCodeWhenEmpty() {
+            WmItemRecpt entity = new WmItemRecpt();
+            entity.setStatus("DRAFT");
+            entity.setWarehouseId(1L);
+            when(autoCodeGenerator.genSerialCode(eq("RECEIPT_NO"), eq(""))).thenReturn("00RCVT20260819002");
+            when(wmItemRecptMapper.selectByRecptCode(anyString())).thenReturn(null);
+            when(wmItemRecptMapper.insertWmItemRecpt(any())).thenReturn(1);
+
+            service.insertWmItemRecpt(entity);
+
+            assertThat(entity.getRecptCode()).isEqualTo("00RCVT20260819002");
+            verify(autoCodeGenerator).genSerialCode("RECEIPT_NO", "");
+            verify(wmItemRecptMapper).insertWmItemRecpt(any());
+        }
     }
 }

@@ -9,6 +9,13 @@ public interface WmItemRecptMapper
     public List<WmItemRecpt> selectWmItemRecptList(WmItemRecpt entity);
     public List<WmItemRecpt> selectWmItemRecptAll();
     public WmItemRecpt selectWmItemRecptByRecptId(Long recptId);
+
+    /**
+     * 按入库单号精确查询（factory_id 由 FactoryIdInterceptor 自动注入，按工厂隔离）。
+     * 用于新增时查重，防止同号重复落库。
+     */
+    public WmItemRecpt selectByRecptCode(@Param("recptCode") String recptCode);
+
     public int insertWmItemRecpt(WmItemRecpt entity);
     public int updateWmItemRecpt(WmItemRecpt entity);
     public int deleteWmItemRecptByRecptId(Long recptId);

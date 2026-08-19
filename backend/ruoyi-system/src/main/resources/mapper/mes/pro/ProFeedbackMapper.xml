@@ -53,6 +53,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="recordUser"    column="record_user"    />
         <result property="recordNick"    column="record_nick"    />
         <result property="status"    column="status"    />
+        <result property="qcStatus"    column="qc_status"    />
+        <result property="ipqcId"    column="ipqc_id"    />
         <result property="remark"    column="remark"    />
         <result property="createBy"    column="create_by"    />
         <result property="createTime"    column="create_time"    />
@@ -65,22 +67,42 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </sql>
 
     <select id="selectProFeedbackList" parameterType="ProFeedback" resultMap="ProFeedbackResult">
-        <include refid="selectProFeedbackVo"/>
+        select t.*,
+               (
+                   select case
+                       when i.status = 'COMPLETED' and i.check_result = 'FAIL' then 'FAILED'
+                       when i.status = 'COMPLETED' and i.check_result = 'CONCESSION' then 'CONCESSION'
+                       when i.status in ('PENDING', 'INSPECTING') then 'PENDING'
+                       when i.status = 'COMPLETED' and i.check_result = 'PASS' then 'PASSED'
+                       else 'NONE'
+                   end
+                   from qxx_pro_card_process cp
+                   left join qxx_qc_ipqc i on i.ipqc_id = cp.ipqc_id and i.factory_id = t.factory_id
+                   where cp.feedback_id = t.record_id
+                   limit 1
+               ) as qc_status,
+               (
+                   select cp.ipqc_id from qxx_pro_card_process cp
+                   where cp.feedback_id = t.record_id
+                   limit 1
+               ) as ipqc_id
+        from qxx_pro_feedback t
         <where>
-            <if test="feedbackCode != null  and feedbackCode != ''"> and feedback_code = #{feedbackCode}</if>
-            <if test="feedbackType != null  and feedbackType != ''"> and feedback_type = #{feedbackType}</if>
-            <if test="workorderId != null "> and workorder_id = #{workorderId}</if>
-            <if test="workorderCode != null  and workorderCode != ''"> and workorder_code = #{workorderCode}</if>
-            <if test="cardId != null"> and card_id = #{cardId}</if>
-            <if test="workstationId != null "> and workstation_id = #{workstationId}</if>
-            <if test="processId != null "> and process_id = #{processId}</if>
-            <if test="itemId != null "> and item_id = #{itemId}</if>
-            <if test="workorderName != null  and workorderName != ''"> and workorder_name like concat('%', #{workorderName}, '%')</if>
-            <if test="workstationName != null  and workstationName != ''"> and workstation_name like concat('%', #{workstationName}, '%')</if>
-            <if test="processName != null  and processName != ''"> and process_name like concat('%', #{processName}, '%')</if>
-            <if test="status != null  and status != ''"> and status = #{status}</if>
+            t.record_id is not null
+            <if test="feedbackCode != null  and feedbackCode != ''"> and t.feedback_code = #{feedbackCode}</if>
+            <if test="feedbackType != null  and feedbackType != ''"> and t.feedback_type = #{feedbackType}</if>
+            <if test="workorderId != null "> and t.workorder_id = #{workorderId}</if>
+            <if test="workorderCode != null  and workorderCode != ''"> and t.workorder_code = #{workorderCode}</if>
+            <if test="cardId != null"> and t.card_id = #{cardId}</if>
+            <if test="workstationId != null "> and t.workstation_id = #{workstationId}</if>
+            <if test="processId != null "> and t.process_id = #{processId}</if>
+            <if test="itemId != null "> and t.item_id = #{itemId}</if>
+            <if test="workorderName != null  and workorderName != ''"> and t.workorder_name like concat('%', #{workorderName}, '%')</if>
+            <if test="workstationName != null  and workstationName != ''"> and t.workstation_name like concat('%', #{workstationName}, '%')</if>
+            <if test="processName != null  and processName != ''"> and t.process_name like concat('%', #{processName}, '%')</if>
+            <if test="status != null  and status != ''"> and t.status = #{status}</if>
         </where>
-        order by record_id desc
+        order by t.record_id desc
     </select>
 
     <select id="selectProFeedbackByRecordId" parameterType="Long" resultMap="ProFeedbackResult">

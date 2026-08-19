@@ -81,6 +81,14 @@ public class ProFeedback extends BaseEntity
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private List<ProFeedbackParam> paramList;
 
+    /** 检验状态（transient，列表聚合：PASSED/PENDING/FAILED/CONCESSION/NONE） */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String qcStatus;
+
+    /** 关联工序检 ID（transient，列表聚合，用于跳转） */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Long ipqcId;
+
     public Long getRecordId() { return recordId; }
     public void setRecordId(Long v) { this.recordId = v; }
     public Long getFactoryId() { return factoryId; }
@@ -181,6 +189,11 @@ public class ProFeedback extends BaseEntity
     public void setConsumeList(List<ProFeedbackConsume> v) { this.consumeList = v; }
     public List<ProFeedbackParam> getParamList() { return paramList; }
     public void setParamList(List<ProFeedbackParam> v) { this.paramList = v; }
+
+    public String getQcStatus() { return qcStatus; }
+    public void setQcStatus(String qcStatus) { this.qcStatus = qcStatus; }
+    public Long getIpqcId() { return ipqcId; }
+    public void setIpqcId(Long ipqcId) { this.ipqcId = ipqcId; }
 
     @Override
     public String toString() {

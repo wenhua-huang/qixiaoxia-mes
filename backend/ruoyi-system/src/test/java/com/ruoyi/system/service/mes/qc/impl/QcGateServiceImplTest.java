@@ -1,7 +1,10 @@
 package com.ruoyi.system.service.mes.qc.impl;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,6 +17,7 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.system.domain.mes.qc.QcIpqc;
 import com.ruoyi.system.domain.mes.qc.QcIqc;
 import com.ruoyi.system.domain.mes.qc.QcOqc;
+import com.ruoyi.system.domain.mes.qc.QcRqc;
 import com.ruoyi.system.domain.mes.qc.QcTemplateProduct;
 import com.ruoyi.system.domain.mes.wm.WmItemRecpt;
 import com.ruoyi.system.domain.mes.wm.WmItemRecptLine;
@@ -24,6 +28,7 @@ import com.ruoyi.system.domain.mes.wm.WmProductSalesLine;
 import com.ruoyi.system.mapper.mes.qc.QcIpqcMapper;
 import com.ruoyi.system.mapper.mes.qc.QcIqcMapper;
 import com.ruoyi.system.mapper.mes.qc.QcOqcMapper;
+import com.ruoyi.system.mapper.mes.qc.QcRqcMapper;
 import com.ruoyi.system.mapper.mes.wm.WmProductRecptLineMapper;
 import com.ruoyi.system.mapper.mes.wm.WmProductSalesLineMapper;
 import com.ruoyi.system.service.mes.qc.IQcFactoryService;
@@ -33,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -40,19 +46,22 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * IQC 确认入库拦截门单测（Mockito 全 Mock，禁止连库）
+ * 质检拦截门单测（Mockito 全 Mock，禁止连库）
  */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("IQC 确认入库拦截门")
+@DisplayName("IQC/IPQC/OQC/RQC 拦截门")
 class QcGateServiceImplTest {
 
     @Mock IQcFactoryService factoryService;
     @Mock QcIqcMapper iqcMapper;
     @Mock QcOqcMapper oqcMapper;
     @Mock QcIpqcMapper ipqcMapper;
+    @Mock QcRqcMapper rqcMapper;
     @Mock WmProductSalesLineMapper wmProductSalesLineMapper;
     @Mock WmProductRecptLineMapper wmProductRecptLineMapper;
     @InjectMocks QcGateServiceImpl service;
+
+    // ── 通用夹具 ──
 
     private WmItemRecpt header(Long recptId) {
         WmItemRecpt h = new WmItemRecpt();
@@ -76,20 +85,39 @@ class QcGateServiceImplTest {
         o.setIqcCode("IQC001");
         o.setStatus(status);
         o.setCheckResult(result);
+        o.setItemId(1L);
         return o;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void stubBind(String qcType, Long itemId, QcTemplateProduct bind) {
+        when(factoryService.resolveTemplates(eq(qcType), anyCollection(), any()))
+            .thenAnswer(inv -> {
+                Collection<Long> ids = inv.getArgument(1);
+                Map<Long, QcTemplateProduct> map = new HashMap<>();
+                if (bind != null) {
+                    for (Long id : ids) {
+                        if (id.equals(itemId)) {
+                            map.put(id, bind);
+                        }
+                    }
+                }
+                return map;
+            });
     }
 
     /** 物料 1 绑定了 IQC 模板（需检） */
     private void needInspect() {
-        when(factoryService.resolveTemplate(eq(QcConstants.TYPE_IQC), eq(1L), any()))
-            .thenReturn(new QcTemplateProduct());
+        stubBind(QcConstants.TYPE_IQC, 1L, new QcTemplateProduct());
     }
+
+    // ==================== IQC 确认入库拦截 ====================
 
     @Test
     @DisplayName("需检物料无检验单时抛异常且消息含物料编码与提示")
     void should_throw_when_no_order_for_inspected_item() {
         needInspect();
-        when(iqcMapper.selectBySource(QcConstants.SOURCE_ITEM_RECPT, 1L, 1L))
+        when(iqcMapper.selectBySourceItems(eq(QcConstants.SOURCE_ITEM_RECPT), eq(1L), anyCollection()))
             .thenReturn(Collections.emptyList());
 
         ServiceException ex = assertThrows(ServiceException.class,
@@ -103,7 +131,7 @@ class QcGateServiceImplTest {
     @DisplayName("存在 COMPLETED 且 PASS 的检验单时放行")
     void should_pass_when_completed_pass_order_exists() {
         needInspect();
-        when(iqcMapper.selectBySource(QcConstants.SOURCE_ITEM_RECPT, 1L, 1L))
+        when(iqcMapper.selectBySourceItems(eq(QcConstants.SOURCE_ITEM_RECPT), eq(1L), anyCollection()))
             .thenReturn(Collections.singletonList(order(QcConstants.STATUS_COMPLETED, QcConstants.RESULT_PASS)));
 
         assertDoesNotThrow(
@@ -114,7 +142,7 @@ class QcGateServiceImplTest {
     @DisplayName("仅有 FAIL 判定单时抛异常且消息含检验单编码与状态")
     void should_throw_when_only_fail_order_exists() {
         needInspect();
-        when(iqcMapper.selectBySource(QcConstants.SOURCE_ITEM_RECPT, 1L, 1L))
+        when(iqcMapper.selectBySourceItems(eq(QcConstants.SOURCE_ITEM_RECPT), eq(1L), anyCollection()))
             .thenReturn(Collections.singletonList(order(QcConstants.STATUS_COMPLETED, QcConstants.RESULT_FAIL)));
 
         ServiceException ex = assertThrows(ServiceException.class,
@@ -128,7 +156,7 @@ class QcGateServiceImplTest {
     @DisplayName("COMPLETED 且 CONCESSION 让步接收单放行")
     void should_pass_when_concession_order_exists() {
         needInspect();
-        when(iqcMapper.selectBySource(QcConstants.SOURCE_ITEM_RECPT, 1L, 1L))
+        when(iqcMapper.selectBySourceItems(eq(QcConstants.SOURCE_ITEM_RECPT), eq(1L), anyCollection()))
             .thenReturn(Collections.singletonList(order(QcConstants.STATUS_COMPLETED, QcConstants.RESULT_CONCESSION)));
 
         assertDoesNotThrow(
@@ -138,20 +166,20 @@ class QcGateServiceImplTest {
     @Test
     @DisplayName("未绑定模板的物料免检放行且不查检验单")
     void should_pass_when_item_not_bound() {
-        when(factoryService.resolveTemplate(eq(QcConstants.TYPE_IQC), eq(1L), any()))
-            .thenReturn(null);
+        stubBind(QcConstants.TYPE_IQC, 1L, null);
 
         assertDoesNotThrow(
             () -> service.assertItemRecptConfirmable(header(1L), Collections.singletonList(line(1L))));
 
         verify(iqcMapper, never()).selectBySource(anyString(), any(), any());
+        verify(iqcMapper, never()).selectBySourceItems(anyString(), any(), anyCollection());
     }
 
     @Test
     @DisplayName("待检单仍在 PENDING 未完成时抛异常")
     void should_throw_when_order_not_completed() {
         needInspect();
-        when(iqcMapper.selectBySource(QcConstants.SOURCE_ITEM_RECPT, 1L, 1L))
+        when(iqcMapper.selectBySourceItems(eq(QcConstants.SOURCE_ITEM_RECPT), eq(1L), anyCollection()))
             .thenReturn(Collections.singletonList(order(QcConstants.STATUS_PENDING, null)));
 
         ServiceException ex = assertThrows(ServiceException.class,
@@ -184,22 +212,21 @@ class QcGateServiceImplTest {
         o.setOqcCode("OQC001");
         o.setStatus(status);
         o.setCheckResult(result);
+        o.setItemId(1L);
         return o;
     }
 
-    /** 物料 1 绑定了 OQC 模板（需检）并加载出库行 */
     private void needOqcInspect() {
         when(wmProductSalesLineMapper.selectLinesBySalesId(1L))
             .thenReturn(Collections.singletonList(salesLine(1L)));
-        when(factoryService.resolveTemplate(eq(QcConstants.TYPE_OQC), eq(1L), any()))
-            .thenReturn(new QcTemplateProduct());
+        stubBind(QcConstants.TYPE_OQC, 1L, new QcTemplateProduct());
     }
 
     @Test
     @DisplayName("OQC：需检物料无检验单时抛异常且消息含物料编码与出货检验提示")
     void should_throw_oqc_when_no_order_for_inspected_item() {
         needOqcInspect();
-        when(oqcMapper.selectBySource(QcConstants.SOURCE_PRODUCT_SALES, 1L, 1L))
+        when(oqcMapper.selectBySourceItems(eq(QcConstants.SOURCE_PRODUCT_SALES), eq(1L), anyCollection()))
             .thenReturn(Collections.emptyList());
 
         ServiceException ex = assertThrows(ServiceException.class,
@@ -214,7 +241,7 @@ class QcGateServiceImplTest {
     @DisplayName("OQC：存在 COMPLETED 且 PASS 的检验单时放行")
     void should_pass_oqc_when_completed_pass_order_exists() {
         needOqcInspect();
-        when(oqcMapper.selectBySource(QcConstants.SOURCE_PRODUCT_SALES, 1L, 1L))
+        when(oqcMapper.selectBySourceItems(eq(QcConstants.SOURCE_PRODUCT_SALES), eq(1L), anyCollection()))
             .thenReturn(Collections.singletonList(oqcOrder(QcConstants.STATUS_COMPLETED, QcConstants.RESULT_PASS)));
 
         assertDoesNotThrow(() -> service.assertProductSalesPostable(salesHeader(1L)));
@@ -224,7 +251,7 @@ class QcGateServiceImplTest {
     @DisplayName("OQC：仅有 FAIL 判定单时抛异常且消息含检验单编码与结果")
     void should_throw_oqc_when_only_fail_order_exists() {
         needOqcInspect();
-        when(oqcMapper.selectBySource(QcConstants.SOURCE_PRODUCT_SALES, 1L, 1L))
+        when(oqcMapper.selectBySourceItems(eq(QcConstants.SOURCE_PRODUCT_SALES), eq(1L), anyCollection()))
             .thenReturn(Collections.singletonList(oqcOrder(QcConstants.STATUS_COMPLETED, QcConstants.RESULT_FAIL)));
 
         ServiceException ex = assertThrows(ServiceException.class,
@@ -238,7 +265,7 @@ class QcGateServiceImplTest {
     @DisplayName("OQC：COMPLETED 且 CONCESSION 让步接收单放行")
     void should_pass_oqc_when_concession_order_exists() {
         needOqcInspect();
-        when(oqcMapper.selectBySource(QcConstants.SOURCE_PRODUCT_SALES, 1L, 1L))
+        when(oqcMapper.selectBySourceItems(eq(QcConstants.SOURCE_PRODUCT_SALES), eq(1L), anyCollection()))
             .thenReturn(Collections.singletonList(oqcOrder(QcConstants.STATUS_COMPLETED, QcConstants.RESULT_CONCESSION)));
 
         assertDoesNotThrow(() -> service.assertProductSalesPostable(salesHeader(1L)));
@@ -249,19 +276,19 @@ class QcGateServiceImplTest {
     void should_pass_oqc_when_item_not_bound() {
         when(wmProductSalesLineMapper.selectLinesBySalesId(1L))
             .thenReturn(Collections.singletonList(salesLine(1L)));
-        when(factoryService.resolveTemplate(eq(QcConstants.TYPE_OQC), eq(1L), any()))
-            .thenReturn(null);
+        stubBind(QcConstants.TYPE_OQC, 1L, null);
 
         assertDoesNotThrow(() -> service.assertProductSalesPostable(salesHeader(1L)));
 
         verify(oqcMapper, never()).selectBySource(anyString(), any(), any());
+        verify(oqcMapper, never()).selectBySourceItems(anyString(), any(), anyCollection());
     }
 
     @Test
     @DisplayName("OQC：待检单仍在 PENDING 未完成时抛异常")
     void should_throw_oqc_when_order_not_completed() {
         needOqcInspect();
-        when(oqcMapper.selectBySource(QcConstants.SOURCE_PRODUCT_SALES, 1L, 1L))
+        when(oqcMapper.selectBySourceItems(eq(QcConstants.SOURCE_PRODUCT_SALES), eq(1L), anyCollection()))
             .thenReturn(Collections.singletonList(oqcOrder(QcConstants.STATUS_PENDING, null)));
 
         ServiceException ex = assertThrows(ServiceException.class,
@@ -296,22 +323,21 @@ class QcGateServiceImplTest {
         o.setIpqcCode("IPQC001");
         o.setStatus(status);
         o.setCheckResult(result);
+        o.setItemId(1L);
         return o;
     }
 
-    /** 产品 1 绑定了 IPQC 模板（需完工检）并加载入库行 */
     private void needIpqcInspect() {
         when(wmProductRecptLineMapper.selectWmProductRecptLineList(any()))
             .thenReturn(Collections.singletonList(recptLine(1L)));
-        when(factoryService.resolveTemplate(eq(QcConstants.TYPE_IPQC), eq(1L), any()))
-            .thenReturn(new QcTemplateProduct());
+        stubBind(QcConstants.TYPE_IPQC, 1L, new QcTemplateProduct());
     }
 
     @Test
     @DisplayName("IPQC：需检产品无完工检验单时抛异常且消息含物料编码与完工检验提示")
     void should_throw_ipqc_when_no_order_for_inspected_product() {
         needIpqcInspect();
-        when(ipqcMapper.selectBySource(QcConstants.SOURCE_PRODUCT_RECPT, 1L, 1L))
+        when(ipqcMapper.selectBySourceItems(eq(QcConstants.SOURCE_PRODUCT_RECPT), eq(1L), anyCollection()))
             .thenReturn(Collections.emptyList());
 
         ServiceException ex = assertThrows(ServiceException.class,
@@ -326,7 +352,7 @@ class QcGateServiceImplTest {
     @DisplayName("IPQC：存在 COMPLETED 且 PASS 的完工检验单时放行")
     void should_pass_ipqc_when_completed_pass_order_exists() {
         needIpqcInspect();
-        when(ipqcMapper.selectBySource(QcConstants.SOURCE_PRODUCT_RECPT, 1L, 1L))
+        when(ipqcMapper.selectBySourceItems(eq(QcConstants.SOURCE_PRODUCT_RECPT), eq(1L), anyCollection()))
             .thenReturn(Collections.singletonList(ipqcOrder(QcConstants.STATUS_COMPLETED, QcConstants.RESULT_PASS)));
 
         assertDoesNotThrow(() -> service.assertProductRecptConfirmable(recptHeader(1L)));
@@ -336,7 +362,7 @@ class QcGateServiceImplTest {
     @DisplayName("IPQC：COMPLETED 且 CONCESSION 让步接收单放行")
     void should_pass_ipqc_when_concession_order_exists() {
         needIpqcInspect();
-        when(ipqcMapper.selectBySource(QcConstants.SOURCE_PRODUCT_RECPT, 1L, 1L))
+        when(ipqcMapper.selectBySourceItems(eq(QcConstants.SOURCE_PRODUCT_RECPT), eq(1L), anyCollection()))
             .thenReturn(Collections.singletonList(ipqcOrder(QcConstants.STATUS_COMPLETED, QcConstants.RESULT_CONCESSION)));
 
         assertDoesNotThrow(() -> service.assertProductRecptConfirmable(recptHeader(1L)));
@@ -346,7 +372,7 @@ class QcGateServiceImplTest {
     @DisplayName("IPQC：仅有 FAIL 判定单时抛异常且消息含检验单编码与结果")
     void should_throw_ipqc_when_only_fail_order_exists() {
         needIpqcInspect();
-        when(ipqcMapper.selectBySource(QcConstants.SOURCE_PRODUCT_RECPT, 1L, 1L))
+        when(ipqcMapper.selectBySourceItems(eq(QcConstants.SOURCE_PRODUCT_RECPT), eq(1L), anyCollection()))
             .thenReturn(Collections.singletonList(ipqcOrder(QcConstants.STATUS_COMPLETED, QcConstants.RESULT_FAIL)));
 
         ServiceException ex = assertThrows(ServiceException.class,
@@ -360,7 +386,7 @@ class QcGateServiceImplTest {
     @DisplayName("IPQC：待检单仍在 PENDING 未完成时抛异常")
     void should_throw_ipqc_when_order_not_completed() {
         needIpqcInspect();
-        when(ipqcMapper.selectBySource(QcConstants.SOURCE_PRODUCT_RECPT, 1L, 1L))
+        when(ipqcMapper.selectBySourceItems(eq(QcConstants.SOURCE_PRODUCT_RECPT), eq(1L), anyCollection()))
             .thenReturn(Collections.singletonList(ipqcOrder(QcConstants.STATUS_PENDING, null)));
 
         ServiceException ex = assertThrows(ServiceException.class,
@@ -375,11 +401,76 @@ class QcGateServiceImplTest {
     void should_pass_ipqc_when_product_not_bound() {
         when(wmProductRecptLineMapper.selectWmProductRecptLineList(any()))
             .thenReturn(Collections.singletonList(recptLine(1L)));
-        when(factoryService.resolveTemplate(eq(QcConstants.TYPE_IPQC), eq(1L), any()))
-            .thenReturn(null);
+        stubBind(QcConstants.TYPE_IPQC, 1L, null);
 
         assertDoesNotThrow(() -> service.assertProductRecptConfirmable(recptHeader(1L)));
 
         verify(ipqcMapper, never()).selectBySource(anyString(), any(), any());
+        verify(ipqcMapper, never()).selectBySourceItems(anyString(), any(), anyCollection());
+    }
+
+    // ==================== RQC 退料执行拦截 ====================
+
+    private com.ruoyi.system.domain.mes.wm.WmRtIssue rtHeader(Long rtId) {
+        com.ruoyi.system.domain.mes.wm.WmRtIssue h = new com.ruoyi.system.domain.mes.wm.WmRtIssue();
+        h.setRtId(rtId);
+        h.setRtCode("RT001");
+        return h;
+    }
+
+    private com.ruoyi.system.domain.mes.wm.WmRtIssueLine rtLine(Long itemId) {
+        com.ruoyi.system.domain.mes.wm.WmRtIssueLine l = new com.ruoyi.system.domain.mes.wm.WmRtIssueLine();
+        l.setItemId(itemId);
+        l.setItemCode("ITEM-" + itemId);
+        l.setQuantityRt(BigDecimal.TEN);
+        return l;
+    }
+
+    private QcRqc rqcOrder(String status, String result) {
+        QcRqc o = new QcRqc();
+        o.setRqcId(500L);
+        o.setRqcCode("RQC001");
+        o.setStatus(status);
+        o.setCheckResult(result);
+        o.setItemId(1L);
+        return o;
+    }
+
+    @Test
+    @DisplayName("RQC：需检物料无退料检验单时抛异常")
+    void should_throw_rqc_when_no_order_for_inspected_item() {
+        stubBind(QcConstants.TYPE_RQC, 1L, new QcTemplateProduct());
+        when(rqcMapper.selectBySourceItems(eq(QcConstants.SOURCE_RT_ISSUE), eq(7L), anyCollection()))
+            .thenReturn(Collections.emptyList());
+
+        ServiceException ex = assertThrows(ServiceException.class,
+            () -> service.assertRtIssueExecutable(rtHeader(7L), Collections.singletonList(rtLine(1L))));
+
+        assertTrue(ex.getMessage().contains("ITEM-1"));
+        assertTrue(ex.getMessage().contains("需退料检验合格后方可执行退料"));
+        assertTrue(ex.getMessage().contains("未生成检验单"));
+    }
+
+    @Test
+    @DisplayName("RQC：存在 COMPLETED 且 PASS 的检验单时放行")
+    void should_pass_rqc_when_completed_pass_order_exists() {
+        stubBind(QcConstants.TYPE_RQC, 1L, new QcTemplateProduct());
+        when(rqcMapper.selectBySourceItems(eq(QcConstants.SOURCE_RT_ISSUE), eq(7L), anyCollection()))
+            .thenReturn(Collections.singletonList(rqcOrder(QcConstants.STATUS_COMPLETED, QcConstants.RESULT_PASS)));
+
+        assertDoesNotThrow(
+            () -> service.assertRtIssueExecutable(rtHeader(7L), Collections.singletonList(rtLine(1L))));
+    }
+
+    @Test
+    @DisplayName("RQC：未绑定模板的物料免检放行且不查检验单")
+    void should_pass_rqc_when_item_not_bound() {
+        stubBind(QcConstants.TYPE_RQC, 1L, null);
+
+        assertDoesNotThrow(
+            () -> service.assertRtIssueExecutable(rtHeader(7L), Collections.singletonList(rtLine(1L))));
+
+        verify(rqcMapper, never()).selectBySource(anyString(), any(), any());
+        verify(rqcMapper, never()).selectBySourceItems(anyString(), any(), anyCollection());
     }
 }

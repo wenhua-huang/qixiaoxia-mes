@@ -218,25 +218,30 @@ public class QcIqcServiceImpl implements IQcIqcService
     @Override
     public void closeIqc(Long iqcId)
     {
-        QcIqc iqc = qcIqcMapper.selectQcIqcByIqcId(iqcId);
-        if (iqc == null)
-        {
-            throw new ServiceException("检验单不存在");
-        }
-        if (QcConstants.STATUS_CLOSED.equals(iqc.getStatus()))
-        {
-            return;  // 幂等：已关闭直接返回
-        }
-        if (QcConstants.STATUS_COMPLETED.equals(iqc.getStatus()))
-        {
-            throw new ServiceException("已判定的检验单不可关闭（判定结果可能已驱动下游入库）");
-        }
-        QcIqc update = new QcIqc();
-        update.setIqcId(iqcId);
-        update.setStatus(QcConstants.STATUS_CLOSED);
-        update.setUpdateBy(SecurityUtils.getUsername());
-        update.setUpdateTime(DateUtils.getNowDate());
-        qcIqcMapper.updateQcIqc(update);
+        // 与判定共用 LOCK_JUDGE 串行化，锁内条件 UPDATE 消除读-改竞态
+        String lockKey = QcConstants.LOCK_JUDGE + "IQC:" + iqcId;
+        lockTemplate.execute(lockKey, () -> {
+            int rows = qcIqcMapper.closeIfActive(iqcId, SecurityUtils.getUsername(), DateUtils.getNowDate());
+            if (rows > 0)
+            {
+                return;
+            }
+            // 0 行：不存在 / 已关闭(幂等) / 已判定(拒绝)，重读给出精确反馈
+            QcIqc existing = qcIqcMapper.selectQcIqcByIqcId(iqcId);
+            if (existing == null)
+            {
+                throw new ServiceException("检验单不存在");
+            }
+            if (QcConstants.STATUS_CLOSED.equals(existing.getStatus()))
+            {
+                return;
+            }
+            if (QcConstants.STATUS_COMPLETED.equals(existing.getStatus()))
+            {
+                throw new ServiceException("已判定的检验单不可关闭（判定结果可能已驱动下游入库）");
+            }
+            throw new ServiceException("当前检验单状态不可关闭：" + existing.getStatus());
+        });
     }
 
     /**

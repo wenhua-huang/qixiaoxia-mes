@@ -114,6 +114,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by ipqc_id desc
     </select>
 
+    <select id="selectBySourceItems" resultMap="QcIpqcResult">
+        <include refid="selectQcIpqcVo"/>
+        where source_doc_type = #{sourceDocType} and source_doc_id = #{sourceDocId}
+          and item_id in
+          <foreach collection="itemIds" item="itemId" open="(" separator="," close=")">#{itemId}</foreach>
+        order by ipqc_id desc
+    </select>
+
     <insert id="insertQcIpqc" parameterType="com.ruoyi.system.domain.mes.qc.QcIpqc" useGeneratedKeys="true" keyProperty="ipqcId">
         insert into qxx_qc_ipqc
         <trim prefix="(" suffix=")" suffixOverrides=",">
@@ -275,6 +283,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateTime != null">update_time = #{updateTime},</if>
         </trim>
         where ipqc_id = #{ipqcId}
+    </update>
+
+    <update id="closeIfActive">
+        update qxx_qc_ipqc
+        set status = 'CLOSED',
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            update_time = #{updateTime}
+        where ipqc_id = #{id}
+          and status in ('PENDING', 'INSPECTING')
     </update>
 
     <delete id="deleteQcIpqcByIpqcId" parameterType="Long">

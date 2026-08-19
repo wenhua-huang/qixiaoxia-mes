@@ -1,5 +1,7 @@
 package com.ruoyi.system.mapper.mes.qc;
 
+import java.util.Collection;
+import java.util.Date;
 import java.util.List;
 import org.apache.ibatis.annotations.Param;
 import com.ruoyi.system.domain.mes.qc.QcIqc;
@@ -37,4 +39,24 @@ public interface QcIqcMapper
     public List<QcIqc> selectBySource(@Param("sourceDocType") String sourceDocType,
                                       @Param("sourceDocId") Long sourceDocId,
                                       @Param("itemId") Long itemId);
+
+    /**
+     * 按来源单据批量反查多个物料的检验单（gate/生成路径消除 N+1）
+     */
+    public List<QcIqc> selectBySourceItems(@Param("sourceDocType") String sourceDocType,
+                                           @Param("sourceDocId") Long sourceDocId,
+                                           @Param("itemIds") Collection<Long> itemIds);
+
+    /**
+     * 条件关闭：仅当单据处于 PENDING/INSPECTING 时原子置为 CLOSED。
+     * 用数据库行级条件消除"读状态→改状态"的 TOCTOU 竞态（与判定 COMPLETED 并发时判定获胜）。
+     *
+     * @param id         检验单ID
+     * @param updateBy   更新人(可 null)
+     * @param updateTime 更新时间
+     * @return 受影响行数：1=成功关闭；0=已越过活动态（COMPLETED/CLOSED），调用方应重读判定
+     */
+    public int closeIfActive(@Param("id") Long id,
+                             @Param("updateBy") String updateBy,
+                             @Param("updateTime") Date updateTime);
 }

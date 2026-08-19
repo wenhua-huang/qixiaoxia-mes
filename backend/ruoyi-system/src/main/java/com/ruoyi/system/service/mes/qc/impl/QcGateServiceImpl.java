@@ -1,6 +1,7 @@
 package com.ruoyi.system.service.mes.qc.impl;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -13,6 +14,7 @@ import com.ruoyi.system.domain.mes.qc.QcIpqc;
 import com.ruoyi.system.domain.mes.qc.QcIqc;
 import com.ruoyi.system.domain.mes.qc.QcOqc;
 import com.ruoyi.system.domain.mes.qc.QcRqc;
+import com.ruoyi.system.domain.mes.qc.QcTemplateProduct;
 import com.ruoyi.system.domain.mes.wm.WmItemRecpt;
 import com.ruoyi.system.domain.mes.wm.WmItemRecptLine;
 import com.ruoyi.system.domain.mes.wm.WmProductRecpt;
@@ -33,6 +35,9 @@ import com.ruoyi.system.service.mes.qc.QcConstants;
 
 /**
  * 质检拦截门实现（IQC/IPQC/OQC/RQC 四类业务单据的执行前校验）
+ *
+ * <p>批量优化：模板解析与检验单反查均按单据维度批量进行（每类 2 条 SQL），
+ * 消除逐物料 N+1，缩短持锁时间。
  *
  * @author qixiaoxia
  * @date 2026-08-16
@@ -68,47 +73,28 @@ public class QcGateServiceImpl implements IQcGateService
         {
             return;
         }
-        Set<Long> items = lines.stream().map(WmItemRecptLine::getItemId).collect(Collectors.toSet());
-        for (Long itemId : items)
+        Set<Long> items = distinctItems(lines, WmItemRecptLine::getItemId);
+        Map<Long, QcTemplateProduct> binds = factoryService.resolveTemplates(
+            QcConstants.TYPE_IQC, items, null);
+        if (binds.isEmpty())
         {
-            checkItemInspected(header, lines, itemId);
+            return;  // 全部未绑定模板 = 免检
         }
-    }
-
-    /** 单物料校验：需检物料必须有 COMPLETED 且 PASS/CONCESSION 的检验单 */
-    private void checkItemInspected(WmItemRecpt header, List<WmItemRecptLine> lines, Long itemId)
-    {
-        if (factoryService.resolveTemplate(QcConstants.TYPE_IQC, itemId, null) == null)
+        List<QcIqc> orders = iqcMapper.selectBySourceItems(
+            QcConstants.SOURCE_ITEM_RECPT, header.getRecptId(), binds.keySet());
+        Map<Long, List<QcIqc>> byItem = orders.stream()
+            .filter(o -> o.getItemId() != null)
+            .collect(Collectors.groupingBy(QcIqc::getItemId));
+        for (Map.Entry<Long, QcTemplateProduct> e : binds.entrySet())
         {
-            return;  // 未绑定模板 = 免检
+            Long itemId = e.getKey();
+            if (anyPassed(byItem.get(itemId), QcIqc::getStatus, QcIqc::getCheckResult))
+            {
+                continue;
+            }
+            throw new ServiceException("物料[" + itemCodeOf(lines, itemId) + "]需来料检验合格后方可确认入库（"
+                + iqcHintOf(byItem.get(itemId)) + "）");
         }
-        List<QcIqc> orders = iqcMapper.selectBySource(QcConstants.SOURCE_ITEM_RECPT, header.getRecptId(), itemId);
-        boolean passed = orders.stream().anyMatch(o -> QcConstants.STATUS_COMPLETED.equals(o.getStatus())
-            && (QcConstants.RESULT_PASS.equals(o.getCheckResult())
-                || QcConstants.RESULT_CONCESSION.equals(o.getCheckResult())));
-        if (passed)
-        {
-            return;
-        }
-        throw new ServiceException("物料[" + itemCodeOf(lines, itemId) + "]需来料检验合格后方可确认入库（"
-            + hintOf(orders) + "）");
-    }
-
-    private String itemCodeOf(List<WmItemRecptLine> lines, Long itemId)
-    {
-        return lines.stream().filter(l -> itemId.equals(l.getItemId())).findFirst()
-            .map(WmItemRecptLine::getItemCode).orElse(String.valueOf(itemId));
-    }
-
-    /** 未生成检验单 / 检验单未完成的差异提示 */
-    private String hintOf(List<QcIqc> orders)
-    {
-        if (orders.isEmpty())
-        {
-            return "未生成检验单";
-        }
-        QcIqc first = orders.get(0);
-        return "检验单[" + first.getIqcCode() + "]状态:" + first.getStatus() + "/" + first.getCheckResult();
     }
 
     @Override
@@ -125,48 +111,28 @@ public class QcGateServiceImpl implements IQcGateService
         {
             return;
         }
-        Set<Long> items = lines.stream().map(WmProductRecptLine::getItemId)
-            .filter(Objects::nonNull).collect(Collectors.toSet());
-        for (Long itemId : items)
-        {
-            checkProductInspected(header, lines, itemId);
-        }
-    }
-
-    /** 单产品校验：需检产品（绑定了 IPQC 模板）必须有 COMPLETED 且 PASS/CONCESSION 的完工检验单 */
-    private void checkProductInspected(WmProductRecpt header, List<WmProductRecptLine> lines, Long itemId)
-    {
-        if (factoryService.resolveTemplate(QcConstants.TYPE_IPQC, itemId, null) == null)
-        {
-            return;  // 未绑定模板 = 免检
-        }
-        List<QcIpqc> orders = ipqcMapper.selectBySource(QcConstants.SOURCE_PRODUCT_RECPT, header.getRecptId(), itemId);
-        boolean passed = orders.stream().anyMatch(o -> QcConstants.STATUS_COMPLETED.equals(o.getStatus())
-            && (QcConstants.RESULT_PASS.equals(o.getCheckResult())
-                || QcConstants.RESULT_CONCESSION.equals(o.getCheckResult())));
-        if (passed)
+        Set<Long> items = distinctItems(lines, WmProductRecptLine::getItemId);
+        Map<Long, QcTemplateProduct> binds = factoryService.resolveTemplates(
+            QcConstants.TYPE_IPQC, items, null);
+        if (binds.isEmpty())
         {
             return;
         }
-        throw new ServiceException("物料[" + recptItemCodeOf(lines, itemId) + "]需完工检验合格后方可确认入库（"
-            + ipqcHintOf(orders) + "）");
-    }
-
-    private String recptItemCodeOf(List<WmProductRecptLine> lines, Long itemId)
-    {
-        return lines.stream().filter(l -> itemId.equals(l.getItemId())).findFirst()
-            .map(WmProductRecptLine::getItemCode).orElse(String.valueOf(itemId));
-    }
-
-    /** 未生成检验单 / 检验单未完成的差异提示 */
-    private String ipqcHintOf(List<QcIpqc> orders)
-    {
-        if (orders.isEmpty())
+        List<QcIpqc> orders = ipqcMapper.selectBySourceItems(
+            QcConstants.SOURCE_PRODUCT_RECPT, header.getRecptId(), binds.keySet());
+        Map<Long, List<QcIpqc>> byItem = orders.stream()
+            .filter(o -> o.getItemId() != null)
+            .collect(Collectors.groupingBy(QcIpqc::getItemId));
+        for (Map.Entry<Long, QcTemplateProduct> e : binds.entrySet())
         {
-            return "未生成检验单";
+            Long itemId = e.getKey();
+            if (anyPassed(byItem.get(itemId), QcIpqc::getStatus, QcIpqc::getCheckResult))
+            {
+                continue;
+            }
+            throw new ServiceException("物料[" + recptItemCodeOf(lines, itemId) + "]需完工检验合格后方可确认入库（"
+                + ipqcHintOf(byItem.get(itemId)) + "）");
         }
-        QcIpqc first = orders.get(0);
-        return "检验单[" + first.getIpqcCode() + "]状态:" + first.getStatus() + "/" + first.getCheckResult();
     }
 
     @Override
@@ -181,48 +147,28 @@ public class QcGateServiceImpl implements IQcGateService
         {
             return;
         }
-        Set<Long> items = lines.stream().map(WmProductSalesLine::getItemId)
-            .filter(Objects::nonNull).collect(Collectors.toSet());
-        for (Long itemId : items)
-        {
-            checkItemShipped(header, lines, itemId);
-        }
-    }
-
-    /** 单物料校验：需检物料必须有 COMPLETED 且 PASS/CONCESSION 的出货检验单 */
-    private void checkItemShipped(WmProductSales header, List<WmProductSalesLine> lines, Long itemId)
-    {
-        if (factoryService.resolveTemplate(QcConstants.TYPE_OQC, itemId, null) == null)
-        {
-            return;  // 未绑定模板 = 免检
-        }
-        List<QcOqc> orders = oqcMapper.selectBySource(QcConstants.SOURCE_PRODUCT_SALES, header.getSalesId(), itemId);
-        boolean passed = orders.stream().anyMatch(o -> QcConstants.STATUS_COMPLETED.equals(o.getStatus())
-            && (QcConstants.RESULT_PASS.equals(o.getCheckResult())
-                || QcConstants.RESULT_CONCESSION.equals(o.getCheckResult())));
-        if (passed)
+        Set<Long> items = distinctItems(lines, WmProductSalesLine::getItemId);
+        Map<Long, QcTemplateProduct> binds = factoryService.resolveTemplates(
+            QcConstants.TYPE_OQC, items, null);
+        if (binds.isEmpty())
         {
             return;
         }
-        throw new ServiceException("物料[" + salesItemCodeOf(lines, itemId) + "]需出货检验合格后方可出库确认（"
-            + oqcHintOf(orders) + "）");
-    }
-
-    private String salesItemCodeOf(List<WmProductSalesLine> lines, Long itemId)
-    {
-        return lines.stream().filter(l -> itemId.equals(l.getItemId())).findFirst()
-            .map(WmProductSalesLine::getItemCode).orElse(String.valueOf(itemId));
-    }
-
-    /** 未生成检验单 / 检验单未完成的差异提示 */
-    private String oqcHintOf(List<QcOqc> orders)
-    {
-        if (orders.isEmpty())
+        List<QcOqc> orders = oqcMapper.selectBySourceItems(
+            QcConstants.SOURCE_PRODUCT_SALES, header.getSalesId(), binds.keySet());
+        Map<Long, List<QcOqc>> byItem = orders.stream()
+            .filter(o -> o.getItemId() != null)
+            .collect(Collectors.groupingBy(QcOqc::getItemId));
+        for (Map.Entry<Long, QcTemplateProduct> e : binds.entrySet())
         {
-            return "未生成检验单";
+            Long itemId = e.getKey();
+            if (anyPassed(byItem.get(itemId), QcOqc::getStatus, QcOqc::getCheckResult))
+            {
+                continue;
+            }
+            throw new ServiceException("物料[" + salesItemCodeOf(lines, itemId) + "]需出货检验合格后方可出库确认（"
+                + oqcHintOf(byItem.get(itemId)) + "）");
         }
-        QcOqc first = orders.get(0);
-        return "检验单[" + first.getOqcCode() + "]状态:" + first.getStatus() + "/" + first.getCheckResult();
     }
 
     @Override
@@ -232,31 +178,60 @@ public class QcGateServiceImpl implements IQcGateService
         {
             return;
         }
-        Set<Long> items = lines.stream().map(WmRtIssueLine::getItemId)
-            .filter(Objects::nonNull).collect(Collectors.toSet());
-        for (Long itemId : items)
-        {
-            checkRtItemInspected(header, lines, itemId);
-        }
-    }
-
-    /** 单退料物料校验：绑定 RQC 模板的必须有 COMPLETED 且 PASS/CONCESSION 的退料检验单 */
-    private void checkRtItemInspected(WmRtIssue header, List<WmRtIssueLine> lines, Long itemId)
-    {
-        if (factoryService.resolveTemplate(QcConstants.TYPE_RQC, itemId, null) == null)
-        {
-            return;  // 未绑定模板 = 免检
-        }
-        List<QcRqc> orders = rqcMapper.selectBySource(QcConstants.SOURCE_RT_ISSUE, header.getRtId(), itemId);
-        boolean passed = orders.stream().anyMatch(o -> QcConstants.STATUS_COMPLETED.equals(o.getStatus())
-            && (QcConstants.RESULT_PASS.equals(o.getCheckResult())
-                || QcConstants.RESULT_CONCESSION.equals(o.getCheckResult())));
-        if (passed)
+        Set<Long> items = distinctItems(lines, WmRtIssueLine::getItemId);
+        Map<Long, QcTemplateProduct> binds = factoryService.resolveTemplates(
+            QcConstants.TYPE_RQC, items, null);
+        if (binds.isEmpty())
         {
             return;
         }
-        throw new ServiceException("物料[" + rtItemCodeOf(lines, itemId) + "]需退料检验合格后方可执行退料（"
-            + rqcHintOf(orders) + "）");
+        List<QcRqc> orders = rqcMapper.selectBySourceItems(
+            QcConstants.SOURCE_RT_ISSUE, header.getRtId(), binds.keySet());
+        Map<Long, List<QcRqc>> byItem = orders.stream()
+            .filter(o -> o.getItemId() != null)
+            .collect(Collectors.groupingBy(QcRqc::getItemId));
+        for (Map.Entry<Long, QcTemplateProduct> e : binds.entrySet())
+        {
+            Long itemId = e.getKey();
+            if (anyPassed(byItem.get(itemId), QcRqc::getStatus, QcRqc::getCheckResult))
+            {
+                continue;
+            }
+            throw new ServiceException("物料[" + rtItemCodeOf(lines, itemId) + "]需退料检验合格后方可执行退料（"
+                + rqcHintOf(byItem.get(itemId)) + "）");
+        }
+    }
+
+    // ── 共用判定：存在 COMPLETED 且 PASS/CONCESSION 的检验单即放行 ──
+
+    private <T> boolean anyPassed(List<T> orders,
+                                  java.util.function.Function<T, String> statusFn,
+                                  java.util.function.Function<T, String> resultFn)
+    {
+        return orders != null && orders.stream().anyMatch(o ->
+            QcConstants.STATUS_COMPLETED.equals(statusFn.apply(o))
+                && (QcConstants.RESULT_PASS.equals(resultFn.apply(o))
+                    || QcConstants.RESULT_CONCESSION.equals(resultFn.apply(o))));
+    }
+
+    // ── 物料编码查找（按 itemId 匹配行） ──
+
+    private String itemCodeOf(List<WmItemRecptLine> lines, Long itemId)
+    {
+        return lines.stream().filter(l -> itemId.equals(l.getItemId())).findFirst()
+            .map(WmItemRecptLine::getItemCode).orElse(String.valueOf(itemId));
+    }
+
+    private String recptItemCodeOf(List<WmProductRecptLine> lines, Long itemId)
+    {
+        return lines.stream().filter(l -> itemId.equals(l.getItemId())).findFirst()
+            .map(WmProductRecptLine::getItemCode).orElse(String.valueOf(itemId));
+    }
+
+    private String salesItemCodeOf(List<WmProductSalesLine> lines, Long itemId)
+    {
+        return lines.stream().filter(l -> itemId.equals(l.getItemId())).findFirst()
+            .map(WmProductSalesLine::getItemCode).orElse(String.valueOf(itemId));
     }
 
     private String rtItemCodeOf(List<WmRtIssueLine> lines, Long itemId)
@@ -265,14 +240,52 @@ public class QcGateServiceImpl implements IQcGateService
             .map(WmRtIssueLine::getItemCode).orElse(String.valueOf(itemId));
     }
 
-    /** 未生成检验单 / 检验单未完成的差异提示 */
+    // ── 差异提示 ──
+
+    private String iqcHintOf(List<QcIqc> orders)
+    {
+        if (orders == null || orders.isEmpty())
+        {
+            return "未生成检验单";
+        }
+        QcIqc first = orders.get(0);
+        return "检验单[" + first.getIqcCode() + "]状态:" + first.getStatus() + "/" + first.getCheckResult();
+    }
+
+    private String ipqcHintOf(List<QcIpqc> orders)
+    {
+        if (orders == null || orders.isEmpty())
+        {
+            return "未生成检验单";
+        }
+        QcIpqc first = orders.get(0);
+        return "检验单[" + first.getIpqcCode() + "]状态:" + first.getStatus() + "/" + first.getCheckResult();
+    }
+
+    private String oqcHintOf(List<QcOqc> orders)
+    {
+        if (orders == null || orders.isEmpty())
+        {
+            return "未生成检验单";
+        }
+        QcOqc first = orders.get(0);
+        return "检验单[" + first.getOqcCode() + "]状态:" + first.getStatus() + "/" + first.getCheckResult();
+    }
+
     private String rqcHintOf(List<QcRqc> orders)
     {
-        if (orders.isEmpty())
+        if (orders == null || orders.isEmpty())
         {
             return "未生成检验单";
         }
         QcRqc first = orders.get(0);
         return "检验单[" + first.getRqcCode() + "]状态:" + first.getStatus() + "/" + first.getCheckResult();
+    }
+
+    // ── 工具：去重非空 itemId ──
+
+    private <T> Set<Long> distinctItems(List<T> lines, java.util.function.Function<T, Long> getter)
+    {
+        return lines.stream().map(getter).filter(Objects::nonNull).collect(Collectors.toSet());
     }
 }

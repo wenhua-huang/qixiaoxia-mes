@@ -55,6 +55,9 @@
       <el-col :span="1.5">
         <el-button type="warning" plain icon="Download" size="small" @click="handleExport" v-hasPermi="['mes:pro:card:export']">导出</el-button>
       </el-col>
+      <el-col :span="1.5">
+        <el-button type="info" plain icon="Printer" size="small" :disabled="multiple" @click="handleBatchPrint" v-hasPermi="['mes:pro:card:query']">批量打印</el-button>
+      </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList" />
     </el-row>
 
@@ -81,8 +84,9 @@
           <span>{{ parseTime(scope.row.createTime) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="160" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="220" class-name="small-padding fixed-width">
         <template #default="scope">
+          <el-button link type="primary" size="small" icon="Grid" @click="handleQrCode(scope.row)" v-hasPermi="['mes:pro:card:query']">二维码</el-button>
           <el-button link type="primary" size="small" icon="View" @click="handleView(scope.row)" v-hasPermi="['mes:pro:card:query']">查看</el-button>
           <el-button link type="primary" size="small" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:pro:card:edit']">修改</el-button>
           <el-button link type="primary" size="small" icon="SplitScreen" @click="handleSplit(scope.row)" v-if="scope.row.status === 'ACTIVE'" v-hasPermi="['mes:pro:card:edit']">拆卡</el-button>
@@ -228,6 +232,22 @@
         <el-button @click="splitOpen = false">关 闭</el-button>
       </template>
     </el-dialog>
+
+    <!-- 二维码弹窗 -->
+    <el-dialog title="流转卡二维码" v-model="qrOpen" width="340px" append-to-body>
+      <div v-if="qrRow" style="text-align:center">
+        <QrCode :payload="buildCardPayload(qrRow.cardCode)" :size="240" />
+        <div style="margin-top:12px;font-size:18px;font-weight:bold">{{ qrRow.cardCode }}</div>
+        <div style="color:#999;margin-top:4px">{{ qrRow.itemName }}</div>
+      </div>
+      <template #footer>
+        <el-select v-model="labelSpecKey" size="small" style="width: 110px" title="标签纸规格">
+          <el-option v-for="s in LABEL_SPECS" :key="s.key" :value="s.key" :label="s.label" />
+        </el-select>
+        <el-button type="primary" @click="handlePrintOne" icon="Printer">打印</el-button>
+        <el-button @click="qrOpen = false">关 闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -237,6 +257,9 @@ import { listProcard, getProcard, addProcard, updateProcard, delProcard, splitPr
 import { listCardProcessByCardId } from '@/api/mes/pro/cardprocess'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import workorderSelect from '@/components/workorderSelect/single.vue'
+import QrCode from '@/components/QrCode/index.vue'
+import { buildCardPayload } from '@/utils/qrPayload'
+import { printQrLabels, LABEL_SPECS, labelSpecKey } from '@/utils/labelPrint'
 
 const { proxy } = getCurrentInstance() as any
 
@@ -471,6 +494,10 @@ const splitOpen = ref(false)
 const splitLoading = ref(false)
 const splitForm = reactive<any>({ cardId: null, cardCode: '', originQty: 0, splitQty: 1 })
 
+// ==================== 二维码 / 打印 ====================
+const qrOpen = ref(false)
+const qrRow = ref<any>(null)
+
 function handleSplit(row: any) {
   splitForm.cardId = row.cardId
   splitForm.cardCode = row.cardCode
@@ -509,6 +536,38 @@ function handleAutoGenChange(flag: boolean) {
   } else {
     form.cardCode = null
   }
+}
+
+// ==================== 二维码 / 打印 ====================
+function handleQrCode(row: any) {
+  qrRow.value = row
+  qrOpen.value = true
+}
+
+function cardLabelItems(rows: any[]) {
+  return rows.map(c => ({
+    payload: buildCardPayload(c.cardCode),
+    headline: c.cardCode || '',
+    fields: [
+      `${c.itemName || ''} ${c.specification || ''}`.trim(),
+      `数量: ${c.quantityTransfered ?? ''} ${c.unitName || ''}`,
+      `当前工序: ${c.currentProcessName || ''}`,
+      `工单: ${c.workorderCode || ''}`
+    ]
+  }))
+}
+
+async function handleBatchPrint() {
+  if (!ids.value.length) { proxy.$modal.msgWarning('请勾选要打印的流转卡'); return }
+  const rows = dataList.value.filter((r: any) => ids.value.includes(r.cardId))
+  const channel = await printQrLabels({ title: '流转卡打印', items: cardLabelItems(rows) })
+  if (channel === 'clodop') proxy.$modal.msgSuccess('已发送到标签打印机')
+}
+
+async function handlePrintOne() {
+  if (!qrRow.value) return
+  const channel = await printQrLabels({ title: '流转卡打印', items: cardLabelItems([qrRow.value]) })
+  if (channel === 'clodop') proxy.$modal.msgSuccess('已发送到标签打印机')
 }
 
 // 初始化

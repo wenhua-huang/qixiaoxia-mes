@@ -12,4 +12,12 @@ public interface IWmRollDetailService
     public int updateWmRollDetail(WmRollDetail entity);
     public int deleteWmRollDetailByRollId(Long rollId);
     public int deleteWmRollDetailByRollIds(Long[] rollIds);
+
+    /**
+     * 按卷料码精确反查纸卷（扫码用，roll_code 唯一）。
+     *
+     * @param rollCode 卷料码（会 trim）
+     * @return 纸卷实体（未找到抛 ServiceException）
+     */
+    public WmRollDetail scanByRollCode(String rollCode);
 }

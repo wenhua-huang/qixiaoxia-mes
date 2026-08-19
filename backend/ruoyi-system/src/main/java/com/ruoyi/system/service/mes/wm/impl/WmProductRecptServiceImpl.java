@@ -298,7 +298,7 @@ public class WmProductRecptServiceImpl implements IWmProductRecptService
      */
     @Override
     @Transactional
-    public void mobileConfirmProductRecpt(Long recptId, WmProductRecptMobileBody body) {
+    public WmProductRecpt mobileConfirmProductRecpt(Long recptId, WmProductRecptMobileBody body) {
         WmProductRecpt header = selectWmProductRecptByRecptId(recptId);
         if (header == null) {
             throw new RuntimeException("入库单不存在");
@@ -374,6 +374,9 @@ public class WmProductRecptServiceImpl implements IWmProductRecptService
         // 确认收货 — 校验仓库已选 + 更新库存（仅处理用户提交的行，避免未提交行产生零数量库存事务）
         validateWarehouseResolved(header, updatedLines);
         doConfirmProductRecpt(header, updatedLines);
+
+        // 返回详情（头 + 行，行含批次码），供 App 收货完成页展示
+        return selectWmProductRecptDetail(recptId);
     }
 
     /** 加载入库单下所有行 */

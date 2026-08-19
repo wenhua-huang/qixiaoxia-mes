@@ -54,11 +54,12 @@
           <span v-else>-</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="140" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="190" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-tooltip content="修改" placement="top" v-if="isEditable(scope.row)"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:itemrecpt:edit']"></el-button></el-tooltip>
           <el-tooltip content="删除" placement="top" v-if="isEditable(scope.row)"><el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:wm:itemrecpt:remove']"></el-button></el-tooltip>
           <el-tooltip content="确认收货" placement="top" v-if="scope.row.status === 'DRAFT'"><el-button link type="success" icon="Check" @click="handleConfirm(scope.row)"></el-button></el-tooltip>
+          <el-tooltip content="打印批次标签" placement="top" v-if="scope.row.status !== 'DRAFT'"><el-button link type="primary" icon="Printer" @click="handlePrintLabels(scope.row)"></el-button></el-tooltip>
           <el-button v-if="scope.row.status === 'CONFIRMED'" link type="warning" size="small" @click="handlePost(scope.row)" v-hasPermi="['mes:wm:itemrecpt:edit']">过账</el-button>
         </template>
       </el-table-column>
@@ -77,8 +78,12 @@
 import { ref, reactive, toRefs, getCurrentInstance } from 'vue'
 import { useRouter } from 'vue-router'
 import type { WmItemRecptQueryParams, WmItemRecpt } from '@/types/api/mes/wm/item_recpt'
+import type { WmItemRecptLine } from '@/types/api/mes/wm/item_recpt_line'
 import type { PurOrder } from '@/types/api/mes/pur/order'
 import { listWmItemRecpt, delWmItemRecpt, buildFromPurOrder } from '@/api/mes/wm/item_recpt'
+import { listWmItemRecptLine } from '@/api/mes/wm/item_recpt_line'
+import { buildMatPayload } from '@/utils/qrPayload'
+import { printQrLabels } from '@/utils/labelPrint'
 import request from '@/utils/request'
 import ItemRecptFormDialog from './components/ItemRecptFormDialog.vue'
 import PurOrderSelect from '@/components/purOrderSelect/single.vue'
@@ -126,6 +131,7 @@ function handleConfirm(row: WmItemRecpt) {
     request({ url: `/mes/wm/item_recpt/confirm/${row.recptId}`, method: 'put' }).then(() => {
       proxy.$modal.msgSuccess('收货确认成功，库存已更新')
       getList()
+      proxy.$modal.confirm('收货成功，是否打印批次标签？').then(() => handlePrintLabels(row)).catch(() => {})
     })
   }).catch(() => {})
 }
@@ -159,6 +165,28 @@ function qcTagType(s: string) { return QC_TAG[s]?.type || 'info' }
 function qcTagText(s: string) { return QC_TAG[s]?.text || s }
 function goIqc(row: WmItemRecpt) {
   router.push({ path: '/qc/qciqc', query: { sourceDocId: String(row.recptId) } })
+}
+
+// ==================== 批次标签打印 ====================
+async function handlePrintLabels(row: WmItemRecpt) {
+  if (!row?.recptId) return
+  const r = await listWmItemRecptLine({ recptId: row.recptId, pageNum: 1, pageSize: 100 } as any)
+  const lines = (r.rows || []).filter((l: WmItemRecptLine) => l.batchCode)
+  if (!lines.length) { proxy.$modal.msgWarning('该单无批次物料'); return }
+  const channel = await printQrLabels({
+    title: '批次标签打印',
+    items: lines.map(l => ({
+      payload: buildMatPayload(l.batchCode!),
+      headline: l.batchCode!,
+      fields: [
+        `${l.itemName || ''} ${l.specification || ''}`.trim(),
+        `数量: ${l.quantityRecpt ?? ''} ${l.unitName || ''}`,
+        `入库单: ${row.recptCode || ''}`,
+        `仓库: ${l.warehouseName || row.warehouseName || ''}`
+      ]
+    }))
+  })
+  if (channel === 'clodop') proxy.$modal.msgSuccess('已发送到标签打印机')
 }
 
 getList()

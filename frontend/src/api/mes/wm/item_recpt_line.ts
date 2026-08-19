@@ -1,7 +1,7 @@
 import request from '@/utils/request'
 import type { WmItemRecptLineQueryParams, WmItemRecptLine, AjaxResult, TableDataInfo } from '@/types'
 
-export function listWmItemRecptLine(q: WmItemRecptLineQueryParams): Promise<TableDataInfo<WmItemRecptLine[]>> {
+export function listWmItemRecptLine(q: WmItemRecptLineQueryParams): Promise<TableDataInfo<WmItemRecptLine>> {
   return request({ url: '/mes/wm/item_recpt_line/list', method: 'get', params: q })
 }
 

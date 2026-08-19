@@ -901,14 +901,23 @@ public class OutsourceServiceImpl implements IOutsourceService
         // 推进任务状态：外协收货 → 任务 COMPLETED + 累加产量（失败将回滚收货事务）
         advanceTask(order, recptLines, operator);
 
-        // 流转卡恢复/推进（只前进不回退）
-        if (order.getCardId() != null) advanceCard(order, feedbackId, operator);
+        // 流转卡恢复/推进（只前进不回退）。
+        // 外协单创建早于开工建卡时单上 cardId 为空，发料标记与收货推进都会被跳过：
+        // 收货时按工单回补卡关联（仅取 ACTIVE 卡，避免干扰其它外协单占用的卡），
+        // 补走 OUTSOURCING 标记（对已标记卡幂等无副作用）后推进，与发料即关联的卡链路一致
+        resolveOrderCardIfAbsent(order);
+        if (order.getCardId() != null)
+        {
+            markCardOutsourcing(order);
+            advanceCard(order, feedbackId, operator);
+        }
 
-        // 订单 → RECEIVED
+        // 订单 → RECEIVED（回补的 cardId 随之一并落库，后续操作不再缺关联）
         WmOutsourceOrder upd = new WmOutsourceOrder();
         upd.setOrderId(orderId);
         upd.setStatus(STATUS_RECEIVED);
         upd.setFeedbackId(feedbackId);
+        upd.setCardId(order.getCardId());
         upd.setReceiveTime(DateUtils.getNowDate());
         upd.setUpdateBy(operator);
         upd.setUpdateTime(DateUtils.getNowDate());
@@ -1350,6 +1359,32 @@ public class OutsourceServiceImpl implements IOutsourceService
         if (rows == 0)
             log.debug("流转卡非 ACTIVE 状态，跳过外协标记（不回退已完工/已外协卡）: cardId={}, status={}",
                     order.getCardId(), existing.getStatus());
+    }
+
+    /**
+     * 外协单缺卡关联时按工单回补：建单早于开工建卡的时序下 order.cardId 为空，
+     * 发料标记（markCardOutsourcing）与收货推进（advanceCard）都会因空关联被跳过。
+     * 仅回补 ACTIVE 卡——不碰其它外协单已占用（OUTSOURCING）或已完结的卡；
+     * 工单无 ACTIVE 卡（未开工/全部外占）保持为空，由推进逻辑自行跳过。包内可见以便单测。
+     */
+    void resolveOrderCardIfAbsent(WmOutsourceOrder order)
+    {
+        if (order.getCardId() != null || order.getWorkorderId() == null) return;
+        ProCard q = new ProCard();
+        q.setWorkorderId(order.getWorkorderId());
+        List<ProCard> cards = cardMapper.selectProCardList(q);
+        ProCard picked = (cards == null) ? null : cards.stream()
+                .filter(c -> STATUS_CARD_ACTIVE.equals(c.getStatus()))
+                .findFirst().orElse(null);
+        if (picked == null)
+        {
+            log.debug("外协单缺卡关联且工单无 ACTIVE 卡，跳过回补: orderId={}, workorderId={}",
+                    order.getOrderId(), order.getWorkorderId());
+            return;
+        }
+        order.setCardId(picked.getCardId());
+        log.info("外协单回补卡关联: orderId={}, workorderId={}, cardId={}",
+                order.getOrderId(), order.getWorkorderId(), picked.getCardId());
     }
 
     /**

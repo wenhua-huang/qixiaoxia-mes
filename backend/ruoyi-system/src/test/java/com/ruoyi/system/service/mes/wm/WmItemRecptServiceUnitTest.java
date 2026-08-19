@@ -586,6 +586,40 @@ class WmItemRecptServiceUnitTest {
             assertThat(line.getBatchCode()).isNull();
             verify(wmBatchService).getOrGenerateBatchCode(any());
         }
+
+        @Test
+        @DisplayName("17. receiveWithLines 返回入库单详情(头+行批次码)")
+        void shouldReturnDetailWithBatchCodes() {
+            WmItemRecpt header = draftRecpt(); header.setPurOrderId(100L);
+            WmItemRecptLine line = new WmItemRecptLine();
+            line.setItemId(208L); line.setItemCode("AUX-GLUE-001"); line.setItemName("制袋胶水");
+            line.setQuantityRecpt(new BigDecimal("10.0000"));
+            line.setWarehouseId(1L); line.setWarehouseCode("WH-001"); line.setWarehouseName("原料仓");
+
+            WmBatch generated = new WmBatch();
+            generated.setBatchId(500L); generated.setBatchCode("BAT20260707001");
+
+            ItemRecptReceiveBody body = new ItemRecptReceiveBody();
+            body.setHeader(header); body.setLines(Collections.singletonList(line));
+
+            when(wmItemRecptMapper.insertWmItemRecpt(any())).thenReturn(1);
+            when(wmItemRecptMapper.updateWmItemRecpt(any())).thenReturn(1);
+            when(wmItemRecptLineService.insertWmItemRecptLine(any())).thenReturn(1);
+            when(wmBatchService.getOrGenerateBatchCode(any())).thenReturn(generated);
+            stubConfirmMocks(header);
+            // 详情回读(loadRecptLines)返回真实行对象（已带生成批次码），替代 stubConfirmMocks 的通用行
+            when(wmItemRecptLineService.selectWmItemRecptLineList(any())).thenReturn(Collections.singletonList(line));
+
+            WmItemRecpt result = service.receiveWithLines(body);
+
+            // 返回的详情：头 + 行，行携带生成的批次码，供 App 收货完成页展示
+            assertThat(result).isNotNull();
+            assertThat(result.getRecptId()).isEqualTo(1L);
+            assertThat(result.getStatus()).isEqualTo("POSTED");
+            assertThat(result.getLines()).hasSize(1);
+            assertThat(result.getLines().get(0).getBatchId()).isEqualTo(500L);
+            assertThat(result.getLines().get(0).getBatchCode()).isEqualTo("BAT20260707001");
+        }
     }
 
     private WmItemRecpt draftRecpt() {

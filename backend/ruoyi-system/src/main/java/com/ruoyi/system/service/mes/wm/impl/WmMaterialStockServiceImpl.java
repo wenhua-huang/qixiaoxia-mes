@@ -4,6 +4,7 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.system.domain.mes.wm.WmMaterialStock;
 import com.ruoyi.system.mapper.mes.wm.WmMaterialStockMapper;
@@ -60,5 +61,15 @@ public class WmMaterialStockServiceImpl implements IWmMaterialStockService
     @Override
     public List<WmMaterialStock> selectAvailableBatches(Long itemId, Long warehouseId) {
         return wmMaterialStockMapper.selectAvailableBatches(itemId, warehouseId, "NORMAL");
+    }
+
+    /** 批次码精确反查（扫码用）：同批次可分布在多仓/多库位，返回全部库存行 */
+    @Override
+    public List<WmMaterialStock> scanByBatchCode(String batchCode) {
+        String code = batchCode == null ? "" : batchCode.trim();
+        if (code.isEmpty()) {
+            throw new ServiceException("批次码不能为空");
+        }
+        return wmMaterialStockMapper.selectWmMaterialStockByExactBatchCode(code);
     }
 }

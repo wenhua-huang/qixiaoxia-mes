@@ -32,7 +32,17 @@ export function closeIssue(issueId) {
 
 // 物料库存查询（扫码后根据 itemCode 查可用库存）
 export function getItemStock(itemCode, warehouseId) {
-  return request({ url: '/mes/wm/materialstock/list', method: 'get', params: { itemCode, warehouseId } })
+  return request({ url: '/mes/wm/material_stock/list', method: 'get', params: { itemCode, warehouseId } })
+}
+
+// 按批次码查库存（扫物料批次码）：返回该批次各仓库存行数组
+export function getStockByBatchCode(batchCode) {
+  return request({ url: '/mes/wm/material_stock/scan/' + encodeURIComponent(batchCode), method: 'get' })
+}
+
+// 按纸卷码查卷料详情（扫卷料码）：返回单卷信息
+export function getRollByRollCode(rollCode) {
+  return request({ url: '/mes/wm/roll_detail/scan/' + encodeURIComponent(rollCode), method: 'get' })
 }
 
 // 查可用批次列表（发料选批次用）：按 itemId 查所有 available>0 的批次记录

@@ -56,6 +56,16 @@ public class WmMaterialStockController extends BaseController
         return AjaxResult.success(list);
     }
 
+    /**
+     * 批次码精确反查库存（扫码用）：batch_code 精确匹配，返回该批次全部库存行（可跨仓/库位）。
+     */
+    @PreAuthorize("@ss.hasPermi('mes:wm:material_stock:query')")
+    @GetMapping("/scan/{batchCode}")
+    public AjaxResult scan(@PathVariable("batchCode") String batchCode)
+    {
+        return AjaxResult.success(wmMaterialStockService.scanByBatchCode(batchCode));
+    }
+
     @PreAuthorize("@ss.hasPermi('mes:wm:material_stock:export')")
     @Log(title = "库存记录表", businessType = BusinessType.EXPORT)
     @PostMapping("/export")

@@ -35,3 +35,11 @@ export function availableBatches(itemId: number, warehouseId?: number | null): P
   if (warehouseId != null) params.warehouseId = warehouseId
   return request({ url: '/mes/wm/material_stock/availableBatches', method: 'get', params })
 }
+
+/**
+ * 批次码反查库存（扫码枪/手输批次码识别用）：按 batchCode 查该批次的库存行。
+ * 返回行含 itemCode/itemId/batchId/batchCode/materialStockId/warehouseId/quantityOnhand。
+ */
+export function getStockByBatchCode(batchCode: string): Promise<AjaxResult<WmMaterialStock[]>> {
+  return request({ url: '/mes/wm/material_stock/scan/' + encodeURIComponent(batchCode), method: 'get' })
+}

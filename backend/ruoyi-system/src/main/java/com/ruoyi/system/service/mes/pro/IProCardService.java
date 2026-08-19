@@ -1,6 +1,7 @@
 package com.ruoyi.system.service.mes.pro;
 
 import java.util.List;
+import com.ruoyi.system.domain.mes.pro.CardScanResultVO;
 import com.ruoyi.system.domain.mes.pro.ProCard;
 
 /**
@@ -20,4 +21,7 @@ public interface IProCardService
     public int deleteProCardByCardId(Long cardId);
     /** 拆卡：从原卡拆出 splitQty 生成新卡，原卡数量原子扣减，单事务保证一致性 */
     public ProCard splitCard(Long cardId, java.math.BigDecimal splitQty);
+
+    /** 扫流转卡码反查报工上下文（App 扫码报工入口） */
+    public CardScanResultVO scanForReport(String cardCode);
 }

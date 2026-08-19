@@ -93,15 +93,15 @@
         <view class="line-extra">
           <view class="extra-row">
             <text class="label">生产日期</text>
-            <picker mode="date" :value="line.produceDate" @change="(e) => line.produceDate = e.detail.value">
+            <UniDatetimePicker type="date" v-model="line.produceDate">
               <view class="picker-value-sm">{{ line.produceDate || '请选择' }}</view>
-            </picker>
+            </UniDatetimePicker>
           </view>
           <view class="extra-row">
             <text class="label">有效期至</text>
-            <picker mode="date" :value="line.expireDate" @change="(e) => line.expireDate = e.detail.value">
+            <UniDatetimePicker type="date" v-model="line.expireDate">
               <view class="picker-value-sm">{{ line.expireDate || '请选择' }}</view>
-            </picker>
+            </UniDatetimePicker>
           </view>
           <view class="extra-row">
             <text class="label">生产批号</text>
@@ -159,6 +159,7 @@
 
 <script setup>
 import { ref, reactive, getCurrentInstance, onMounted } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 // 显式引入 uni-ui 组件（绕过 HBuilderX 发行 H5 时 easycom 失效）
 import UniEasyInput from '@/uni_modules/uni-easyinput/components/uni-easyinput/uni-easyinput.vue'
 import UniForms from '@/uni_modules/uni-forms/components/uni-forms/uni-forms.vue'
@@ -166,6 +167,7 @@ import UniFormsItem from '@/uni_modules/uni-forms/components/uni-forms-item/uni-
 import UniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue'
 import UniSection from '@/components/uni-section/uni-section.vue'
 import UniTag from '@/uni_modules/uni-tag/components/uni-tag/uni-tag.vue'
+import UniDatetimePicker from '@/uni_modules/uni-datetime-picker/components/uni-datetime-picker/uni-datetime-picker.vue'
 import { getOrderDetailByCode, receiveItemRecpt, listWarehouseAll } from '@/api/mes/pur/order'
 import { isValidReceiptQty, genRecptCode, purchaseTypeText, orderStatusTagType, orderStatusText, canReceive } from '@/utils/pur.js'
 
@@ -219,23 +221,21 @@ function searchOrder() {
   }
   proxy.$modal.loading('查询中...')
   getOrderDetailByCode(orderCode.value.trim()).then(res => {
-    proxy.$modal.closeLoading()
+    // H5 下在 Promise .then 中同步调 hideLoading 有时不生效，延迟一帧确保 loading 被关闭，
+    // 否则"查询中..."会残留并遮住后续所有 toast（如仓库校验提示）
+    setTimeout(() => proxy.$modal.closeLoading(), 0)
     const detail = res.data
     if (!detail || !detail.order) {
-      // H5 下 hideLoading + 立即 showToast/showModal 有时序冲突，用 setTimeout 错开
       setTimeout(() => proxy.$modal.msgError('未找到该采购订单'), 60)
       return
     }
     const found = detail.order
     if (!canReceive(found.status)) {
-      // 用 alert 弹框而不是 toast：toast 在 H5/小程序都有宽度限制，长文本会被截断
-      // 延迟一帧，避免被 hideLoading 遗留的 mask 挡住
       setTimeout(() => {
         proxy.$modal.alert('该订单状态为"' + orderStatusText(found.status) + '"，仅"已下单/收货中"的订单可执行收货操作', '无法收货')
       }, 60)
       return
     }
-    // 存储原始数据，模板中用 purchaseTypeText() 显示中文
     order.value = found
     lines.value = (detail.lines || []).map(l => ({
       ...l,
@@ -247,8 +247,8 @@ function searchOrder() {
       quantityReceived: l.quantityReceived || 0
     }))
   }).catch(() => {
-    proxy.$modal.closeLoading()
-    proxy.$modal.msgError('查询失败，请检查单号')
+    setTimeout(() => proxy.$modal.closeLoading(), 0)
+    setTimeout(() => proxy.$modal.msgError('查询失败，请检查单号'), 60)
   })
 }
 
@@ -279,6 +279,8 @@ function removePhoto(idx) {
 
 // 提交收货 — 单接口完成（头+行+确认，后端事务保证原子性）
 function submitReceipt() {
+  // 清除可能残留的全局 loading（如查询后未关闭的"查询中..."），否则会遮住校验 toast
+  uni.hideLoading()
   const hasQty = lines.value.some(l => isValidReceiptQty(l.receiptQty))
   if (!hasQty) {
     proxy.$modal.msgError('请至少填写一行的实收数量')
@@ -324,9 +326,17 @@ function submitReceipt() {
     }
 
     // 单接口调用，后端原子完成：创建头 → 创建行 → 确认收货 → 回写PO
-    receiveItemRecpt(body).then(() => {
-      proxy.$modal.msgSuccess('收货确认成功！库存已更新')
-      setTimeout(() => { proxy.$tab.navigateBack() }, 1500)
+    receiveItemRecpt(body).then(res => {
+      // res.data = 收货详情（Task 2），lines[].batchCode 为生成的批次码（非批次管理物料为 null）
+      const batchCodes = [...new Set((res.data?.lines || []).map(l => l.batchCode).filter(Boolean))]
+      if (batchCodes.length) {
+        // toast 会截断多行文本，用 alert 弹窗展示批次码并引导 PC 打印
+        proxy.$modal.alert('本次生成批次码：\n' + batchCodes.join('\n') + '\n\n请在 PC【采购入库管理】打印批次标签', '收货成功')
+        setTimeout(() => { proxy.$tab.navigateBack() }, 2500)
+      } else {
+        proxy.$modal.msgSuccess('收货确认成功！库存已更新')
+        setTimeout(() => { proxy.$tab.navigateBack() }, 1500)
+      }
     }).catch(e => {
       proxy.$modal.msgError('收货失败：' + (typeof e === 'string' ? e : (e.msg || e.message || '未知错误')))
     }).finally(() => {
@@ -336,6 +346,9 @@ function submitReceipt() {
 }
 
 onMounted(() => {
+  // 防御性清理：uni.showLoading 是全局模态，跨页面不自动消失。
+  // 若上个页面（如登录页）因异常残留 loading，会遮住本页所有 toast（包括仓库校验提示）。
+  uni.hideLoading()
   // 必须有 catch：token 过期时后端返回 401，request.js 拦截器会弹"登录状态已过期"modal，
   // 这里再不兜住会让 Promise 成为 unhandledrejection；且 warehouseList 永远为空，picker 无选项可选
   listWarehouseAll()
@@ -346,6 +359,11 @@ onMounted(() => {
         proxy.$modal.msgError('仓库列表加载失败，请重试')
       }
     })
+})
+
+// 每次页面显示时清理可能残留的全局 loading（如从其他页面返回时）
+onShow(() => {
+  uni.hideLoading()
 })
 </script>
 

@@ -1,5 +1,11 @@
 <template>
   <view class="container">
+    <!-- 流转卡报工标识条（扫码进入时显示） -->
+    <view class="card-banner" v-if="card">
+      <uni-tag text="流转卡报工" type="primary" size="small" />
+      <text class="card-banner-code">{{ card.cardCode }} · {{ card.currentProcessName }}</text>
+    </view>
+
     <!-- 步骤 1：扫码/输入工单编码 -->
     <view class="section">
       <uni-section title="生产工单" type="line">
@@ -168,7 +174,10 @@
 
 <script setup>
 import { ref, reactive, computed, watch, getCurrentInstance } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { addFeedback, getFeedbackEntry } from '@/api/mes/pro/feedback'
+import { getCardScanResult } from '@/api/mes/pro/procard'
+import { parseQrPayload } from '@/utils/qrPayload'
 import { listParamTemplateByProcessId } from '@/api/mes/pro/paramtemplate'
 import config from '@/config.js'
 
@@ -189,6 +198,8 @@ const form = reactive({
   remark: ''
 })
 const paramList = ref([])
+const card = ref(null)                       // 扫码得到的流转卡
+const reportedQualifiedSum = ref(0)          // 该卡该工序已报合格数
 
 // 本次报工总数 = 合格 + 不合格 + 工废 + 料废
 const totalQuantity = computed(() => {
@@ -215,6 +226,95 @@ function taskStatusLabel(s) {
 function taskStatusTagType(s) {
   const m = { COMPLETED: 'success', PRODUCING: 'warning', CANCEL: 'error', PREPARE: 'default' }
   return m[s] || 'default'
+}
+
+// 页面入口：扫码分发（Task 5）带入 cardCode / workorderCode / rawCode
+onLoad((options) => {
+  if (!options) return
+  if (options.cardCode) {
+    scanByCard(options.cardCode)
+  } else if (options.workorderCode) {
+    workorderCode.value = options.workorderCode
+    searchWorkorder()
+  } else if (options.rawCode) {
+    // 裸码兜底：像卡号就当卡，否则当工单
+    const parsed = parseQrPayload(options.rawCode)
+    if (parsed && parsed.type === 'CARD') {
+      scanByCard(parsed.code)
+    } else {
+      workorderCode.value = options.rawCode
+      searchWorkorder()
+    }
+  }
+})
+
+// 不可报工原因文案
+function reasonText(reason) {
+  const map = {
+    CARD_NOT_FOUND: '未找到该流转卡',
+    CARD_COMPLETED: '该流转卡已完工，无需报工',
+    CARD_OUTSOURCING: '该流转卡外协中，请到外协收货页操作',
+    CARD_SCRAPPED: '该流转卡已报废',
+    PROCESS_OUTSOURCED: '下一道工序为外协工序，请在厂商端录结果或到「外协任务」处理',
+    NO_REPORTABLE_TASK: '当前工序无可报工任务'
+  }
+  return map[reason] || '当前不可报工'
+}
+
+// 扫流转卡码 → 后端反查报工上下文 → 单任务自动选中直进填数量步（4 步压成 2 步）
+function scanByCard(cardCode) {
+  proxy.$modal.loading('查询流转卡...')
+  getCardScanResult(cardCode).then(res => {
+    proxy.$modal.closeLoading()
+    const data = res.data || {}
+    if (!data.card) {
+      proxy.$modal.msgError('未找到流转卡：' + cardCode)
+      return
+    }
+    // 重置已选状态（与 searchWorkorder 一致）
+    workorder.value = null
+    taskList.value = []
+    outsourceTaskList.value = []
+    selectedTaskId.value = null
+    selectedTask.value = null
+    paramList.value = []
+    Object.assign(form, { quantityQualified: 0, quantityUnqualified: 0, quantityLaborScrap: 0, quantityMaterialScrap: 0, remark: '' })
+
+    card.value = data.card
+    // 用卡的冗余字段填充 workorder 供 doSubmit 复用 + 页面展示工单信息/外协任务（字段名与 doSubmit body 一致）
+    workorder.value = {
+      workorderId: data.card.workorderId,
+      workorderCode: data.card.workorderCode,
+      workorderName: data.card.workorderName,
+      productId: data.card.itemId,
+      productCode: data.card.itemCode,
+      productName: data.card.itemName,
+      unitOfMeasure: data.card.unitOfMeasure,
+      unitName: data.card.unitName
+    }
+    taskList.value = data.reportableTasks || []
+    outsourceTaskList.value = data.outsourceTasks || []
+    reportedQualifiedSum.value = data.reportedQualifiedSum || 0
+    if (!data.canReport) {
+      // 先填充上下文再提示：外协工序时页面仍能看到工单信息与「外协任务」区块
+      let msg = reasonText(data.reason)
+      if (data.reason === 'PROCESS_OUTSOURCED') {
+        const doing = outsourceTaskList.value.find(t => t.status === 'PRODUCING')
+        if (doing && doing.processName) {
+          msg = '下一道工序「' + doing.processName + '」为外协工序（进行中），请在厂商端录结果或到「外协任务」处理'
+        }
+      }
+      proxy.$modal.alert(msg, '无法报工')
+      return
+    }
+    // 单任务自动选中 → 直接进填数量步
+    if (taskList.value.length === 1) {
+      selectTask(taskList.value[0])
+    }
+  }).catch(() => {
+    proxy.$modal.closeLoading()
+    proxy.$modal.msgError('查询流转卡失败')
+  })
 }
 
 // 扫码
@@ -343,10 +443,25 @@ watch(() => paramList.value.map(p => p.actualValue).join(','), () => {
 })
 
 // 提交报工
-function submitReport() {
+async function submitReport() {
   if (totalQuantity.value <= 0) {
     proxy.$modal.msgError('请至少填写一项报工数量')
     return
+  }
+  // 防超报软提醒：扫码报工且卡有流转数量时，校验累计合格是否超过流转数
+  if (card.value && card.value.quantityTransfered != null) {
+    const willTotal = (Number(form.quantityQualified) || 0) + Number(reportedQualifiedSum.value || 0)
+    if (willTotal > Number(card.value.quantityTransfered)) {
+      try {
+        await proxy.$modal.confirm(
+          '该卡流转数量 ' + card.value.quantityTransfered + '，已报合格 ' +
+          reportedQualifiedSum.value + '，本次合格将超报，是否继续？',
+          '超报提醒'
+        )
+      } catch (e) {
+        return
+      }
+    }
   }
   doSubmit()
 }
@@ -368,6 +483,7 @@ function doSubmit() {
       feedbackType: 'INTERNAL',
       feedbackCode: '',
       taskId: t.taskId,
+      cardId: card.value?.cardId || null,
       taskCode: t.taskCode,
       workorderId: w.workorderId,
       workorderCode: w.workorderCode,
@@ -420,6 +536,16 @@ function doSubmit() {
 page { background-color: #f5f6f7; min-height: 100%; }
 
 .container { padding-bottom: 120rpx; }
+
+.card-banner {
+  display: flex; align-items: center;
+  gap: 16rpx;
+  padding: 16rpx 24rpx;
+  background: #ecf5ff;
+  border-radius: 12rpx;
+  margin: 20rpx 24rpx 0;
+}
+.card-banner-code { font-size: 28rpx; color: #303133; }
 
 .section {
   margin: 20rpx 0;

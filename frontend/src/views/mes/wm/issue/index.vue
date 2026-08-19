@@ -122,7 +122,7 @@ import IssueOutDialog from './components/IssueOutDialog.vue'
 
 const { proxy } = getCurrentInstance() as any
 const router = useRouter()
-const { issue_status } = proxy.useDict('mes_wm_issue_status')
+const { mes_wm_issue_status: issue_status } = proxy.useDict('mes_wm_issue_status')
 
 const loading = ref(true); const ids = ref<number[]>([]); const single = ref(true); const multiple = ref(true); const showSearch = ref(true); const total = ref(0)
 const title = ref(''); const open = ref(false); const optType = ref(''); const activeTab = ref('header')

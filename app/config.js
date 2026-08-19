@@ -1,10 +1,22 @@
 // 应用全局配置
 // 生产构建(uni build)用 /prod-api 走 Nginx 代理；
-// 本地开发(uni)用相对路径 /dev-api，由 H5 dev server(Vite) 转发到后端，
-// 这样真机(手机)通过 192.168.x.x:9090 访问时也能通，避免写死 localhost 指向手机自身。
+// H5 开发用相对路径 /dev-api 走 Vite 代理（vite.config.js），桌面 localhost 与
+// 手机 LAN IP 访问都通，无需写死 IP；APP/小程序无同源代理，需填电脑 LAN IP。
 const isProd = process.env.NODE_ENV === 'production'
+let baseUrl
+if (isProd) {
+  baseUrl = '/prod-api'
+} else {
+  // #ifdef H5
+  baseUrl = '/dev-api'
+  // #endif
+  // #ifndef H5
+  // APP/小程序真机调试：改成运行本 dev server 的电脑局域网 IP（后端需监听 0.0.0.0 或同机反代）
+  baseUrl = 'http://192.168.1.9:8081'
+  // #endif
+}
 export default {
-  baseUrl: isProd ? '/prod-api' : '/dev-api',
+  baseUrl,
   // baseUrl: 'https://vue.ruoyi.vip/prod-api',
   // 应用信息
   appInfo: {

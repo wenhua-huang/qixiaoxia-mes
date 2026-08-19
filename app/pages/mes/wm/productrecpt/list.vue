@@ -80,6 +80,8 @@ import UniLoadMore from '@/uni_modules/uni-load-more/components/uni-load-more/un
 import UniTag from '@/uni_modules/uni-tag/components/uni-tag/uni-tag.vue'
 import { onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
 import { listProductRecpt } from '@/api/mes/wm/productrecpt'
+import { getCardScanResult } from '@/api/mes/pro/procard'
+import { parseQrPayload } from '@/utils/qrPayload'
 import { recptStatusText, recptStatusTagType } from '@/utils/wm-productrecpt.js'
 
 const { proxy } = getCurrentInstance()
@@ -134,25 +136,48 @@ function viewDetail(item) {
   proxy.$tab.navigateTo('/pages/mes/wm/productrecpt/detail?recptId=' + item.recptId)
 }
 
-// 扫码
+// 统一扫码结果入口：识别 QXX|TYPE|CODE 载荷分发（CARD/WO → 反查工单号定位，其他按原文搜索）
+function handleCode(code) {
+  const payload = parseQrPayload(code)
+  if (payload && (payload.type === 'CARD' || payload.type === 'WO')) {
+    lookupWorkorderByCard(payload.code)
+    return
+  }
+  // 裸条码（非 QXX 载荷）：维持旧行为，keyword=原文按工单号搜索
+  queryParams.keyword = code
+  handleQuery()
+}
+
+// 扫流转卡/工单码 → 反查工单号并搜索（失败由 request 拦截器 toast；无卡这里兜底提示）
+async function lookupWorkorderByCard(cardCode) {
+  let data = null
+  try {
+    const res = await getCardScanResult(cardCode)
+    data = res.data || {}
+  } catch (e) { return }
+  const woCode = data.card && data.card.workorderCode
+  if (!woCode) {
+    proxy.$modal.msgError('未找到流转卡：' + cardCode)
+    return
+  }
+  queryParams.keyword = woCode
+  handleQuery()
+}
+
+// 扫码：H5 跳统一相机扫码页（html5-qrcode，回调取结果）；App/小程序用原生 uni.scanCode
 function handleScan() {
-  // #ifdef APP-PLUS || H5
+  // #ifdef H5
+  uni.navigateTo({
+    url: '/pages/mes/pro/scan?callback=1',
+    events: { scanResult: (code) => handleCode(code) }
+  })
+  // #endif
+  // #ifndef H5
   uni.scanCode({
     onlyFromCamera: false,
     scanType: ['barCode', 'qrCode'],
-    success: (res) => {
-      queryParams.keyword = res.result
-      handleQuery()
-    },
+    success: (res) => { handleCode(res.result) },
     fail: (err) => { console.log('扫码取消:', err) }
-  })
-  // #endif
-  // #ifdef MP-WEIXIN
-  uni.scanCode({
-    success: (res) => {
-      queryParams.keyword = res.result
-      handleQuery()
-    }
   })
   // #endif
 }

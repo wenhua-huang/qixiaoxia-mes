@@ -1,5 +1,6 @@
 package com.ruoyi.system.mapper.mes.qc;
 
+import java.util.Collection;
 import java.util.List;
 import org.apache.ibatis.annotations.Param;
 import com.ruoyi.system.domain.mes.qc.QcTemplateProduct;
@@ -37,6 +38,19 @@ public interface QcTemplateProductMapper
      * 按检验类型+物料查全部启用绑定（可选按工序过滤），波次 2 使用
      */
     public List<QcTemplateProduct> selectEnabledByItem(@Param("qcType") String qcType, @Param("itemId") Long itemId, @Param("processId") Long processId);
+
+    /**
+     * 批量按工序精确查找启用绑定（消除 gate/生成路径逐物料 N+1）
+     */
+    public List<QcTemplateProduct> selectEnabledBindExactBatch(@Param("qcType") String qcType,
+                                                               @Param("itemIds") Collection<Long> itemIds,
+                                                               @Param("processId") Long processId);
+
+    /**
+     * 批量通用绑定查找（tp.process_id IS NULL，消除 gate/生成路径逐物料 N+1）
+     */
+    public List<QcTemplateProduct> selectEnabledBindCommonBatch(@Param("qcType") String qcType,
+                                                                @Param("itemIds") Collection<Long> itemIds);
 
     /**
      * 统计本模板之外、同检验维度已存在的启用绑定数（保存前唯一性校验用）

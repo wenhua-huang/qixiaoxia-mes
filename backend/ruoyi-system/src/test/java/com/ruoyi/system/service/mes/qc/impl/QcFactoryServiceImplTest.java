@@ -3,6 +3,7 @@ package com.ruoyi.system.service.mes.qc.impl;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -62,6 +63,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mockStatic;
@@ -120,6 +123,21 @@ class QcFactoryServiceImplTest {
         // 用 mock 事务管理器构造真实 TransactionTemplate：execute 回调真实执行
         // （getTransaction/commit 走 mock no-op），覆盖"锁内三写包事务"路径
         service.initTx();
+        // 批量模板解析委托到逐物料 stub，保持既有用例无需逐条改写
+        lenient().doAnswer(inv -> {
+            String qcType = inv.getArgument(0);
+            @SuppressWarnings("unchecked")
+            java.util.Collection<Long> ids = inv.getArgument(1);
+            java.util.List<QcTemplateProduct> result = new java.util.ArrayList<>();
+            for (Long id : ids) {
+                QcTemplateProduct b = bindMapper.selectEnabledBindCommon(qcType, id);
+                if (b != null) {
+                    b.setItemId(id);  // 真实批量 SQL 返回 item_id，供生产代码按物料归组
+                    result.add(b);
+                }
+            }
+            return result;
+        }).when(bindMapper).selectEnabledBindCommonBatch(anyString(), any(java.util.Collection.class));
     }
 
     // ---- 测试数据构造 ----
@@ -290,7 +308,7 @@ class QcFactoryServiceImplTest {
     }
 
     @Test
-    @DisplayName("closeBySource 关闭 PENDING/INSPECTING 单并跳过 COMPLETED/CLOSED")
+    @DisplayName("closeBySource 对来源下每张单调用条件关闭（状态过滤下推 SQL）")
     void should_close_active_orders_by_source() {
         QcIqc pending = orderWithStatus(QcConstants.STATUS_PENDING);
         pending.setIqcId(101L);
@@ -305,12 +323,12 @@ class QcFactoryServiceImplTest {
 
         service.closeBySource(QcConstants.SOURCE_ITEM_RECPT, 5L);
 
-        ArgumentCaptor<QcIqc> cap = ArgumentCaptor.forClass(QcIqc.class);
-        verify(iqcMapper, times(2)).updateQcIqc(cap.capture());
-        assertEquals(Long.valueOf(101L), cap.getAllValues().get(0).getIqcId());
-        assertEquals(QcConstants.STATUS_CLOSED, cap.getAllValues().get(0).getStatus());
-        assertEquals(Long.valueOf(104L), cap.getAllValues().get(1).getIqcId());
-        assertEquals(QcConstants.STATUS_CLOSED, cap.getAllValues().get(1).getStatus());
+        // 对每张单都走一次条件 UPDATE（活跃态命中，COMPLETED/CLOSED 被 SQL WHERE 挡掉返回 0 行）
+        verify(iqcMapper).closeIfActive(eq(101L), isNull(), any(Date.class));
+        verify(iqcMapper).closeIfActive(eq(102L), isNull(), any(Date.class));
+        verify(iqcMapper).closeIfActive(eq(103L), isNull(), any(Date.class));
+        verify(iqcMapper).closeIfActive(eq(104L), isNull(), any(Date.class));
+        verify(iqcMapper, never()).updateQcIqc(any());
     }
 
     @Test
@@ -464,7 +482,7 @@ class QcFactoryServiceImplTest {
     }
 
     @Test
-    @DisplayName("OQC：closeBySource 关闭 wm_product_sales 来源的 PENDING/INSPECTING 单并跳过 COMPLETED/CLOSED")
+    @DisplayName("OQC：closeBySource 对 wm_product_sales 来源每张单调条件关闭（状态过滤下推 SQL）")
     void should_close_active_oqc_orders_by_source() {
         QcOqc pending = oqcWithStatus(QcConstants.STATUS_PENDING);
         pending.setOqcId(301L);
@@ -477,12 +495,10 @@ class QcFactoryServiceImplTest {
 
         service.closeBySource(QcConstants.SOURCE_PRODUCT_SALES, 5L);
 
-        ArgumentCaptor<QcOqc> cap = ArgumentCaptor.forClass(QcOqc.class);
-        verify(oqcMapper, times(2)).updateQcOqc(cap.capture());
-        assertEquals(Long.valueOf(301L), cap.getAllValues().get(0).getOqcId());
-        assertEquals(QcConstants.STATUS_CLOSED, cap.getAllValues().get(0).getStatus());
-        assertEquals(Long.valueOf(303L), cap.getAllValues().get(1).getOqcId());
-        assertEquals(QcConstants.STATUS_CLOSED, cap.getAllValues().get(1).getStatus());
+        verify(oqcMapper).closeIfActive(eq(301L), isNull(), any(Date.class));
+        verify(oqcMapper).closeIfActive(eq(302L), isNull(), any(Date.class));
+        verify(oqcMapper).closeIfActive(eq(303L), isNull(), any(Date.class));
+        verify(oqcMapper, never()).updateQcOqc(any());
         // IQC 侧不受影响
         verify(iqcMapper, never()).selectBySource(anyString(), any(), any());
     }
@@ -745,7 +761,7 @@ class QcFactoryServiceImplTest {
     }
 
     @Test
-    @DisplayName("IPQC：closeBySource 关闭 wm_product_recpt 来源的 PENDING/INSPECTING 单并跳过 COMPLETED/CLOSED")
+    @DisplayName("IPQC：closeBySource 对 wm_product_recpt 来源每张单调条件关闭（状态过滤下推 SQL）")
     void should_close_active_ipqc_orders_by_source() {
         QcIpqc pending = ipqcWithStatus(QcConstants.STATUS_PENDING);
         pending.setIpqcId(401L);
@@ -760,12 +776,11 @@ class QcFactoryServiceImplTest {
 
         service.closeBySource(QcConstants.SOURCE_PRODUCT_RECPT, 5L);
 
-        ArgumentCaptor<QcIpqc> cap = ArgumentCaptor.forClass(QcIpqc.class);
-        verify(ipqcMapper, times(2)).updateQcIpqc(cap.capture());
-        assertEquals(Long.valueOf(401L), cap.getAllValues().get(0).getIpqcId());
-        assertEquals(QcConstants.STATUS_CLOSED, cap.getAllValues().get(0).getStatus());
-        assertEquals(Long.valueOf(404L), cap.getAllValues().get(1).getIpqcId());
-        assertEquals(QcConstants.STATUS_CLOSED, cap.getAllValues().get(1).getStatus());
+        verify(ipqcMapper).closeIfActive(eq(401L), isNull(), any(Date.class));
+        verify(ipqcMapper).closeIfActive(eq(402L), isNull(), any(Date.class));
+        verify(ipqcMapper).closeIfActive(eq(403L), isNull(), any(Date.class));
+        verify(ipqcMapper).closeIfActive(eq(404L), isNull(), any(Date.class));
+        verify(ipqcMapper, never()).updateQcIpqc(any());
         // IQC/OQC 侧不受影响
         verify(iqcMapper, never()).selectBySource(anyString(), any(), any());
         verify(oqcMapper, never()).selectBySource(anyString(), any(), any());

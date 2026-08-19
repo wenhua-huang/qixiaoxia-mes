@@ -134,6 +134,28 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by tp.process_id, tp.record_id
     </select>
 
+    <!-- 批量工序级精确查找（gate/生成路径批量解析模板用） -->
+    <select id="selectEnabledBindExactBatch" resultMap="QcTemplateProductResult">
+        <include refid="enabledBindColumns"/>
+        where t.enable_flag = '1'
+          and find_in_set(#{qcType}, t.qc_types)
+          and tp.item_id in
+          <foreach collection="itemIds" item="itemId" open="(" separator="," close=")">#{itemId}</foreach>
+          and tp.process_id = #{processId}
+        order by tp.item_id, tp.record_id
+    </select>
+
+    <!-- 批量通用绑定查找（tp.process_id IS NULL，gate/生成路径批量解析模板用） -->
+    <select id="selectEnabledBindCommonBatch" resultMap="QcTemplateProductResult">
+        <include refid="enabledBindColumns"/>
+        where t.enable_flag = '1'
+          and find_in_set(#{qcType}, t.qc_types)
+          and tp.item_id in
+          <foreach collection="itemIds" item="itemId" open="(" separator="," close=")">#{itemId}</foreach>
+          and tp.process_id is null
+        order by tp.item_id, tp.record_id
+    </select>
+
     <!-- 保存前唯一性校验：本模板之外、同检验维度已存在的启用绑定数 -->
     <select id="countEnabledBindExclude" resultType="int">
         select count(1)

@@ -99,6 +99,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by oqc_id desc
     </select>
 
+    <select id="selectBySourceItems" resultMap="QcOqcResult">
+        <include refid="selectQcOqcVo"/>
+        where source_doc_type = #{sourceDocType} and source_doc_id = #{sourceDocId}
+          and item_id in
+          <foreach collection="itemIds" item="itemId" open="(" separator="," close=")">#{itemId}</foreach>
+        order by oqc_id desc
+    </select>
+
     <insert id="insertQcOqc" parameterType="com.ruoyi.system.domain.mes.qc.QcOqc" useGeneratedKeys="true" keyProperty="oqcId">
         insert into qxx_qc_oqc
         <trim prefix="(" suffix=")" suffixOverrides=",">
@@ -236,6 +244,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateTime != null">update_time = #{updateTime},</if>
         </trim>
         where oqc_id = #{oqcId}
+    </update>
+
+    <update id="closeIfActive">
+        update qxx_qc_oqc
+        set status = 'CLOSED',
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            update_time = #{updateTime}
+        where oqc_id = #{id}
+          and status in ('PENDING', 'INSPECTING')
     </update>
 
     <delete id="deleteQcOqcByOqcId" parameterType="Long">

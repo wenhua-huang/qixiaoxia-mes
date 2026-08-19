@@ -2,6 +2,7 @@ package com.ruoyi.system.service.mes.qc.impl;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -161,18 +162,48 @@ public class QcFactoryServiceImpl implements IQcFactoryService
     }
 
     @Override
+    public Map<Long, QcTemplateProduct> resolveTemplates(String qcType, Collection<Long> itemIds, Long processId)
+    {
+        if (itemIds == null || itemIds.isEmpty())
+        {
+            return java.util.Collections.emptyMap();
+        }
+        // 先批量查精确工序绑定（processId 非空时），再对未命中物料批量补查通用绑定
+        Map<Long, QcTemplateProduct> byItem = new LinkedHashMap<>();
+        if (processId != null)
+        {
+            List<QcTemplateProduct> exacts = bindMapper.selectEnabledBindExactBatch(qcType, itemIds, processId);
+            for (QcTemplateProduct b : exacts)
+            {
+                byItem.putIfAbsent(b.getItemId(), b);  // 同物料多条时取 record_id 最小（SQL order by record_id）
+            }
+        }
+        List<Long> missing = itemIds.stream().filter(id -> !byItem.containsKey(id)).collect(Collectors.toList());
+        if (!missing.isEmpty())
+        {
+            List<QcTemplateProduct> commons = bindMapper.selectEnabledBindCommonBatch(qcType, missing);
+            for (QcTemplateProduct b : commons)
+            {
+                byItem.putIfAbsent(b.getItemId(), b);
+            }
+        }
+        return byItem;
+    }
+
+    @Override
     public void generateIqcForItemRecpt(WmItemRecpt header, List<WmItemRecptLine> lines)
     {
         if (header == null || lines == null || lines.isEmpty())
         {
             return;
         }
-        // 多行同物料合并为一组 → 一张检验单
+        // 多行同物料合并为一组 → 一张检验单；批量解析模板消除逐物料 N+1
         Map<Long, List<WmItemRecptLine>> byItem = lines.stream()
             .collect(Collectors.groupingBy(WmItemRecptLine::getItemId, LinkedHashMap::new, Collectors.toList()));
+        Map<Long, QcTemplateProduct> binds = resolveTemplates(QcConstants.TYPE_IQC, byItem.keySet(), null);
         for (Map.Entry<Long, List<WmItemRecptLine>> e : byItem.entrySet())
         {
-            QcTemplateProduct bind = resolveTemplate(QcConstants.TYPE_IQC, e.getKey(), null);
+            QcTemplateProduct bind = binds.get(e.getKey());
             if (bind == null)
             {
                 continue;  // 未绑定模板 = 免检
@@ -335,68 +366,36 @@ public class QcFactoryServiceImpl implements IQcFactoryService
         }
     }
 
-    /** 仅 PENDING/INSPECTING 置 CLOSED；COMPLETED 是质量档案保留 */
+    /**
+     * 条件关闭：与判定共用 LOCK_JUDGE 串行化，锁内原子 UPDATE ... WHERE status IN ('PENDING','INSPECTING')。
+     * 0 行表示单据已被判定（COMPLETED）或已关闭，判定结果获胜，不再覆盖。
+     * 来源单据反查/作废触发的系统关闭无操作人，updateBy 传 null。
+     */
     private void closeIfActive(QcIqc order)
     {
-        boolean active = QcConstants.STATUS_PENDING.equals(order.getStatus())
-            || QcConstants.STATUS_INSPECTING.equals(order.getStatus());
-        if (!active)
-        {
-            return;
-        }
-        QcIqc update = new QcIqc();
-        update.setIqcId(order.getIqcId());
-        update.setStatus(QcConstants.STATUS_CLOSED);
-        update.setUpdateTime(new Date());
-        iqcMapper.updateQcIqc(update);
+        String lockKey = QcConstants.LOCK_JUDGE + "IQC:" + order.getIqcId();
+        lockTemplate.execute(lockKey, () -> iqcMapper.closeIfActive(order.getIqcId(), null, new Date()));
     }
 
-    /** OQC 版 closeIfActive：同 IQC 语义（仅 PENDING/INSPECTING 置 CLOSED） */
+    /** OQC 版 closeIfActive：同 IQC 语义（LOCK_JUDGE 串行 + 条件 UPDATE，无操作人） */
     private void closeIfActive(QcOqc order)
     {
-        boolean active = QcConstants.STATUS_PENDING.equals(order.getStatus())
-            || QcConstants.STATUS_INSPECTING.equals(order.getStatus());
-        if (!active)
-        {
-            return;
-        }
-        QcOqc update = new QcOqc();
-        update.setOqcId(order.getOqcId());
-        update.setStatus(QcConstants.STATUS_CLOSED);
-        update.setUpdateTime(new Date());
-        oqcMapper.updateQcOqc(update);
+        String lockKey = QcConstants.LOCK_JUDGE + "OQC:" + order.getOqcId();
+        lockTemplate.execute(lockKey, () -> oqcMapper.closeIfActive(order.getOqcId(), null, new Date()));
     }
 
-    /** IPQC 版 closeIfActive：同 IQC/OQC 语义（仅 PENDING/INSPECTING 置 CLOSED） */
+    /** IPQC 版 closeIfActive：同 IQC/OQC 语义（LOCK_JUDGE 串行 + 条件 UPDATE，无操作人） */
     private void closeIfActive(QcIpqc order)
     {
-        boolean active = QcConstants.STATUS_PENDING.equals(order.getStatus())
-            || QcConstants.STATUS_INSPECTING.equals(order.getStatus());
-        if (!active)
-        {
-            return;
-        }
-        QcIpqc update = new QcIpqc();
-        update.setIpqcId(order.getIpqcId());
-        update.setStatus(QcConstants.STATUS_CLOSED);
-        update.setUpdateTime(new Date());
-        ipqcMapper.updateQcIpqc(update);
+        String lockKey = QcConstants.LOCK_JUDGE + "IPQC:" + order.getIpqcId();
+        lockTemplate.execute(lockKey, () -> ipqcMapper.closeIfActive(order.getIpqcId(), null, new Date()));
     }
 
-    /** RQC 版 closeIfActive：同 IQC/OQC/IPQC 语义（仅 PENDING/INSPECTING 置 CLOSED） */
+    /** RQC 版 closeIfActive：同 IQC/OQC/IPQC 语义（LOCK_JUDGE 串行 + 条件 UPDATE，无操作人） */
     private void closeIfActive(QcRqc order)
     {
-        boolean active = QcConstants.STATUS_PENDING.equals(order.getStatus())
-            || QcConstants.STATUS_INSPECTING.equals(order.getStatus());
-        if (!active)
-        {
-            return;
-        }
-        QcRqc update = new QcRqc();
-        update.setRqcId(order.getRqcId());
-        update.setStatus(QcConstants.STATUS_CLOSED);
-        update.setUpdateTime(new Date());
-        rqcMapper.updateQcRqc(update);
+        String lockKey = QcConstants.LOCK_JUDGE + "RQC:" + order.getRqcId();
+        lockTemplate.execute(lockKey, () -> rqcMapper.closeIfActive(order.getRqcId(), null, new Date()));
     }
 
     @Override
@@ -406,13 +405,14 @@ public class QcFactoryServiceImpl implements IQcFactoryService
         {
             return;
         }
-        // 多行同物料合并为一组 → 一张检验单（与 IQC 同范式）
+        // 多行同物料合并为一组 → 一张检验单（与 IQC 同范式）；批量解析模板消除 N+1
         Map<Long, List<WmProductSalesLine>> byItem = lines.stream()
             .filter(l -> l.getItemId() != null)
             .collect(Collectors.groupingBy(WmProductSalesLine::getItemId, LinkedHashMap::new, Collectors.toList()));
+        Map<Long, QcTemplateProduct> binds = resolveTemplates(QcConstants.TYPE_OQC, byItem.keySet(), null);
         for (Map.Entry<Long, List<WmProductSalesLine>> e : byItem.entrySet())
         {
-            QcTemplateProduct bind = resolveTemplate(QcConstants.TYPE_OQC, e.getKey(), null);
+            QcTemplateProduct bind = binds.get(e.getKey());
             if (bind == null)
             {
                 continue;  // 未绑定模板 = 免检
@@ -695,13 +695,14 @@ public class QcFactoryServiceImpl implements IQcFactoryService
         {
             return;
         }
-        // 多行同物料合并为一组 → 一张退料检验单（与 IQC/OQC 同范式）
+        // 多行同物料合并为一组 → 一张退料检验单（与 IQC/OQC 同范式）；批量解析模板消除 N+1
         Map<Long, List<WmRtIssueLine>> byItem = lines.stream()
             .filter(l -> l.getItemId() != null)
             .collect(Collectors.groupingBy(WmRtIssueLine::getItemId, LinkedHashMap::new, Collectors.toList()));
+        Map<Long, QcTemplateProduct> binds = resolveTemplates(QcConstants.TYPE_RQC, byItem.keySet(), null);
         for (Map.Entry<Long, List<WmRtIssueLine>> e : byItem.entrySet())
         {
-            QcTemplateProduct bind = resolveTemplate(QcConstants.TYPE_RQC, e.getKey(), null);
+            QcTemplateProduct bind = binds.get(e.getKey());
             if (bind == null)
             {
                 continue;  // 未绑定模板 = 免检

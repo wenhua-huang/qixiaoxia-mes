@@ -1,6 +1,8 @@
 package com.ruoyi.system.service.mes.qc;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 import com.ruoyi.system.domain.mes.pro.ProFeedback;
 import com.ruoyi.system.domain.mes.qc.QcOrderLine;
@@ -27,6 +29,15 @@ public interface IQcFactoryService
      * 无绑定返回 null = 免检
      */
     QcTemplateProduct resolveTemplate(String qcType, Long itemId, Long processId);
+
+    /**
+     * 批量解析模板绑定（gate/生成路径消除逐物料 N+1）：对每个 itemId 先查精确工序绑定，
+     * 未命中再回退通用绑定(process_id IS NULL)。等价于对集合内每个元素调用
+     * {@link #resolveTemplate}，但至多 2 条 SQL。
+     *
+     * @return itemId → 绑定；未绑定模板的物料不在 Map 中（免检）
+     */
+    Map<Long, QcTemplateProduct> resolveTemplates(String qcType, Collection<Long> itemIds, Long processId);
 
     /**
      * 采购入库单创建后生成 IQC 待检单（幂等：同来源+物料存在未关闭单则跳过；Redis 锁内执行；

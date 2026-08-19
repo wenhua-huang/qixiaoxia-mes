@@ -13,10 +13,13 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.core.redis.RedisLockTemplate;
+import com.ruoyi.system.domain.mes.pro.ProCard;
 import com.ruoyi.system.domain.mes.pro.ProCardProcess;
 import com.ruoyi.system.domain.mes.pro.ProFeedback;
 import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
@@ -24,6 +27,7 @@ import com.ruoyi.system.domain.mes.qc.QcIpqc;
 import com.ruoyi.system.domain.mes.qc.QcIqc;
 import com.ruoyi.system.domain.mes.qc.QcOqc;
 import com.ruoyi.system.domain.mes.qc.QcOrderLine;
+import com.ruoyi.system.domain.mes.qc.QcRqc;
 import com.ruoyi.system.domain.mes.qc.QcTemplateIndex;
 import com.ruoyi.system.domain.mes.qc.QcTemplateProduct;
 import com.ruoyi.system.domain.mes.wm.WmItemRecpt;
@@ -32,19 +36,23 @@ import com.ruoyi.system.domain.mes.wm.WmProductRecpt;
 import com.ruoyi.system.domain.mes.wm.WmProductRecptLine;
 import com.ruoyi.system.domain.mes.wm.WmProductSales;
 import com.ruoyi.system.domain.mes.wm.WmProductSalesLine;
+import com.ruoyi.system.mapper.mes.pro.ProCardMapper;
 import com.ruoyi.system.mapper.mes.pro.ProCardProcessMapper;
 import com.ruoyi.system.mapper.mes.pro.ProRouteProcessMapper;
 import com.ruoyi.system.mapper.mes.qc.QcIpqcMapper;
 import com.ruoyi.system.mapper.mes.qc.QcIqcMapper;
 import com.ruoyi.system.mapper.mes.qc.QcOqcMapper;
 import com.ruoyi.system.mapper.mes.qc.QcOrderLineMapper;
+import com.ruoyi.system.mapper.mes.qc.QcRqcMapper;
 import com.ruoyi.system.mapper.mes.qc.QcTemplateIndexMapper;
 import com.ruoyi.system.mapper.mes.qc.QcTemplateProductMapper;
 import com.ruoyi.system.mapper.mes.wm.WmItemRecptMapper;
 import com.ruoyi.system.mapper.mes.wm.WmProductRecptLineMapper;
 import com.ruoyi.system.mapper.mes.wm.WmProductRecptMapper;
 import com.ruoyi.system.mapper.mes.wm.WmProductSalesMapper;
+import com.ruoyi.system.mapper.mes.wm.WmRtIssueMapper;
 import com.ruoyi.system.service.mes.qc.QcConstants;
+import com.ruoyi.system.service.mes.qc.QcTodoHelper;
 import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -56,6 +64,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -84,9 +93,13 @@ class QcFactoryServiceImplTest {
     @Mock WmProductSalesMapper wmProductSalesMapper;
     @Mock ProRouteProcessMapper proRouteProcessMapper;
     @Mock ProCardProcessMapper proCardProcessMapper;
+    @Mock ProCardMapper proCardMapper;
     @Mock WmProductRecptMapper wmProductRecptMapper;
     @Mock WmProductRecptLineMapper wmProductRecptLineMapper;
     @Mock PlatformTransactionManager transactionManager;
+    @Mock QcTodoHelper qcTodoHelper;
+    @Mock QcRqcMapper rqcMapper;
+    @Mock WmRtIssueMapper wmRtIssueMapper;
     @InjectMocks QcFactoryServiceImpl service;
 
     @Captor ArgumentCaptor<QcIqc> iqcCaptor;
@@ -301,14 +314,13 @@ class QcFactoryServiceImplTest {
     }
 
     @Test
-    @DisplayName("closeBySource 对未实现的来源类型当前为 no-op")
-    void should_noop_close_for_unimplemented_source_type() {
+    @DisplayName("closeBySource 对退料检来源路由到 RQC，无活跃单时 no-op")
+    void should_route_rt_issue_close_to_rqc() {
         service.closeBySource(QcConstants.SOURCE_RT_ISSUE, 5L);
 
+        verify(rqcMapper).selectBySource(QcConstants.SOURCE_RT_ISSUE, 5L, null);
         verify(iqcMapper, never()).selectBySource(anyString(), any(), any());
-        verify(iqcMapper, never()).updateQcIqc(any());
         verify(oqcMapper, never()).selectBySource(anyString(), any(), any());
-        verify(oqcMapper, never()).updateQcOqc(any());
     }
 
     @Test
@@ -553,15 +565,38 @@ class QcFactoryServiceImplTest {
     }
 
     @Test
-    @DisplayName("IPQC 工序检：流转卡工序记录缺失时不生成")
-    void should_skip_ipqc_when_card_process_missing() {
+    @DisplayName("IPQC 工序检：流转卡工序记录缺失时惰性补建后生成")
+    void should_lazy_create_card_process_when_missing_then_generate() {
         when(proRouteProcessMapper.selectByRouteAndProcess(7L, 5L)).thenReturn(routeProcess("Y"));
         when(bindMapper.selectEnabledBindExact("IPQC", 1L, 5L)).thenReturn(bind(10L));
         when(proCardProcessMapper.selectByCardAndProcess(100L, 5L)).thenReturn(null);
+        when(proCardMapper.selectProCardByCardId(100L)).thenReturn(null);  // 卡查不到时 cardCode 兜底 null
+        when(proCardProcessMapper.insertProCardProcess(any())).thenAnswer(inv -> {
+            ((ProCardProcess) inv.getArgument(0)).setRecordId(77L);
+            return 1;
+        });
+        when(ipqcMapper.selectBySource(QcConstants.SOURCE_CARD_PROCESS, 77L, null))
+            .thenReturn(Collections.emptyList());
+        when(templateIndexMapper.selectByTemplateId(10L))
+            .thenReturn(Collections.singletonList(index(11L, "IDX-IPQC")));
+        when(autoCodeGenerator.genSerialCode(QcConstants.CODE_RULE_IPQC, null)).thenReturn(IPQC_CODE);
+        when(ipqcMapper.insertQcIpqc(any())).thenAnswer(inv -> {
+            ((QcIpqc) inv.getArgument(0)).setIpqcId(300L);
+            return 1;
+        });
 
-        assertNull(service.generateIpqcForFeedback(feedback()));
+        String code;
+        try (MockedStatic<SecurityUtils> sec = mockStatic(SecurityUtils.class)) {
+            sec.when(SecurityUtils::getUserId).thenReturn(1L);
+            sec.when(SecurityUtils::getUsername).thenReturn("admin");
+            code = service.generateIpqcForFeedback(feedback());
+        }
 
-        verify(ipqcMapper, never()).insertQcIpqc(any());
+        assertEquals(IPQC_CODE, code);
+        // 确认惰性补建被调用
+        verify(proCardProcessMapper).insertProCardProcess(any());
+        // 用新建的 cp.recordId(77) 建单并回填
+        verify(proCardProcessMapper).updateCardProcessRefs(77L, 300L, IPQC_CODE);
     }
 
     @Test

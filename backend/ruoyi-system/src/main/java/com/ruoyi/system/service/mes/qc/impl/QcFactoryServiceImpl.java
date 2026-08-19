@@ -620,13 +620,14 @@ public class QcFactoryServiceImpl implements IQcFactoryService
         cp.setWorkstationCode(feedback.getWorkstationCode());
         cp.setWorkstationName(feedback.getWorkstationName());
         cp.setUserId(SecurityUtils.getUserId());
-        cp.setUserName(feedback.getRecordUser());
-        cp.setNickName(feedback.getRecordNick());
+        // App/PC 报工 recordUser/recordNick 常为空，回退到 user_name/nick_name
+        cp.setUserName(StringUtils.defaultIfBlank(feedback.getRecordUser(), feedback.getUserName()));
+        cp.setNickName(StringUtils.defaultIfBlank(feedback.getRecordNick(), feedback.getNickName()));
         cp.setFeedbackId(feedback.getRecordId());
         cp.setOutputTime(feedback.getFeedbackTime());
         cp.setQuantityOutput(feedback.getQuantityQualified());
         cp.setQuantityUnqualified(feedback.getQuantityUnqualified());
-        cp.setCreateBy(feedback.getRecordUser());
+        cp.setCreateBy(SecurityUtils.getUsername());
         cp.setCreateTime(new Date());
         proCardProcessMapper.insertProCardProcess(cp);
         return cp;

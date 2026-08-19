@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.qc.QcTemplateIndexMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.qc.QcTemplateIndex" id="QcTemplateIndexResult">
+        <result property="recordId"       column="record_id"       />
+        <result property="factoryId"      column="factory_id"      />
+        <result property="templateId"     column="template_id"     />
+        <result property="indexId"        column="index_id"        />
+        <result property="indexCode"      column="index_code"      />
+        <result property="indexName"      column="index_name"      />
+        <result property="indexType"      column="index_type"      />
+        <result property="qcTool"         column="qc_tool"         />
+        <result property="qcResultType"   column="qc_result_type" />
+        <result property="checkMethod"    column="check_method"    />
+        <result property="standerVal"     column="stander_val"     />
+        <result property="unitOfMeasure"  column="unit_of_measure" />
+        <result property="thresholdMin"   column="threshold_min"   />
+        <result property="thresholdMax"   column="threshold_max"   />
+        <result property="orderNum"       column="order_num"       />
+        <result property="remark"         column="remark"          />
+        <result property="createBy"       column="create_by"       />
+        <result property="createTime"     column="create_time"     />
+        <result property="updateBy"       column="update_by"       />
+        <result property="updateTime"     column="update_time"     />
+    </resultMap>
+
+    <sql id="selectQcTemplateIndexVo">
+        select record_id, factory_id, template_id, index_id, index_code, index_name, index_type,
+               qc_tool, qc_result_type, check_method, stander_val, unit_of_measure,
+               threshold_min, threshold_max, order_num, remark, create_by, create_time, update_by, update_time
+        from qxx_qc_template_index
+    </sql>
+
+    <select id="selectByTemplateId" parameterType="Long" resultMap="QcTemplateIndexResult">
+        <include refid="selectQcTemplateIndexVo"/>
+        where template_id = #{templateId}
+        order by order_num, record_id
+    </select>
+
+    <insert id="insertQcTemplateIndex" parameterType="com.ruoyi.system.domain.mes.qc.QcTemplateIndex" useGeneratedKeys="true" keyProperty="recordId">
+        insert into qxx_qc_template_index
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="templateId != null">template_id,</if>
+            <if test="indexId != null">index_id,</if>
+            <if test="indexCode != null and indexCode != ''">index_code,</if>
+            <if test="indexName != null and indexName != ''">index_name,</if>
+            <if test="indexType != null and indexType != ''">index_type,</if>
+            <if test="qcTool != null">qc_tool,</if>
+            <if test="qcResultType != null">qc_result_type,</if>
+            <if test="checkMethod != null">check_method,</if>
+            <if test="standerVal != null">stander_val,</if>
+            <if test="unitOfMeasure != null">unit_of_measure,</if>
+            <if test="thresholdMin != null">threshold_min,</if>
+            <if test="thresholdMax != null">threshold_max,</if>
+            <if test="orderNum != null">order_num,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="templateId != null">#{templateId},</if>
+            <if test="indexId != null">#{indexId},</if>
+            <if test="indexCode != null and indexCode != ''">#{indexCode},</if>
+            <if test="indexName != null and indexName != ''">#{indexName},</if>
+            <if test="indexType != null and indexType != ''">#{indexType},</if>
+            <if test="qcTool != null">#{qcTool},</if>
+            <if test="qcResultType != null">#{qcResultType},</if>
+            <if test="checkMethod != null">#{checkMethod},</if>
+            <if test="standerVal != null">#{standerVal},</if>
+            <if test="unitOfMeasure != null">#{unitOfMeasure},</if>
+            <if test="thresholdMin != null">#{thresholdMin},</if>
+            <if test="thresholdMax != null">#{thresholdMax},</if>
+            <if test="orderNum != null">#{orderNum},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <delete id="deleteByTemplateId" parameterType="Long">
+        delete from qxx_qc_template_index where template_id = #{templateId}
+    </delete>
+</mapper>

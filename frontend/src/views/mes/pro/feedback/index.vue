@@ -94,6 +94,14 @@
       </el-table-column>
       <el-table-column label="合格数" align="center" prop="quantityQualified" width="80" />
       <el-table-column label="不合格数" align="center" prop="quantityUnqualified" width="90" />
+      <el-table-column label="检验状态" align="center" width="100">
+        <template #default="scope">
+          <el-tag v-if="scope.row.qcStatus && scope.row.qcStatus !== 'NONE'" size="small"
+            :type="qcTagType(scope.row.qcStatus)" style="cursor: pointer"
+            @click="goIpqc(scope.row)">{{ qcTagText(scope.row.qcStatus) }}</el-tag>
+          <span v-else style="color: #909399">-</span>
+        </template>
+      </el-table-column>
       <el-table-column label="状态" align="center" prop="status" width="85">
         <template #default="scope">
           <el-tag :type="statusTagMap[scope.row.status] || 'info'" size="small">{{ statusLabelMap[scope.row.status] || scope.row.status }}</el-tag>
@@ -397,6 +405,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, getCurrentInstance } from 'vue'
+import { useRouter } from 'vue-router'
 import { Warning } from '@element-plus/icons-vue'
 import { listFeedback, getFeedback, addFeedback, updateFeedback, delFeedback, confirmFeedback, auditFeedback, batchConfirmFeedback, batchAuditFeedback, getConsumeDefaults } from '@/api/mes/pro/feedback'
 import { getTask } from '@/api/mes/pro/task'
@@ -408,6 +417,21 @@ import taskSelect from '@/components/taskSelect/single.vue'
 import workorderSelect from '@/components/workorderSelect/single.vue'
 
 const { proxy } = getCurrentInstance() as any
+const router = useRouter()
+
+// 检验状态标签（聚合自关联工序检 IPQC）
+const QC_TAG: Record<string, { type: string; text: string }> = {
+  PASSED: { type: 'success', text: '检验合格' },
+  CONCESSION: { type: 'warning', text: '让步接收' },
+  PENDING: { type: 'info', text: '待检验' },
+  FAILED: { type: 'danger', text: '检验不合格' }
+}
+function qcTagType(s: string) { return (QC_TAG[s]?.type as any) || 'info' }
+function qcTagText(s: string) { return QC_TAG[s]?.text || s }
+function goIpqc(row: any) {
+  if (!row.ipqcId) return
+  router.push({ path: '/qc/qcipqc', query: { openId: String(row.ipqcId), ro: '1' } })
+}
 
 // 流转卡状态字典（后端字典 mes_pro_card_status，禁硬编码 Record<string,string>）
 const { mes_pro_card_status: cardStatusDict } = proxy.useDict('mes_pro_card_status')

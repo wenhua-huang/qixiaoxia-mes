@@ -23,6 +23,8 @@ export interface WmProductRecpt {
   totalBox?: number
   ipqcId?: number
   ipqcCode?: string
+  /** 检验状态汇总（列表计算列：NONE/PENDING/PASSED/FAILED/CONCESSION） */
+  qcStatus?: string
   status?: string
   remark?: string
   lines?: WmProductRecptLine[]

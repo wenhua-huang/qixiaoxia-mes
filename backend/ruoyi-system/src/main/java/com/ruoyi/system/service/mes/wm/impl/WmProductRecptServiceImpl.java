@@ -25,6 +25,8 @@ import com.ruoyi.system.mapper.mes.pro.ProDocGenerationLogMapper;
 import com.ruoyi.system.mapper.mes.wm.WmProductRecptMapper;
 import com.ruoyi.system.mapper.mes.wm.WmTransactionMapper;
 import com.ruoyi.system.service.mes.pro.IProMaterialTraceService;
+import com.ruoyi.system.service.mes.qc.IQcFactoryService;
+import com.ruoyi.system.service.mes.qc.IQcGateService;
 import com.ruoyi.system.service.mes.wm.IWmBatchService;
 import com.ruoyi.system.service.mes.wm.IWmProductRecptLineService;
 import com.ruoyi.system.service.mes.wm.IWmProductRecptService;
@@ -53,6 +55,12 @@ public class WmProductRecptServiceImpl implements IWmProductRecptService
 
     @Autowired
     private IWmBatchService wmBatchService;
+
+    @Autowired
+    private IQcFactoryService qcFactoryService;
+
+    @Autowired
+    private IQcGateService qcGateService;
 
     @Override
     public List<WmProductRecpt> selectWmProductRecptList(WmProductRecpt entity) {
@@ -84,7 +92,21 @@ public class WmProductRecptServiceImpl implements IWmProductRecptService
     public int insertWmProductRecpt(WmProductRecpt entity) {
         entity.setCreateBy(SecurityUtils.getUsername());
         entity.setCreateTime(DateUtils.getNowDate());
-        return wmProductRecptMapper.insertWmProductRecpt(entity);
+        if (entity.getStatus() == null || entity.getStatus().isEmpty()) {
+            entity.setStatus("DRAFT");
+        }
+        wmProductRecptMapper.insertWmProductRecpt(entity);
+        // 携带行时一次性插入（PC 手工新增/携带行场景）；无行时仅插头（向后兼容原新增流程）
+        if (entity.getLines() != null && !entity.getLines().isEmpty()) {
+            for (WmProductRecptLine line : entity.getLines()) {
+                line.setRecptId(entity.getRecptId());
+                wmProductRecptLineService.insertWmProductRecptLine(line);
+            }
+            // IPQC 完工检生成 hook：入库单头+行落库后生成待检单（工厂内部锁+事务，
+            // 随本方法外层事务与入库单创建同生共死；未绑模板产品免检跳过）
+            qcFactoryService.generateIpqcForProductRecpt(entity);
+        }
+        return 1;
     }
 
     @Override
@@ -142,6 +164,10 @@ public class WmProductRecptServiceImpl implements IWmProductRecptService
 
     /** 确认收货核心逻辑（不入库查询，由调用方传入已加载的 header + lines） */
     private void doConfirmProductRecpt(WmProductRecpt header, List<WmProductRecptLine> lines) {
+        // IPQC 完工检拦截 hook：confirm 即增库存，检验必须前置（需检产品必须有 COMPLETED+PASS/CONCESSION
+        // 完工检验单，否则抛 ServiceException 阻断；confirmProductRecpt 与 mobileConfirmProductRecpt 双入口均经此覆盖）
+        qcGateService.assertProductRecptConfirmable(header);
+
         Long recptId = header.getRecptId();
         List<ProductRecptTxBean> txBeans = new ArrayList<>();
         for (WmProductRecptLine line : lines) {

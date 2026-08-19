@@ -47,6 +47,13 @@
           <dict-tag :options="mes_itemrecpt_status" :value="scope.row.status" />
         </template>
       </el-table-column>
+      <el-table-column label="检验状态" align="center" width="110">
+        <template #default="scope">
+          <el-tag v-if="scope.row.qcStatus && scope.row.qcStatus !== 'NONE'" size="small" :type="qcTagType(scope.row.qcStatus)"
+            style="cursor: pointer" @click="goIpqc(scope.row)">{{ qcTagText(scope.row.qcStatus) }}</el-tag>
+          <span v-else>-</span>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" align="center" width="190" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-tooltip content="修改" placement="top" v-if="isEditable(scope.row)"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:product_recpt:edit']"></el-button></el-tooltip>
@@ -166,6 +173,7 @@
 
 <script setup lang="ts" name="WmProductRecpt">
 import { ref, reactive, toRefs, getCurrentInstance } from 'vue'
+import { useRouter } from 'vue-router'
 import type { WmProductRecptQueryParams, WmProductRecpt, WmProductRecptLine } from '@/api/mes/wm/product_recpt'
 import { listWmProductRecpt, getWmProductRecpt, delWmProductRecpt, addWmProductRecpt, updateWmProductRecpt } from '@/api/mes/wm/product_recpt'
 import request from '@/utils/request'
@@ -177,6 +185,7 @@ import WorkorderSelect from '@/components/workorderSelect/single.vue'
 
 const { proxy } = getCurrentInstance() as any
 const { mes_itemrecpt_status } = useDict('mes_itemrecpt_status')
+const router = useRouter()
 const warehouseSelectRef = ref()
 const createWarehouseRef = ref()
 const woSelectRef = ref()
@@ -211,6 +220,19 @@ function handleQuery() { queryParams.value.pageNum = 1; getList() }
 function resetQuery() { proxy.resetForm('queryRef'); handleQuery() }
 function handleSelectionChange(s: any[]) { ids.value = s.map(i => i.recptId); single.value = s.length !== 1; multiple.value = !s.length }
 function isEditable(row: WmProductRecpt) { return row.status === 'DRAFT' }
+
+// 检验状态 tag：点击跳转 IPQC 列表页并按来源单据过滤
+const QC_TAG: Record<string, { type: string; text: string }> = {
+  PASSED: { type: 'success', text: '检验合格' },
+  CONCESSION: { type: 'warning', text: '让步接收' },
+  PENDING: { type: 'info', text: '待检验' },
+  FAILED: { type: 'danger', text: '检验不合格' }
+}
+function qcTagType(s: string) { return QC_TAG[s]?.type || 'info' }
+function qcTagText(s: string) { return QC_TAG[s]?.text || s }
+function goIpqc(row: WmProductRecpt) {
+  router.push({ path: '/qc/qcipqc', query: { sourceDocId: String(row.recptId) } })
+}
 
 // 入口已改为「从工单生成」，handleAdd 暂保留以支持未来手动新增入口恢复（dialog 复用）
 function handleAdd() {

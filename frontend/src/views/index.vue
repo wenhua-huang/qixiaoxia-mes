@@ -23,6 +23,13 @@
       </el-col>
     </el-row>
 
+    <!-- 我的待办 -->
+    <el-row :gutter="20" class="todo-row">
+      <el-col :span="24">
+        <TodoPanel />
+      </el-col>
+    </el-row>
+
     <el-divider />
 
     <!-- 技术栈 & 生产看板 -->
@@ -1149,6 +1156,7 @@
 <script setup lang="ts" name="Index">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import TodoPanel from './components/TodoPanel.vue'
 
 const router = useRouter()
 const version = ref<string>('3.9.2')
@@ -1255,6 +1263,11 @@ function goModule(path: string): void {
         color: #909399;
       }
     }
+  }
+
+  // 待办面板
+  .todo-row {
+    margin-bottom: 10px;
   }
 
   // 通用卡片

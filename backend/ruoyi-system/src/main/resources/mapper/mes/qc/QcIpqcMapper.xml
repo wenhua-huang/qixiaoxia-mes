@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.qc.QcIpqcMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.qc.QcIpqc" id="QcIpqcResult">
+        <result property="ipqcId"                  column="ipqc_id"                  />
+        <result property="factoryId"               column="factory_id"               />
+        <result property="ipqcCode"                column="ipqc_code"                />
+        <result property="ipqcName"                column="ipqc_name"                />
+        <result property="ipqcType"                column="ipqc_type"                />
+        <result property="templateId"              column="template_id"              />
+        <result property="sourceDocId"             column="source_doc_id"            />
+        <result property="sourceDocType"           column="source_doc_type"          />
+        <result property="sourceDocCode"           column="source_doc_code"          />
+        <result property="sourceLineId"            column="source_line_id"           />
+        <result property="workorderId"             column="workorder_id"             />
+        <result property="workorderCode"           column="workorder_code"           />
+        <result property="workorderName"           column="workorder_name"           />
+        <result property="cardId"                  column="card_id"                  />
+        <result property="cardCode"                column="card_code"                />
+        <result property="taskId"                  column="task_id"                  />
+        <result property="taskCode"                column="task_code"                />
+        <result property="processId"               column="process_id"               />
+        <result property="processCode"             column="process_code"             />
+        <result property="processName"             column="process_name"             />
+        <result property="workstationId"           column="workstation_id"           />
+        <result property="workstationCode"         column="workstation_code"         />
+        <result property="workstationName"         column="workstation_name"         />
+        <result property="itemId"                  column="item_id"                  />
+        <result property="itemCode"                column="item_code"                />
+        <result property="itemName"                column="item_name"                />
+        <result property="specification"           column="specification"            />
+        <result property="unitOfMeasure"           column="unit_of_measure"          />
+        <result property="quantityCheck"           column="quantity_check"           />
+        <result property="quantityMinCheck"        column="quantity_min_check"       />
+        <result property="quantityMaxUnqualified"  column="quantity_max_unqualified" />
+        <result property="quantityQualified"       column="quantity_qualified"       />
+        <result property="quantityUnqualified"     column="quantity_unqualified"     />
+        <result property="crRateLimit"             column="cr_rate_limit"            />
+        <result property="majRateLimit"            column="maj_rate_limit"           />
+        <result property="minRateLimit"            column="min_rate_limit"           />
+        <result property="crQuantity"              column="cr_quantity"              />
+        <result property="majQuantity"             column="maj_quantity"             />
+        <result property="minQuantity"             column="min_quantity"             />
+        <result property="crRate"                  column="cr_rate"                  />
+        <result property="majRate"                 column="maj_rate"                 />
+        <result property="minRate"                 column="min_rate"                 />
+        <result property="checkResult"             column="check_result"             />
+        <result property="concessionReason"        column="concession_reason"        />
+        <result property="inspectDate"             column="inspect_date"             />
+        <result property="inspector"               column="inspector"                />
+        <result property="status"                  column="status"                   />
+        <result property="remark"                  column="remark"                   />
+        <result property="createBy"                column="create_by"                />
+        <result property="createTime"              column="create_time"              />
+        <result property="updateBy"                column="update_by"                />
+        <result property="updateTime"              column="update_time"              />
+    </resultMap>
+
+    <sql id="selectQcIpqcVo">
+        select ipqc_id, factory_id, ipqc_code, ipqc_name, ipqc_type, template_id, source_doc_id,
+               source_doc_type, source_doc_code, source_line_id, workorder_id, workorder_code, workorder_name,
+               card_id, card_code, task_id, task_code, process_id, process_code, process_name,
+               workstation_id, workstation_code, workstation_name, item_id, item_code, item_name,
+               specification, unit_of_measure, quantity_check, quantity_min_check, quantity_max_unqualified,
+               quantity_qualified, quantity_unqualified, cr_rate_limit, maj_rate_limit, min_rate_limit,
+               cr_quantity, maj_quantity, min_quantity, cr_rate, maj_rate, min_rate, check_result,
+               concession_reason, inspect_date, inspector, status, remark, create_by, create_time,
+               update_by, update_time
+        from qxx_qc_ipqc
+    </sql>
+
+    <select id="selectQcIpqcList" parameterType="com.ruoyi.system.domain.mes.qc.QcIpqc" resultMap="QcIpqcResult">
+        <include refid="selectQcIpqcVo"/>
+        <where>
+            <if test="ipqcCode != null and ipqcCode != ''"> and ipqc_code like concat('%', #{ipqcCode}, '%')</if>
+            <if test="ipqcName != null and ipqcName != ''"> and ipqc_name like concat('%', #{ipqcName}, '%')</if>
+            <if test="ipqcType != null and ipqcType != ''"> and ipqc_type = #{ipqcType}</if>
+            <if test="templateId != null"> and template_id = #{templateId}</if>
+            <if test="sourceDocType != null and sourceDocType != ''"> and source_doc_type = #{sourceDocType}</if>
+            <if test="sourceDocId != null"> and source_doc_id = #{sourceDocId}</if>
+            <if test="workorderId != null"> and workorder_id = #{workorderId}</if>
+            <if test="workorderCode != null and workorderCode != ''"> and workorder_code like concat('%', #{workorderCode}, '%')</if>
+            <if test="cardId != null"> and card_id = #{cardId}</if>
+            <if test="cardCode != null and cardCode != ''"> and card_code like concat('%', #{cardCode}, '%')</if>
+            <if test="processId != null"> and process_id = #{processId}</if>
+            <if test="processName != null and processName != ''"> and process_name like concat('%', #{processName}, '%')</if>
+            <if test="itemId != null"> and item_id = #{itemId}</if>
+            <if test="itemCode != null and itemCode != ''"> and item_code like concat('%', #{itemCode}, '%')</if>
+            <if test="itemName != null and itemName != ''"> and concat(item_code, ' ', item_name) like concat('%', replace(#{itemName}, ' ', '%'), '%')</if>
+            <if test="checkResult != null and checkResult != ''"> and check_result = #{checkResult}</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+            <if test="inspector != null and inspector != ''"> and inspector = #{inspector}</if>
+        </where>
+        order by ipqc_id desc
+    </select>
+
+    <select id="selectQcIpqcByIpqcId" parameterType="Long" resultMap="QcIpqcResult">
+        <include refid="selectQcIpqcVo"/>
+        where ipqc_id = #{ipqcId}
+    </select>
+
+    <select id="checkIpqcCodeUnique" parameterType="String" resultMap="QcIpqcResult">
+        <include refid="selectQcIpqcVo"/>
+        where ipqc_code = #{ipqcCode} limit 1
+    </select>
+
+    <select id="selectBySource" resultMap="QcIpqcResult">
+        <include refid="selectQcIpqcVo"/>
+        where source_doc_type = #{sourceDocType} and source_doc_id = #{sourceDocId}
+        <if test="itemId != null"> and item_id = #{itemId}</if>
+        order by ipqc_id desc
+    </select>
+
+    <insert id="insertQcIpqc" parameterType="com.ruoyi.system.domain.mes.qc.QcIpqc" useGeneratedKeys="true" keyProperty="ipqcId">
+        insert into qxx_qc_ipqc
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="ipqcCode != null and ipqcCode != ''">ipqc_code,</if>
+            <if test="ipqcName != null">ipqc_name,</if>
+            <if test="ipqcType != null and ipqcType != ''">ipqc_type,</if>
+            <if test="templateId != null">template_id,</if>
+            <if test="sourceDocId != null">source_doc_id,</if>
+            <if test="sourceDocType != null">source_doc_type,</if>
+            <if test="sourceDocCode != null">source_doc_code,</if>
+            <if test="sourceLineId != null">source_line_id,</if>
+            <if test="workorderId != null">workorder_id,</if>
+            <if test="workorderCode != null">workorder_code,</if>
+            <if test="workorderName != null">workorder_name,</if>
+            <if test="cardId != null">card_id,</if>
+            <if test="cardCode != null">card_code,</if>
+            <if test="taskId != null">task_id,</if>
+            <if test="taskCode != null">task_code,</if>
+            <if test="processId != null">process_id,</if>
+            <if test="processCode != null">process_code,</if>
+            <if test="processName != null">process_name,</if>
+            <if test="workstationId != null">workstation_id,</if>
+            <if test="workstationCode != null">workstation_code,</if>
+            <if test="workstationName != null">workstation_name,</if>
+            <if test="itemId != null">item_id,</if>
+            <if test="itemCode != null">item_code,</if>
+            <if test="itemName != null">item_name,</if>
+            <if test="specification != null">specification,</if>
+            <if test="unitOfMeasure != null">unit_of_measure,</if>
+            <if test="quantityCheck != null">quantity_check,</if>
+            <if test="quantityMinCheck != null">quantity_min_check,</if>
+            <if test="quantityMaxUnqualified != null">quantity_max_unqualified,</if>
+            <if test="quantityQualified != null">quantity_qualified,</if>
+            <if test="quantityUnqualified != null">quantity_unqualified,</if>
+            <if test="crRateLimit != null">cr_rate_limit,</if>
+            <if test="majRateLimit != null">maj_rate_limit,</if>
+            <if test="minRateLimit != null">min_rate_limit,</if>
+            <if test="crQuantity != null">cr_quantity,</if>
+            <if test="majQuantity != null">maj_quantity,</if>
+            <if test="minQuantity != null">min_quantity,</if>
+            <if test="crRate != null">cr_rate,</if>
+            <if test="majRate != null">maj_rate,</if>
+            <if test="minRate != null">min_rate,</if>
+            <if test="checkResult != null">check_result,</if>
+            <if test="concessionReason != null">concession_reason,</if>
+            <if test="inspectDate != null">inspect_date,</if>
+            <if test="inspector != null">inspector,</if>
+            <if test="status != null and status != ''">status,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="ipqcCode != null and ipqcCode != ''">#{ipqcCode},</if>
+            <if test="ipqcName != null">#{ipqcName},</if>
+            <if test="ipqcType != null and ipqcType != ''">#{ipqcType},</if>
+            <if test="templateId != null">#{templateId},</if>
+            <if test="sourceDocId != null">#{sourceDocId},</if>
+            <if test="sourceDocType != null">#{sourceDocType},</if>
+            <if test="sourceDocCode != null">#{sourceDocCode},</if>
+            <if test="sourceLineId != null">#{sourceLineId},</if>
+            <if test="workorderId != null">#{workorderId},</if>
+            <if test="workorderCode != null">#{workorderCode},</if>
+            <if test="workorderName != null">#{workorderName},</if>
+            <if test="cardId != null">#{cardId},</if>
+            <if test="cardCode != null">#{cardCode},</if>
+            <if test="taskId != null">#{taskId},</if>
+            <if test="taskCode != null">#{taskCode},</if>
+            <if test="processId != null">#{processId},</if>
+            <if test="processCode != null">#{processCode},</if>
+            <if test="processName != null">#{processName},</if>
+            <if test="workstationId != null">#{workstationId},</if>
+            <if test="workstationCode != null">#{workstationCode},</if>
+            <if test="workstationName != null">#{workstationName},</if>
+            <if test="itemId != null">#{itemId},</if>
+            <if test="itemCode != null">#{itemCode},</if>
+            <if test="itemName != null">#{itemName},</if>
+            <if test="specification != null">#{specification},</if>
+            <if test="unitOfMeasure != null">#{unitOfMeasure},</if>
+            <if test="quantityCheck != null">#{quantityCheck},</if>
+            <if test="quantityMinCheck != null">#{quantityMinCheck},</if>
+            <if test="quantityMaxUnqualified != null">#{quantityMaxUnqualified},</if>
+            <if test="quantityQualified != null">#{quantityQualified},</if>
+            <if test="quantityUnqualified != null">#{quantityUnqualified},</if>
+            <if test="crRateLimit != null">#{crRateLimit},</if>
+            <if test="majRateLimit != null">#{majRateLimit},</if>
+            <if test="minRateLimit != null">#{minRateLimit},</if>
+            <if test="crQuantity != null">#{crQuantity},</if>
+            <if test="majQuantity != null">#{majQuantity},</if>
+            <if test="minQuantity != null">#{minQuantity},</if>
+            <if test="crRate != null">#{crRate},</if>
+            <if test="majRate != null">#{majRate},</if>
+            <if test="minRate != null">#{minRate},</if>
+            <if test="checkResult != null">#{checkResult},</if>
+            <if test="concessionReason != null">#{concessionReason},</if>
+            <if test="inspectDate != null">#{inspectDate},</if>
+            <if test="inspector != null">#{inspector},</if>
+            <if test="status != null and status != ''">#{status},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateQcIpqc" parameterType="com.ruoyi.system.domain.mes.qc.QcIpqc">
+        update qxx_qc_ipqc
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="ipqcCode != null and ipqcCode != ''">ipqc_code = #{ipqcCode},</if>
+            <if test="ipqcName != null">ipqc_name = #{ipqcName},</if>
+            <if test="ipqcType != null and ipqcType != ''">ipqc_type = #{ipqcType},</if>
+            <if test="templateId != null">template_id = #{templateId},</if>
+            <if test="sourceDocId != null">source_doc_id = #{sourceDocId},</if>
+            <if test="sourceDocType != null">source_doc_type = #{sourceDocType},</if>
+            <if test="sourceDocCode != null">source_doc_code = #{sourceDocCode},</if>
+            <if test="sourceLineId != null">source_line_id = #{sourceLineId},</if>
+            <if test="workorderId != null">workorder_id = #{workorderId},</if>
+            <if test="workorderCode != null">workorder_code = #{workorderCode},</if>
+            <if test="workorderName != null">workorder_name = #{workorderName},</if>
+            <if test="cardId != null">card_id = #{cardId},</if>
+            <if test="cardCode != null">card_code = #{cardCode},</if>
+            <if test="taskId != null">task_id = #{taskId},</if>
+            <if test="taskCode != null">task_code = #{taskCode},</if>
+            <if test="processId != null">process_id = #{processId},</if>
+            <if test="processCode != null">process_code = #{processCode},</if>
+            <if test="processName != null">process_name = #{processName},</if>
+            <if test="workstationId != null">workstation_id = #{workstationId},</if>
+            <if test="workstationCode != null">workstation_code = #{workstationCode},</if>
+            <if test="workstationName != null">workstation_name = #{workstationName},</if>
+            <if test="itemId != null">item_id = #{itemId},</if>
+            <if test="itemCode != null">item_code = #{itemCode},</if>
+            <if test="itemName != null">item_name = #{itemName},</if>
+            <if test="specification != null">specification = #{specification},</if>
+            <if test="unitOfMeasure != null">unit_of_measure = #{unitOfMeasure},</if>
+            <if test="quantityCheck != null">quantity_check = #{quantityCheck},</if>
+            <if test="quantityMinCheck != null">quantity_min_check = #{quantityMinCheck},</if>
+            <if test="quantityMaxUnqualified != null">quantity_max_unqualified = #{quantityMaxUnqualified},</if>
+            <if test="quantityQualified != null">quantity_qualified = #{quantityQualified},</if>
+            <if test="quantityUnqualified != null">quantity_unqualified = #{quantityUnqualified},</if>
+            <if test="crRateLimit != null">cr_rate_limit = #{crRateLimit},</if>
+            <if test="majRateLimit != null">maj_rate_limit = #{majRateLimit},</if>
+            <if test="minRateLimit != null">min_rate_limit = #{minRateLimit},</if>
+            <if test="crQuantity != null">cr_quantity = #{crQuantity},</if>
+            <if test="majQuantity != null">maj_quantity = #{majQuantity},</if>
+            <if test="minQuantity != null">min_quantity = #{minQuantity},</if>
+            <if test="crRate != null">cr_rate = #{crRate},</if>
+            <if test="majRate != null">maj_rate = #{majRate},</if>
+            <if test="minRate != null">min_rate = #{minRate},</if>
+            <if test="checkResult != null">check_result = #{checkResult},</if>
+            <if test="concessionReason != null">concession_reason = #{concessionReason},</if>
+            <if test="inspectDate != null">inspect_date = #{inspectDate},</if>
+            <if test="inspector != null">inspector = #{inspector},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where ipqc_id = #{ipqcId}
+    </update>
+
+    <delete id="deleteQcIpqcByIpqcId" parameterType="Long">
+        delete from qxx_qc_ipqc where ipqc_id = #{ipqcId}
+    </delete>
+
+    <delete id="deleteQcIpqcByIpqcIds" parameterType="String">
+        delete from qxx_qc_ipqc where ipqc_id in
+        <foreach item="ipqcId" collection="array" open="(" separator="," close=")">
+            #{ipqcId}
+        </foreach>
+    </delete>
+</mapper>

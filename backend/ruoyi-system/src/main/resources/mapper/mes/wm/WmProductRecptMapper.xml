@@ -25,6 +25,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="ipqcId" column="ipqc_id" />
         <result property="ipqcCode" column="ipqc_code" />
         <result property="status" column="status" />
+        <result property="qcStatus" column="qc_status" />
         <result property="remark" column="remark" />
         <result property="createBy" column="create_by" />
         <result property="createTime" column="create_time" />
@@ -42,9 +43,34 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         left join qxx_md_client c on c.client_id = t.client_id and c.factory_id = t.factory_id
     </sql>
 
+    <!-- 列表带 qcStatus 计算列：对本入库单全部 IPQC 完工检单状态汇总（最差优先，
+         任一 COMPLETED+FAIL→FAILED；COMPLETED+CONCESSION→CONCESSION；存在 PENDING/INSPECTING→PENDING；
+         全部 COMPLETED+PASS→PASSED；无单→NONE。与确认入库拦截门判定口径一致，防列表显示 PASSED 但确认被拦）。
+         注：外层恒真条件保证 WHERE 必渲染 — FactoryIdInterceptor 注入 factory_id 时
+         不致误将子查询的 where 当作外层 where 导致注入点错位。 -->
     <select id="selectWmProductRecptList" parameterType="WmProductRecpt" resultMap="WmProductRecptResult">
-        <include refid="selectWmProductRecptVo"/>
+        select t.recpt_id, t.factory_id, t.recpt_code, t.recpt_name, t.produce_id, t.produce_code,
+               t.workorder_id, t.workorder_code, t.client_id, t.source_warehouse_id, t.warehouse_id,
+               t.warehouse_code, t.warehouse_name, t.recpt_date, t.total_quantity, t.total_box,
+               t.ipqc_id, t.ipqc_code, t.status, t.remark, t.create_by, t.create_time, t.update_by, t.update_time,
+               c.client_name,
+               (
+                   select case
+                       when max(case when i.status = 'COMPLETED' and i.check_result = 'FAIL' then 1 else 0 end) = 1 then 'FAILED'
+                       when max(case when i.status = 'COMPLETED' and i.check_result = 'CONCESSION' then 1 else 0 end) = 1 then 'CONCESSION'
+                       when max(case when i.status in ('PENDING', 'INSPECTING') then 1 else 0 end) = 1 then 'PENDING'
+                       when max(case when i.status = 'COMPLETED' and i.check_result = 'PASS' then 1 else 0 end) = 1 then 'PASSED'
+                       else 'NONE'
+                   end
+                   from qxx_qc_ipqc i
+                   where i.source_doc_type = 'wm_product_recpt'
+                     and i.source_doc_id = t.recpt_id
+                     and i.factory_id = t.factory_id
+               ) as qc_status
+        from qxx_wm_product_recpt t
+        left join qxx_md_client c on c.client_id = t.client_id and c.factory_id = t.factory_id
         <where>
+            t.recpt_id is not null
             <if test="recptCode != null and recptCode != ''"> and t.recpt_code like concat('%', #{recptCode}, '%')</if>
             <if test="recptName != null and recptName != ''"> and t.recpt_name like concat('%', #{recptName}, '%')</if>
             <if test="produceId != null"> and t.produce_id = #{produceId}</if>
@@ -179,5 +205,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where workorder_id = #{workorderId}
           and status in ('DRAFT', 'CONFIRMED', 'POSTED')
     </select>
+
+    <!-- 回填入库单头 IPQC 完工检挂点（两列专用 UPDATE，避免并发覆盖整头） -->
+    <update id="updateProductRecptHeaderRefs">
+        update qxx_wm_product_recpt set ipqc_id = #{ipqcId}, ipqc_code = #{ipqcCode}
+        where recpt_id = #{recptId}
+    </update>
 
 </mapper>

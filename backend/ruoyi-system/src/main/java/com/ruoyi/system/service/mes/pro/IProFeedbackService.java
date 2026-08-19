@@ -80,8 +80,13 @@ public interface IProFeedbackService
     /** 审核报工：CONFIRMED→AUDITED，同时增量更新任务和工单已生产数量 */
     public void auditFeedback(Long recordId);
 
-    /** 确认报工：PREPARE → CONFIRMED（下沉自 Controller，供批量复用）。 */
-    public int confirmFeedback(Long recordId);
+    /**
+     * 确认报工：PREPARE → CONFIRMED（下沉自 Controller，供批量复用）。
+     * 确认成功后触发 IPQC 工序检待检单生成（弱拦截，失败仅告警不回滚确认）。
+     *
+     * @return 生成的 IPQC 检验单编码；null = 未生成（非检验工序/未绑模板/已有活动单）
+     */
+    public String confirmFeedback(Long recordId);
 
     /**
      * 批量确认报工：逐条调用 confirmFeedback，尽力执行，失败逐条收集。

@@ -2,7 +2,8 @@ import { defineConfig, loadEnv } from 'vite'
 import path from 'path'
 import createVitePlugins from './vite/plugins'
 
-const baseUrl = 'http://localhost:8081' // 企小侠MES 后端接口
+// 企小侠MES 后端接口（可用 VITE_BACKEND_PORT 覆盖，便于多 worktree 并行联调）
+const baseUrl = `http://localhost:${process.env.VITE_BACKEND_PORT || '8081'}`
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode, command }) => {
@@ -42,7 +43,7 @@ export default defineConfig(({ mode, command }) => {
     },
     // vite 相关配置
     server: {
-      port: 5173,
+      port: Number(process.env.VITE_DEV_PORT) || 5173,
       strictPort: true,
       host: true,
       open: true,

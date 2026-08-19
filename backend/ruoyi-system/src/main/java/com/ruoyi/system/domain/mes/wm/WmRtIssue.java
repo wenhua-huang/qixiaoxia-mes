@@ -52,6 +52,9 @@ public class WmRtIssue extends BaseEntity
     /** 退料明细列表（聚合字段，不落库；用于头行一次性提交/查询返回） */
     private List<WmRtIssueLine> lines;
 
+    /** RQC 检验状态汇总（列表计算列，不落库；PENDING/PASSED/FAILED/CONCESSION/NONE） */
+    private String qcStatus;
+
     public Long getRtId() { return rtId; }
     public void setRtId(Long v) { this.rtId = v; }
     public Long getFactoryId() { return factoryId; }
@@ -98,6 +101,8 @@ public class WmRtIssue extends BaseEntity
     public void setStatus(String v) { this.status = v; }
     public List<WmRtIssueLine> getLines() { return lines; }
     public void setLines(List<WmRtIssueLine> lines) { this.lines = lines; }
+    public String getQcStatus() { return qcStatus; }
+    public void setQcStatus(String v) { this.qcStatus = v; }
 
     @Override
     public String toString() {

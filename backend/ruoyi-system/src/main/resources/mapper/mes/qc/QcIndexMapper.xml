@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.qc.QcIndexMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.qc.QcIndex" id="QcIndexResult">
+        <result property="indexId"       column="index_id"       />
+        <result property="factoryId"     column="factory_id"     />
+        <result property="indexCode"     column="index_code"     />
+        <result property="indexName"     column="index_name"     />
+        <result property="indexType"     column="index_type"     />
+        <result property="qcTool"        column="qc_tool"        />
+        <result property="qcResultType"  column="qc_result_type" />
+        <result property="dictType"      column="dict_type"      />
+        <result property="qcResultSpc"   column="qc_result_spc"  />
+        <result property="enableFlag"    column="enable_flag"    />
+        <result property="remark"        column="remark"         />
+        <result property="createBy"      column="create_by"      />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"      column="update_by"      />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectQcIndexVo">
+        select index_id, factory_id, index_code, index_name, index_type, qc_tool,
+               qc_result_type, dict_type, qc_result_spc, enable_flag, remark,
+               create_by, create_time, update_by, update_time
+        from qxx_qc_index
+    </sql>
+
+    <select id="selectQcIndexList" parameterType="com.ruoyi.system.domain.mes.qc.QcIndex" resultMap="QcIndexResult">
+        <include refid="selectQcIndexVo"/>
+        <where>
+            <if test="indexCode != null and indexCode != ''"> and index_code like concat('%', #{indexCode}, '%')</if>
+            <if test="indexName != null and indexName != ''"> and index_name like concat('%', #{indexName}, '%')</if>
+            <if test="indexType != null and indexType != ''"> and index_type = #{indexType}</if>
+            <if test="qcResultType != null and qcResultType != ''"> and qc_result_type = #{qcResultType}</if>
+            <if test="enableFlag != null and enableFlag != ''"> and enable_flag = #{enableFlag}</if>
+            <if test="factoryId != null and factoryId != ''"> and factory_id = #{factoryId}</if>
+        </where>
+        order by index_code
+    </select>
+
+    <select id="selectQcIndexByIndexId" parameterType="Long" resultMap="QcIndexResult">
+        <include refid="selectQcIndexVo"/>
+        where index_id = #{indexId}
+    </select>
+
+    <select id="checkIndexCodeUnique" parameterType="String" resultMap="QcIndexResult">
+        <include refid="selectQcIndexVo"/>
+        where index_code = #{indexCode} limit 1
+    </select>
+
+    <insert id="insertQcIndex" parameterType="com.ruoyi.system.domain.mes.qc.QcIndex" useGeneratedKeys="true" keyProperty="indexId">
+        insert into qxx_qc_index
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="indexCode != null and indexCode != ''">index_code,</if>
+            <if test="indexName != null and indexName != ''">index_name,</if>
+            <if test="indexType != null and indexType != ''">index_type,</if>
+            <if test="qcTool != null">qc_tool,</if>
+            <if test="qcResultType != null and qcResultType != ''">qc_result_type,</if>
+            <if test="dictType != null">dict_type,</if>
+            <if test="qcResultSpc != null">qc_result_spc,</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="indexCode != null and indexCode != ''">#{indexCode},</if>
+            <if test="indexName != null and indexName != ''">#{indexName},</if>
+            <if test="indexType != null and indexType != ''">#{indexType},</if>
+            <if test="qcTool != null">#{qcTool},</if>
+            <if test="qcResultType != null and qcResultType != ''">#{qcResultType},</if>
+            <if test="dictType != null">#{dictType},</if>
+            <if test="qcResultSpc != null">#{qcResultSpc},</if>
+            <if test="enableFlag != null and enableFlag != ''">#{enableFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateQcIndex" parameterType="com.ruoyi.system.domain.mes.qc.QcIndex">
+        update qxx_qc_index
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="indexCode != null and indexCode != ''">index_code = #{indexCode},</if>
+            <if test="indexName != null and indexName != ''">index_name = #{indexName},</if>
+            <if test="indexType != null and indexType != ''">index_type = #{indexType},</if>
+            <if test="qcTool != null">qc_tool = #{qcTool},</if>
+            <if test="qcResultType != null and qcResultType != ''">qc_result_type = #{qcResultType},</if>
+            <if test="dictType != null">dict_type = #{dictType},</if>
+            <if test="qcResultSpc != null">qc_result_spc = #{qcResultSpc},</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag = #{enableFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where index_id = #{indexId}
+    </update>
+
+    <delete id="deleteQcIndexByIndexId" parameterType="Long">
+        delete from qxx_qc_index where index_id = #{indexId}
+    </delete>
+
+    <delete id="deleteQcIndexByIndexIds" parameterType="String">
+        delete from qxx_qc_index where index_id in
+        <foreach item="indexId" collection="array" open="(" separator="," close=")">
+            #{indexId}
+        </foreach>
+    </delete>
+</mapper>

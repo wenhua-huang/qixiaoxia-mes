@@ -38,6 +38,8 @@ import com.ruoyi.system.domain.mes.wm.WmTransaction;
 import com.ruoyi.system.domain.mes.pro.ProMaterialTrace;
 import com.ruoyi.system.domain.mes.pro.ProFeedback;
 import com.ruoyi.system.domain.mes.pro.ProFeedbackConsume;
+import com.ruoyi.system.service.mes.qc.IQcFactoryService;
+import com.ruoyi.system.service.mes.qc.IQcGateService;
 import com.ruoyi.system.service.mes.wm.IWmRtIssueService;
 
 /**
@@ -75,6 +77,12 @@ public class WmRtIssueServiceImpl implements IWmRtIssueService
 
     @Autowired
     private ProFeedbackConsumeMapper proConsumeMapper;
+
+    @Autowired
+    private IQcFactoryService qcFactoryService;
+
+    @Autowired
+    private IQcGateService qcGateService;
 
     @Autowired
     private RedisLockTemplate lockTemplate;
@@ -127,6 +135,9 @@ public class WmRtIssueServiceImpl implements IWmRtIssueService
         // 头行一次性原子落库（修复旧版"先存头后存行中途出错留脏单"问题）
         if (e.getLines() != null && !e.getLines().isEmpty()) {
             saveRtLines(e, e.getLines());
+            // RQC 生成 hook：手工新增退料单头+行落库后，按物料绑定的 RQC 模板生成退料待检单
+            // （工厂内部锁+事务保证原子，随本方法外层事务与退料单创建同生共死）
+            qcFactoryService.generateRqcForRtIssue(e, e.getLines());
         }
         return 1;
     }
@@ -220,6 +231,7 @@ public class WmRtIssueServiceImpl implements IWmRtIssueService
 
         // 复制领料单行 → 退料单行
         BigDecimal totalQty = BigDecimal.ZERO;
+        List<WmRtIssueLine> rtLines = new ArrayList<>();
         for (WmIssueLine issueLine : issueLines) {
             WmRtIssueLine rtLine = new WmRtIssueLine();
             rtLine.setRtId(rt.getRtId());
@@ -242,6 +254,7 @@ public class WmRtIssueServiceImpl implements IWmRtIssueService
             rtLine.setCreateTime(DateUtils.getNowDate());
             rtLine.setCreateBy(SecurityUtils.getUsername());
             wmRtIssueLineMapper.insertWmRtIssueLine(rtLine);
+            rtLines.add(rtLine);
             totalQty = totalQty.add(issueLine.getQuantityIssue() != null ? issueLine.getQuantityIssue() : BigDecimal.ZERO);
         }
 
@@ -250,6 +263,11 @@ public class WmRtIssueServiceImpl implements IWmRtIssueService
         rt.setUpdateTime(DateUtils.getNowDate());
         rt.setUpdateBy(SecurityUtils.getUsername());
         wmRtIssueMapper.updateWmRtIssue(rt);
+
+        // RQC 生成 hook：从领料单生成退料单后，按物料绑定的 RQC 模板生成退料待检单
+        if (!rtLines.isEmpty()) {
+            qcFactoryService.generateRqcForRtIssue(rt, rtLines);
+        }
 
         return rt.getRtId();
     }
@@ -420,6 +438,9 @@ public class WmRtIssueServiceImpl implements IWmRtIssueService
         lineQuery.setRtId(rtId);
         List<WmRtIssueLine> lines = wmRtIssueLineMapper.selectWmRtIssueLineList(lineQuery);
         if (lines == null || lines.isEmpty()) throw new ServiceException("退料单无明细行");
+
+        // RQC 拦截门：绑定 RQC 模板的物料必须已有 COMPLETED+PASS/CONCESSION 的退料检验单方可执行退料
+        qcGateService.assertRtIssueExecutable(header, lines);
 
         for (WmRtIssueLine line : lines) {
             // 2. 查库存 (itemId + batchId + warehouseId + vendorId + workorderId + qualityStatus)

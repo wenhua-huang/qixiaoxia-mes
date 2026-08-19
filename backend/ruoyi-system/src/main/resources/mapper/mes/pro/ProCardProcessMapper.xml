@@ -59,6 +59,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where record_id = #{recordId}
     </select>
 
+    <!-- IPQC 工序检建单定位：按流转卡+工序唯一定位（factory_id 由 FactoryIdInterceptor 自动注入） -->
+    <select id="selectByCardAndProcess" resultMap="ProCardProcessResult">
+        <include refid="selectProCardProcessVo"/>
+        where card_id = #{cardId} and process_id = #{processId}
+        limit 1
+    </select>
+
+    <!-- 回填流转卡工序 IPQC 挂点（两列专用 UPDATE，避免并发覆盖整头） -->
+    <update id="updateCardProcessRefs">
+        update qxx_pro_card_process set ipqc_id = #{ipqcId}, ipqc_code = #{ipqcCode}
+        where record_id = #{recordId}
+    </update>
+
     <insert id="insertProCardProcess" parameterType="ProCardProcess" useGeneratedKeys="true" keyProperty="recordId">
         insert into qxx_pro_card_process
         <trim prefix="(" suffix=")" suffixOverrides=",">

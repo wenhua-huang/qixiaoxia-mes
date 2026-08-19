@@ -52,6 +52,8 @@ export interface WmProductSales extends BaseEntity {
   salesOrderId?: number
   salesOrderCode?: string
   status?: string
+  /** OQC 检验状态（最差优先聚合：PASSED/CONCESSION/PENDING/FAILED/NONE） */
+  qcStatus?: string
   lines?: WmProductSalesLine[]
   details?: WmProductSalesDetail[]
   shipments?: WmProductSalesShipment[]

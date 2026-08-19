@@ -74,6 +74,12 @@ const docTree = ref<DocGroup[]>([
     ]
   },
   {
+    title: '质量管理',
+    items: [
+      { file: 'qc-quality-inspection.md', title: '来料/过程/出货/退料检验（IQC/IPQC/OQC/RQC）' }
+    ]
+  },
+  {
     title: '操作指南',
     items: [
       { file: 'qr-code-scan.md', title: '二维码扫码作业指南' }

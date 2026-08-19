@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.qc.QcTemplateMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.qc.QcTemplate" id="QcTemplateResult">
+        <result property="templateId"    column="template_id"    />
+        <result property="factoryId"     column="factory_id"     />
+        <result property="templateCode"  column="template_code"  />
+        <result property="templateName"  column="template_name"  />
+        <result property="qcTypes"       column="qc_types"       />
+        <result property="enableFlag"    column="enable_flag"    />
+        <result property="remark"        column="remark"         />
+        <result property="createBy"      column="create_by"      />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"      column="update_by"      />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectQcTemplateVo">
+        select template_id, factory_id, template_code, template_name, qc_types, enable_flag, remark,
+               create_by, create_time, update_by, update_time
+        from qxx_qc_template
+    </sql>
+
+    <select id="selectQcTemplateList" parameterType="com.ruoyi.system.domain.mes.qc.QcTemplate" resultMap="QcTemplateResult">
+        <include refid="selectQcTemplateVo"/>
+        <where>
+            <if test="templateCode != null and templateCode != ''"> and template_code like concat('%', #{templateCode}, '%')</if>
+            <if test="templateName != null and templateName != ''"> and template_name like concat('%', #{templateName}, '%')</if>
+            <if test="qcTypes != null and qcTypes != ''"> and find_in_set(#{qcTypes}, qc_types)</if>
+            <if test="enableFlag != null and enableFlag != ''"> and enable_flag = #{enableFlag}</if>
+            <if test="factoryId != null and factoryId != ''"> and factory_id = #{factoryId}</if>
+        </where>
+        order by template_code
+    </select>
+
+    <select id="selectQcTemplateByTemplateId" parameterType="Long" resultMap="QcTemplateResult">
+        <include refid="selectQcTemplateVo"/>
+        where template_id = #{templateId}
+    </select>
+
+    <select id="checkTemplateCodeUnique" parameterType="String" resultMap="QcTemplateResult">
+        <include refid="selectQcTemplateVo"/>
+        where template_code = #{templateCode} limit 1
+    </select>
+
+    <insert id="insertQcTemplate" parameterType="com.ruoyi.system.domain.mes.qc.QcTemplate" useGeneratedKeys="true" keyProperty="templateId">
+        insert into qxx_qc_template
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="templateCode != null and templateCode != ''">template_code,</if>
+            <if test="templateName != null and templateName != ''">template_name,</if>
+            <if test="qcTypes != null and qcTypes != ''">qc_types,</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="templateCode != null and templateCode != ''">#{templateCode},</if>
+            <if test="templateName != null and templateName != ''">#{templateName},</if>
+            <if test="qcTypes != null and qcTypes != ''">#{qcTypes},</if>
+            <if test="enableFlag != null and enableFlag != ''">#{enableFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateQcTemplate" parameterType="com.ruoyi.system.domain.mes.qc.QcTemplate">
+        update qxx_qc_template
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="templateCode != null and templateCode != ''">template_code = #{templateCode},</if>
+            <if test="templateName != null and templateName != ''">template_name = #{templateName},</if>
+            <if test="qcTypes != null and qcTypes != ''">qc_types = #{qcTypes},</if>
+            <if test="enableFlag != null and enableFlag != ''">enable_flag = #{enableFlag},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where template_id = #{templateId}
+    </update>
+
+    <delete id="deleteQcTemplateByTemplateId" parameterType="Long">
+        delete from qxx_qc_template where template_id = #{templateId}
+    </delete>
+
+    <delete id="deleteQcTemplateByTemplateIds" parameterType="String">
+        delete from qxx_qc_template where template_id in
+        <foreach item="templateId" collection="array" open="(" separator="," close=")">
+            #{templateId}
+        </foreach>
+    </delete>
+
+    <!-- 删除保护：检验单头引用计数（单表平铺查询，拦截器对每条自动追加 factory_id 条件） -->
+    <select id="countIqcReference" parameterType="Long" resultType="int">
+        select count(1) from qxx_qc_iqc where template_id = #{templateId}
+    </select>
+
+    <select id="countIpqcReference" parameterType="Long" resultType="int">
+        select count(1) from qxx_qc_ipqc where template_id = #{templateId}
+    </select>
+
+    <select id="countOqcReference" parameterType="Long" resultType="int">
+        select count(1) from qxx_qc_oqc where template_id = #{templateId}
+    </select>
+
+    <select id="countRqcReference" parameterType="Long" resultType="int">
+        select count(1) from qxx_qc_rqc where template_id = #{templateId}
+    </select>
+</mapper>

@@ -17,10 +17,13 @@ server:
 # Redis — 连接本地 Docker (docker compose up -d redis)
 spring:
   flyway:
-    # Testcontainers DB 非空（SQL init + manual_tables 建所有表）+ baselineVersion=60 跳过 V1-V60
-    # 只跑 V61/V62（DML 菜单/字典，不 ALTER 表，避免与 manual_tables 现状字段重复）
+    # Testcontainers DB 非空（SQL init + manual_tables 建所有表——manual_tables 已含 V61-V136 之后的最终结构，
+    # 若 baseline 过低会重放 ALTER 型迁移（如 V73 加列）而 Duplicate column 失败）。
+    # baselineVersion=136：只跑 V137/V138（qc 建表+幂等 DML 种子，qc 表不在 manual_tables 中）。
+    # 约束：新增非幂等迁移时，若其表已存在于 manual_tables 则同步抬高此 baseline；qc 模块后续波次迁移（V139+）
+    # 为 qc 新表/幂等 DML，无需调整。
     baseline-on-migrate: true
-    baseline-version: 60
+    baseline-version: 136
     repair-before-migrate: true
   datasource:
     druid:

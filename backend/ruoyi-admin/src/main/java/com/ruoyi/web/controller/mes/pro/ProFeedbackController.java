@@ -129,14 +129,15 @@ public class ProFeedbackController extends BaseController
         return toAjax(proFeedbackService.deleteProFeedbackByRecordIds(recordIds));
     }
 
-    /** 确认报工：PREPARE → CONFIRMED */
+    /** 确认报工：PREPARE → CONFIRMED；isCheck 工序同时生成 IPQC 待检单（响应携带编码提示前端） */
     @PreAuthorize("@ss.hasPermi('mes:pro:feedback:edit')")
     @Log(title = "报工确认", businessType = BusinessType.UPDATE)
     @PutMapping("/confirm/{recordId}")
     public AjaxResult confirm(@PathVariable Long recordId)
     {
-        proFeedbackService.confirmFeedback(recordId);
-        return success();
+        String ipqcCode = proFeedbackService.confirmFeedback(recordId);
+        // 响应结构向后兼容：原前端忽略 body；新增 ipqcCode 供前端提示"已生成过程检验单"
+        return AjaxResult.success(ipqcCode != null ? java.util.Map.of("ipqcCode", ipqcCode) : null);
     }
 
     /** 审核报工：CONFIRMED → AUDITED，同时更新任务/工单已生产数量 */

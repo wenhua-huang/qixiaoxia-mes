@@ -63,6 +63,13 @@
           </el-tag>
         </template>
       </el-table-column>
+      <el-table-column label="检验状态" align="center" width="110">
+        <template #default="scope">
+          <el-tag v-if="scope.row.qcStatus && scope.row.qcStatus !== 'NONE'" size="small" :type="qcTagType(scope.row.qcStatus)"
+            style="cursor: pointer" @click="goRqc(scope.row)">{{ qcTagText(scope.row.qcStatus) }}</el-tag>
+          <span v-else>-</span>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" align="center" width="230" fixed="right" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="View" size="small" @click="handleView(scope.row)" v-hasPermi="['mes:wm:rtissue:query']">查看</el-button>
@@ -228,10 +235,12 @@
 
 <script setup lang="ts" name="WmRTIssue">
 import { ref, reactive, toRefs, getCurrentInstance, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { listRtIssue, getRtIssue, addRtIssue, updateRtIssue, delRtIssue, buildFromIssue, executeReturn, returnablePreview } from '@/api/mes/wm/rtissue'
 import { listRtIssueLineByRtId } from '@/api/mes/wm/rtissueline'
 
 const { proxy } = getCurrentInstance() as any
+const router = useRouter()
 
 // -------------------- 常量 --------------------
 // 状态机：DRAFT → POSTED（与后端 doExecuteReturn 一致）
@@ -251,6 +260,19 @@ const statusOptions = [
 const issueStatusMap: Record<string, string> = {
   DRAFT: '草稿', PENDING: '待审核', APPROVED: '已审核', ALLOCATED: '已预占',
   ISSUED: '已发料', PARTIAL_ISSUED: '部分发料', CLOSED: '已关闭', CANCELED: '已作废'
+}
+
+// 检验状态 tag：口径与后端 WmRtIssueMapper 聚合一致（FAILED>CONCESSION>PENDING>PASSED>NONE），点击跳 RQC 列表
+const QC_TAG: Record<string, { type: string; text: string }> = {
+  PASSED: { type: 'success', text: '检验合格' },
+  CONCESSION: { type: 'warning', text: '让步接收' },
+  PENDING: { type: 'info', text: '待检验' },
+  FAILED: { type: 'danger', text: '检验不合格' }
+}
+function qcTagType(s: string) { return QC_TAG[s]?.type || 'info' }
+function qcTagText(s: string) { return QC_TAG[s]?.text || s }
+function goRqc(row: any) {
+  router.push({ path: '/qc/qcrqc', query: { sourceDocId: String(row.rtId) } })
 }
 
 // -------------------- 状态定义 --------------------

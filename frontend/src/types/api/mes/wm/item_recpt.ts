@@ -28,6 +28,8 @@ export interface WmItemRecpt extends BaseEntity {
   iqcId?: number
   iqcCode?: string
   status?: string
+  /** 检验状态汇总（列表计算列）：PASSED/CONCESSION/PENDING/FAILED/NONE，空=未启用质检 */
+  qcStatus?: string
   /** 入库单行列表（新增草稿/详情返回，非持久化） */
   lines?: WmItemRecptLine[]
 }

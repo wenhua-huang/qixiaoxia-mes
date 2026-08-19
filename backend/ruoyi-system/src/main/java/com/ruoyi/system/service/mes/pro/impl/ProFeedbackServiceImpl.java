@@ -50,6 +50,7 @@ import com.ruoyi.system.domain.mes.pro.ProMaterialTrace;
 import com.ruoyi.system.domain.mes.md.MdItem;
 import com.ruoyi.system.service.mes.pro.IProFeedbackService;
 import com.ruoyi.system.service.mes.pro.IProWorkorderDocService;
+import com.ruoyi.system.service.mes.qc.IQcFactoryService;
 
 /**
  * 报工记录Service业务层处理
@@ -468,6 +469,9 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
     @Autowired
     private IProWorkorderDocService proWorkorderDocService;
 
+    @Autowired
+    private IQcFactoryService qcFactoryService;
+
     /**
      * 自注入代理：批量方法内需要调用 confirmFeedback / auditFeedback，
      * 直接 this::foo 走裸方法会绕过 CGLIB 代理导致 @Transactional 失效，
@@ -690,10 +694,15 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
     // 单条方法各自事务/幂等，单张失败不影响其他张。
     // ════════════════════════════════════════════════════════════════
 
-    /** 确认报工：PREPARE → CONFIRMED。纯状态翻转，无库存/单据副作用。 */
+    /**
+     * 确认报工：PREPARE → CONFIRMED。确认成功后触发 IPQC 工序检待检单生成
+     * （弱拦截：生产报工高频，生成失败只告警不阻断报工确认，检验不合格走后续处置流程）。
+     *
+     * @return 生成的 IPQC 检验单编码；null = 未生成（非检验工序/未绑模板/已有活动单/生成失败）
+     */
     @Override
     @Transactional
-    public int confirmFeedback(Long recordId) {
+    public String confirmFeedback(Long recordId) {
         ProFeedback fb = qxxProFeedbackMapper.selectProFeedbackByRecordId(recordId);
         if (fb == null) throw new ServiceException("报工记录不存在");
         if (!"PREPARE".equals(fb.getStatus())) {
@@ -702,7 +711,14 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
         fb.setStatus("CONFIRMED");
         fb.setUpdateTime(DateUtils.getNowDate());
         fb.setUpdateBy(SecurityUtils.getUsername());
-        return qxxProFeedbackMapper.updateProFeedback(fb);
+        qxxProFeedbackMapper.updateProFeedback(fb);
+        // IPQC 工序检：isCheck 工序报工确认后生成待检单（弱拦截：报工不阻断，失败仅告警）
+        try {
+            return qcFactoryService.generateIpqcForFeedback(fb);
+        } catch (Exception e) {
+            log.warn("IPQC 待检单生成失败 feedbackId={}", recordId, e);
+            return null;
+        }
     }
 
     /**

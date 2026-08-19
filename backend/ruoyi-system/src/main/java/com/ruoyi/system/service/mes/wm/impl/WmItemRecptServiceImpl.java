@@ -23,6 +23,8 @@ import com.ruoyi.system.mapper.mes.wm.WmItemRecptMapper;
 import com.ruoyi.system.mapper.mes.pur.PurOrderLineMapper;
 import com.ruoyi.system.service.mes.pur.IPurOrderLineService;
 import com.ruoyi.system.service.mes.pur.IPurOrderService;
+import com.ruoyi.system.service.mes.qc.IQcFactoryService;
+import com.ruoyi.system.service.mes.qc.IQcGateService;
 import com.ruoyi.system.service.mes.wm.IWmBatchService;
 import com.ruoyi.system.service.mes.wm.IWmItemRecptLineService;
 import com.ruoyi.system.service.mes.wm.IWmItemRecptService;
@@ -68,6 +70,14 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
     @Autowired
     private IWmWarehouseService wmWarehouseService;
 
+    /** 质检生成工厂：入库单创建后生成 IQC 待检单（内部锁+事务，幂等） */
+    @Autowired
+    private IQcFactoryService qcFactoryService;
+
+    /** 质检拦截门：confirm 即增库存，需检物料的检验必须前置 */
+    @Autowired
+    private IQcGateService qcGateService;
+
     private static final Logger log = LoggerFactory.getLogger(WmItemRecptServiceImpl.class);
 
     @Override
@@ -107,6 +117,9 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
         // 携带行时一次性插入（从采购订单生成场景）；无行时仅插头（向后兼容原新增流程）
         if (entity.getLines() != null && !entity.getLines().isEmpty()) {
             saveRecptLines(entity, entity.getLines());
+            // IQC 生成 hook：PC 手工新增/从采购订单生成的入库单头+行落库后生成来料待检单
+            // （工厂内部锁+事务保证原子，随本方法外层事务与入库单创建同生共死）
+            qcFactoryService.generateIqcForItemRecpt(entity, entity.getLines());
         }
         return 1;
     }
@@ -183,6 +196,10 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
 
     /** 确认收货核心逻辑（不入库查询，由调用方传入已加载的 header + lines） */
     private void doConfirmItemRecpt(WmItemRecpt header, List<WmItemRecptLine> lines) {
+        // IQC 拦截 hook：confirm 即增库存，检验必须前置（需检物料必须有 COMPLETED+PASS/CONCESSION 检验单，
+        // 否则抛 ServiceException 阻断；confirmItemRecpt 与 receiveWithLines 双入口均经此覆盖）
+        qcGateService.assertItemRecptConfirmable(header, lines);
+
         Long recptId = header.getRecptId();
         List<ItemRecptTxBean> txBeans = new ArrayList<>();
         for (WmItemRecptLine line : lines) {
@@ -340,6 +357,10 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
 
         // 2. 创建入库单行（公共逻辑，与 PC 端从采购订单生成共享）
         saveRecptLines(header, lines);
+
+        // 2.5 IQC 生成 hook：需检物料生成待检单（下方 confirm 校验对 PENDING 单拒绝 → 本事务整体回滚，
+        // 移动端一键收货被拒属预期行为——一期检验仅 PC 端操作）
+        qcFactoryService.generateIqcForItemRecpt(header, lines);
 
         // 3. 确认收货 + 过账入库（直接传入已加载对象，避免重复 DB 查询）
         doConfirmItemRecpt(header, lines);

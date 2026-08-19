@@ -23,4 +23,15 @@ public interface WmProductRecptMapper
      * factory_id 由 FactoryIdInterceptor 自动注入到 SQL。
      */
     public BigDecimal sumQuantityByWorkorderId(@Param("workorderId") Long workorderId);
+
+    /**
+     * 回填入库单头的 IPQC 完工检挂点（两列专用 UPDATE，避免并发覆盖整头）
+     *
+     * @param recptId  入库单ID
+     * @param ipqcId   过程检验单ID
+     * @param ipqcCode 过程检验单编码
+     */
+    public int updateProductRecptHeaderRefs(@Param("recptId") Long recptId,
+                                            @Param("ipqcId") Long ipqcId,
+                                            @Param("ipqcCode") String ipqcCode);
 }

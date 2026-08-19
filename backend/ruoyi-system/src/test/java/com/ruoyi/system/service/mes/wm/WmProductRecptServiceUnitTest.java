@@ -42,6 +42,8 @@ class WmProductRecptServiceUnitTest {
     @Mock private ProDocGenerationLogMapper proDocGenerationLogMapper;
     @Mock private WmTransactionMapper wmTransactionMapper;
     @Mock private IWmBatchService wmBatchService;
+    @Mock private com.ruoyi.system.service.mes.qc.IQcFactoryService qcFactoryService;
+    @Mock private com.ruoyi.system.service.mes.qc.IQcGateService qcGateService;
     @InjectMocks private WmProductRecptServiceImpl service;
 
     private MockedStatic<SecurityUtils> securityUtilsMock;

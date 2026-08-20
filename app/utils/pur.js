@@ -32,6 +32,18 @@ export function recptStatusText(status) {
   return map[status] || status
 }
 
+// IQC 检验状态（列表 qcStatus 计算列）→ uni-tag type
+export function qcStatusTagType(status) {
+  const map = { PENDING: 'warning', INSPECTING: 'warning', PASSED: 'success', CONCESSION: 'warning', FAILED: 'danger', NONE: 'default' }
+  return map[status] || 'default'
+}
+
+// IQC 检验状态 → 中文文本
+export function qcStatusText(status) {
+  const map = { PENDING: '待检', INSPECTING: '检验中', PASSED: '合格', CONCESSION: '让步接收', FAILED: '不合格', NONE: '免检' }
+  return map[status] || '免检'
+}
+
 // 校验实收数量是否有效
 export function isValidReceiptQty(qty) {
   const num = parseFloat(qty)

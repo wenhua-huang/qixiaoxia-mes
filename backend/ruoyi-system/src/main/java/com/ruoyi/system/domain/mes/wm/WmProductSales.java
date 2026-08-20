@@ -110,6 +110,9 @@ public class WmProductSales extends BaseEntity
     @Excel(name = "状态:DRAFT-草稿")
     private String status;
 
+    /** 状态多值筛选(查询专用,不落库):供"待出库"等业务语义默认筛选多个状态 */
+    private java.util.List<String> statusList;
+
     @Excel(name = "已出库量")
     private BigDecimal postedQuantity;
 
@@ -223,6 +226,9 @@ public class WmProductSales extends BaseEntity
 
     public String getStatus() { return status; }
     public void setStatus(String v) { this.status = v; }
+
+    public java.util.List<String> getStatusList() { return statusList; }
+    public void setStatusList(java.util.List<String> v) { this.statusList = v; }
 
     public Long getSalesOrderId() { return salesOrderId; }
     public void setSalesOrderId(Long v) { this.salesOrderId = v; }

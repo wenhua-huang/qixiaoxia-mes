@@ -3,8 +3,8 @@
     <!-- 搜索栏 -->
     <view class="search-bar">
       <uni-easyinput
-        v-model="queryParams.salesCode"
-        placeholder="出库单编码"
+        v-model="queryParams.orderCode"
+        placeholder="输入PO单号"
         :inputBorder="false"
         class="search-input"
         @confirm="handleQuery"
@@ -29,33 +29,37 @@
 
     <!-- 空状态 -->
     <view v-else-if="list.length === 0" class="empty-box">
-      <text class="text-grey">暂无出库单</text>
+      <text class="text-grey">暂无待收货订单</text>
     </view>
 
     <!-- 列表 -->
     <view v-else class="list-box">
-      <view v-for="item in list" :key="item.salesId" class="list-item" @click="goScanOut(item)">
+      <view v-for="item in list" :key="item.orderId" class="list-item" @click="goReceipt(item)">
         <view class="item-header">
-          <text class="bold">{{ item.salesCode }}</text>
-          <uni-tag :type="salesStatusTagType(item.status)" :text="salesStatusText(item.status)" size="small" />
+          <text class="bold">{{ item.orderCode }}</text>
+          <uni-tag :type="orderStatusTagType(item.status)" :text="orderStatusText(item.status)" size="small" />
         </view>
         <view class="item-body">
           <view class="item-row">
-            <text class="label">客户</text>
-            <text class="value">{{ item.clientName || '-' }}</text>
+            <text class="label">供应商</text>
+            <text class="value">{{ item.vendorName || '-' }}</text>
           </view>
           <view class="item-row">
-            <text class="label">应出 / 已出</text>
-            <text class="value bold">{{ item.totalQuantity || 0 }} / {{ item.postedQuantity || 0 }}</text>
+            <text class="label">采购类型</text>
+            <text class="value">{{ purchaseTypeText(item.purchaseType) }}</text>
           </view>
           <view class="item-row">
-            <text class="label">仓库</text>
-            <text class="value">{{ item.warehouseName || '-' }}</text>
+            <text class="label">订购 / 已收</text>
+            <text class="value bold">{{ item.totalQuantity || 0 }} / {{ item.receivedQuantity || 0 }}</text>
+          </view>
+          <view class="item-row">
+            <text class="label">预计到货</text>
+            <text class="value">{{ formatDate(item.expectedDate) || '-' }}</text>
           </view>
         </view>
         <view class="item-footer">
-          <text class="text-grey">{{ item.salesDate || item.createTime }}</text>
-          <text v-if="canPost(item.status)" class="go-text">扫码出库 ›</text>
+          <text class="text-grey">{{ formatDate(item.orderDate) || item.createTime }}</text>
+          <text v-if="canReceive(item.status)" class="go-text">去收货 ›</text>
           <uni-icons v-else type="right" size="16" color="#ccc" />
         </view>
       </view>
@@ -73,35 +77,41 @@ import UniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue
 import UniLoadMore from '@/uni_modules/uni-load-more/components/uni-load-more/uni-load-more.vue'
 import UniTag from '@/uni_modules/uni-tag/components/uni-tag/uni-tag.vue'
 import { onShow, onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
-import { getSalesList } from '@/api/mes/wm/sales'
-import { salesStatusText, salesStatusTagType, canPost } from '@/utils/wm-sales.js'
+import { listOrder } from '@/api/mes/pur/order'
+import { purchaseTypeText, orderStatusText, orderStatusTagType, canReceive } from '@/utils/pur.js'
 
 const { proxy } = getCurrentInstance()
 const list = ref([])
 const loading = ref(false)
 const loadMoreStatus = ref('more')
-// activeStatus 是当前 tab 的逻辑值；__PENDING__ 代表待出库聚合（DRAFT+PARTIAL_POSTED）
+// activeStatus 是当前 tab 的逻辑值；__PENDING__ 代表待收货聚合（ORDERED+RECEIVING）
 const activeStatus = ref('__PENDING__')
 const queryParams = reactive({
   pageNum: 1,
   pageSize: 10,
-  salesCode: '',
+  orderCode: '',
   status: '',
   statusList: null
 })
 
 const statusFilters = [
-  { label: '待出库', value: '__PENDING__' },
+  { label: '待收货', value: '__PENDING__' },
   { label: '全部', value: '' },
-  { label: '草稿', value: 'DRAFT' },
-  { label: '部分出库', value: 'PARTIAL_POSTED' },
-  { label: '已出库', value: 'POSTED' },
-  { label: '已发运', value: 'SHIPPED' }
+  { label: '已下单', value: 'ORDERED' },
+  { label: '收货中', value: 'RECEIVING' },
+  { label: '已收货', value: 'RECEIVED' }
 ]
+
+function formatDate(v) {
+  if (!v) return ''
+  // 后端返回 2026-08-19T00:00:00 或时间戳，统一截到日期
+  return String(v).substring(0, 10)
+}
 
 function filterStatus(val) {
   activeStatus.value = val
   queryParams.pageNum = 1
+  applyStatusFilter()
   loadData()
 }
 
@@ -110,11 +120,11 @@ function handleQuery() {
   loadData()
 }
 
-// 把 activeStatus 翻译成后端查询参数：待出库走 statusList 多值，其余走单值 status
+// 把 activeStatus 翻译成后端查询参数：待收货走 statusList 多值，其余走单值 status
 function applyStatusFilter() {
   if (activeStatus.value === '__PENDING__') {
     queryParams.status = ''
-    queryParams.statusList = ['DRAFT', 'PARTIAL_POSTED']
+    queryParams.statusList = ['ORDERED', 'RECEIVING']
   } else {
     queryParams.status = activeStatus.value
     queryParams.statusList = null
@@ -125,7 +135,7 @@ function buildQuery() {
   const q = {
     pageNum: queryParams.pageNum,
     pageSize: queryParams.pageSize,
-    salesCode: queryParams.salesCode
+    orderCode: queryParams.orderCode
   }
   if (queryParams.statusList) {
     q.statusList = queryParams.statusList
@@ -138,7 +148,7 @@ function buildQuery() {
 function loadData(append = false) {
   loading.value = true
   applyStatusFilter()
-  return getSalesList(buildQuery()).then(res => {
+  return listOrder(buildQuery()).then(res => {
     const rows = res.rows || []
     list.value = append ? list.value.concat(rows) : rows
     loading.value = false
@@ -149,11 +159,15 @@ function loadData(append = false) {
   })
 }
 
-function goScanOut(item) {
-  proxy.$tab.navigateTo('/pages/mes/wm/sales/scan-out?salesId=' + item.salesId)
+function goReceipt(item) {
+  if (!canReceive(item.status)) {
+    proxy.$modal.msgError('仅"已下单/收货中"的订单可收货')
+    return
+  }
+  proxy.$tab.navigateTo('/pages/mes/pur/receipt?orderId=' + item.orderId)
 }
 
-// 出库返回后自动刷新列表
+// 收货返回后自动刷新列表
 onShow(() => {
   queryParams.pageNum = 1
   loadData(false)

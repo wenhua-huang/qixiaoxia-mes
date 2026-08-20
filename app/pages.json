@@ -76,9 +76,15 @@
       "navigationBarTitleText": "关于我们"
     }
   }, {
+    "path": "pages/mes/pur/list",
+    "style": {
+      "navigationBarTitleText": "待收货",
+      "enablePullDownRefresh": true
+    }
+  }, {
     "path": "pages/mes/pur/receipt",
     "style": {
-      "navigationBarTitleText": "采购收货"
+      "navigationBarTitleText": "到货登记"
     }
   }, {
     "path": "pages/mes/pur/history",

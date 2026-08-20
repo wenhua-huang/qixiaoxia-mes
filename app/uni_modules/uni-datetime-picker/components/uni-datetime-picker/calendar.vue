@@ -612,6 +612,11 @@
 					this.tempRange.after = this.cale.multipleStatus.after
 				}
 				this.change(true)
+				// 日期单选（弹层模式、非区间、无时间）点击日期即确认并关闭，
+				// 避免底部"确认"按钮在移动端被浏览器/手势条遮挡导致选了日期不回填
+				if (!this.insert && !this.range && !this.hasTime) {
+					this.confirm()
+				}
 			},
 			changeMonth(type) {
 				let newDate

@@ -103,6 +103,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="oqcId != null"> and t.oqc_id = #{oqcId}</if>
             <if test="oqcCode != null and oqcCode != ''"> and t.oqc_code like concat('%', #{oqcCode}, '%')</if>
             <if test="status != null and status != ''"> and t.status like concat('%', #{status}, '%')</if>
+            <if test="statusList != null and statusList.size() > 0">
+                and t.status in
+                <foreach collection="statusList" item="s" open="(" separator="," close=")">#{s}</foreach>
+            </if>
             <if test="createBy != null and createBy != ''"> and t.create_by like concat('%', #{createBy}, '%')</if>
             <if test="updateBy != null and updateBy != ''"> and t.update_by like concat('%', #{updateBy}, '%')</if>
         </where>

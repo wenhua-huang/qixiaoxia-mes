@@ -1,23 +1,20 @@
 <template>
   <view class="container">
-    <!-- 步骤 1：扫码/输入PO单号 -->
+    <!-- 步骤 1：输入PO单号（已知单号兜底；正常从待收货列表进入） -->
     <view class="section">
       <uni-section title="采购订单" type="line">
         <template #right>
-          <text class="scan-tip">扫码或输入单号</text>
+          <text class="scan-tip">输入单号查询</text>
         </template>
       </uni-section>
       <view class="search-row">
         <uni-easyinput
           v-model="orderCode"
-          placeholder="输入PO单号或扫码"
+          placeholder="输入PO单号"
           :inputBorder="false"
           class="search-input"
           @confirm="searchOrder"
         />
-        <button class="scan-btn" @click="handleScan" size="mini">
-          <uni-icons type="scan" size="20"></uni-icons>
-        </button>
         <button class="search-btn cu-btn bg-blue sm" @click="searchOrder">查询</button>
       </view>
     </view>
@@ -159,7 +156,7 @@
 
 <script setup>
 import { ref, reactive, getCurrentInstance, onMounted } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { onShow, onLoad } from '@dcloudio/uni-app'
 // 显式引入 uni-ui 组件（绕过 HBuilderX 发行 H5 时 easycom 失效）
 import UniEasyInput from '@/uni_modules/uni-easyinput/components/uni-easyinput/uni-easyinput.vue'
 import UniForms from '@/uni_modules/uni-forms/components/uni-forms/uni-forms.vue'
@@ -168,7 +165,7 @@ import UniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue
 import UniSection from '@/components/uni-section/uni-section.vue'
 import UniTag from '@/uni_modules/uni-tag/components/uni-tag/uni-tag.vue'
 import UniDatetimePicker from '@/uni_modules/uni-datetime-picker/components/uni-datetime-picker/uni-datetime-picker.vue'
-import { getOrderDetailByCode, receiveItemRecpt, listWarehouseAll } from '@/api/mes/pur/order'
+import { getOrder, getOrderDetailByCode, receiveItemRecpt, listWarehouseAll } from '@/api/mes/pur/order'
 import { isValidReceiptQty, genRecptCode, purchaseTypeText, orderStatusTagType, orderStatusText, canReceive } from '@/utils/pur.js'
 
 const { proxy } = getCurrentInstance()
@@ -188,29 +185,30 @@ const arrivalInfo = reactive({
   vendorDeliveryNo: ''
 })
 
-// 扫码
-function handleScan() {
-  // #ifdef APP-PLUS || H5
-  uni.scanCode({
-    onlyFromCamera: false,
-    scanType: ['barCode', 'qrCode'],
-    success: (res) => {
-      orderCode.value = res.result
-      searchOrder()
-    },
-    fail: (err) => {
-      console.log('扫码取消:', err)
-    }
-  })
-  // #endif
-  // #ifdef MP-WEIXIN
-  uni.scanCode({
-    success: (res) => {
-      orderCode.value = res.result
-      searchOrder()
-    }
-  })
-  // #endif
+// 把后端返回的订单详情（PurOrderDetailVO：order + lines）填充到表单
+function applyDetail(detail) {
+  if (!detail || !detail.order) {
+    setTimeout(() => proxy.$modal.msgError('未找到该采购订单'), 60)
+    return
+  }
+  const found = detail.order
+  if (!canReceive(found.status)) {
+    setTimeout(() => {
+      proxy.$modal.alert('该订单状态为"' + orderStatusText(found.status) + '"，仅"已下单/收货中"的订单可执行收货操作', '无法收货')
+    }, 60)
+    return
+  }
+  order.value = found
+  orderCode.value = found.orderCode
+  lines.value = (detail.lines || []).map(l => ({
+    ...l,
+    receiptQty: '',
+    warehouseId: null,
+    produceDate: '',
+    expireDate: '',
+    lotNumber: l.lotNumber || '',
+    quantityReceived: l.quantityReceived || 0
+  }))
 }
 
 // 搜索PO（一次请求拿到头+行，避免二次调用 order-line/list）
@@ -224,33 +222,26 @@ function searchOrder() {
     // H5 下在 Promise .then 中同步调 hideLoading 有时不生效，延迟一帧确保 loading 被关闭，
     // 否则"查询中..."会残留并遮住后续所有 toast（如仓库校验提示）
     setTimeout(() => proxy.$modal.closeLoading(), 0)
-    const detail = res.data
-    if (!detail || !detail.order) {
-      setTimeout(() => proxy.$modal.msgError('未找到该采购订单'), 60)
-      return
-    }
-    const found = detail.order
-    if (!canReceive(found.status)) {
-      setTimeout(() => {
-        proxy.$modal.alert('该订单状态为"' + orderStatusText(found.status) + '"，仅"已下单/收货中"的订单可执行收货操作', '无法收货')
-      }, 60)
-      return
-    }
-    order.value = found
-    lines.value = (detail.lines || []).map(l => ({
-      ...l,
-      receiptQty: '',
-      warehouseId: null,
-      produceDate: '',
-      expireDate: '',
-      lotNumber: l.lotNumber || '',
-      quantityReceived: l.quantityReceived || 0
-    }))
+    applyDetail(res.data)
   }).catch(() => {
     setTimeout(() => proxy.$modal.closeLoading(), 0)
     setTimeout(() => proxy.$modal.msgError('查询失败，请检查单号'), 60)
   })
 }
+
+// 从待收货列表点进来：按 orderId 直接加载订单
+onLoad((options) => {
+  if (options && options.orderId) {
+    proxy.$modal.loading('加载中...')
+    getOrder(options.orderId).then(res => {
+      setTimeout(() => proxy.$modal.closeLoading(), 0)
+      applyDetail(res.data)
+    }).catch(() => {
+      setTimeout(() => proxy.$modal.closeLoading(), 0)
+      setTimeout(() => proxy.$modal.msgError('订单加载失败'), 60)
+    })
+  }
+})
 
 // 拍照
 function takePhoto() {
@@ -385,14 +376,6 @@ page { background-color: #f5f6f7; min-height: 100%; }
   gap: 16rpx;
 }
 .search-input { flex: 1; }
-.scan-btn {
-  width: 72rpx; height: 72rpx;
-  display: flex; align-items: center; justify-content: center;
-  border: 1px solid #e5e5e5; border-radius: 12rpx;
-  background: #fff;
-  padding: 0; margin: 0;
-}
-.scan-btn::after { border: none; }
 .search-btn { margin: 0; font-size: 26rpx; height: 64rpx; line-height: 64rpx; }
 
 .order-info {

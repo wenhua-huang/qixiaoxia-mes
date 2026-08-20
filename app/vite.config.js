@@ -25,12 +25,13 @@ export default defineConfig({
   server: {
     // 端口以 manifest.json 的 h5.devServer.port(9090) 为准，这里显式对齐避免误导；
     // host:true 监听 0.0.0.0，手机同局域网可通过 http://<电脑IP>:9090 访问
+    // 多 worktree 并行联调时可用 VITE_PORT / VITE_API_TARGET 覆盖
     host: true,
-    port: 9090,
+    port: Number(process.env.VITE_PORT) || 9090,
     proxy: {
       // H5 dev 态 config.baseUrl='/dev-api'，由这里转发到本机后端 8081
       '/dev-api': {
-        target: 'http://localhost:8081',
+        target: process.env.VITE_API_TARGET || 'http://localhost:8081',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/dev-api/, '')
       }

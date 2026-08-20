@@ -3,7 +3,7 @@
     <!-- 搜索栏 -->
     <view class="search-bar">
       <uni-easyinput
-        v-model="queryParams.orderCode"
+        v-model="queryParams.purOrderCode"
         placeholder="PO单号"
         :inputBorder="false"
         class="search-input"
@@ -54,6 +54,10 @@
             <text class="label">入库数量</text>
             <text class="value bold">{{ item.totalQuantity || 0 }}</text>
           </view>
+          <view class="item-row">
+            <text class="label">检验状态</text>
+            <uni-tag :type="qcStatusTagType(item.qcStatus)" :text="qcStatusText(item.qcStatus)" size="small" />
+          </view>
         </view>
         <view class="item-footer">
           <text class="text-grey">{{ item.createTime }}</text>
@@ -75,7 +79,7 @@ import UniLoadMore from '@/uni_modules/uni-load-more/components/uni-load-more/un
 import UniTag from '@/uni_modules/uni-tag/components/uni-tag/uni-tag.vue'
 import { onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
 import { listItemRecpt } from '@/api/mes/pur/order'
-import { recptStatusText, recptStatusTagType } from '@/utils/pur.js'
+import { recptStatusText, recptStatusTagType, qcStatusText, qcStatusTagType } from '@/utils/pur.js'
 
 const { proxy } = getCurrentInstance()
 const list = ref([])
@@ -84,7 +88,7 @@ const loadMoreStatus = ref('more')
 const queryParams = reactive({
   pageNum: 1,
   pageSize: 10,
-  orderCode: '',
+  purOrderCode: '',
   status: '',
   recptType: 'PURCHASE'
 })

@@ -51,12 +51,6 @@
             <text class="text">销售出库</text>
           </view>
         </uni-grid-item>
-        <uni-grid-item @click="goSalesScanOut">
-          <view class="grid-item-box">
-            <uni-icons type="paperplane" size="30" color="#67c23a"></uni-icons>
-            <text class="text">扫码出库</text>
-          </view>
-        </uni-grid-item>
       </uni-grid>
     </view>
 
@@ -248,7 +242,7 @@
   }
 
   function goReceipt() {
-    proxy.$tab.navigateTo('/pages/mes/pur/receipt')
+    proxy.$tab.navigateTo('/pages/mes/pur/list')
   }
   function goHistory() {
     proxy.$tab.navigateTo('/pages/mes/pur/history')
@@ -310,9 +304,6 @@
   }
   function goSalesList() {
     proxy.$tab.navigateTo('/pages/mes/wm/sales/list')
-  }
-  function goSalesScanOut() {
-    proxy.$tab.navigateTo('/pages/mes/wm/sales/scan-out')
   }
 </script>
 

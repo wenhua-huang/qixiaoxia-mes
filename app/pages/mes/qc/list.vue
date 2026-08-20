@@ -11,7 +11,7 @@
       </view>
     </view>
 
-    <scroll-view scroll-y class="list-wrap" @scrolltolower="loadMore" refresher-enabled @refresherrefresh="onRefresh">
+    <scroll-view scroll-y class="list-wrap" @scrolltolower="loadMore" refresher-enabled :refresher-triggered="refresherTriggered" @refresherrefresh="onRefresh">
       <view v-if="!list.length && !loading" class="empty">暂无待检单</view>
       <view v-for="item in list" :key="item.iqcId || item.ipqcId" class="card" @click="openItem(item)">
         <view class="card-head">
@@ -20,11 +20,11 @@
         </view>
         <view class="card-line" v-if="tab === 'IPQC'">
           <text>{{ item.itemName }}</text>
-          <text class="muted"> · {{ item.processName }}</text>
+          <text v-if="item.processName" class="muted"> · {{ item.processName }}</text>
         </view>
         <view class="card-line" v-else>
           <text>{{ item.itemName }}</text>
-          <text class="muted"> · {{ item.vendorName }}</text>
+          <text v-if="item.vendorName" class="muted"> · {{ item.vendorName }}</text>
         </view>
         <view class="card-line sub">
           <text class="muted">来源：{{ item.sourceDocCode || '—' }}</text>
@@ -44,7 +44,7 @@
 
 <script setup>
 import { ref, getCurrentInstance } from 'vue'
-import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
+import { onShow } from '@dcloudio/uni-app'
 import uniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue'
 import uniTag from '@/uni_modules/uni-tag/components/uni-tag/uni-tag.vue'
 import { listIqc, listIpqc, scanIqc } from '@/api/mes/qc'
@@ -58,8 +58,10 @@ const tab = ref('IPQC')
 const list = ref([])
 const loading = ref(false)
 const noMore = ref(false)
+const refresherTriggered = ref(false)
 const pageNum = ref(1)
 const pageSize = 10
+let loadSeq = 0
 
 function statusText(s) { return qcStatusText(s) }
 function statusTagType(s) { return qcStatusTagType(s) }
@@ -73,20 +75,26 @@ function switchTab(t) {
 function reset() { list.value = []; pageNum.value = 1; noMore.value = false }
 
 function load() {
+  const seq = ++loadSeq
   loading.value = true
-  // list 端点 status 仅支持精确匹配，分别查 PENDING/INSPECTING 后合并
+  // list 端点 status 仅支持精确匹配，分别查 PENDING/INSPECTING 后合并，按创建时间倒序
   const api = tab.value === 'IPQC' ? listIpqc : listIqc
   const baseQ = { pageNum: pageNum.value, pageSize }
   Promise.all([
     api({ ...baseQ, status: 'PENDING' }),
     api({ ...baseQ, status: 'INSPECTING' })
   ]).then(([r1, r2]) => {
+    if (seq !== loadSeq) return
     const rows = [...(r1.rows || []), ...(r2.rows || [])]
+    rows.sort((a, b) => String(b.createTime || '').localeCompare(String(a.createTime || '')))
     list.value = pageNum.value === 1 ? rows : list.value.concat(rows)
     noMore.value = rows.length < pageSize
+  }).catch(() => {
+    proxy.$modal.msgError('查询失败，请重试')
   }).finally(() => {
+    if (seq !== loadSeq) return
     loading.value = false
-    uni.stopPullDownRefresh()
+    refresherTriggered.value = false
   })
 }
 function loadMore() {
@@ -94,9 +102,8 @@ function loadMore() {
   pageNum.value++
   load()
 }
-function onRefresh() { reset(); load() }
+function onRefresh() { refresherTriggered.value = true; reset(); load() }
 onShow(() => { reset(); load() })
-onPullDownRefresh(onRefresh)
 
 function openItem(item) {
   const id = item.iqcId || item.ipqcId
@@ -178,7 +185,7 @@ page { background: #f5f6f7; min-height: 100%; }
 .tab { font-size: 28rpx; color: #606266; padding: 12rpx 0; position: relative;
   &.active { color: #409eff; font-weight: 600; &::after { content:''; position:absolute; bottom:0; left:20%; right:20%; height:4rpx; background:#409eff; border-radius:2rpx; } } }
 .top-actions { display: flex; gap: 28rpx; }
-.list-wrap { flex: 1; padding: 20rpx 24rpx; }
+.list-wrap { flex: 1; padding: 20rpx 24rpx 140rpx; }
 .empty { text-align: center; color: #999; padding: 120rpx 0; font-size: 28rpx; }
 .card { background: #fff; border-radius: 12rpx; padding: 24rpx; margin-bottom: 20rpx; }
 .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12rpx; }

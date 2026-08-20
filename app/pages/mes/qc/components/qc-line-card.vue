@@ -86,6 +86,7 @@ const props = defineProps({
   required: { type: Boolean, default: false },
   showError: { type: Boolean, default: false }
 })
+const emit = defineEmits(['uploading-change'])
 
 const dictOptions = [
   { label: '合格', value: 'PASS' },
@@ -127,13 +128,14 @@ function takePhoto() {
     success: (res) => {
       const path = res.tempFilePaths[0]
       uploading.value = true
+      emit('uploading-change', true)
       uploadQcImage(path).then((r) => {
         const url = r.url
         const cur = props.line.checkValText ? props.line.checkValText + ',' : ''
         props.line.checkValText = cur + url
       }).catch(() => {
         uni.showToast({ title: '图片上传失败', icon: 'none' })
-      }).finally(() => { uploading.value = false })
+      }).finally(() => { uploading.value = false; emit('uploading-change', false) })
     }
   })
 }

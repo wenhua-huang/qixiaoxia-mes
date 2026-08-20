@@ -36,11 +36,15 @@
     <view v-for="(line, idx) in lines" :id="'qc-line-' + idx" :key="line.lineId || idx">
       <qc-line-card
         :line="line" :readonly="readonly" :required="true" :show-error="showLineError"
+        @uploading-change="onUploadingChange"
       />
     </view>
 
     <!-- 缺陷记录 -->
-    <qc-defect-editor v-model="defectRecords" :readonly="readonly" :defect-options="defectOptions" />
+    <qc-defect-editor
+      v-model="defectRecords" :readonly="readonly" :defect-options="defectOptions"
+      @uploading-change="onUploadingChange"
+    />
 
     <!-- 让步理由（COMPLETED 后回显） -->
     <view v-if="form.concessionReason" class="concession-box">
@@ -52,9 +56,9 @@
 
     <!-- 底部操作栏 -->
     <view v-if="!readonly" class="footer-bar">
-      <button class="btn-save" @click="save" :disabled="submitting">暂存</button>
-      <button class="btn-judge" type="primary" @click="onJudge" :disabled="submitting">
-        {{ submitting ? '提交中…' : '提交判定' }}
+      <button class="btn-save" @click="save" :disabled="submitting || uploading">暂存</button>
+      <button class="btn-judge" type="primary" @click="onJudge" :disabled="submitting || uploading">
+        {{ uploading ? '图片上传中…' : (submitting ? '提交中…' : '提交判定') }}
       </button>
     </view>
 
@@ -100,6 +104,8 @@ const lines = ref([])
 const defectRecords = ref([])
 const defectOptions = ref([])
 const submitting = ref(false)
+const uploadingCount = ref(0)
+const uploading = computed(() => uploadingCount.value > 0)
 const showLineError = ref(false)
 const loadError = ref('')
 const judgePopup = ref(null)
@@ -139,6 +145,9 @@ function loadDefects() {
   listDefect({ indexType: type.value, enableFlag: '1', pageNum: 1, pageSize: 500 })
     .then(res => { defectOptions.value = res.rows || [] }).catch(() => {})
 }
+function onUploadingChange(busy) {
+  uploadingCount.value = Math.max(0, uploadingCount.value + (busy ? 1 : -1))
+}
 
 function buildBody() {
   // 整单提交（lines/defectRecords 全量，edit 全删全插）
@@ -153,6 +162,7 @@ function buildBody() {
 }
 
 function save() {
+  if (uploading.value) { proxy.$modal.msgWarning('图片仍在上传，请稍候'); return }
   if (!form.value.quantityCheck || form.value.quantityCheck < 1) {
     proxy.$modal.msgWarning('请填写本次检测数量'); return
   }

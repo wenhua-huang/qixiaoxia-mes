@@ -30,7 +30,7 @@
           <uni-icons v-if="!readonly" type="closeempty" size="18" class="photo-del" @click="removeImg(rec, i)" />
         </view>
         <view v-if="!readonly && imagesOf(rec).length < 9" class="photo-add" @click="takePhoto(rec)">
-          <uni-icons type="camera-filled" size="24" color="#999" />
+          <uni-icons type="camera-filled" size="24" :color="uploading ? '#409eff' : '#999'" />
         </view>
       </view>
       <view v-if="!readonly" class="de-del" @click="removeRecord(idx)">删除</view>
@@ -39,7 +39,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import uniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue'
 import uniNumberBox from '@/uni_modules/uni-number-box/components/uni-number-box/uni-number-box.vue'
 import { uploadQcImage } from '@/api/mes/qc/upload'
@@ -50,10 +50,11 @@ const props = defineProps({
   readonly: { type: Boolean, default: false },
   defectOptions: { type: Array, default: () => [] }
 })
-const emit = defineEmits(['update:modelValue'])
+const emit = defineEmits(['update:modelValue', 'uploading-change'])
 
 const list = computed(() => props.modelValue || [])
 const defectNames = computed(() => props.defectOptions.map(d => d.defectName))
+const uploading = ref(0)
 
 function defectIndex(rec) {
   return props.defectOptions.findIndex(d => d.defectId === rec.defectId)
@@ -99,9 +100,12 @@ function takePhoto(rec) {
   uni.chooseImage({
     count: 1, sizeType: ['compressed'], sourceType: ['camera', 'album'],
     success: (res) => {
+      uploading.value++
+      emit('uploading-change', true)
       uploadQcImage(res.tempFilePaths[0]).then((r) => {
         rec.defectImage = rec.defectImage ? rec.defectImage + ',' + r.url : r.url
       }).catch(() => uni.showToast({ title: '图片上传失败', icon: 'none' }))
+        .finally(() => { uploading.value = Math.max(0, uploading.value - 1); if (!uploading.value) emit('uploading-change', false) })
     }
   })
 }

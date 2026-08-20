@@ -234,7 +234,7 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
     /** 确认收货核心逻辑（不入库查询，由调用方传入已加载的 header + lines） */
     private void doConfirmItemRecpt(WmItemRecpt header, List<WmItemRecptLine> lines) {
         // IQC 拦截 hook：confirm 即增库存，检验必须前置（需检物料必须有 COMPLETED+PASS/CONCESSION 检验单，
-        // 否则抛 ServiceException 阻断；confirmItemRecpt 与 receiveWithLines 双入口均经此覆盖）
+        // 否则抛 ServiceException 阻断；receiveWithLines 仅做到货登记不 confirm，不走此门）
         qcGateService.assertItemRecptConfirmable(header, lines);
 
         Long recptId = header.getRecptId();

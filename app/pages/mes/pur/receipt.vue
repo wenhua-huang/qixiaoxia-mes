@@ -47,7 +47,7 @@
       <!-- 物料行 — 填入实收数量 + 仓库 -->
       <view class="line-header">
         <text class="bold">物料明细</text>
-        <text class="text-grey">填写实收数量</text>
+        <text class="text-grey">填写实收数量 · 仅登记到货</text>
       </view>
       <view v-for="(line, idx) in lines" :key="idx" class="line-item">
         <view class="line-info">
@@ -151,7 +151,7 @@
     <!-- 底部确认按钮 -->
     <view v-if="order" class="footer-bar">
       <button type="primary" class="confirm-btn" @click="submitReceipt" :disabled="submitting">
-        {{ submitting ? '提交中...' : '确认收货' }}
+        {{ submitting ? '提交中...' : '到货登记' }}
       </button>
     </view>
   </view>
@@ -277,7 +277,7 @@ function removePhoto(idx) {
   photos.value.splice(idx, 1)
 }
 
-// 提交收货 — 单接口完成（头+行+确认，后端事务保证原子性）
+// 提交到货登记 — 单接口建 DRAFT 入库单（头+行+批次+IQC），不增库存/不过账
 function submitReceipt() {
   // 清除可能残留的全局 loading（如查询后未关闭的"查询中..."），否则会遮住校验 toast
   uni.hideLoading()
@@ -292,12 +292,12 @@ function submitReceipt() {
     return
   }
 
-  proxy.$modal.confirm('确认提交收货？确认后将更新库存。').then(() => {
+  proxy.$modal.confirm('确认提交到货登记？登记后仅生成草稿入库单，库存不变；检验合格后由 PC 端确认入库。').then(() => {
     submitting.value = true
     const body = {
       header: {
         recptCode: genRecptCode(),
-        recptName: '移动端收货-' + (order.value.orderCode || ''),
+        recptName: '移动端到货登记-' + (order.value.orderCode || ''),
         purOrderId: order.value.orderId,
         purOrderCode: order.value.orderCode,
         vendorId: order.value.vendorId,
@@ -325,20 +325,21 @@ function submitReceipt() {
       }))
     }
 
-    // 单接口调用，后端原子完成：创建头 → 创建行 → 确认收货 → 回写PO
+    // 到货登记：后端建 DRAFT 头+行+批次+IQC，不 confirm/post
     receiveItemRecpt(body).then(res => {
-      // res.data = 收货详情（Task 2），lines[].batchCode 为生成的批次码（非批次管理物料为 null）
-      const batchCodes = [...new Set((res.data?.lines || []).map(l => l.batchCode).filter(Boolean))]
-      if (batchCodes.length) {
-        // toast 会截断多行文本，用 alert 弹窗展示批次码并引导 PC 打印
-        proxy.$modal.alert('本次生成批次码：\n' + batchCodes.join('\n') + '\n\n请在 PC【采购入库管理】打印批次标签', '收货成功')
-        setTimeout(() => { proxy.$tab.navigateBack() }, 2500)
-      } else {
-        proxy.$modal.msgSuccess('收货确认成功！库存已更新')
-        setTimeout(() => { proxy.$tab.navigateBack() }, 1500)
-      }
+      // res.data = 入库单详情：recptCode 入库单号、iqcCode 首张来料检验单（免检为 null）、
+      // lines[].batchCode 生成的批次码（非批次管理物料为 null）
+      const data = res.data || {}
+      const batchCodes = [...new Set((data.lines || []).map(l => l.batchCode).filter(Boolean))]
+      const msg = [
+        '入库单号：' + (data.recptCode || '-'),
+        data.iqcCode ? ('来料检验单：' + data.iqcCode) : '免检物料，无需检验',
+        batchCodes.length ? ('批次码：' + batchCodes.join('、')) : ''
+      ].filter(Boolean).join('\n') + '\n\n请在 PC 端完成' + (data.iqcCode ? '质检并' : '') + '确认入库'
+      proxy.$modal.alert(msg, '到货登记成功')
+      setTimeout(() => { proxy.$tab.navigateBack() }, 2500)
     }).catch(e => {
-      proxy.$modal.msgError('收货失败：' + (typeof e === 'string' ? e : (e.msg || e.message || '未知错误')))
+      proxy.$modal.msgError('登记失败：' + (typeof e === 'string' ? e : (e.msg || e.message || '未知错误')))
     }).finally(() => {
       submitting.value = false
     })

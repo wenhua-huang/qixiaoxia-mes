@@ -89,7 +89,7 @@
 
     <template #footer>
       <div class="dialog-footer">
-        <el-button type="primary" @click="submitForm" v-if="!readonly">保存单据</el-button>
+        <el-button type="primary" :loading="submitting" @click="submitForm" v-if="!readonly">保存单据</el-button>
         <el-button @click="show = false">{{ readonly ? '关 闭' : '取 消' }}</el-button>
       </div>
     </template>
@@ -124,6 +124,7 @@ const title = ref('')
 const autoGenFlag = ref(false)
 const form = reactive<WmItemRecpt>({} as WmItemRecpt)
 const lineList = ref<WmItemRecptLine[]>([])
+const submitting = ref(false)
 
 const rules = {
   recptCode: [{ required: true, message: '入库单号不能为空', trigger: 'blur' }],
@@ -196,6 +197,7 @@ function reset() {
   Object.keys(form).forEach(k => delete (form as any)[k])
   lineList.value = []
   autoGenFlag.value = false
+  submitting.value = false
 }
 
 function handleClose() { reset() }
@@ -247,18 +249,22 @@ function onItemSelected(row: any) {
 function handleDelLine(idx: number) { lineList.value.splice(idx, 1) }
 
 function submitForm() {
+  if (submitting.value) return
   formRef.value?.validate((v: boolean) => {
     if (!v) return
     if (lineList.value.length === 0) {
       proxy.$modal.msgWarning('请至少添加一行物料')
       return
     }
+    submitting.value = true
     form.lines = lineList.value
     const fn = form.recptId ? updateWmItemRecpt(form) : addWmItemRecpt(form)
     fn.then(() => {
       proxy.$modal.msgSuccess('保存成功')
       show.value = false
       emit('success')
+    }).finally(() => {
+      submitting.value = false
     })
   })
 }

@@ -74,18 +74,10 @@
         </view>
         <view class="line-warehouse">
           <text class="label">入库仓库</text>
-          <picker :value="warehouseList.findIndex(w => w.warehouseId === line.warehouseId)"
-            :range="warehouseList" range-key="warehouseName"
-            @change="(e) => {
-              // 守卫：列表空/索引越界时不赋值，避免 warehouseList[undefined] 异常
-              const w = warehouseList[e.detail.value]
-              if (w) line.warehouseId = w.warehouseId
-            }">
-            <view class="picker-value-sm">
-              {{ warehouseNameOf(line.warehouseId) || '请选择' }}
-              <uni-icons type="right" size="12" color="#999" />
-            </view>
-          </picker>
+          <view class="picker-value-sm" @click="chooseWarehouse(line)">
+            {{ warehouseNameOf(line.warehouseId) || '请选择' }}
+            <uni-icons type="right" size="12" color="#999" />
+          </view>
         </view>
         <view class="line-extra">
           <view class="extra-row">
@@ -179,6 +171,23 @@ function warehouseNameOf(id) {
   const found = warehouseList.value.find(w => w.warehouseId === id)
   return found ? found.warehouseName : ''
 }
+
+// 用 showActionSheet 替代原生 picker：H5 移动端原生 selector-picker 是滚轮式，
+// 触摸点击选项不能可靠选中；actionSheet 点击即选，各端一致
+function chooseWarehouse(line) {
+  if (!warehouseList.value.length) {
+    proxy.$modal.msgError('仓库列表未加载，请稍候重试')
+    return
+  }
+  uni.showActionSheet({
+    itemList: warehouseList.value.map(w => w.warehouseName),
+    success: (res) => {
+      const w = warehouseList.value[res.tapIndex]
+      if (w) line.warehouseId = w.warehouseId
+    }
+  })
+}
+
 const arrivalInfo = reactive({
   logisticsNo: '',
   vehiclePlate: '',

@@ -59,7 +59,12 @@ const tplIndex = computed(() => ipqcTemplates.value.findIndex(t => t.templateId 
 const tplName = computed(() => { const t = ipqcTemplates.value[tplIndex.value]; return t ? t.templateName : '' })
 
 onLoad((opt) => {
-  listTemplate({ enableFlag: '1', pageNum: 1, pageSize: 500 }).then(r => { templates.value = r.rows || [] })
+  listTemplate({ enableFlag: '1', pageNum: 1, pageSize: 500 }).then(r => {
+    templates.value = r.rows || []
+    const hasIpqcTpl = templates.value.some(t =>
+      (t.qcTypes || '').split(',').map(s => s.trim()).includes('IPQC'))
+    if (!hasIpqcTpl) proxy.$modal.msgWarning('未配置启用的 IPQC 检验模板，请到 PC 端维护后再建单')
+  }).catch(() => proxy.$modal.msgError('检验模板加载失败'))
   if (opt.cardCode) { cardCodeInput.value = decodeURIComponent(opt.cardCode); onScanCard() }
 })
 

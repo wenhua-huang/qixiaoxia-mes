@@ -23,18 +23,21 @@
 
     <!-- 判定结果横幅 -->
     <view v-if="form.checkResult" class="result-banner" :class="form.checkResult">
-      <uni-icons :type="form.checkResult === 'PASS' ? 'checkmarkempty' : 'closeempty'" size="22" color="#fff" />
+      <uni-icons :type="bannerIcon" size="22" color="#fff" />
       <text>{{ qcResultText(form.checkResult) }}</text>
       <text v-if="form.checkResult === 'FAIL'" class="rb-sub">下游业务将被拦截</text>
       <text v-if="form.checkResult === 'CONCESSION'" class="rb-sub">让步接收</text>
     </view>
 
+    <view v-if="loadError" class="error-box">检验单加载失败：{{ loadError }}</view>
+
     <!-- 检测项 -->
-    <view class="section-title">检测项（{{ lines.length }}）</view>
-    <qc-line-card
-      v-for="(line, idx) in lines" :key="line.lineId || idx"
-      :line="line" :readonly="readonly" :required="true" :show-error="showLineError"
-    />
+    <view v-if="lines.length" class="section-title">检测项（{{ lines.length }}）</view>
+    <view v-for="(line, idx) in lines" :id="'qc-line-' + idx" :key="line.lineId || idx">
+      <qc-line-card
+        :line="line" :readonly="readonly" :required="true" :show-error="showLineError"
+      />
+    </view>
 
     <!-- 缺陷记录 -->
     <qc-defect-editor v-model="defectRecords" :readonly="readonly" :defect-options="defectOptions" />
@@ -49,7 +52,7 @@
 
     <!-- 底部操作栏 -->
     <view v-if="!readonly" class="footer-bar">
-      <button class="btn-save" @click="save(false)" :disabled="submitting">暂存</button>
+      <button class="btn-save" @click="save" :disabled="submitting">暂存</button>
       <button class="btn-judge" type="primary" @click="onJudge" :disabled="submitting">
         {{ submitting ? '提交中…' : '提交判定' }}
       </button>
@@ -70,7 +73,7 @@
           <button v-if="predictResult === 'FAIL'" class="btn-fail" @click="doJudge(false)">按不合格提交</button>
           <button v-if="predictResult === 'FAIL'" class="btn-concession" :disabled="!concessionInput.trim()" @click="doJudge(true)">让步接收</button>
           <button v-else type="primary" @click="doJudge(false)">确认判定</button>
-          <button class="btn-cancel" @click="judgePopup.close()">取消</button>
+          <button class="btn-cancel" @click="closeDialog">取消</button>
         </view>
       </view>
     </uni-popup>
@@ -98,12 +101,18 @@ const defectRecords = ref([])
 const defectOptions = ref([])
 const submitting = ref(false)
 const showLineError = ref(false)
+const loadError = ref('')
 const judgePopup = ref(null)
 const predictResult = ref(null)
 const predictReasons = ref([])
 const concessionInput = ref('')
 
 const readonly = computed(() => form.value.status === 'COMPLETED' || form.value.status === 'CLOSED')
+const bannerIcon = computed(() => {
+  if (form.value.checkResult === 'PASS') return 'checkmarkempty'
+  if (form.value.checkResult === 'CONCESSION') return 'info'
+  return 'closeempty'
+})
 
 onLoad((opt) => {
   type.value = opt.type || 'IPQC'
@@ -112,6 +121,7 @@ onLoad((opt) => {
 })
 
 function loadDetail(id) {
+  loadError.value = ''
   const api = type.value === 'IPQC' ? getIpqc : getIqc
   uni.showLoading({ title: '加载中…' })
   api(id).then(res => {
@@ -120,11 +130,14 @@ function loadDetail(id) {
     lines.value = (d.lines || []).map(l => ({ ...l,
       crQuantity: l.crQuantity || 0, majQuantity: l.majQuantity || 0, minQuantity: l.minQuantity || 0 }))
     defectRecords.value = (d.defectRecords || []).map(r => ({ ...r }))
+  }).catch((e) => {
+    form.value = {}
+    loadError.value = e?.msg || '检验单不存在或已被删除'
   }).finally(() => uni.hideLoading())
 }
 function loadDefects() {
   listDefect({ indexType: type.value, enableFlag: '1', pageNum: 1, pageSize: 500 })
-    .then(res => { defectOptions.value = res.rows || [] })
+    .then(res => { defectOptions.value = res.rows || [] }).catch(() => {})
 }
 
 function buildBody() {
@@ -139,18 +152,16 @@ function buildBody() {
   return { ...head, lines: lines.value, defectRecords: defectRecords.value }
 }
 
-function save(reloadAfter) {
+function save() {
   if (!form.value.quantityCheck || form.value.quantityCheck < 1) {
-    proxy.$modal.msgWarning('请填写本次检测数量'); return Promise.reject()
+    proxy.$modal.msgWarning('请填写本次检测数量'); return
   }
   submitting.value = true
   const api = type.value === 'IPQC' ? updateIpqc : updateIqc
-  return api(buildBody()).then(() => {
+  api(buildBody()).then(() => {
     proxy.$modal.msgSuccess('已保存')
-    if (reloadAfter) return loadDetail(form.value.iqcId || form.value.ipqcId)
   }).catch((e) => {
     proxy.$modal.msgError(e?.msg || '保存失败')
-    throw e
   }).finally(() => { submitting.value = false })
 }
 
@@ -171,12 +182,25 @@ function onJudge() {
   if (pred.unentered) {
     showLineError.value = true
     proxy.$modal.msgError(`检测项[${pred.unentered.indexName}]未录入结果`)
+    const idx = lines.value.indexOf(pred.unentered)
+    if (idx >= 0) {
+      uni.createSelectorQuery().select('#qc-line-' + idx).boundingClientRect()
+        .selectViewport().scrollOffset().exec((rects) => {
+          const r = rects && rects[0], v = rects && rects[1]
+          if (r && v) uni.pageScrollTo({ scrollTop: r.top + v.scrollTop - 20, duration: 200 })
+        })
+    }
     return
   }
   predictResult.value = pred.result
   predictReasons.value = pred.reasons
   concessionInput.value = ''
   judgePopup.value.open()
+}
+
+function closeDialog() {
+  judgePopup.value && judgePopup.value.close()
+  predictResult.value = null
 }
 
 function doJudge(concession) {
@@ -192,6 +216,7 @@ function doJudge(concession) {
     // 先保存最新录入，再单次 judge（让步理由随本次提交）
     return api(buildBody()).then(() => judgeApi(id, concession ? concessionInput.value.trim() : null))
   }).then(() => {
+    predictResult.value = null
     proxy.$modal.msgSuccess('判定完成')
     return loadDetail(form.value.iqcId || form.value.ipqcId)
   }).catch((e) => {
@@ -216,6 +241,7 @@ page { background: #f5f6f7; }
   &.CONCESSION { background: #e6a23c; }
   .rb-sub { font-size: 24rpx; font-weight: normal; margin-left: auto; } }
 .section-title { font-size: 28rpx; color: #606266; margin: 12rpx 0 16rpx; }
+.error-box { background: #fef0f0; color: #f56c6c; padding: 24rpx; border-radius: 12rpx; font-size: 28rpx; margin-bottom: 20rpx; }
 .concession-box { background: #fdf6ec; padding: 20rpx; border-radius: 8rpx; font-size: 26rpx; margin-top: 16rpx; }
 .footer-bar { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; padding: 16rpx 24rpx; display: flex; gap: 20rpx; box-shadow: 0 -2rpx 12rpx rgba(0,0,0,.06); }
 .btn-save { flex: 1; background: #f4f4f5; color: #606266; font-size: 30rpx; border-radius: 44rpx; }

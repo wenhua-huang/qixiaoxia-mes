@@ -119,6 +119,8 @@ const bannerIcon = computed(() => {
   if (form.value.checkResult === 'CONCESSION') return 'info'
   return 'closeempty'
 })
+// 未选择缺陷的空行（误加）不参与预判/提交，否则默认 MAJOR qty=1 会误判
+const validDefects = computed(() => defectRecords.value.filter(r => r.defectId))
 
 onLoad((opt) => {
   type.value = opt.type || 'IPQC'
@@ -158,7 +160,7 @@ function buildBody() {
     : { iqcId: form.value.iqcId, iqcCode: form.value.iqcCode, quantityCheck: form.value.quantityCheck,
         sourceDocId: form.value.sourceDocId, sourceDocType: form.value.sourceDocType,
         itemId: form.value.itemId, templateId: form.value.templateId, status: form.value.status }
-  return { ...head, lines: lines.value, defectRecords: defectRecords.value }
+  return { ...head, lines: lines.value, defectRecords: validDefects.value }
 }
 
 function save() {

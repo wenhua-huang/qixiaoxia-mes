@@ -1,5 +1,7 @@
 import request from '@/utils/request'
 
+export { listDefect } from './defect'
+
 // ============ IQC 来料检验 ============
 export function listIqc(query) {
   return request({ url: '/mes/qc/iqc/list', method: 'get', params: query })

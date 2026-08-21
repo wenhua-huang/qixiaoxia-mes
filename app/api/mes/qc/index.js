@@ -45,6 +45,42 @@ export function judgeIpqc(ipqcId, concessionReason) {
   })
 }
 
+// ============ OQC 出货检验 ============
+export function listOqc(query) {
+  return request({ url: '/mes/qc/oqc/list', method: 'get', params: query })
+}
+export function getOqc(oqcId) {
+  return request({ url: '/mes/qc/oqc/' + oqcId, method: 'get' })
+}
+export function updateOqc(data) {
+  return request({ url: '/mes/qc/oqc', method: 'put', data })
+}
+export function judgeOqc(oqcId, concessionReason) {
+  return request({
+    url: '/mes/qc/oqc/judge/' + oqcId,
+    method: 'put',
+    data: { concessionReason: concessionReason || null }
+  })
+}
+
+// ============ RQC 退货检验 ============
+export function listRqc(query) {
+  return request({ url: '/mes/qc/rqc/list', method: 'get', params: query })
+}
+export function getRqc(rqcId) {
+  return request({ url: '/mes/qc/rqc/' + rqcId, method: 'get' })
+}
+export function updateRqc(data) {
+  return request({ url: '/mes/qc/rqc', method: 'put', data })
+}
+export function judgeRqc(rqcId, concessionReason) {
+  return request({
+    url: '/mes/qc/rqc/judge/' + rqcId,
+    method: 'put',
+    data: { concessionReason: concessionReason || null }
+  })
+}
+
 // ============ 检验模板（IPQC 手工建单选模板） ============
 export function listTemplate(query) {
   return request({ url: '/mes/qc/template/list', method: 'get', params: query })

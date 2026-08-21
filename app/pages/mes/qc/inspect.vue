@@ -3,22 +3,20 @@
     <!-- 单据头 -->
     <view class="header-card">
       <view class="h-row">
-        <text class="h-code">{{ form.iqcCode || form.ipqcCode }}</text>
+        <text class="h-code">{{ form[cfg.code] }}</text>
         <uni-tag :type="qcStatusTagType(form.status)" :text="qcStatusText(form.status)" size="small" />
       </view>
-      <view class="h-row sub" v-if="type === 'IPQC'">
+      <view class="h-row sub">
         <text>{{ form.itemName }}</text>
-        <text class="muted">{{ form.processName }} · {{ ipqcTypeText(form.ipqcType) }}</text>
-      </view>
-      <view class="h-row sub" v-else>
-        <text>{{ form.itemName }}</text>
-        <text class="muted">{{ form.vendorName }}</text>
+        <text class="muted">{{ subRight }}</text>
       </view>
       <view class="h-row qty-row">
         <text class="muted">本次检测数量</text>
         <uni-number-box v-if="!readonly" v-model="form.quantityCheck" :min="1" :step="1" />
         <text v-else>{{ form.quantityCheck }}</text>
       </view>
+      <!-- RQC 专属：责任归属 + 退料原因（OQC 无可编辑头字段，与 PC 一致） -->
+      <rqc-fields v-if="type === 'RQC'" :form="form" :readonly="readonly" />
     </view>
 
     <!-- 判定结果横幅 -->
@@ -85,7 +83,7 @@
 </template>
 
 <script setup>
-import { ref, computed, getCurrentInstance } from 'vue'
+import { ref, computed, nextTick, getCurrentInstance } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import uniTag from '@/uni_modules/uni-tag/components/uni-tag/uni-tag.vue'
 import uniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue'
@@ -94,11 +92,23 @@ import uniEasyinput from '@/uni_modules/uni-easyinput/components/uni-easyinput/u
 import uniPopup from '@/uni_modules/uni-popup/components/uni-popup/uni-popup.vue'
 import qcLineCard from './components/qc-line-card.vue'
 import qcDefectEditor from './components/qc-defect-editor.vue'
-import { getIqc, updateIqc, judgeIqc, getIpqc, updateIpqc, judgeIpqc, listDefect } from '@/api/mes/qc'
-import { qcStatusText, qcStatusTagType, qcResultText, ipqcTypeText, predictOrder } from '@/utils/qc'
+import rqcFields from './components/rqc-fields.vue'
+import { getIqc, updateIqc, judgeIqc, getIpqc, updateIpqc, judgeIpqc,
+  getOqc, updateOqc, judgeOqc, getRqc, updateRqc, judgeRqc, listDefect } from '@/api/mes/qc'
+import { qcStatusText, qcStatusTagType, qcResultText, ipqcTypeText, rqcTypeText,
+  QC_TYPE_KEYS, buildInspectHead, predictOrder } from '@/utils/qc'
 
 const { proxy } = getCurrentInstance()
 const type = ref('IPQC')
+
+// 各检验类型的接口与主键/编码字段（OQC/RQC 由后端自动生成，仅做查询/暂存/判定）
+const TYPE_CFG = {
+  IPQC: { get: getIpqc, update: updateIpqc, judge: judgeIpqc, ...QC_TYPE_KEYS.IPQC },
+  IQC:  { get: getIqc,  update: updateIqc,  judge: judgeIqc,  ...QC_TYPE_KEYS.IQC  },
+  OQC:  { get: getOqc,  update: updateOqc,  judge: judgeOqc,  ...QC_TYPE_KEYS.OQC  },
+  RQC:  { get: getRqc,  update: updateRqc,  judge: judgeRqc,  ...QC_TYPE_KEYS.RQC  }
+}
+const cfg = computed(() => TYPE_CFG[type.value])
 const form = ref({})
 const lines = ref([])
 const defectRecords = ref([])
@@ -118,6 +128,14 @@ const bannerIcon = computed(() => {
   if (form.value.checkResult === 'PASS') return 'checkmarkempty'
   if (form.value.checkResult === 'CONCESSION') return 'info'
   return 'closeempty'
+})
+// 头部副标题：IPQC→工序·检验类型，IQC→供应商，OQC→客户，RQC→工单号/供应商·退料类型
+const subRight = computed(() => {
+  const f = form.value
+  if (type.value === 'IPQC') return [f.processName, ipqcTypeText(f.ipqcType)].filter(Boolean).join(' · ')
+  if (type.value === 'OQC') return f.clientName
+  if (type.value === 'RQC') return [f.workorderCode || f.vendorName, rqcTypeText(f.rqcType)].filter(Boolean).join(' · ')
+  return f.vendorName
 })
 // 未选择缺陷的空行（误加）不参与预判/提交，否则默认 MAJOR qty=1 会误判
 const validDefects = computed(() => defectRecords.value.filter(r => r.defectId))
@@ -140,7 +158,7 @@ onLoad((opt) => {
 
 function loadDetail(id) {
   loadError.value = ''
-  const api = type.value === 'IPQC' ? getIpqc : getIqc
+  const api = cfg.value.get
   uni.showLoading({ title: '加载中…' })
   api(id).then(res => {
     const d = res.data || {}
@@ -162,15 +180,9 @@ function onUploadingChange(busy) {
 }
 
 function buildBody() {
-  // 整单提交（lines/defectRecords 全量，edit 全删全插）
-  const head = type.value === 'IPQC'
-    ? { ipqcId: form.value.ipqcId, ipqcCode: form.value.ipqcCode, quantityCheck: form.value.quantityCheck,
-        workorderId: form.value.workorderId, cardId: form.value.cardId, processId: form.value.processId,
-        itemId: form.value.itemId, templateId: form.value.templateId, status: form.value.status }
-    : { iqcId: form.value.iqcId, iqcCode: form.value.iqcCode, quantityCheck: form.value.quantityCheck,
-        sourceDocId: form.value.sourceDocId, sourceDocType: form.value.sourceDocType,
-        itemId: form.value.itemId, templateId: form.value.templateId, status: form.value.status }
-  return { ...head, lines: lines.value, defectRecords: validDefects.value }
+  // 整单提交（lines/defectRecords 全量，edit 全删全插）；head 字段组装逻辑下沉到 utils
+  return { ...buildInspectHead(type.value, form.value, cfg.value),
+    lines: lines.value, defectRecords: validDefects.value }
 }
 
 function save() {
@@ -180,7 +192,7 @@ function save() {
   }
   if (!validateDefects()) return
   submitting.value = true
-  const api = type.value === 'IPQC' ? updateIpqc : updateIqc
+  const api = cfg.value.update
   api(buildBody()).then(() => {
     proxy.$modal.msgSuccess('已保存')
   }).catch((e) => {
@@ -219,7 +231,8 @@ function onJudge() {
   predictResult.value = pred.result
   predictReasons.value = pred.reasons
   concessionInput.value = ''
-  judgePopup.value.open()
+  // v-if 控制弹窗挂载，需等 DOM 更新后 ref 才可用
+  nextTick(() => judgePopup.value && judgePopup.value.open())
 }
 
 function closeDialog() {
@@ -234,15 +247,15 @@ function doJudge(concession) {
   judgePopup.value.close()
   proxy.$modal.confirm('确认提交判定？判定后不可修改。').then(() => {
     submitting.value = true
-    const api = type.value === 'IPQC' ? updateIpqc : updateIqc
-    const judgeApi = type.value === 'IPQC' ? judgeIpqc : judgeIqc
-    const id = form.value.ipqcId || form.value.iqcId
+    const api = cfg.value.update
+    const judgeApi = cfg.value.judge
+    const id = form.value[cfg.value.id]
     // 先保存最新录入，再单次 judge（让步理由随本次提交）
     return api(buildBody()).then(() => judgeApi(id, concession ? concessionInput.value.trim() : null))
   }).then(() => {
     predictResult.value = null
     proxy.$modal.msgSuccess('判定完成')
-    return loadDetail(form.value.iqcId || form.value.ipqcId)
+    return loadDetail(form.value[cfg.value.id])
   }).catch((e) => {
     if (e === 'cancel' || e === false || e?.cancel) return
     proxy.$modal.msgError(e?.msg || '判定失败')

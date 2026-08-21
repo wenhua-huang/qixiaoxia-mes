@@ -1,12 +1,14 @@
 <template>
   <view class="qc-page">
     <view class="top-bar">
-      <view class="tabs">
+      <scroll-view scroll-x class="tabs" :show-scrollbar="false">
         <view class="tab" :class="{ active: tab === 'IPQC' }" @click="switchTab('IPQC')">过程检 IPQC</view>
         <view class="tab" :class="{ active: tab === 'IQC' }" @click="switchTab('IQC')">来料检 IQC</view>
-      </view>
+        <view class="tab" :class="{ active: tab === 'OQC' }" @click="switchTab('OQC')">出货检 OQC</view>
+        <view class="tab" :class="{ active: tab === 'RQC' }" @click="switchTab('RQC')">退货检 RQC</view>
+      </scroll-view>
       <view class="top-actions">
-        <uni-icons type="scan" size="26" color="#409eff" @click="goScan" />
+        <uni-icons v-if="canScan" type="scan" size="26" color="#409eff" @click="goScan" />
         <view class="history-btn" @click="goHistory">
           <uni-icons type="clock" size="18" color="#409eff" />
           <text>检验历史</text>
@@ -16,18 +18,14 @@
 
     <scroll-view scroll-y class="list-wrap" @scrolltolower="loadMore" refresher-enabled :refresher-triggered="refresherTriggered" @refresherrefresh="onRefresh">
       <view v-if="!list.length && !loading" class="empty">暂无待检单</view>
-      <view v-for="item in list" :key="item.iqcId || item.ipqcId" class="card" @click="openItem(item)">
+      <view v-for="item in list" :key="item[cfg.id]" class="card" @click="openItem(item)">
         <view class="card-head">
-          <text class="code">{{ item.iqcCode || item.ipqcCode }}</text>
+          <text class="code">{{ item[cfg.code] }}</text>
           <uni-tag :type="statusTagType(item.status)" :text="statusText(item.status)" size="small" />
         </view>
-        <view class="card-line" v-if="tab === 'IPQC'">
+        <view class="card-line">
           <text>{{ item.itemName }}</text>
-          <text v-if="item.processName" class="muted"> · {{ item.processName }}</text>
-        </view>
-        <view class="card-line" v-else>
-          <text>{{ item.itemName }}</text>
-          <text v-if="item.vendorName" class="muted"> · {{ item.vendorName }}</text>
+          <text v-if="subText(item)" class="muted"> · {{ subText(item) }}</text>
         </view>
         <view class="card-line sub">
           <text class="muted">来源：{{ item.sourceDocCode || '—' }}</text>
@@ -46,18 +44,29 @@
 </template>
 
 <script setup>
-import { ref, getCurrentInstance } from 'vue'
+import { ref, computed, getCurrentInstance } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import uniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue'
 import uniTag from '@/uni_modules/uni-tag/components/uni-tag/uni-tag.vue'
-import { listIqc, listIpqc, scanIqc } from '@/api/mes/qc'
+import { listIqc, listIpqc, listOqc, listRqc, scanIqc } from '@/api/mes/qc'
 import { getCardScanResult } from '@/api/mes/pro/procard'
 import { parseQrPayload } from '@/utils/qrPayload'
 import { qcStatusText, qcStatusTagType } from '@/utils/qc'
 
 const { proxy } = getCurrentInstance()
 
+// 各检验类型的接口与字段配置（OQC/RQC 由后端从出库/退料单自动生成，无移动端建单与扫码）
+const CFG = {
+  IPQC: { listApi: listIpqc, id: 'ipqcId', code: 'ipqcCode' },
+  IQC:  { listApi: listIqc,  id: 'iqcId',  code: 'iqcCode'  },
+  OQC:  { listApi: listOqc,  id: 'oqcId',  code: 'oqcCode'  },
+  RQC:  { listApi: listRqc,  id: 'rqcId',  code: 'rqcCode'  }
+}
+
 const tab = ref('IPQC')
+const cfg = computed(() => CFG[tab.value])
+// 扫码仅支持 IPQC（流转卡）与 IQC（收货单）；二维码体系不含销售/退料单据
+const canScan = computed(() => tab.value === 'IPQC' || tab.value === 'IQC')
 const list = ref([])
 const loading = ref(false)
 const noMore = ref(false)
@@ -68,6 +77,14 @@ let loadSeq = 0
 
 function statusText(s) { return qcStatusText(s) }
 function statusTagType(s) { return qcStatusTagType(s) }
+
+// 卡片副标题：IPQC→工序、IQC→供应商、OQC→客户、RQC→工单号（采购退货时为供应商）
+function subText(item) {
+  if (tab.value === 'IPQC') return item.processName
+  if (tab.value === 'OQC') return item.clientName
+  if (tab.value === 'RQC') return item.workorderCode || item.vendorName
+  return item.vendorName
+}
 
 function switchTab(t) {
   if (tab.value === t) return
@@ -81,7 +98,7 @@ function load() {
   const seq = ++loadSeq
   loading.value = true
   // list 端点 status 仅支持精确匹配，分别查 PENDING/INSPECTING 后合并，按创建时间倒序
-  const api = tab.value === 'IPQC' ? listIpqc : listIqc
+  const api = cfg.value.listApi
   const baseQ = { pageNum: pageNum.value, pageSize }
   Promise.all([
     api({ ...baseQ, status: 'PENDING' }),
@@ -109,15 +126,14 @@ function onRefresh() { refresherTriggered.value = true; reset(); load() }
 onShow(() => { reset(); load() })
 
 function openItem(item) {
-  const id = item.iqcId || item.ipqcId
-  proxy.$tab.navigateTo(`/pages/mes/qc/inspect?type=${tab.value}&id=${id}`)
+  proxy.$tab.navigateTo(`/pages/mes/qc/inspect?type=${tab.value}&id=${item[cfg.value.id]}`)
 }
 function goHistory() { proxy.$tab.navigateTo('/pages/mes/qc/history') }
 function goCreate() { proxy.$tab.navigateTo('/pages/mes/qc/ipqc-create') }
 
 function fmtTime(t) { return t ? String(t).replace('T', ' ').substring(5, 16) : '' }
 
-// ===== 扫码路由 =====
+// ===== 扫码路由（仅 IPQC/IQC） =====
 function goScan() {
   // #ifdef H5
   uni.navigateTo({ url: '/pages/mes/pro/scan?callback=1', events: { scanResult: (code) => resolveCode(code) } })
@@ -184,10 +200,10 @@ function resolveCard(realCode) {
 page { background: #f5f6f7; min-height: 100%; }
 .qc-page { display: flex; flex-direction: column; height: 100vh; }
 .top-bar { display: flex; align-items: center; justify-content: space-between; padding: 16rpx 24rpx; background: #fff; }
-.tabs { display: flex; gap: 24rpx; }
-.tab { font-size: 28rpx; color: #606266; padding: 12rpx 0; position: relative;
+.tabs { display: flex; gap: 28rpx; white-space: nowrap; flex: 1; }
+.tab { font-size: 28rpx; color: #606266; padding: 12rpx 0; position: relative; display: inline-block;
   &.active { color: #409eff; font-weight: 600; &::after { content:''; position:absolute; bottom:0; left:20%; right:20%; height:4rpx; background:#409eff; border-radius:2rpx; } } }
-.top-actions { display: flex; gap: 28rpx; align-items: center; }
+.top-actions { display: flex; gap: 28rpx; align-items: center; padding-left: 20rpx; }
 .history-btn { display: flex; align-items: center; gap: 6rpx; font-size: 24rpx; color: #409eff;
   border: 2rpx solid #b3d8ff; background: #ecf5ff; border-radius: 24rpx; padding: 6rpx 18rpx; }
 .list-wrap { flex: 1; padding: 20rpx 24rpx 140rpx; }

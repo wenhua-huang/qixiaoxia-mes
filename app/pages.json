@@ -235,6 +235,18 @@
       "navigationBarTitleText": "外协收货"
     }
   }, {
+    "path": "pages/mes/wm/outsource-issue-list",
+    "style": {
+      "navigationBarTitleText": "待发料",
+      "enablePullDownRefresh": true
+    }
+  }, {
+    "path": "pages/mes/wm/outsource-recpt-list",
+    "style": {
+      "navigationBarTitleText": "待收货",
+      "enablePullDownRefresh": true
+    }
+  }, {
     "path": "pages/mes/qc/list",
     "style": {
       "navigationBarTitleText": "质检",

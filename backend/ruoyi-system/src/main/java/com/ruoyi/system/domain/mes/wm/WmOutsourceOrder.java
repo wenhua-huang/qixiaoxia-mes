@@ -42,6 +42,9 @@ public class WmOutsourceOrder extends BaseEntity
 
     // 状态
     private String status;
+    /** 多状态查询（IN 条件），与 status 互斥使用；非持久字段 */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private List<String> statusList;
     private Long feedbackId;
 
     // 汇总
@@ -101,6 +104,8 @@ public class WmOutsourceOrder extends BaseEntity
     public void setSourceRefId(Long v) { this.sourceRefId = v; }
     public String getStatus() { return status; }
     public void setStatus(String v) { this.status = v; }
+    public List<String> getStatusList() { return statusList; }
+    public void setStatusList(List<String> v) { this.statusList = v; }
     public Long getFeedbackId() { return feedbackId; }
     public void setFeedbackId(Long v) { this.feedbackId = v; }
     public BigDecimal getIssueTotalQty() { return issueTotalQty; }

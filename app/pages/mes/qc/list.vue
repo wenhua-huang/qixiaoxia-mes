@@ -2,10 +2,10 @@
   <view class="qc-page">
     <view class="top-bar">
       <scroll-view scroll-x class="tabs" :show-scrollbar="false">
-        <view class="tab" :class="{ active: tab === 'IPQC' }" @click="switchTab('IPQC')">过程检 IPQC</view>
-        <view class="tab" :class="{ active: tab === 'IQC' }" @click="switchTab('IQC')">来料检 IQC</view>
-        <view class="tab" :class="{ active: tab === 'OQC' }" @click="switchTab('OQC')">出货检 OQC</view>
-        <view class="tab" :class="{ active: tab === 'RQC' }" @click="switchTab('RQC')">退货检 RQC</view>
+        <view class="tab" :class="{ active: tab === 'IPQC' }" @click="switchTab('IPQC')">过程检</view>
+        <view class="tab" :class="{ active: tab === 'IQC' }" @click="switchTab('IQC')">来料检</view>
+        <view class="tab" :class="{ active: tab === 'OQC' }" @click="switchTab('OQC')">出货检</view>
+        <view class="tab" :class="{ active: tab === 'RQC' }" @click="switchTab('RQC')">退货检</view>
       </scroll-view>
       <view class="top-actions">
         <uni-icons v-if="canScan" type="scan" size="26" color="#409eff" @click="goScan" />
@@ -200,8 +200,10 @@ function resolveCard(realCode) {
 page { background: #f5f6f7; min-height: 100%; }
 .qc-page { display: flex; flex-direction: column; height: 100vh; }
 .top-bar { display: flex; align-items: center; justify-content: space-between; padding: 16rpx 24rpx; background: #fff; }
-.tabs { display: flex; gap: 28rpx; white-space: nowrap; flex: 1; }
-.tab { font-size: 28rpx; color: #606266; padding: 12rpx 0; position: relative; display: inline-block;
+/* scroll-view 在 H5/真机内部包了一层 .uni-scroll-view-content，flex/gap 设在外层不生效；
+   用 inline-block + margin 让标签在内容层里自然横向排列并留间距 */
+.tabs { white-space: nowrap; flex: 1; min-width: 0; }
+.tab { font-size: 28rpx; color: #606266; padding: 12rpx 0; margin-right: 28rpx; position: relative; display: inline-block;
   &.active { color: #409eff; font-weight: 600; &::after { content:''; position:absolute; bottom:0; left:20%; right:20%; height:4rpx; background:#409eff; border-radius:2rpx; } } }
 .top-actions { display: flex; gap: 28rpx; align-items: center; padding-left: 20rpx; }
 .history-btn { display: flex; align-items: center; gap: 6rpx; font-size: 24rpx; color: #409eff;

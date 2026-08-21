@@ -11,6 +11,11 @@ public interface IWmItemRecptService
     public WmItemRecpt selectWmItemRecptByRecptId(Long recptId);
 
     /**
+     * 按收货单号精确查询收货单（供移动端扫码）
+     */
+    public WmItemRecpt selectByRecptCode(String recptCode);
+
+    /**
      * 查询入库单详情（头 + 行）。供详情页一次请求取回，避免前端分两次调用。
      */
     public WmItemRecpt selectWmItemRecptDetail(Long recptId);

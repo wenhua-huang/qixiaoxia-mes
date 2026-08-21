@@ -83,7 +83,8 @@ public class QcIpqcController extends BaseController
     @PostMapping
     public AjaxResult add(@RequestBody QcIpqc qcipqc)
     {
-        return toAjax(qcIpqcService.insertQcIpqc(qcipqc));
+        qcIpqcService.insertQcIpqc(qcipqc);
+        return AjaxResult.success(qcipqc.getIpqcId());
     }
 
     /**

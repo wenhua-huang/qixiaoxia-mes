@@ -84,6 +84,12 @@
             <text class="text">生产报工</text>
           </view>
         </uni-grid-item>
+        <uni-grid-item @click="goQc">
+          <view class="grid-item-box">
+            <uni-icons type="checkmarkempty" size="30" color="#409eff"></uni-icons>
+            <text class="text">质检</text>
+          </view>
+        </uni-grid-item>
         <uni-grid-item @click="goScan">
           <view class="grid-item-box">
             <uni-icons type="scan" size="30" color="#409eff"></uni-icons>
@@ -265,6 +271,9 @@
   // 生产管理入口
   function goReport() {
     proxy.$tab.navigateTo('/pages/mes/pro/report')
+  }
+  function goQc() {
+    proxy.$tab.navigateTo('/pages/mes/qc/list')
   }
   // 统一扫码分发：扫流转卡/工单码跳报工页
   async function goScan() {

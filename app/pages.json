@@ -234,6 +234,28 @@
     "style": {
       "navigationBarTitleText": "外协收货"
     }
+  }, {
+    "path": "pages/mes/qc/list",
+    "style": {
+      "navigationBarTitleText": "质检",
+      "enablePullDownRefresh": true
+    }
+  }, {
+    "path": "pages/mes/qc/inspect",
+    "style": {
+      "navigationBarTitleText": "检验录入"
+    }
+  }, {
+    "path": "pages/mes/qc/ipqc-create",
+    "style": {
+      "navigationBarTitleText": "新建过程检验"
+    }
+  }, {
+    "path": "pages/mes/qc/history",
+    "style": {
+      "navigationBarTitleText": "检验历史",
+      "enablePullDownRefresh": true
+    }
   }],
   "tabBar": {
     "color": "#000000",

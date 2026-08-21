@@ -125,6 +125,11 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
     }
 
     @Override
+    public WmItemRecpt selectByRecptCode(String recptCode) {
+        return wmItemRecptMapper.selectByRecptCode(recptCode);
+    }
+
+    @Override
     public WmItemRecpt selectWmItemRecptDetail(Long recptId) {
         WmItemRecpt header = wmItemRecptMapper.selectWmItemRecptByRecptId(recptId);
         if (header == null) {

@@ -44,6 +44,8 @@ import uniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue
 import uniNumberBox from '@/uni_modules/uni-number-box/components/uni-number-box/uni-number-box.vue'
 import { uploadQcImage } from '@/api/mes/qc/upload'
 import { DEFECT_LEVEL_ORDER, defectLevelText } from '@/utils/qc'
+import { chooseImageAsync } from '@/utils/chooseImage'
+import { normalizeImageUrl } from '@/utils/image'
 
 const props = defineProps({
   modelValue: { type: Array, default: () => [] },
@@ -94,23 +96,21 @@ function removeRecord(idx) {
   emit('update:modelValue', arr)
 }
 function imagesOf(rec) {
-  return rec.defectImage ? rec.defectImage.split(',').filter(Boolean) : []
+  return rec.defectImage ? rec.defectImage.split(',').filter(Boolean).map(normalizeImageUrl) : []
 }
 function takePhoto(rec) {
-  uni.chooseImage({
-    count: 1, sizeType: ['compressed'], sourceType: ['camera', 'album'],
-    success: (res) => {
-      uploading.value++
-      emit('uploading-change', true)
-      uploadQcImage(res.tempFilePaths[0]).then((r) => {
-        rec.defectImage = rec.defectImage ? rec.defectImage + ',' + r.url : r.url
-      }).catch(() => uni.showToast({ title: '图片上传失败', icon: 'none' }))
-        .finally(() => { uploading.value = Math.max(0, uploading.value - 1); if (!uploading.value) emit('uploading-change', false) })
-    }
-  })
+  chooseImageAsync({ count: 1, sizeType: ['compressed'] }).then((res) => {
+    uploading.value++
+    emit('uploading-change', true)
+    uploadQcImage(res.tempFilePaths[0]).then((r) => {
+      rec.defectImage = rec.defectImage ? rec.defectImage + ',' + r.url : r.url
+    }).catch(() => uni.showToast({ title: '图片上传失败', icon: 'none' }))
+      .finally(() => { uploading.value = Math.max(0, uploading.value - 1); if (!uploading.value) emit('uploading-change', false) })
+  }).catch(() => {})
 }
 function removeImg(rec, i) {
-  const arr = imagesOf(rec)
+  // 始终操作原始存储字符串：imagesOf 是规范化后的展示值，写回会把相对路径污染进库
+  const arr = rec.defectImage ? rec.defectImage.split(',').filter(Boolean) : []
   arr.splice(i, 1)
   rec.defectImage = arr.join(',')
 }

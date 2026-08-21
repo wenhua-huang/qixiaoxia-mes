@@ -122,6 +122,16 @@ const bannerIcon = computed(() => {
 // 未选择缺陷的空行（误加）不参与预判/提交，否则默认 MAJOR qty=1 会误判
 const validDefects = computed(() => defectRecords.value.filter(r => r.defectId))
 
+// 提交前校验：有拍照但没选缺陷名称的行不能静默丢弃（否则图片丢失），必须提示补全
+function validateDefects() {
+  const incomplete = defectRecords.value.find(r => !r.defectId && r.defectImage)
+  if (incomplete) {
+    proxy.$modal.msgWarning('有缺陷已拍照但未选择缺陷名称，请补全后再提交')
+    return false
+  }
+  return true
+}
+
 onLoad((opt) => {
   type.value = opt.type || 'IPQC'
   loadDetail(opt.id)
@@ -168,6 +178,7 @@ function save() {
   if (!form.value.quantityCheck || form.value.quantityCheck < 1) {
     proxy.$modal.msgWarning('请填写本次检测数量'); return
   }
+  if (!validateDefects()) return
   submitting.value = true
   const api = type.value === 'IPQC' ? updateIpqc : updateIqc
   api(buildBody()).then(() => {
@@ -182,9 +193,10 @@ function onJudge() {
   if (!form.value.quantityCheck || form.value.quantityCheck < 1) {
     proxy.$modal.msgWarning('请填写本次检测数量'); return
   }
+  if (!validateDefects()) return
   const pred = predictOrder({
     lines: lines.value,
-    defects: defectRecords.value,
+    defects: validDefects.value,
     quantityCheck: form.value.quantityCheck,
     acQuantity: form.value.quantityMaxUnqualified,
     crRateLimit: form.value.crRateLimit,

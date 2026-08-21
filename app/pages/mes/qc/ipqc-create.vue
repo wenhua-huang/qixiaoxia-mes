@@ -7,8 +7,10 @@
       </view>
       <view class="form-row">
         <text class="label">流转卡</text>
-        <uni-easyinput v-model="cardCodeInput" placeholder="扫码或输入流转卡号" :inputBorder="false" @confirm="onScanCard" />
-        <uni-icons type="scan" size="24" color="#409eff" @click="scanCard" />
+        <uni-easyinput v-model="cardCodeInput" placeholder="扫码或输入流转卡号" :inputBorder="false" :disabled="cardLoading"
+          @input="onCardInput" @confirm="onScanCard" />
+        <uni-icons type="scan" size="24" :color="cardLoading ? '#909399' : '#409eff'"
+          :class="{ 'spin': cardLoading }" @click="scanCard" />
       </view>
       <view v-if="card" class="card-info">
         <view class="ci-row"><text class="muted">工单</text><text>{{ card.workorderCode }}</text></view>
@@ -45,6 +47,8 @@ const card = ref(null)
 const templates = ref([])
 const form = ref({ ipqcType: 'TOUR_CHECK', templateId: null })
 const submitting = ref(false)
+const cardLoading = ref(false)
+let cardQuerySeq = 0
 
 const ipqcTypes = Object.keys(IPQC_TYPE_MAP)
 const ipqcTypeNames = computed(() => ipqcTypes.map(ipqcTypeText))
@@ -83,27 +87,52 @@ function resolveCard(raw) {
   cardCodeInput.value = code
   onScanCard()
 }
+function onCardInput() {
+  // 用户改了卡号，清空旧卡信息，避免残留上一张卡的工单/物料/工位
+  card.value = null
+  form.value.workorderId = null
+  form.value.itemId = null
+  form.value.cardId = null
+  form.value.processId = null
+  form.value.workstationId = null
+}
 function onScanCard() {
   const code = cardCodeInput.value.trim()
-  if (!code) return
+  if (!code) return Promise.resolve(false)
+  const seq = ++cardQuerySeq
+  cardLoading.value = true
   uni.showLoading({ title: '查卡中…' })
-  getCardScanResult(code).then(res => {
+  return getCardScanResult(code).then(res => {
+    if (seq !== cardQuerySeq) return false
     uni.hideLoading()
     const d = res.data
-    if (!d || !d.card) { proxy.$modal.msgError('流转卡不存在或不可用：' + (d?.reason || code)); return }
+    if (!d || !d.card) { proxy.$modal.msgError('流转卡不存在或不可用：' + (d?.reason || code)); return false }
     card.value = d.card
-    // 自动选中第一个可报工任务的工序/工位
     const task = (d.reportableTasks || [])[0]
     form.value.workorderId = card.value.workorderId
     form.value.itemId = card.value.itemId
     form.value.cardId = card.value.cardId
     form.value.processId = task?.processId || card.value.currentProcessId
     form.value.workstationId = task?.workstationId || null
-  }).catch(() => { uni.hideLoading(); proxy.$modal.msgError('查卡失败') })
+    return true
+  }).catch(() => {
+    if (seq !== cardQuerySeq) return false
+    uni.hideLoading()
+    proxy.$modal.msgError('查卡失败')
+    return false
+  }).finally(() => {
+    if (seq === cardQuerySeq) cardLoading.value = false
+  })
 }
 
-function submit() {
-  if (!card.value) { proxy.$modal.msgWarning('请先扫描流转卡'); return }
+async function submit() {
+  const code = cardCodeInput.value.trim()
+  if (!code) { proxy.$modal.msgWarning('请输入或扫描流转卡'); return }
+  // 手填卡号后直接提交（未按回车触发查卡）：先查卡，成功再建单
+  if (!card.value || card.value.cardCode !== code) {
+    const ok = await onScanCard()
+    if (!ok) return
+  }
   if (!form.value.templateId) { proxy.$modal.msgWarning('请选择检验模板'); return }
   submitting.value = true
   const body = {
@@ -138,6 +167,8 @@ page { background: #f5f6f7; }
 .create-page { padding: 20rpx 24rpx; }
 .form-card { background: #fff; border-radius: 12rpx; padding: 8rpx 24rpx; }
 .form-row { display: flex; align-items: center; gap: 16rpx; padding: 24rpx 0; border-bottom: 2rpx solid #f5f5f5; }
+.spin { animation: qc-spin 0.8s linear infinite; }
+@keyframes qc-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .label { font-size: 28rpx; color: #606266; min-width: 140rpx; }
 .pick { flex: 1; font-size: 28rpx; color: #303133; }
 .card-info { background: #f8f9fa; border-radius: 8rpx; padding: 16rpx 20rpx; margin: 16rpx 0; }

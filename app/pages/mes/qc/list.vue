@@ -7,7 +7,10 @@
       </view>
       <view class="top-actions">
         <uni-icons type="scan" size="26" color="#409eff" @click="goScan" />
-        <uni-icons type="clock" size="26" color="#909399" @click="goHistory" />
+        <view class="history-btn" @click="goHistory">
+          <uni-icons type="clock" size="18" color="#409eff" />
+          <text>检验历史</text>
+        </view>
       </view>
     </view>
 
@@ -184,7 +187,9 @@ page { background: #f5f6f7; min-height: 100%; }
 .tabs { display: flex; gap: 24rpx; }
 .tab { font-size: 28rpx; color: #606266; padding: 12rpx 0; position: relative;
   &.active { color: #409eff; font-weight: 600; &::after { content:''; position:absolute; bottom:0; left:20%; right:20%; height:4rpx; background:#409eff; border-radius:2rpx; } } }
-.top-actions { display: flex; gap: 28rpx; }
+.top-actions { display: flex; gap: 28rpx; align-items: center; }
+.history-btn { display: flex; align-items: center; gap: 6rpx; font-size: 24rpx; color: #409eff;
+  border: 2rpx solid #b3d8ff; background: #ecf5ff; border-radius: 24rpx; padding: 6rpx 18rpx; }
 .list-wrap { flex: 1; padding: 20rpx 24rpx 140rpx; }
 .empty { text-align: center; color: #999; padding: 120rpx 0; font-size: 28rpx; }
 .card { background: #fff; border-radius: 12rpx; padding: 24rpx; margin-bottom: 20rpx; }

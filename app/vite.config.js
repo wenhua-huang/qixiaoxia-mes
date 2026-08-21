@@ -34,6 +34,13 @@ export default defineConfig({
         target: process.env.VITE_API_TARGET || 'http://localhost:8081',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/dev-api/, '')
+      },
+      // MinIO 图片：后端返回的 URL 带 http://localhost:9010，真机浏览器/其他设备
+      // 访问 dev server 时 localhost 不通。H5 用 normalizeImageUrl 改写成同源 /qxx-mes
+      // 相对路径后由这里代理到 MinIO；生产由 nginx /qxx-mes/ 反代（见 .agents/skills/deploy/nginx.conf）。
+      '/qxx-mes': {
+        target: 'http://localhost:9010',
+        changeOrigin: true
       }
     }
   }

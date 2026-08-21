@@ -97,8 +97,9 @@ function fmtTime(t) { return t ? String(t).replace('T', ' ').substring(5, 16) : 
 page { background: #f5f6f7; min-height: 100%; }
 .qc-page { display: flex; flex-direction: column; height: 100vh; }
 .top-bar { background: #fff; padding: 16rpx 24rpx; }
-.tabs { display: flex; gap: 28rpx; white-space: nowrap; }
-.tab { font-size: 28rpx; color: #606266; padding: 12rpx 0; position: relative; display: inline-block;
+/* scroll-view 内部有 .uni-scroll-view-content 包裹层，flex/gap 不生效，用 inline-block + margin */
+.tabs { white-space: nowrap; }
+.tab { font-size: 28rpx; color: #606266; padding: 12rpx 0; margin-right: 28rpx; position: relative; display: inline-block;
   &.active { color: #409eff; font-weight: 600; &::after { content:''; position:absolute; bottom:0; left:20%; right:20%; height:4rpx; background:#409eff; border-radius:2rpx; } } }
 .list-wrap { flex: 1; padding: 20rpx 24rpx; }
 .empty { text-align: center; color: #999; padding: 120rpx 0; font-size: 28rpx; }

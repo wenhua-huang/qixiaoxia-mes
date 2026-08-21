@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
+import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.domain.mes.qc.QcIqc;
 import com.ruoyi.system.domain.mes.wm.WmItemRecpt;
 import com.ruoyi.system.service.mes.qc.IQcIqcService;
@@ -40,6 +41,12 @@ public class QcScanController extends BaseController
     @GetMapping("/iqc")
     public AjaxResult scanIqc(@RequestParam("code") String recptCode)
     {
+        // 扫码枪常带 CR/LF，trim 后再校验空串
+        recptCode = StringUtils.trim(recptCode);
+        if (StringUtils.isEmpty(recptCode))
+        {
+            return AjaxResult.error("收货单号不能为空");
+        }
         WmItemRecpt recpt = wmItemRecptService.selectByRecptCode(recptCode);
         if (recpt == null)
         {

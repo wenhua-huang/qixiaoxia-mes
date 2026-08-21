@@ -114,10 +114,16 @@
             <text class="text">打卡历史</text>
           </view>
         </uni-grid-item>
-        <uni-grid-item @click="goSlittingCreate">
+        <uni-grid-item @click="goOutsourceIssue">
           <view class="grid-item-box">
             <uni-icons type="scissors" size="30" color="#909399"></uni-icons>
             <text class="text">外协发料</text>
+          </view>
+        </uni-grid-item>
+        <uni-grid-item @click="goOutsourceRecpt">
+          <view class="grid-item-box">
+            <uni-icons type="download" size="30" color="#67c23a"></uni-icons>
+            <text class="text">外协收料</text>
           </view>
         </uni-grid-item>
         <uni-grid-item @click="goOutsourceList">
@@ -288,9 +294,13 @@
   function goClockHistory() {
     proxy.$tab.navigateTo('/pages/mes/pro/clock-history')
   }
-  // 外协发料入口（按工单选外协工序+BOM发料，工厂员工用）
-  function goSlittingCreate() {
-    proxy.$tab.navigateTo('/pages/mes/wm/outsource-create')
+  // 外协发料：待发料（草稿）列表，点选执行；列表内可新建外协单
+  function goOutsourceIssue() {
+    proxy.$tab.navigateTo('/pages/mes/wm/outsource-issue-list')
+  }
+  // 外协收料：待收货（已发货）列表，点选入库
+  function goOutsourceRecpt() {
+    proxy.$tab.navigateTo('/pages/mes/wm/outsource-recpt-list')
   }
   function goSlittingList() {
     proxy.$tab.navigateTo('/pages/mes/pro/slitting-list')

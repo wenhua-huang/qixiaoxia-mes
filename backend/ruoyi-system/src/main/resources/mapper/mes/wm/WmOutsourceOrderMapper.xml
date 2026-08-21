@@ -60,6 +60,10 @@
             <if test="workorderCode != null and workorderCode != ''"> and workorder_code like concat('%', #{workorderCode}, '%')</if>
             <if test="processId != null"> and process_id = #{processId}</if>
             <if test="status != null and status != ''"> and status = #{status}</if>
+            <if test="statusList != null and statusList.size() > 0">
+                and status in
+                <foreach collection="statusList" item="s" open="(" separator="," close=")">#{s}</foreach>
+            </if>
             <if test="sourceType != null and sourceType != ''"> and source_type = #{sourceType}</if>
             <if test="cardId != null"> and card_id = #{cardId}</if>
         </where>

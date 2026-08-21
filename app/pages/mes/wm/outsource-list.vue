@@ -9,9 +9,6 @@
         class="search-input"
         @confirm="handleQuery"
       />
-      <button class="scan-btn" @click="handleScan" size="mini">
-        <uni-icons type="scan" size="20"></uni-icons>
-      </button>
       <button class="search-btn cu-btn bg-blue sm" @click="handleQuery">搜索</button>
     </view>
 
@@ -23,8 +20,7 @@
         :class="['filter-tag', queryParams.status === s.value ? 'active' : '']"
         @click="filterStatus(s.value)"
       >{{ s.label }}</text>
-      <button v-if="!isVendorRole" class="filter-tag action-btn cu-btn bg-blue sm" @click="goCreate">＋ 发料</button>
-      <button v-if="!isVendorRole" class="filter-tag action-btn cu-btn sm" @click="goExecute">草稿执行</button>
+      <button v-if="!isVendorRole" class="filter-tag action-btn cu-btn bg-blue sm" @click="goCreate">＋ 新建</button>
     </view>
 
     <!-- 列表 -->
@@ -87,11 +83,9 @@
 
 <script setup>
 import { ref, reactive, computed, getCurrentInstance } from 'vue'
-import { onLoad, onShow, onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
+import { onShow, onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
 import { useUserStore } from '@/store'
 import { listOutsource, vendorReceiveOutsource, completeOutsource, shipOutsource } from '@/api/mes/wm/outsource'
-import { getCardScanResult } from '@/api/mes/pro/procard'
-import { parseQrPayload } from '@/utils/qrPayload'
 
 const { proxy } = getCurrentInstance()
 const userStore = useUserStore()
@@ -102,8 +96,7 @@ const loading = ref(false)
 const loadMoreStatus = ref('more')
 const queryParams = reactive({
   pageNum: 1, pageSize: 10,
-  orderCode: '', status: '',
-  workorderCode: '' // 扫流转卡/工单码定位用（搜索框不展示，手动搜索时清空）
+  orderCode: '', status: ''
 })
 
 const statusFilters = [
@@ -136,8 +129,6 @@ function filterStatus(val) {
   loadData()
 }
 function handleQuery() {
-  // 手动按外协单号搜索：清空扫卡定位的工单过滤，避免两个条件 AND 搜不到
-  queryParams.workorderCode = ''
   queryParams.pageNum = 1
   loadData()
 }
@@ -149,55 +140,6 @@ function loadData() {
     loading.value = false
     loadMoreStatus.value = (res.rows && res.rows.length >= queryParams.pageSize) ? 'more' : 'noMore'
   }).catch(() => { loading.value = false })
-}
-
-// 统一扫码结果入口：识别 QXX|TYPE|CODE 载荷分发（CARD/WO → 反查工单号过滤外协单，其他按原文搜单号）
-function handleCode(code) {
-  const payload = parseQrPayload(code)
-  if (payload && (payload.type === 'CARD' || payload.type === 'WO')) {
-    lookupWorkorderByCard(payload.code)
-    return
-  }
-  // 裸条码（非 QXX 载荷）：维持旧行为，orderCode=原文按外协单号搜索
-  queryParams.orderCode = code
-  handleQuery()
-}
-
-// 扫流转卡/工单码 → 反查工单号并过滤该工单的外协单（失败由 request 拦截器 toast；无卡这里兜底提示）
-async function lookupWorkorderByCard(cardCode) {
-  let data = null
-  try {
-    const res = await getCardScanResult(cardCode)
-    data = res.data || {}
-  } catch (e) { return }
-  const woCode = data.card && data.card.workorderCode
-  if (!woCode) {
-    proxy.$modal.msgError('未找到流转卡：' + cardCode)
-    return
-  }
-  queryParams.orderCode = ''
-  queryParams.workorderCode = woCode
-  queryParams.pageNum = 1
-  proxy.$modal.msg('已按工单 ' + woCode + ' 过滤')
-  loadData()
-}
-
-// 扫码：H5 跳统一相机扫码页（html5-qrcode，回调取结果）；App/小程序用原生 uni.scanCode
-function handleScan() {
-  // #ifdef H5
-  uni.navigateTo({
-    url: '/pages/mes/pro/scan?callback=1',
-    events: { scanResult: (code) => handleCode(code) }
-  })
-  // #endif
-  // #ifndef H5
-  uni.scanCode({
-    onlyFromCamera: false,
-    scanType: ['barCode', 'qrCode'],
-    success: (res) => { handleCode(res.result) },
-    fail: () => {} // 用户取消扫码，静默返回
-  })
-  // #endif
 }
 
 onPullDownRefresh(async () => {
@@ -236,9 +178,6 @@ function goReceive(item) {
 }
 function goCreate() {
   proxy.$tab.navigateTo('/pages/mes/wm/outsource-create')
-}
-function goExecute() {
-  proxy.$tab.navigateTo('/pages/mes/wm/outsource-execute')
 }
 function goVendorReceive(item) {
   uni.showModal({
@@ -283,8 +222,6 @@ function goShip(item) {
   })
 }
 
-// 仅在 onShow 加载（onLoad 与 onShow 首次都会触发，避免双加载）
-onLoad(() => {})
 // 从详情/录结果页返回时自动刷新列表；重置到第 1 页避免分页状态残留
 onShow(() => {
   queryParams.pageNum = 1
@@ -297,8 +234,6 @@ onShow(() => {
 page { background-color: #f5f6f7; min-height: 100%; }
 .search-bar { display: flex; align-items: center; padding: 20rpx 24rpx; gap: 16rpx; background: #fff; }
 .search-input { flex: 1; }
-.scan-btn { width: 72rpx; height: 72rpx; display: flex; align-items: center; justify-content: center; border: 1px solid #e5e5e5; border-radius: 12rpx; background: #fff; padding: 0; margin: 0; }
-.scan-btn::after { border: none; }
 .search-btn { margin: 0; font-size: 26rpx; height: 64rpx; line-height: 64rpx; }
 .filter-row { display: flex; flex-wrap: wrap; gap: 16rpx; padding: 16rpx 24rpx; background: #fff; border-bottom: 1px solid #f0f0f0; }
 .filter-tag { padding: 8rpx 24rpx; border-radius: 32rpx; font-size: 24rpx; color: #666; background: #f5f5f5; }

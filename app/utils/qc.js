@@ -31,6 +31,54 @@ export const IPQC_TYPE_MAP = {
 }
 export function ipqcTypeText(s) { return IPQC_TYPE_MAP[s] || s || '' }
 
+export const RQC_TYPE_MAP = {
+  PROD_RETURN: '生产退料',
+  PURCHASE_RETURN: '采购退货',
+  QC_REJECT: '质检退货'
+}
+export function rqcTypeText(s) { return RQC_TYPE_MAP[s] || s || '' }
+
+export const RESPONSIBILITY_MAP = {
+  SUPPLIER: '供应商',
+  PRODUCTION: '生产部门',
+  STORAGE: '仓储部门',
+  OTHER: '其他'
+}
+export function responsibilityText(s) { return RESPONSIBILITY_MAP[s] || s || '' }
+// 责任归属单选项（inspect 页 RQC 用）
+export const RESPONSIBILITY_OPTIONS = Object.keys(RESPONSIBILITY_MAP).map(v => ({ value: v, label: RESPONSIBILITY_MAP[v] }))
+
+// inspect 页各类型的主键/编码字段（api 由页面注入，避免 util 反向依赖 api 层）
+export const QC_TYPE_KEYS = {
+  IPQC: { id: 'ipqcId', code: 'ipqcCode' },
+  IQC:  { id: 'iqcId',  code: 'iqcCode'  },
+  OQC:  { id: 'oqcId',  code: 'oqcCode'  },
+  RQC:  { id: 'rqcId',  code: 'rqcCode'  }
+}
+
+/**
+ * 构造检验单暂存/update 的 head（lines/defectRecords 由页面拼接）。
+ * 各类型可编辑头字段：
+ * - IPQC：流转卡/工序/工单上下文 + quantityCheck
+ * - IQC/OQC：来源单据 + 物料/模板（OQC 客户快照只读不回传）
+ * - RQC：在 IQC 基础上额外可编辑责任归属与退料原因
+ */
+export function buildInspectHead(type, f, keys) {
+  if (type === 'IPQC') {
+    return { ipqcId: f.ipqcId, ipqcCode: f.ipqcCode, quantityCheck: f.quantityCheck,
+      workorderId: f.workorderId, cardId: f.cardId, processId: f.processId,
+      itemId: f.itemId, templateId: f.templateId, status: f.status }
+  }
+  const head = { [keys.id]: f[keys.id], [keys.code]: f[keys.code], quantityCheck: f.quantityCheck,
+    sourceDocId: f.sourceDocId, sourceDocType: f.sourceDocType,
+    itemId: f.itemId, templateId: f.templateId, status: f.status }
+  if (type === 'RQC') {
+    head.responsibility = f.responsibility
+    head.returnReason = f.returnReason
+  }
+  return head
+}
+
 export const DEFECT_LEVEL_MAP = {
   CRITICAL: '致命',
   MAJOR: '严重',

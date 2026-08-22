@@ -83,6 +83,33 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by task_id desc
     </select>
 
+    <!-- 可报工任务：厂内 PRODUCING + 工单状态 PREPARE/PRODUCING。factory_id 由拦截器注入 t.factory_id。 -->
+    <select id="selectReportableTaskList" parameterType="ProTask" resultMap="ProTaskResult">
+        select t.task_id, t.factory_id, t.task_code, t.task_name, t.workorder_id, t.workorder_code, t.workorder_name,
+               t.workstation_id, t.workstation_code, t.workstation_name, t.route_id, t.route_code,
+               t.process_id, t.process_code, t.process_name, t.item_id, t.item_code, t.item_name,
+               t.specification, t.unit_of_measure, t.unit_name, t.quantity, t.quantity_produced,
+               t.quantity_qualified, t.quantity_unqualified, t.quantity_changed, t.client_id, t.client_code,
+               t.client_name, t.client_nick, t.machine_code, t.setup_duration, t.unit_duration, t.offline_qty,
+               t.start_time, t.duration, t.end_time, t.color_code, t.request_date, t.finish_date, t.cancel_date,
+               t.vendor_id, t.vendor_code, t.outsource_factory_id, t.status, t.predecessor_id, t.snapshot_id,
+               t.gantt_sort, t.remark, t.create_by, t.create_time, t.update_by, t.update_time
+        from qxx_pro_task t
+        inner join qxx_pro_workorder wo on wo.workorder_id = t.workorder_id
+        <where>
+            t.status = 'PRODUCING'
+            and t.workstation_code != 'VENDOR'
+            and wo.status in ('PREPARE', 'PRODUCING')
+            <if test="workorderCode != null and workorderCode != ''">
+                and t.workorder_code like concat('%', #{workorderCode}, '%')
+            </if>
+            <if test="processCode != null and processCode != ''">
+                and t.process_code like concat('%', #{processCode}, '%')
+            </if>
+        </where>
+        order by t.task_id desc
+    </select>
+
     <select id="selectProTaskByTaskId" parameterType="Long" resultMap="ProTaskResult">
         <include refid="selectProTaskVo"/>
         where task_id = #{taskId}

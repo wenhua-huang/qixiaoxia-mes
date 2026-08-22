@@ -349,6 +349,11 @@ function searchWorkorder() {
     proxy.$modal.msgError('请输入工单号')
     return
   }
+  // 待报工列表带入的 taskId：立即取出并清空，保证本次查询只消费一次
+  // （失败/工单不存在/无可报工任务等分支也不会残留到下次手动查询）
+  const targetTaskId = pendingTaskId.value
+  pendingTaskId.value = null
+
   proxy.$modal.loading('查询中...')
   // 重置已选状态
   workorder.value = null
@@ -375,14 +380,13 @@ function searchWorkorder() {
       proxy.$modal.msgError('该工单暂无可报工的工序任务')
     }
     // 待报工列表带入 taskId：自动选中对应工序，直进填数量步
-    if (pendingTaskId.value) {
-      const target = taskList.value.find(t => t.taskId === pendingTaskId.value)
+    if (targetTaskId) {
+      const target = taskList.value.find(t => t.taskId === targetTaskId)
       if (target) {
         selectTask(target)
       } else {
         proxy.$modal.msgError('该工序不可报工或已不在可报工列表中')
       }
-      pendingTaskId.value = null
     }
   }).catch((err) => {
     proxy.$modal.closeLoading()

@@ -46,6 +46,18 @@ public class ProTaskController extends BaseController
         return getDataTable(list);
     }
 
+    /**
+     * 移动端待报工列表：仅厂内 PRODUCING 任务且工单处于 PREPARE/PRODUCING。
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:task:list')")
+    @GetMapping("/reportableList")
+    public TableDataInfo reportableList(ProTask proTask)
+    {
+        startPage();
+        List<ProTask> list = proTaskService.selectReportableTaskList(proTask);
+        return getDataTable(list);
+    }
+
     @PreAuthorize("@ss.hasPermi('mes:pro:task:query')")
     @GetMapping("/listAll")
     public AjaxResult listAll()

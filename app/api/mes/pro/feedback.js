@@ -30,6 +30,11 @@ export function listTaskByWorkorder(workorderId) {
   return request({ url: '/mes/pro/task/list', method: 'get', params: { workorderId } })
 }
 
+// 任务分页列表（支持 status、workorderCode 模糊、workstationCode 等过滤，待报工列表用）
+export function listTask(query) {
+  return request({ url: '/mes/pro/task/list', method: 'get', params: query })
+}
+
 // 移动端报工入口：一次请求返回工单 + 可报工任务列表（PRODUCING 状态）
 export function getFeedbackEntry(workorderCode) {
   return request({ url: '/mes/pro/workorder/feedbackEntry/' + encodeURIComponent(workorderCode), method: 'get' })

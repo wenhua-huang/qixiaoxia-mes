@@ -1018,8 +1018,6 @@ public class ProProgressServiceImpl implements IProProgressService {
                 m -> ((Number)m.get("taskId")).longValue(), m -> m, (a,b)->a));
         int warnHours = cfgInt(ProConstants.CFG_WARN_HOURS, 24);
         int tol = cfgInt(ProConstants.CFG_BEHIND_TOLERANCE, 10);
-        // GanttDataServiceImpl 内需新增与 ProProgressServiceImpl 相同的 cfgInt(key,def) 私有方法，
-        // 用 configService.selectConfigByKey(key) 读字符串后 parseInt（该 Service 原本无此 helper）。
         return tasks.stream().map(t -> toProcessRow(t, actualMap.get(t.getTaskId()), warnHours, tol)).toList();
     }
 
@@ -1178,6 +1176,9 @@ git commit -m "feat(pro): 工单进度详情与延期预警后端接口"
                 .collect(Collectors.toMap(m -> ((Number)m.get("taskId")).longValue(), m -> m, (a,b)->a));
         int warnHours = cfgInt(ProConstants.CFG_WARN_HOURS, 24);
         int tol = cfgInt(ProConstants.CFG_BEHIND_TOLERANCE, 10);
+        // 需在 GanttDataServiceImpl 内新增私有 cfgInt(key,def) 方法（与 ProProgressServiceImpl 相同：
+        // configService.selectConfigByKey(key) 读字符串后 parseInt，异常返回默认值），
+        // 并注入 ISysConfigService configService（该 Service 原本无此依赖）。
 ```
 
 在 for 循环 `item.put(...)` 末尾（`quantityProduced` 之后）加：

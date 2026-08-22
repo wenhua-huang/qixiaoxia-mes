@@ -200,6 +200,7 @@ const form = reactive({
 const paramList = ref([])
 const card = ref(null)                       // 扫码得到的流转卡
 const reportedQualifiedSum = ref(0)          // 该卡该工序已报合格数
+const pendingTaskId = ref(null)              // 待报工列表带入的 taskId，加载后自动选中
 
 // 本次报工总数 = 合格 + 不合格 + 工废 + 料废
 const totalQuantity = computed(() => {
@@ -231,6 +232,8 @@ function taskStatusTagType(s) {
 // 页面入口：扫码分发（Task 5）带入 cardCode / workorderCode / rawCode
 onLoad((options) => {
   if (!options) return
+  // 待报工列表带入 taskId：加载完工单任务后自动选中该工序
+  if (options.taskId) pendingTaskId.value = Number(options.taskId)
   if (options.cardCode) {
     scanByCard(options.cardCode)
   } else if (options.workorderCode) {
@@ -370,6 +373,16 @@ function searchWorkorder() {
       proxy.$modal.msg('外协工序请在厂商端录结果，无需厂内报工')
     } else if (taskList.value.length === 0) {
       proxy.$modal.msgError('该工单暂无可报工的工序任务')
+    }
+    // 待报工列表带入 taskId：自动选中对应工序，直进填数量步
+    if (pendingTaskId.value) {
+      const target = taskList.value.find(t => t.taskId === pendingTaskId.value)
+      if (target) {
+        selectTask(target)
+      } else {
+        proxy.$modal.msgError('该工序不可报工或已不在可报工列表中')
+      }
+      pendingTaskId.value = null
     }
   }).catch((err) => {
     proxy.$modal.closeLoading()

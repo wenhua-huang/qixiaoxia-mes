@@ -1,0 +1,311 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.pro.ProReportMapper">
+
+  <!-- ════════ Overview ════════ -->
+  <select id="selectOverviewCounts" resultType="java.util.HashMap">
+    SELECT
+      COUNT(*) AS workorderTotal,
+      SUM(CASE WHEN w.status = 'COMPLETED' THEN 1 ELSE 0 END) AS workorderCompleted,
+      SUM(CASE WHEN w.request_date IS NOT NULL AND w.request_date &lt; NOW()
+            AND (w.status &lt;&gt; 'COMPLETED' OR w.finish_date &gt; w.request_date) THEN 1 ELSE 0 END) AS workorderDelayed,
+      SUM(CASE WHEN w.status = 'PRODUCING' THEN 1 ELSE 0 END) AS workorderInProgress
+    FROM qxx_pro_workorder w
+    <where>
+      w.create_time BETWEEN #{begin} AND #{end}
+      AND w.status &lt;&gt; 'CANCEL'
+      <if test="workshopIds != null and workshopIds.size() > 0">
+        AND EXISTS (
+          SELECT 1 FROM qxx_pro_task t
+          JOIN qxx_md_workstation ws ON ws.workstation_id = t.workstation_id AND ws.factory_id = t.factory_id
+          WHERE t.workorder_id = w.workorder_id AND t.factory_id = w.factory_id
+          AND ws.workshop_id IN
+          <foreach collection="workshopIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        )
+      </if>
+      <if test="teamIds != null and teamIds.size() > 0">
+        AND EXISTS (
+          SELECT 1 FROM qxx_pro_feedback fb
+          WHERE fb.workorder_id = w.workorder_id AND fb.factory_id = w.factory_id
+          AND fb.team_id IN
+          <foreach collection="teamIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        )
+      </if>
+    </where>
+  </select>
+
+  <select id="selectStandardMinutes" resultType="java.lang.Long">
+    SELECT IFNULL(SUM(IFNULL(t.setup_duration,0) + IFNULL(t.unit_duration,0) * IFNULL(t.quantity_produced,0)),0) AS standardMinutes
+    FROM qxx_pro_task t
+    LEFT JOIN qxx_md_workstation ws ON ws.workstation_id = t.workstation_id AND ws.factory_id = t.factory_id
+    <where>
+      t.status &lt;&gt; 'CANCEL'
+      AND (t.finish_date BETWEEN #{begin} AND #{end} OR t.status = 'PRODUCING')
+      <if test="workshopIds != null and workshopIds.size() > 0">
+        AND ws.workshop_id IN
+        <foreach collection="workshopIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+      </if>
+      <if test="teamIds != null and teamIds.size() > 0">
+        AND EXISTS (
+          SELECT 1 FROM qxx_pro_feedback fb
+          WHERE fb.workorder_id = t.workorder_id AND fb.factory_id = t.factory_id
+          AND fb.team_id IN
+          <foreach collection="teamIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        )
+      </if>
+    </where>
+  </select>
+
+  <select id="selectActualMinutes" resultType="java.lang.Long">
+    SELECT IFNULL(SUM(r.work_duration),0) AS actualMinutes
+    FROM qxx_pro_workrecord r
+    LEFT JOIN qxx_md_workstation ws ON ws.workstation_id = r.workstation_id AND ws.factory_id = r.factory_id
+    <where>
+      r.status = 'CLOSED' AND r.clock_in_time BETWEEN #{begin} AND #{end}
+      <if test="workshopIds != null and workshopIds.size() > 0">
+        AND ws.workshop_id IN
+        <foreach collection="workshopIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+      </if>
+      <if test="teamIds != null and teamIds.size() > 0">
+        AND r.team_id IN
+        <foreach collection="teamIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+      </if>
+    </where>
+  </select>
+
+  <!-- ════════ Productivity: output side ════════ -->
+  <sql id="workshopExistsFilter">
+    <if test="workshopIds != null and workshopIds.size() > 0">
+      AND ws.workshop_id IN
+      <foreach collection="workshopIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </if>
+  </sql>
+
+  <select id="selectWorkshopOutput" resultType="java.util.HashMap">
+    SELECT ws.workshop_id AS groupId, wshop.workshop_name AS groupName,
+      COUNT(DISTINCT t.workorder_id) AS workorderCount,
+      COUNT(DISTINCT CASE WHEN w.status = 'COMPLETED' THEN t.workorder_id END) AS completedCount,
+      COUNT(DISTINCT CASE WHEN w.request_date IS NOT NULL AND w.request_date &lt; NOW()
+            AND (w.status &lt;&gt; 'COMPLETED' OR w.finish_date &gt; w.request_date) THEN t.workorder_id END) AS delayedCount,
+      IFNULL(SUM(t.quantity),0) AS standardOutput,
+      IFNULL(SUM(t.quantity_produced),0) AS actualOutput,
+      IFNULL(SUM(IFNULL(t.setup_duration,0) + IFNULL(t.unit_duration,0) * IFNULL(t.quantity_produced,0)),0) AS standardMinutes,
+      IFNULL(SUM(t.quantity_qualified),0) AS qualifiedQty,
+      IFNULL(SUM(t.quantity_unqualified),0) AS scrapQty
+    FROM qxx_pro_task t
+    JOIN qxx_md_workstation ws ON ws.workstation_id = t.workstation_id AND ws.factory_id = t.factory_id
+    LEFT JOIN qxx_md_workshop wshop ON wshop.workshop_id = ws.workshop_id AND wshop.factory_id = t.factory_id
+    LEFT JOIN qxx_pro_workorder w ON w.workorder_id = t.workorder_id AND w.factory_id = t.factory_id
+    <where>
+      (t.finish_date BETWEEN #{begin} AND #{end} OR t.status IN ('PRODUCING','NORMAL','PREPARE','PAUSED'))
+      <include refid="workshopExistsFilter"/>
+    </where>
+    GROUP BY ws.workshop_id, wshop.workshop_name
+  </select>
+
+  <select id="selectWorkstationOutput" resultType="java.util.HashMap">
+    SELECT t.workstation_id AS groupId, MAX(t.workstation_name) AS groupName,
+      COUNT(DISTINCT t.workorder_id) AS workorderCount,
+      COUNT(DISTINCT CASE WHEN w.status = 'COMPLETED' THEN t.workorder_id END) AS completedCount,
+      COUNT(DISTINCT CASE WHEN w.request_date IS NOT NULL AND w.request_date &lt; NOW()
+            AND (w.status &lt;&gt; 'COMPLETED' OR w.finish_date &gt; w.request_date) THEN t.workorder_id END) AS delayedCount,
+      IFNULL(SUM(t.quantity),0) AS standardOutput,
+      IFNULL(SUM(t.quantity_produced),0) AS actualOutput,
+      IFNULL(SUM(IFNULL(t.setup_duration,0) + IFNULL(t.unit_duration,0) * IFNULL(t.quantity_produced,0)),0) AS standardMinutes,
+      IFNULL(SUM(t.quantity_qualified),0) AS qualifiedQty,
+      IFNULL(SUM(t.quantity_unqualified),0) AS scrapQty
+    FROM qxx_pro_task t
+    LEFT JOIN qxx_md_workstation ws ON ws.workstation_id = t.workstation_id AND ws.factory_id = t.factory_id
+    LEFT JOIN qxx_pro_workorder w ON w.workorder_id = t.workorder_id AND w.factory_id = t.factory_id
+    <where>
+      (t.finish_date BETWEEN #{begin} AND #{end} OR t.status IN ('PRODUCING','NORMAL','PREPARE','PAUSED'))
+      <include refid="workshopExistsFilter"/>
+    </where>
+    GROUP BY t.workstation_id
+  </select>
+
+  <select id="selectProcessOutput" resultType="java.util.HashMap">
+    SELECT t.process_id AS groupId, MAX(t.process_name) AS groupName,
+      COUNT(DISTINCT t.workorder_id) AS workorderCount,
+      COUNT(DISTINCT CASE WHEN w.status = 'COMPLETED' THEN t.workorder_id END) AS completedCount,
+      COUNT(DISTINCT CASE WHEN w.request_date IS NOT NULL AND w.request_date &lt; NOW()
+            AND (w.status &lt;&gt; 'COMPLETED' OR w.finish_date &gt; w.request_date) THEN t.workorder_id END) AS delayedCount,
+      IFNULL(SUM(t.quantity),0) AS standardOutput,
+      IFNULL(SUM(t.quantity_produced),0) AS actualOutput,
+      IFNULL(SUM(IFNULL(t.setup_duration,0) + IFNULL(t.unit_duration,0) * IFNULL(t.quantity_produced,0)),0) AS standardMinutes,
+      IFNULL(SUM(t.quantity_qualified),0) AS qualifiedQty,
+      IFNULL(SUM(t.quantity_unqualified),0) AS scrapQty
+    FROM qxx_pro_task t
+    LEFT JOIN qxx_md_workstation ws ON ws.workstation_id = t.workstation_id AND ws.factory_id = t.factory_id
+    LEFT JOIN qxx_pro_workorder w ON w.workorder_id = t.workorder_id AND w.factory_id = t.factory_id
+    <where>
+      (t.finish_date BETWEEN #{begin} AND #{end} OR t.status IN ('PRODUCING','NORMAL','PREPARE','PAUSED'))
+      <include refid="workshopExistsFilter"/>
+    </where>
+    GROUP BY t.process_id
+  </select>
+
+  <select id="selectTeamOutput" resultType="java.util.HashMap">
+    SELECT fb.team_id AS groupId, MAX(fb.team_name) AS groupName,
+      COUNT(DISTINCT fb.workorder_id) AS workorderCount,
+      COUNT(DISTINCT CASE WHEN w.status = 'COMPLETED' THEN fb.workorder_id END) AS completedCount,
+      COUNT(DISTINCT CASE WHEN w.request_date IS NOT NULL AND w.request_date &lt; NOW()
+            AND (w.status &lt;&gt; 'COMPLETED' OR w.finish_date &gt; w.request_date) THEN fb.workorder_id END) AS delayedCount,
+      IFNULL(SUM(fb.quantity),0) AS standardOutput,
+      IFNULL(SUM(fb.quantity_feedback),0) AS actualOutput,
+      IFNULL(SUM(IFNULL(t.setup_duration,0) + IFNULL(t.unit_duration,0) * IFNULL(fb.quantity_qualified,0)),0) AS standardMinutes,
+      IFNULL(SUM(fb.quantity_qualified),0) AS qualifiedQty,
+      IFNULL(SUM(fb.quantity_unqualified),0) AS scrapQty
+    FROM qxx_pro_feedback fb
+    LEFT JOIN qxx_pro_workorder w ON w.workorder_id = fb.workorder_id AND w.factory_id = fb.factory_id
+    LEFT JOIN qxx_pro_task t ON t.task_id = fb.task_id AND t.factory_id = fb.factory_id
+    <where>
+      fb.status = 'AUDITED' AND fb.feedback_time BETWEEN #{begin} AND #{end}
+      AND fb.team_id IS NOT NULL
+      <if test="teamIds != null and teamIds.size() > 0">
+        AND fb.team_id IN
+        <foreach collection="teamIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+      </if>
+    </where>
+    GROUP BY fb.team_id
+  </select>
+
+  <!-- ════════ Productivity: actual hours side ════════ -->
+  <select id="selectWorkshopHours" resultType="java.util.HashMap">
+    SELECT ws.workshop_id AS groupId, IFNULL(SUM(r.work_duration),0) AS actualMinutes
+    FROM qxx_pro_workrecord r
+    JOIN qxx_md_workstation ws ON ws.workstation_id = r.workstation_id AND ws.factory_id = r.factory_id
+    <where>
+      r.status = 'CLOSED' AND r.clock_in_time BETWEEN #{begin} AND #{end}
+      <if test="workshopIds != null and workshopIds.size() > 0">
+        AND ws.workshop_id IN
+        <foreach collection="workshopIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+      </if>
+    </where>
+    GROUP BY ws.workshop_id
+  </select>
+
+  <select id="selectWorkstationHours" resultType="java.util.HashMap">
+    SELECT r.workstation_id AS groupId, IFNULL(SUM(r.work_duration),0) AS actualMinutes
+    FROM qxx_pro_workrecord r
+    <where>
+      r.status = 'CLOSED' AND r.clock_in_time BETWEEN #{begin} AND #{end}
+      <if test="workshopIds != null and workshopIds.size() > 0">
+        AND r.workstation_id IN (
+          SELECT ws2.workstation_id FROM qxx_md_workstation ws2 WHERE ws2.factory_id = r.factory_id
+          AND ws2.workshop_id IN
+          <foreach collection="workshopIds" item="id" open="(" separator="," close=")">#{id}</foreach>)
+      </if>
+    </where>
+    GROUP BY r.workstation_id
+  </select>
+
+  <select id="selectProcessHours" resultType="java.util.HashMap">
+    SELECT t.process_id AS groupId, MAX(t.process_name) AS groupName, IFNULL(SUM(r.work_duration),0) AS actualMinutes
+    FROM qxx_pro_workrecord r
+    JOIN qxx_pro_task t ON t.task_id = r.task_id AND t.factory_id = r.factory_id
+    LEFT JOIN qxx_md_workstation ws ON ws.workstation_id = t.workstation_id AND ws.factory_id = t.factory_id
+    <where>
+      r.status = 'CLOSED' AND r.clock_in_time BETWEEN #{begin} AND #{end}
+      <if test="workshopIds != null and workshopIds.size() > 0">
+        AND ws.workshop_id IN
+        <foreach collection="workshopIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+      </if>
+    </where>
+    GROUP BY t.process_id
+  </select>
+
+  <select id="selectTeamHours" resultType="java.util.HashMap">
+    SELECT r.team_id AS groupId, MAX(r.team_name) AS groupName, IFNULL(SUM(r.work_duration),0) AS actualMinutes
+    FROM qxx_pro_workrecord r
+    <where>
+      r.status = 'CLOSED' AND r.clock_in_time BETWEEN #{begin} AND #{end} AND r.team_id IS NOT NULL
+      <if test="teamIds != null and teamIds.size() > 0">
+        AND r.team_id IN
+        <foreach collection="teamIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+      </if>
+    </where>
+    GROUP BY r.team_id
+  </select>
+
+  <!-- ════════ Trend ════════ -->
+  <select id="selectTrendCompleted" resultType="java.util.HashMap">
+    SELECT DATE(t.finish_date) AS statDate,
+      COUNT(*) AS completedCount,
+      SUM(CASE WHEN t.finish_date &gt; t.end_time THEN 1 ELSE 0 END) AS delayedCount,
+      IFNULL(SUM(t.quantity_qualified),0) AS qualifiedQty
+    FROM qxx_pro_task t
+    LEFT JOIN qxx_md_workstation ws ON ws.workstation_id = t.workstation_id AND ws.factory_id = t.factory_id
+    <where>
+      t.status = 'COMPLETED' AND t.finish_date BETWEEN #{begin} AND #{end}
+      <if test="workshopId != null"> AND ws.workshop_id = #{workshopId}</if>
+    </where>
+    GROUP BY DATE(t.finish_date)
+  </select>
+
+  <select id="selectTrendCreated" resultType="java.util.HashMap">
+    SELECT DATE(w.create_time) AS statDate, COUNT(*) AS createdCount
+    FROM qxx_pro_workorder w
+    <where>
+      w.create_time BETWEEN #{begin} AND #{end} AND w.status &lt;&gt; 'CANCEL'
+      <if test="workshopIds != null and workshopIds.size() > 0">
+        AND EXISTS (
+          SELECT 1 FROM qxx_pro_task t
+          JOIN qxx_md_workstation ws ON ws.workstation_id = t.workstation_id AND ws.factory_id = t.factory_id
+          WHERE t.workorder_id = w.workorder_id AND t.factory_id = w.factory_id
+          AND ws.workshop_id IN
+          <foreach collection="workshopIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        )
+      </if>
+    </where>
+    GROUP BY DATE(w.create_time)
+  </select>
+
+  <select id="selectTrendMinutes" resultType="java.util.HashMap">
+    SELECT DATE(r.clock_in_time) AS statDate, IFNULL(SUM(r.work_duration),0) AS actualMinutes
+    FROM qxx_pro_workrecord r
+    LEFT JOIN qxx_md_workstation ws ON ws.workstation_id = r.workstation_id AND ws.factory_id = r.factory_id
+    <where>
+      r.status = 'CLOSED' AND r.clock_in_time BETWEEN #{begin} AND #{end}
+      <if test="workshopId != null"> AND ws.workshop_id = #{workshopId}</if>
+    </where>
+    GROUP BY DATE(r.clock_in_time)
+  </select>
+
+  <!-- ════════ Task status distribution ════════ -->
+  <select id="selectTaskStatus" resultType="java.util.HashMap">
+    SELECT t.status AS status, COUNT(*) AS cnt
+    FROM qxx_pro_task t
+    LEFT JOIN qxx_md_workstation ws ON ws.workstation_id = t.workstation_id AND ws.factory_id = t.factory_id
+    <where>
+      t.create_time BETWEEN #{begin} AND #{end}
+      <if test="workshopId != null"> AND ws.workshop_id = #{workshopId}</if>
+    </where>
+    GROUP BY t.status
+  </select>
+
+  <!-- ════════ Detail (paginated) ════════ -->
+  <select id="selectDetail" resultType="java.util.HashMap">
+    SELECT w.workorder_id AS workorderId, w.workorder_code AS workorderCode,
+      w.workorder_name AS workorderName, w.product_code AS productCode, w.product_name AS productName,
+      w.quantity AS quantity, w.quantity_produced AS quantityProduced,
+      w.request_date AS requestDate, w.finish_date AS finishDate, w.status AS status,
+      ROUND(IFNULL(w.quantity_produced,0)/NULLIF(w.quantity,0)*100,0) AS completionRate
+    FROM qxx_pro_workorder w
+    <where>
+      w.create_time BETWEEN #{begin} AND #{end}
+      <if test="workshopId != null">
+        AND EXISTS (
+          SELECT 1 FROM qxx_pro_task t
+          JOIN qxx_md_workstation ws ON ws.workstation_id = t.workstation_id AND ws.factory_id = t.factory_id
+          WHERE t.workorder_id = w.workorder_id AND t.factory_id = w.factory_id AND ws.workshop_id = #{workshopId}
+        )
+      </if>
+      <if test="teamId != null">
+        AND EXISTS (SELECT 1 FROM qxx_pro_feedback fb
+          WHERE fb.workorder_id = w.workorder_id AND fb.factory_id = w.factory_id AND fb.team_id = #{teamId})
+      </if>
+    </where>
+    ORDER BY w.create_time DESC
+  </select>
+</mapper>

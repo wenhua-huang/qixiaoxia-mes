@@ -40,14 +40,10 @@
           <div v-for="(r,i) in rows" :key="'g'+i" class="gc-row" :style="{height:rowH+'px'}">
             <div v-for="(c,j) in cols" :key="'c'+j" class="gc-cell"
               :class="{we:c.isWE}" :style="{left:c.left+'px',width:colW+'px'}" />
-            <div v-if="r.t==='t' && r.s && r.e" class="gc-bar"
-              :class="{constrained: constrained}"
-              :style="{left:posX(r.s)+'px',width:Math.max(posX(r.e)-posX(r.s),4)+'px',background:r.c}"
-              @mouseup="onBarClick($event, r)"
-              @mousedown="onBarDown($event, r)" >
-              <div class="gc-resize-l" @mousedown.stop="onResizeDown($event, r, 'left')" />
-              <div class="gc-resize-r" @mousedown.stop="onResizeDown($event, r, 'right')" />
-            </div>
+            <GanttBar v-if="r.t==='t' && r.s && r.e" :row="r" :pos-x="posX" :readonly="readonly"
+              :constrained="constrained"
+              @bar-click="(e: MouseEvent)=>onBarClick(e,r)" @bar-down="(e: MouseEvent)=>onBarDown(e,r)"
+              @resize-down="(e: MouseEvent, s: 'left'|'right')=>onResizeDown(e,r,s)" />
           </div>
         </div>
       </div>
@@ -60,8 +56,9 @@ import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { GanttTask } from '@/types/api/mes/pro/gantt'
 import request from '@/utils/request'
+import GanttBar, { type GanttRow } from './GanttBar.vue'
 
-const props = defineProps<{ tasks: GanttTask[]; loading?: boolean }>()
+const props = withDefaults(defineProps<{ tasks: GanttTask[]; loading?: boolean; readonly?: boolean }>(), { readonly: false })
 const emit = defineEmits<{ (e: 'select', t: GanttTask): void; (e: 'barMove', t: GanttTask, newStart: string, newEnd: string): void }>()
 
 // ---- 配置 ----
@@ -79,7 +76,7 @@ const range = reactive({
 })
 
 // ---- 扁平行 ----
-interface Row { id: string; text: string; t: 'p'|'t'; s: Date|null; e: Date|null; c: string; raw: any; minStartMs?: number }
+type Row = GanttRow
 const rows = ref<Row[]>([])
 
 // ---- 日历数据 ----
@@ -113,6 +110,8 @@ const msPerUnit = computed(() => mode.value === 'day' ? 3600000 : 86400000)
 function posX(d: Date): number {
   return (d.getTime() - range.s.getTime()) / msPerUnit.value * colW.value
 }
+// 后端日期为 yyyy-MM-dd HH:mm:ss，空格分隔在部分 Safari 不可解析，统一转 T
+const parseDate = (s: string) => new Date(String(s).replace(' ', 'T'))
 
 // ---- 构建 ----
 function buildRows() {
@@ -125,13 +124,17 @@ function buildRows() {
       for (const c of p.children) {
         const row: Row = {
           id: c.id, text: c.processName || c.text, t: 't',
-          s: c.start ? new Date(c.start) : null,
-          e: c.end ? new Date(c.end) : null,
+          s: c.start ? parseDate(c.start) : null,
+          e: c.end ? parseDate(c.end) : null,
           c: c.colorCode || '#409eff', raw: c,
           // 首工序无约束，后续工序不能早于前道结束时间
-          minStartMs: isFirst ? 0 : prevEndMs
+          minStartMs: isFirst ? 0 : prevEndMs,
+          aS: c.actualStartTime ? parseDate(c.actualStartTime) : null,
+          aE: c.actualEndTime ? parseDate(c.actualEndTime) : null,
+          progress: typeof c.progressPercent === 'number' ? Math.min(100, Math.max(0, c.progressPercent)) : 0,
+          delayLevel: c.delayLevel || 'NORMAL'
         }
-        if (c.end) prevEndMs = new Date(c.end).getTime()
+        if (c.end) prevEndMs = parseDate(c.end).getTime()
         isFirst = false
         rr.push(row)
       }
@@ -183,10 +186,17 @@ const constrained = ref(false)  // 越界闪烁
 function onBarClick(_e: MouseEvent, row: Row) {
   if (!dragMoved) emit('select', row.raw)
 }
-function onBarDown(e: MouseEvent, row: Row) { startDrag(e, row, 'move') }
-function onResizeDown(e: MouseEvent, row: Row, side: 'left'|'right') { startDrag(e, row, side==='left'?'resize-l':'resize-r') }
+function onBarDown(e: MouseEvent, row: Row) {
+  if (props.readonly) return
+  startDrag(e, row, 'move')
+}
+function onResizeDown(e: MouseEvent, row: Row, side: 'left'|'right') {
+  if (props.readonly) return
+  startDrag(e, row, side==='left'?'resize-l':'resize-r')
+}
 
 function startDrag(e: MouseEvent, row: Row, type: 'move'|'resize-l'|'resize-r') {
+  if (props.readonly) return
   if (!row.s || !row.e || !row.raw) return
   dragType = type; dragRow = row; dragMoved = false
   dragStartX = e.clientX
@@ -287,9 +297,4 @@ defineExpose({ render })
 .gc-grid { position:relative; }
 .gc-row { position:relative; border-bottom:1px solid #f2f3f5; }
 .gc-cell { position:absolute; top:0; height:100%; border-right:1px solid #f8f8f8; &.we { background:#fefafa; } }
-.gc-bar { position:absolute; top:3px; height:24px; border-radius:4px; cursor:grab; opacity:.9; z-index:1; display:flex; align-items:center; &:active { cursor:grabbing; } &:hover { opacity:1; box-shadow:0 2px 6px rgba(0,0,0,.2); } &.constrained { animation: flash .3s ease-in-out 2; border:2px solid #f56c6c; } }
-@keyframes flash { 0%,100% { opacity:.9; } 50% { opacity:.4; border-color:#f56c6c; } }
-.gc-resize-l, .gc-resize-r { width:6px; height:100%; position:absolute; top:0; cursor:ew-resize; }
-.gc-resize-l { left:0; border-radius:4px 0 0 4px; }
-.gc-resize-r { right:0; border-radius:0 4px 4px 0; }
 </style>

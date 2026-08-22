@@ -159,7 +159,7 @@ onMounted(() => {
   // 入库单页"检验状态"tag 跳转：携带 sourceDocId 自动过滤
   const sid = route.query.sourceDocId as string
   if (sid) {
-    queryParams.value.sourceDocType = 'wm_item_recpt'
+    queryParams.value.sourceDocType = (route.query.sourceDocType as string) || 'wm_item_recpt'
     queryParams.value.sourceDocId = Number(sid)
   }
   getList()

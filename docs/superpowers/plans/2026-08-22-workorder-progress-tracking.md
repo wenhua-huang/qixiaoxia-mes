@@ -992,7 +992,7 @@ public class ProProgressServiceImpl implements IProProgressService {
         BeanUtils.copyProperties(wo, vo);
         fillTimes(wo, vo);
         vo.setCompletionRate(percent(wo.getQuantityProduced(), wo.getQuantity()));
-        int warnDays = configService.selectConfigByInt(ProConstants.CFG_WARN_DAYS, 2);
+        int warnDays = cfgInt(ProConstants.CFG_WARN_DAYS, 2);
         vo.setDelayLevel(DelayLevelEvaluator.evaluateWorkorder(
             wo.getRequestDate(), wo.getFinishDate(), wo.getStatus(), warnDays, new Date()));
         vo.setProcesses(buildProcessRows(workorderId));
@@ -1016,8 +1016,10 @@ public class ProProgressServiceImpl implements IProProgressService {
         Map<Long,Map<String,Object>> actualMap = progressMapper.aggregateActualByTaskIds(taskIds)
             .stream().collect(Collectors.toMap(
                 m -> ((Number)m.get("taskId")).longValue(), m -> m, (a,b)->a));
-        int warnHours = configService.selectConfigByInt(ProConstants.CFG_WARN_HOURS, 24);
-        int tol = configService.selectConfigByInt(ProConstants.CFG_BEHIND_TOLERANCE, 10);
+        int warnHours = cfgInt(ProConstants.CFG_WARN_HOURS, 24);
+        int tol = cfgInt(ProConstants.CFG_BEHIND_TOLERANCE, 10);
+        // GanttDataServiceImpl 内需新增与 ProProgressServiceImpl 相同的 cfgInt(key,def) 私有方法，
+        // 用 configService.selectConfigByKey(key) 读字符串后 parseInt（该 Service 原本无此 helper）。
         return tasks.stream().map(t -> toProcessRow(t, actualMap.get(t.getTaskId()), warnHours, tol)).toList();
     }
 
@@ -1069,6 +1071,13 @@ public class ProProgressServiceImpl implements IProProgressService {
     }
     // applyTaskDelayLevel/applyWorkorderDelayLevel: 根据 overdueDays/progress 用 DelayLevelEvaluator 二次判定
     // （SQL 已按 riskLevel 预筛；这里补全 delayLevel 字段与临期天数，约 20 行）
+
+    /** 读 sys_config 整数，缺失或非法时返回默认值（ISysConfigService 只有 selectConfigByKey 返回 String）*/
+    private int cfgInt(String key, int def) {
+        String v = configService.selectConfigByKey(key);
+        if (v == null || v.isBlank()) return def;
+        try { return Integer.parseInt(v.trim()); } catch (NumberFormatException e) { return def; }
+    }
 
     private Integer percent(BigDecimal part, BigDecimal total) {
         if (part == null || total == null || total.compareTo(BigDecimal.ZERO) == 0) return 0;
@@ -1167,8 +1176,8 @@ git commit -m "feat(pro): 工单进度详情与延期预警后端接口"
         Map<Long, Map<String,Object>> actualMap = ganttTaskIds.isEmpty() ? Map.of()
             : progressMapper.aggregateActualByTaskIds(ganttTaskIds).stream()
                 .collect(Collectors.toMap(m -> ((Number)m.get("taskId")).longValue(), m -> m, (a,b)->a));
-        int warnHours = configService.selectConfigByInt(ProConstants.CFG_WARN_HOURS, 24);
-        int tol = configService.selectConfigByInt(ProConstants.CFG_BEHIND_TOLERANCE, 10);
+        int warnHours = cfgInt(ProConstants.CFG_WARN_HOURS, 24);
+        int tol = cfgInt(ProConstants.CFG_BEHIND_TOLERANCE, 10);
 ```
 
 在 for 循环 `item.put(...)` 末尾（`quantityProduced` 之后）加：
@@ -2033,5 +2042,5 @@ Expected: 无新增 TS 报错（若项目本就有存量错误，确认本次新
 
 **已知实施注意点（写在任务内）：**
 - `CalTeamMemberMapper.xml` 若不支持按 `user_name` 过滤需补 `<if>`（Task 2 Step 4 注）。
-- `ISysConfigService.selectConfigByInt` 的实际方法名若依版本可能为 `selectConfigByKey` 返回 String，实施时按项目现有用法 Integer.parseInt（Task 5/6 用到 configService 的地方核对）。
+- 已确认 `ISysConfigService` 只有 `selectConfigByKey(String):String`，无 `selectConfigByInt`；Task 5/6 代码统一用私有 `cfgInt(key,def)` helper（内部 parseInt 带默认值），两 Service 各加一份。
 - 报表 SQL 中 workshop 维度的实际工时需要 Service 层内存合并（Task 7 Step 2 注）。

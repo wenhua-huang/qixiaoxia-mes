@@ -44,6 +44,7 @@ class ProFeedbackServiceUnitTest {
     @Mock private IProFeedbackParamService feedbackParamService;
     @Mock private RedisLockTemplate lockTemplate;
     @Mock private PlatformTransactionManager transactionManager;
+    @Mock private TeamResolver teamResolver;
     @InjectMocks private ProFeedbackServiceImpl feedbackService;
 
     private ProFeedback testFeedback;
@@ -60,6 +61,10 @@ class ProFeedbackServiceUnitTest {
         lenient().when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
         ReflectionTestUtils.setField(feedbackService, "txTemplate", txTemplate);
+
+        // 班组快照：默认无归属（insert 调用点不 NPE）
+        lenient().when(teamResolver.resolveByUserId(any())).thenReturn(TeamResolver.TeamSnapshot.empty());
+        lenient().when(teamResolver.resolveByUserName(any())).thenReturn(TeamResolver.TeamSnapshot.empty());
 
         testFeedback = new ProFeedback();
         testFeedback.setRecordId(1L);

@@ -46,6 +46,7 @@ class ProWorkrecordServiceUnitTest {
     @Mock private MdWorkstationMapper mdWorkstationMapper;
     @Mock private ProTaskMapper proTaskMapper;
     @Mock private RedisLockTemplate lockTemplate;
+    @Mock private TeamResolver teamResolver;
 
     @InjectMocks
     private ProWorkrecordServiceImpl workrecordService;
@@ -75,6 +76,9 @@ class ProWorkrecordServiceUnitTest {
         ws.setWorkstationCode("WS-001");
         ws.setWorkstationName("测试工位");
         when(mdWorkstationMapper.selectMdWorkstationByWorkstationId(100L)).thenReturn(ws);
+
+        // 班组快照：默认无归属（上工调用点不 NPE）
+        when(teamResolver.resolveByUserId(any())).thenReturn(TeamResolver.TeamSnapshot.empty());
     }
 
     @AfterEach

@@ -48,6 +48,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="quantityOtherScrap"    column="quantity_other_scrap"    />
         <result property="userName"    column="user_name"    />
         <result property="nickName"    column="nick_name"    />
+        <result property="userId"      column="user_id"      />
+        <result property="teamId"      column="team_id"      />
+        <result property="teamCode"    column="team_code"    />
+        <result property="teamName"    column="team_name"    />
         <result property="feedbackChannel"    column="feedback_channel"    />
         <result property="feedbackTime"    column="feedback_time"    />
         <result property="recordUser"    column="record_user"    />
@@ -63,7 +67,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectProFeedbackVo">
-        select record_id, factory_id, feedback_type, feedback_code, workstation_id, workstation_code, workstation_name, workorder_id, workorder_code, workorder_name, card_id, route_id, route_code, process_id, process_code, process_name, task_id, task_code, item_id, item_code, item_name, unit_of_measure, unit_name, specification, vendor_id, vendor_code, vendor_name, outsource_factory_id, outsource_issue_id, outsource_issue_code, outsource_recpt_id, expire_date, lot_number, quantity, quantity_feedback, quantity_qualified, quantity_unqualified, quantity_uncheck, quantity_labor_scrap, quantity_material_scrap, quantity_other_scrap, user_name, nick_name, feedback_channel, feedback_time, record_user, record_nick, status, remark, create_by, create_time, update_by, update_time from qxx_pro_feedback
+        select record_id, factory_id, feedback_type, feedback_code, workstation_id, workstation_code, workstation_name, workorder_id, workorder_code, workorder_name, card_id, route_id, route_code, process_id, process_code, process_name, task_id, task_code, item_id, item_code, item_name, unit_of_measure, unit_name, specification, vendor_id, vendor_code, vendor_name, outsource_factory_id, outsource_issue_id, outsource_issue_code, outsource_recpt_id, expire_date, lot_number, quantity, quantity_feedback, quantity_qualified, quantity_unqualified, quantity_uncheck, quantity_labor_scrap, quantity_material_scrap, quantity_other_scrap, user_name, nick_name, user_id, team_id, team_code, team_name, feedback_channel, feedback_time, record_user, record_nick, status, remark, create_by, create_time, update_by, update_time from qxx_pro_feedback
     </sql>
 
     <select id="selectProFeedbackList" parameterType="ProFeedback" resultMap="ProFeedbackResult">
@@ -164,6 +168,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="quantityOtherScrap != null">quantity_other_scrap,</if>
             <if test="userName != null">user_name,</if>
             <if test="nickName != null">nick_name,</if>
+            <if test="userId != null">user_id,</if>
+            <if test="teamId != null">team_id,</if>
+            <if test="teamCode != null and teamCode != ''">team_code,</if>
+            <if test="teamName != null and teamName != ''">team_name,</if>
             <if test="feedbackChannel != null">feedback_channel,</if>
             <if test="feedbackTime != null">feedback_time,</if>
             <if test="recordUser != null">record_user,</if>
@@ -215,6 +223,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="quantityOtherScrap != null">#{quantityOtherScrap},</if>
             <if test="userName != null">#{userName},</if>
             <if test="nickName != null">#{nickName},</if>
+            <if test="userId != null">#{userId},</if>
+            <if test="teamId != null">#{teamId},</if>
+            <if test="teamCode != null and teamCode != ''">#{teamCode},</if>
+            <if test="teamName != null and teamName != ''">#{teamName},</if>
             <if test="feedbackChannel != null">#{feedbackChannel},</if>
             <if test="feedbackTime != null">#{feedbackTime},</if>
             <if test="recordUser != null">#{recordUser},</if>
@@ -270,6 +282,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="quantityOtherScrap != null">quantity_other_scrap = #{quantityOtherScrap},</if>
             <if test="userName != null">user_name = #{userName},</if>
             <if test="nickName != null">nick_name = #{nickName},</if>
+            <if test="userId != null">user_id = #{userId},</if>
+            <if test="teamId != null">team_id = #{teamId},</if>
+            <if test="teamCode != null and teamCode != ''">team_code = #{teamCode},</if>
+            <if test="teamName != null and teamName != ''">team_name = #{teamName},</if>
             <if test="feedbackChannel != null">feedback_channel = #{feedbackChannel},</if>
             <if test="feedbackTime != null">feedback_time = #{feedbackTime},</if>
             <if test="recordUser != null">record_user = #{recordUser},</if>

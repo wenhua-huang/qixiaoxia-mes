@@ -1,5 +1,7 @@
 package com.ruoyi.system.service.mes.pro.impl;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -10,6 +12,8 @@ import org.slf4j.LoggerFactory;
 import com.ruoyi.system.domain.mes.md.MdWorkstation;
 import com.ruoyi.system.domain.mes.pro.*;
 import com.ruoyi.system.mapper.mes.pro.*;
+import com.ruoyi.system.service.ISysConfigService;
+import com.ruoyi.system.service.mes.pro.DelayLevelEvaluator;
 import com.ruoyi.system.service.mes.pro.IGanttDataService;
 import com.ruoyi.system.service.mes.pro.IScheduleService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,6 +44,12 @@ public class GanttDataServiceImpl implements IGanttDataService
 
     @Autowired
     private IScheduleService scheduleService;
+
+    @Autowired
+    private ProProgressMapper progressMapper;
+
+    @Autowired
+    private ISysConfigService configService;
 
     private static final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
@@ -94,6 +104,10 @@ public class GanttDataServiceImpl implements IGanttDataService
             }
         }
 
+        Map<Long, Map<String, Object>> actualMap = loadActualMap(taskList);
+        int warnHours = cfgInt(ProConstants.CFG_WARN_HOURS, 24);
+        int tol = cfgInt(ProConstants.CFG_BEHIND_TOLERANCE, 10);
+
         // 按 processId 分组
         Map<Long, List<ProTask>> tasksByProcess = taskList.stream()
             .collect(Collectors.groupingBy(ProTask::getProcessId));
@@ -129,6 +143,7 @@ public class GanttDataServiceImpl implements IGanttDataService
                 item.put("status", pt.getStatus());
                 item.put("quantity", pt.getQuantity());
                 item.put("quantityProduced", pt.getQuantityProduced());
+                enrichItem(pt, item, actualMap, warnHours, tol);
                 children.add(item);
 
                 // 构建依赖连线(沿 route_process.next_process_id)
@@ -165,6 +180,10 @@ public class GanttDataServiceImpl implements IGanttDataService
         taskQuery.setWorkstationId(workstationId);
         List<ProTask> taskList = proTaskMapper.selectProTaskList(taskQuery);
 
+        Map<Long, Map<String, Object>> actualMap = loadActualMap(taskList);
+        int warnHours = cfgInt(ProConstants.CFG_WARN_HOURS, 24);
+        int tol = cfgInt(ProConstants.CFG_BEHIND_TOLERANCE, 10);
+
         // 按工单分组
         Map<Long, List<ProTask>> tasksByWO = taskList.stream()
             .collect(Collectors.groupingBy(ProTask::getWorkorderId));
@@ -189,6 +208,7 @@ public class GanttDataServiceImpl implements IGanttDataService
                 item.put("end", pt.getEndTime() != null ? sdf.format(pt.getEndTime()) : null);
                 item.put("colorCode", pt.getColorCode() != null ? pt.getColorCode() : com.ruoyi.system.domain.mes.pro.ProConstants.DEFAULT_COLOR_CODE);
                 item.put("status", pt.getStatus());
+                enrichItem(pt, item, actualMap, warnHours, tol);
                 children.add(item);
 
                 if (prevId != null) {
@@ -242,5 +262,42 @@ public class GanttDataServiceImpl implements IGanttDataService
             result.sort((a, b) -> Boolean.compare((Boolean) a.get("idle"), (Boolean) b.get("idle")) * -1);
         }
         return result;
+    }
+
+    /** 批量聚合任务的实际开始/结束，避免 N+1；空列表返回空 Map。 */
+    private Map<Long, Map<String, Object>> loadActualMap(List<ProTask> taskList) {
+        List<Long> ids = taskList.stream().map(ProTask::getTaskId).toList();
+        if (ids.isEmpty()) return Map.of();
+        return progressMapper.aggregateActualByTaskIds(ids).stream()
+            .collect(Collectors.toMap(
+                m -> ((Number) m.get("taskId")).longValue(), m -> m, (a, b) -> a));
+    }
+
+    /** 给单个甘特 task 节点回填实际时间/完成率/延期等级。 */
+    private void enrichItem(ProTask pt, Map<String, Object> item,
+                            Map<Long, Map<String, Object>> actualMap, int warnHours, int tol) {
+        Map<String, Object> act = actualMap.get(pt.getTaskId());
+        Date aStart = act == null ? null : (Date) act.get("actualStart");
+        Date aEnd = act == null ? null : (Date) act.get("actualEnd");
+        item.put("actualStartTime", aStart != null ? sdf.format(aStart) : null);
+        item.put("actualEndTime", aEnd != null ? sdf.format(aEnd) : null);
+        item.put("progressPercent", percent(pt.getQuantityProduced(), pt.getQuantity()));
+        String level = DelayLevelEvaluator.evaluateTask(pt.getStartTime(), pt.getEndTime(),
+            aStart, aEnd, pt.getStatus(), pt.getQuantity(), pt.getQuantityProduced(),
+            warnHours, tol, new Date());
+        item.put("delayLevel", level);
+        item.put("behindSchedule", ProConstants.DELAY_BEHIND.equals(level));
+    }
+
+    /** 读 sys_config 整数，缺失或非法返回默认值。 */
+    private int cfgInt(String key, int def) {
+        String v = configService.selectConfigByKey(key);
+        if (v == null || v.isBlank()) return def;
+        try { return Integer.parseInt(v.trim()); } catch (NumberFormatException e) { return def; }
+    }
+
+    private Integer percent(BigDecimal part, BigDecimal total) {
+        if (part == null || total == null || total.compareTo(BigDecimal.ZERO) == 0) return 0;
+        return part.multiply(BigDecimal.valueOf(100)).divide(total, 0, RoundingMode.HALF_UP).intValue();
     }
 }

@@ -69,6 +69,11 @@
           <dict-tag :options="mes_outsource_status" :value="row.status" />
         </template>
       </el-table-column>
+      <el-table-column label="检验状态" align="center" width="100">
+        <template #default="{ row }">
+          <qc-status-tag :status="row.qcStatus" @click="goIqc(row)" />
+        </template>
+      </el-table-column>
       <el-table-column label="操作" align="center" width="270" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" size="small" @click="handleDetail(row)">详情</el-button>
@@ -122,9 +127,11 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, getCurrentInstance } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { useRouter } from 'vue-router'
 import { listOutsource, getOutsource, executeOutsource, batchExecuteOutsource, receiveOutsource, batchReceiveOutsource, delOutsource } from '@/api/mes/wm/outsource'
 import OutsourceCreateDialog from './OutsourceCreateDialog.vue'
+import QcStatusTag from '../../qc/components/QcStatusTag.vue'
+import { showBatchResult } from './batchResult'
 
 interface OutsourceOrderRow {
   orderId: number
@@ -139,6 +146,9 @@ interface OutsourceOrderRow {
   issueTime: string
   status: string
   feedbackId?: number | null
+  iqcId?: number | null
+  iqcCode?: string | null
+  qcStatus?: string | null
   issueLines?: unknown[]
   recptLines?: unknown[]
 }
@@ -150,12 +160,6 @@ interface OutsourceQuery {
   vendorName: string
   status: string
   sourceType: string
-}
-
-interface BatchResult {
-  success: number
-  failed: number
-  failures: { orderId?: number; orderCode?: string; reason: string }[]
 }
 
 const { proxy } = getCurrentInstance() as any
@@ -247,19 +251,13 @@ function handleSelectionChange(rows: OutsourceOrderRow[]) {
   selectedRows.value = rows
 }
 
-// 批量操作结果汇总：全成功提示成功数；有失败弹窗列出单号+原因（纯文本，不渲染 HTML）
-async function handleBatchResult(promise: Promise<{ data: BatchResult }>, successLabel: string) {
-  const res = await promise
-  const r = res.data || { success: 0, failed: 0, failures: [] }
-  if (r.failed > 0) {
-    const lines = (r.failures || []).map(f => `${f.orderCode || '#' + f.orderId}：${f.reason}`).join('\n')
-    return ElMessageBox.alert(`成功 ${r.success} 张，失败 ${r.failed} 张：\n${lines}`, '批量操作结果', {
-      type: 'warning',
-      customStyle: { whiteSpace: 'pre-wrap' }
-    })
-  }
-  proxy.$modal.msgSuccess(`批量${successLabel}成功，共 ${r.success} 张`)
+// 来料检验状态 tag：点击跳转 IQC 列表并按外协单过滤
+const router = useRouter()
+function goIqc(row: OutsourceOrderRow) {
+  router.push({ path: '/qc/qciqc', query: { sourceDocId: String(row.orderId), sourceDocType: 'wm_outsource_order' } })
 }
+
+// 批量操作结果汇总抽到 ./batchResult（全成功提示；失败弹窗列原因）
 
 function clearTableSelection() {
   tableRef.value?.clearSelection()
@@ -272,7 +270,7 @@ async function handleBatchExecute() {
   if (!await confirmAction(`确认对选中的 ${ids.length} 张草稿单执行发料？将扣减库存并将单据置为「已发料」。`)) return
   try {
     batchLoading.value = true
-    await handleBatchResult(batchExecuteOutsource(ids), '发料')
+    await showBatchResult(batchExecuteOutsource(ids), '发料')
     clearTableSelection()
     getList()
   } finally {
@@ -286,7 +284,7 @@ async function handleBatchReceive() {
   if (!await confirmAction(`确认对选中的 ${ids.length} 张外协单收货？将入库、建报工并推进流转卡。`)) return
   try {
     batchLoading.value = true
-    await handleBatchResult(batchReceiveOutsource(ids), '收货')
+    await showBatchResult(batchReceiveOutsource(ids), '收货')
     clearTableSelection()
     getList()
   } finally {

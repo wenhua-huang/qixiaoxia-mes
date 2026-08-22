@@ -17,6 +17,8 @@ import com.ruoyi.system.domain.mes.qc.QcRqc;
 import com.ruoyi.system.domain.mes.qc.QcTemplateProduct;
 import com.ruoyi.system.domain.mes.wm.WmItemRecpt;
 import com.ruoyi.system.domain.mes.wm.WmItemRecptLine;
+import com.ruoyi.system.domain.mes.wm.WmOutsourceOrder;
+import com.ruoyi.system.domain.mes.wm.WmOutsourceRecptLine;
 import com.ruoyi.system.domain.mes.wm.WmProductRecpt;
 import com.ruoyi.system.domain.mes.wm.WmProductRecptLine;
 import com.ruoyi.system.domain.mes.wm.WmProductSales;
@@ -93,6 +95,37 @@ public class QcGateServiceImpl implements IQcGateService
                 continue;
             }
             throw new ServiceException("物料[" + itemCodeOf(lines, itemId) + "]需来料检验合格后方可确认入库（"
+                + iqcHintOf(byItem.get(itemId)) + "）");
+        }
+    }
+
+    @Override
+    public void assertOutsourceReceivable(WmOutsourceOrder order, List<WmOutsourceRecptLine> lines)
+    {
+        if (order == null || lines == null || lines.isEmpty())
+        {
+            return;
+        }
+        Set<Long> items = distinctItems(lines, WmOutsourceRecptLine::getItemId);
+        Map<Long, QcTemplateProduct> binds = factoryService.resolveTemplates(
+            QcConstants.TYPE_IQC, items, null);
+        if (binds.isEmpty())
+        {
+            return;  // 全部未绑定模板 = 免检
+        }
+        List<QcIqc> orders = iqcMapper.selectBySourceItems(
+            QcConstants.SOURCE_OUTSOURCE_ORDER, order.getOrderId(), binds.keySet());
+        Map<Long, List<QcIqc>> byItem = orders.stream()
+            .filter(o -> o.getItemId() != null)
+            .collect(Collectors.groupingBy(QcIqc::getItemId));
+        for (Map.Entry<Long, QcTemplateProduct> e : binds.entrySet())
+        {
+            Long itemId = e.getKey();
+            if (anyPassed(byItem.get(itemId), QcIqc::getStatus, QcIqc::getCheckResult))
+            {
+                continue;
+            }
+            throw new ServiceException("物料[" + outsourceItemCodeOf(lines, itemId) + "]需来料检验合格后方可收货入库（"
                 + iqcHintOf(byItem.get(itemId)) + "）");
         }
     }
@@ -220,6 +253,12 @@ public class QcGateServiceImpl implements IQcGateService
     {
         return lines.stream().filter(l -> itemId.equals(l.getItemId())).findFirst()
             .map(WmItemRecptLine::getItemCode).orElse(String.valueOf(itemId));
+    }
+
+    private String outsourceItemCodeOf(List<WmOutsourceRecptLine> lines, Long itemId)
+    {
+        return lines.stream().filter(l -> itemId.equals(l.getItemId())).findFirst()
+            .map(WmOutsourceRecptLine::getItemCode).orElse(String.valueOf(itemId));
     }
 
     private String recptItemCodeOf(List<WmProductRecptLine> lines, Long itemId)

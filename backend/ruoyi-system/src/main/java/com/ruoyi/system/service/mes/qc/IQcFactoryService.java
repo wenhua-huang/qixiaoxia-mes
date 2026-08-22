@@ -9,6 +9,8 @@ import com.ruoyi.system.domain.mes.qc.QcOrderLine;
 import com.ruoyi.system.domain.mes.qc.QcTemplateProduct;
 import com.ruoyi.system.domain.mes.wm.WmItemRecpt;
 import com.ruoyi.system.domain.mes.wm.WmItemRecptLine;
+import com.ruoyi.system.domain.mes.wm.WmOutsourceOrder;
+import com.ruoyi.system.domain.mes.wm.WmOutsourceRecptLine;
 import com.ruoyi.system.domain.mes.wm.WmProductRecpt;
 import com.ruoyi.system.domain.mes.wm.WmProductSales;
 import com.ruoyi.system.domain.mes.wm.WmProductSalesLine;
@@ -44,6 +46,13 @@ public interface IQcFactoryService
      * 多行同物料合并为一张单；生成后回填入库单头 iqc_id/iqc_code 挂点）
      */
     void generateIqcForItemRecpt(WmItemRecpt header, List<WmItemRecptLine> lines);
+
+    /**
+     * 外协厂商发货后生成 IQC 待检单（source_doc_type=wm_outsource_order），
+     * 幂等 + Redis 锁 + 多物料合并，生成后回填外协单头 iqc_id/iqc_code 挂点；
+     * 未绑定 IQC 模板的物料免检跳过。
+     */
+    void generateIqcForOutsource(WmOutsourceOrder order, List<WmOutsourceRecptLine> lines);
 
     /**
      * 按模板检测项快照生成检验行（qcType/qcId/检测项五件套/标准值/单位/上下偏差/order_num，

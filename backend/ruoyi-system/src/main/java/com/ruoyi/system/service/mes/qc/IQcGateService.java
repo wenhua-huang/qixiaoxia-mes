@@ -4,6 +4,8 @@ import java.util.List;
 
 import com.ruoyi.system.domain.mes.wm.WmItemRecpt;
 import com.ruoyi.system.domain.mes.wm.WmItemRecptLine;
+import com.ruoyi.system.domain.mes.wm.WmOutsourceOrder;
+import com.ruoyi.system.domain.mes.wm.WmOutsourceRecptLine;
 import com.ruoyi.system.domain.mes.wm.WmProductRecpt;
 import com.ruoyi.system.domain.mes.wm.WmProductSales;
 import com.ruoyi.system.domain.mes.wm.WmRtIssue;
@@ -23,6 +25,12 @@ public interface IQcGateService
      * PASS/CONCESSION 判定的检验单，否则抛 ServiceException
      */
     void assertItemRecptConfirmable(WmItemRecpt header, List<WmItemRecptLine> lines);
+
+    /**
+     * 外协收货入库前校验：需检物料（绑定了 IQC 模板）必须存在 COMPLETED 且
+     * PASS/CONCESSION 判定的检验单，否则抛 ServiceException 阻断收货
+     */
+    void assertOutsourceReceivable(WmOutsourceOrder order, List<WmOutsourceRecptLine> lines);
 
     /** 成品入库确认前校验（Task 14 实现） */
     void assertProductRecptConfirmable(WmProductRecpt header);

@@ -166,7 +166,7 @@ import { listDelay } from '@/api/mes/pro/progress'
 import { listAllWorkshop } from '@/api/mes/md/workshop'
 import { listTeam } from '@/api/mes/cal/team'
 import { parseTime } from '@/utils/ruoyi'
-import { statusText, workorderStatusType, delayType, delayText } from './dict'
+import { statusText, workorderStatusType, delayType, delayText } from '@/utils/mes/progress'
 
 const { proxy } = getCurrentInstance() as any
 

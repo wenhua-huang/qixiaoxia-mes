@@ -29,7 +29,7 @@
       <el-table-column label="状态" align="center" prop="status" width="80"><template #default="scope"><span :style="{color: statusColor[scope.row.status]}">{{ statusMap[scope.row.status] || scope.row.status }}</span></template></el-table-column>
       <el-table-column label="需求日期" align="center" prop="requestDate" width="100"><template #default="scope"><span>{{ parseTime(scope.row.requestDate, '{y}-{m}-{d}') }}</span></template></el-table-column>
       <el-table-column label="创建时间" align="center" prop="createTime" width="150"><template #default="scope"><span>{{ parseTime(scope.row.createTime, '{y}-{m}-{d} {h}:{i}:{s}') }}</span></template></el-table-column>
-      <el-table-column label="操作" align="center" width="220" fixed="right" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="260" fixed="right" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-tooltip content="排产" placement="top" v-if="scope.row.status==='PREPARE' || scope.row.status==='PRODUCING'"><el-button link type="success" icon="Calendar" @click="handleSchedule(scope.row)" v-hasPermi="['mes:pro:task:add']"></el-button></el-tooltip>
           <el-tooltip content="开工" placement="top" v-if="scope.row.status==='PREPARE'"><el-button link type="primary" icon="VideoPlay" @click="handleStart(scope.row)" v-hasPermi="['mes:pro:workorder:edit']"></el-button></el-tooltip>
@@ -37,6 +37,7 @@
           <el-tooltip content="修改" placement="top" v-if="scope.row.status==='PREPARE'"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:pro:workorder:edit']"></el-button></el-tooltip>
           <el-tooltip content="删除" placement="top" v-if="scope.row.status==='PREPARE'"><el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:pro:workorder:remove']"></el-button></el-tooltip>
           <el-tooltip content="取消" placement="top" v-if="scope.row.status==='PREPARE' || scope.row.status==='PRODUCING'"><el-button link type="danger" icon="Close" @click="handleCancel(scope.row)" v-hasPermi="['mes:pro:workorder:edit']"></el-button></el-tooltip>
+          <el-tooltip content="进度" placement="top"><el-button link type="primary" icon="DataLine" @click="handleProgress(scope.row)"></el-button></el-tooltip>
           <el-tooltip content="查看" placement="top"><el-button link type="primary" icon="View" @click="handleView(scope.row)"></el-button></el-tooltip>
         </template>
       </el-table-column>
@@ -229,6 +230,9 @@
     <!-- 工单齐套看板 → 触发采购单/领料单/退料单/入库单 -->
     <KitDashboard v-model="kitDashboardOpen" :workorderId="kitWorkorderId" @refresh="getList" />
 
+    <!-- 工单进度全屏弹窗（工序/流转卡/只读甘特） -->
+    <WorkorderProgressDialog v-model="progressOpen" :workorder-id="progressWorkorderId" />
+
     <!-- 开工检查流程弹窗 -->
     <el-dialog :title="'开工检查 — ' + startCheckWorkorderName" v-model="startCheckOpen" width="850px" append-to-body @close="startCheckOpen=false" :close-on-click-modal="false">
       <!-- 步骤条 -->
@@ -320,13 +324,14 @@ import ItemSelect from '@/components/itemSelect/single.vue'
 import WorkstationSelect from '@/components/workstationSelect/single.vue'
 import ExtAttrForm from '@/components/ExtAttrForm/index.vue'
 import KitDashboard from './KitDashboard.vue'
+import WorkorderProgressDialog from './components/WorkorderProgressDialog.vue'
 import { listAllProcess } from '@/api/mes/pro/process'
 import { getItem } from '@/api/mes/md/item'
 import { getEffAttrSchema } from '@/api/mes/md/attr'
 
 export default {
   name: 'Workorder',
-  components: { ItemSelect, WorkstationSelect, ExtAttrForm, KitDashboard },
+  components: { ItemSelect, WorkstationSelect, ExtAttrForm, KitDashboard, WorkorderProgressDialog },
   data() {
     return {
       autoGenFlag: false, optType: undefined, step: 1, prorouteId: null,
@@ -337,6 +342,8 @@ export default {
       bomEditOpen: false, bomEditTitle: '', bomEditForm: {},
       // 工单齐套看板
       kitDashboardOpen: false, kitWorkorderId: null,
+      // 工单进度弹窗
+      progressOpen: false, progressWorkorderId: null,
       // 开工检查流程
       startCheckOpen: false, startCheckWorkorderId: null, startCheckWorkorderName: '',
       startCheckSteps: [
@@ -656,6 +663,11 @@ export default {
     handleCheckMaterial(row) {
       this.kitWorkorderId = row.workorderId
       this.kitDashboardOpen = true
+    },
+    // 打开工单进度全屏弹窗
+    handleProgress(row) {
+      this.progressWorkorderId = row.workorderId
+      this.progressOpen = true
     },
     // 开工 — 打开分步检查弹窗
     handleStart(row) {

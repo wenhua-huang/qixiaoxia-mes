@@ -14,6 +14,10 @@ public class DelayItemVO
     private String objectType;
     private Long objectId;
     private String objectCode;
+    /** 关联工单ID（任务行用于跳转进度弹窗；工单行等于 objectId） */
+    private Long workorderId;
+    /** 关联工单编码 */
+    private String workorderCode;
     private String objectName;
     private String productName;
     private Long workshopId;
@@ -39,6 +43,10 @@ public class DelayItemVO
     public void setObjectId(Long v) { this.objectId = v; }
     public String getObjectCode() { return objectCode; }
     public void setObjectCode(String v) { this.objectCode = v; }
+    public Long getWorkorderId() { return workorderId; }
+    public void setWorkorderId(Long v) { this.workorderId = v; }
+    public String getWorkorderCode() { return workorderCode; }
+    public void setWorkorderCode(String v) { this.workorderCode = v; }
     public String getObjectName() { return objectName; }
     public void setObjectName(String v) { this.objectName = v; }
     public String getProductName() { return productName; }

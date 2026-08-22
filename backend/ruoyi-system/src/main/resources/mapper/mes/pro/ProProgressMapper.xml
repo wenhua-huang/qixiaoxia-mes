@@ -6,6 +6,8 @@
     <result property="objectType" column="object_type"/>
     <result property="objectId" column="object_id"/>
     <result property="objectCode" column="object_code"/>
+    <result property="workorderId" column="workorder_id"/>
+    <result property="workorderCode" column="workorder_code"/>
     <result property="objectName" column="object_name"/>
     <result property="productName" column="product_name"/>
     <result property="workshopId" column="workshop_id"/>
@@ -41,6 +43,7 @@
 
   <select id="selectWorkorderDelays" resultMap="DelayItemMap">
     SELECT 'WORKORDER' AS object_type, w.workorder_id AS object_id, w.workorder_code AS object_code,
+           w.workorder_id AS workorder_id, w.workorder_code AS workorder_code,
            w.workorder_name AS object_name, w.product_name,
            w.request_date, w.finish_date AS actual_end_time, w.status,
            DATEDIFF(NOW(), w.request_date) AS overdue_days,
@@ -75,6 +78,7 @@
 
   <select id="selectTaskDelays" resultMap="DelayItemMap">
     SELECT 'TASK' AS object_type, t.task_id AS object_id, t.task_code AS object_code,
+           t.workorder_id AS workorder_id, w.workorder_code AS workorder_code,
            t.task_name AS object_name, w.product_name,
            ws.workshop_id, wshop.workshop_name, t.workstation_name,
            t.end_time AS plan_time, w.request_date, t.finish_date AS actual_end_time, t.status,

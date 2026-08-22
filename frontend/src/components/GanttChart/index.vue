@@ -53,10 +53,10 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
-import { ElMessage } from 'element-plus'
 import type { GanttTask } from '@/types/api/mes/pro/gantt'
 import request from '@/utils/request'
 import GanttBar, { type GanttRow } from './GanttBar.vue'
+import { useGanttDrag } from './useGanttDrag'
 
 const props = withDefaults(defineProps<{ tasks: GanttTask[]; loading?: boolean; readonly?: boolean }>(), { readonly: false })
 const emit = defineEmits<{ (e: 'select', t: GanttTask): void; (e: 'barMove', t: GanttTask, newStart: string, newEnd: string): void }>()
@@ -78,6 +78,7 @@ const range = reactive({
 // ---- 扁平行 ----
 type Row = GanttRow
 const rows = ref<Row[]>([])
+const rightRef = ref<HTMLElement>()
 
 // ---- 日历数据 ----
 const dayStatusMap = ref<Map<string, boolean>>(new Map()) // date → working?
@@ -171,82 +172,12 @@ async function render() {
 onMounted(render)
 watch(() => props.tasks, () => nextTick(render), { deep: true })
 
-// ---- 拖拽/拉伸 ----
-let dragRow: Row|null = null
-let dragType: 'move'|'resize-l'|'resize-r' = 'move'
-let dragStartX = 0
-let dragOrigStart = 0
-let dragOrigEnd = 0
-let dragNewStart = 0
-let dragNewEnd = 0
-let dragMoved = false
-let constraintShown = false
-const constrained = ref(false)  // 越界闪烁
-
-function onBarClick(_e: MouseEvent, row: Row) {
-  if (!dragMoved) emit('select', row.raw)
-}
-function onBarDown(e: MouseEvent, row: Row) {
-  if (props.readonly) return
-  startDrag(e, row, 'move')
-}
-function onResizeDown(e: MouseEvent, row: Row, side: 'left'|'right') {
-  if (props.readonly) return
-  startDrag(e, row, side==='left'?'resize-l':'resize-r')
-}
-
-function startDrag(e: MouseEvent, row: Row, type: 'move'|'resize-l'|'resize-r') {
-  if (props.readonly) return
-  if (!row.s || !row.e || !row.raw) return
-  dragType = type; dragRow = row; dragMoved = false
-  dragStartX = e.clientX
-  dragOrigStart = dragNewStart = row.s.getTime()
-  dragOrigEnd = dragNewEnd = row.e.getTime()
-  document.addEventListener('mousemove', onBarMove)
-  document.addEventListener('mouseup', onBarUp)
-  e.preventDefault()
-}
-
-function onBarMove(e: MouseEvent) {
-  if (!dragRow) return
-  dragMoved = true
-  const msDelta = (e.clientX - dragStartX) / colW.value * msPerUnit.value
-  if (dragType === 'resize-l') {
-    dragNewStart = Math.min(dragOrigStart + msDelta, dragNewEnd - 60000)
-  } else if (dragType === 'resize-r') {
-    dragNewEnd = Math.max(dragOrigEnd + msDelta, dragNewStart + 60000)
-  } else {
-    dragNewStart = dragOrigStart + msDelta
-    dragNewEnd = dragOrigEnd + msDelta
-  }
-  // 前置约束：不能越过前道工序结束时间
-  if (dragRow.minStartMs && dragRow.minStartMs > 0 && dragNewStart < dragRow.minStartMs) {
-    dragNewStart = dragRow.minStartMs
-    dragNewEnd = dragRow.minStartMs + (dragOrigEnd - dragOrigStart)
-    constrained.value = true
-    setTimeout(() => constrained.value = false, 800)
-    if (!constraintShown) { constraintShown = true; setTimeout(() => constraintShown = false, 2000)
-      ElMessage({ message: '受前置工序约束，不能往前移动', type: 'warning', duration: 1500 }) }
-  }
-  dragRow.s = new Date(dragNewStart)
-  dragRow.e = new Date(dragNewEnd)
-  rows.value = [...rows.value]
-}
-
-function onBarUp() {
-  document.removeEventListener('mousemove', onBarMove)
-  document.removeEventListener('mouseup', onBarUp)
-  if (!dragRow?.raw) { dragRow = null; return }
-  if (Math.abs(dragOrigStart - dragNewStart) < 300000 && Math.abs(dragOrigEnd - dragNewEnd) < 300000) {
-    dragRow = null; return
-  }
-  const localStr = (ms: number) => {
-    const d = new Date(ms)
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`
-  }
-  emit('barMove', dragRow.raw, localStr(dragNewStart), localStr(dragNewEnd))
-  dragRow = null
-}
+// ---- 拖拽/拉伸（抽到 composable，保持组件 ≤300 行）----
+const { constrained, onBarClick, onBarDown, onResizeDown } = useGanttDrag({
+  readonly: props.readonly, colW, msPerUnit, rows,
+  onSelect: (t) => emit('select', t),
+  onBarMove: (t, s, e) => emit('barMove', t, s, e)
+})
 
 // ---- 交互 ----
 function shiftRange(dir: number) {
@@ -281,7 +212,33 @@ function onScroll(e: Event) {
   }
 }
 
-defineExpose({ render })
+/** 按任务时间范围自动定位视窗（供只读详情/进度弹窗使用） */
+function fitToData() {
+  let min = Infinity, max = -Infinity
+  for (const p of props.tasks) {
+    for (const c of p.children || []) {
+      for (const v of [c.start, c.end, c.actualStartTime, c.actualEndTime]) {
+        if (!v) continue
+        const t = parseDate(v).getTime()
+        if (!Number.isNaN(t)) { if (t < min) min = t; if (t > max) max = t }
+      }
+    }
+  }
+  if (!Number.isFinite(min)) return
+  const HOUR = 3600000, DAY = 86400000
+  let s = min - HOUR, e = max + HOUR
+  const MAX = 60 * DAY
+  if (e - s > MAX) e = s + MAX
+  mode.value = e - s <= 2 * DAY ? 'day' : 'week'
+  const grid = mode.value === 'day' ? HOUR : DAY
+  s = Math.floor(s / grid) * grid
+  range.s = new Date(s)
+  range.e = new Date(e)
+  render()
+  nextTick(() => { if (rightRef.value) rightRef.value.scrollLeft = 0 })
+}
+
+defineExpose({ render, fitToData })
 </script>
 
 <style scoped lang="scss">

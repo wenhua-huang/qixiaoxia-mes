@@ -28,6 +28,7 @@ import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
 import com.ruoyi.system.service.ISysConfigService;
 import com.ruoyi.system.service.mes.pro.DelayLevelEvaluator;
 import com.ruoyi.system.service.mes.pro.IProProgressService;
+import com.ruoyi.system.service.mes.pro.ProDates;
 
 /**
  * 工单进度 Service 实现
@@ -78,10 +79,10 @@ public class ProProgressServiceImpl implements IProProgressService
         {
             return;
         }
-        vo.setPlanStartTime((Date) agg.get("planStart"));
-        vo.setPlanEndTime((Date) agg.get("planEnd"));
-        vo.setActualStartTime((Date) agg.get("actualStart"));
-        vo.setActualEndTime((Date) agg.get("actualEnd"));
+        vo.setPlanStartTime(ProDates.toDate(agg.get("planStart")));
+        vo.setPlanEndTime(ProDates.toDate(agg.get("planEnd")));
+        vo.setActualStartTime(ProDates.toDate(agg.get("actualStart")));
+        vo.setActualEndTime(ProDates.toDate(agg.get("actualEnd")));
     }
 
     private List<ProcessProgressRowVO> buildProcessRows(Long workorderId)
@@ -114,8 +115,8 @@ public class ProProgressServiceImpl implements IProProgressService
         row.setPlanEndTime(t.getEndTime());
         if (actual != null)
         {
-            row.setActualStartTime((Date) actual.get("actualStart"));
-            row.setActualEndTime((Date) actual.get("actualEnd"));
+            row.setActualStartTime(ProDates.toDate(actual.get("actualStart")));
+            row.setActualEndTime(ProDates.toDate(actual.get("actualEnd")));
         }
         row.setCompletionRate(percent(t.getQuantityProduced(), t.getQuantity()));
         row.setDelayLevel(DelayLevelEvaluator.evaluateTask(

@@ -107,7 +107,7 @@ async function loadAll(id: number) {
     detail.value = progRes?.data || null
     ganttTasks.value = ganttRes?.data?.tasks || []
     await nextTick()
-    ganttRef.value?.render()
+    ganttRef.value?.fitToData()
   } finally {
     if (seq === reqSeq) {
       loading.value = false
@@ -119,7 +119,7 @@ async function loadAll(id: number) {
 async function onTabChange(name: string | number) {
   if (name === 'gantt') {
     await nextTick()
-    ganttRef.value?.render()
+    ganttRef.value?.fitToData()
   }
 }
 
@@ -129,12 +129,12 @@ function goSchedule() {
 
 function fmtDate(v: any): string {
   if (!v) return '—'
-  return parseTime(v, '{y}-{m}-{d}')
+  return parseTime(v, '{y}-{m}-{d}') as string
 }
 
 function fmtDateTime(v: any): string {
   if (!v) return '—'
-  return parseTime(v, '{y}-{m}-{d} {h}:{i}')
+  return parseTime(v, '{y}-{m}-{d} {h}:{i}') as string
 }
 </script>
 

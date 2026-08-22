@@ -16,6 +16,7 @@ import com.ruoyi.system.service.ISysConfigService;
 import com.ruoyi.system.service.mes.pro.DelayLevelEvaluator;
 import com.ruoyi.system.service.mes.pro.IGanttDataService;
 import com.ruoyi.system.service.mes.pro.IScheduleService;
+import com.ruoyi.system.service.mes.pro.ProDates;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -277,8 +278,8 @@ public class GanttDataServiceImpl implements IGanttDataService
     private void enrichItem(ProTask pt, Map<String, Object> item,
                             Map<Long, Map<String, Object>> actualMap, int warnHours, int tol) {
         Map<String, Object> act = actualMap.get(pt.getTaskId());
-        Date aStart = act == null ? null : (Date) act.get("actualStart");
-        Date aEnd = act == null ? null : (Date) act.get("actualEnd");
+        Date aStart = act == null ? null : ProDates.toDate(act.get("actualStart"));
+        Date aEnd = act == null ? null : ProDates.toDate(act.get("actualEnd"));
         item.put("actualStartTime", aStart != null ? sdf.format(aStart) : null);
         item.put("actualEndTime", aEnd != null ? sdf.format(aEnd) : null);
         item.put("progressPercent", percent(pt.getQuantityProduced(), pt.getQuantity()));

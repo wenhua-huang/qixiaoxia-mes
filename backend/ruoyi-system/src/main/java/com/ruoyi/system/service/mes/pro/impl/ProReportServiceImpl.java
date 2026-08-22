@@ -9,6 +9,7 @@ import com.ruoyi.system.mapper.mes.pro.ProReportMapper;
 import com.ruoyi.system.service.ISysConfigService;
 import com.ruoyi.system.service.mes.pro.DelayLevelEvaluator;
 import com.ruoyi.system.service.mes.pro.IProReportService;
+import com.ruoyi.system.service.mes.pro.ProDates;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -123,7 +124,7 @@ public class ProReportServiceImpl implements IProReportService
         for (Map<String, Object> row : rows)
         {
             String level = DelayLevelEvaluator.evaluateWorkorder(
-                    (Date) row.get("requestDate"), (Date) row.get("finishDate"),
+                    ProDates.toDate(row.get("requestDate")), ProDates.toDate(row.get("finishDate")),
                     (String) row.get("status"), warnDays, now);
             row.put("delayLevel", level);
         }

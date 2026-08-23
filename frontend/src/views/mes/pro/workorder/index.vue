@@ -26,14 +26,16 @@
       <el-table-column label="产品" align="center" prop="productName" :show-overflow-tooltip="true" />
       <el-table-column label="计划数量" align="center" prop="quantity" width="90" />
       <el-table-column label="已生产" align="center" prop="quantityProduced" width="80" />
-      <el-table-column label="工序进度" align="center" min-width="160">
+      <el-table-column label="工序进度" align="center" min-width="170">
         <template #default="scope">
           <div v-if="scope.row.steps && scope.row.steps.length" class="proc-steps">
             <template v-for="(s,i) in scope.row.steps" :key="i">
               <el-tooltip :content="stepTip(scope.row, s, i)" placement="top">
-                <span class="proc-dot" :class="{ done: s.done, current: s.done===false && i===firstUndone(scope.row.steps) && scope.row.status==='PRODUCING' }"></span>
+                <span class="proc-dot"
+                  :class="{ current: s.done===false && i===firstUndone(scope.row.steps) && scope.row.status==='PRODUCING' }"
+                  :style="dotStyle(scope.row, s, i)"></span>
               </el-tooltip>
-              <span v-if="i < scope.row.steps.length-1" class="proc-line" :class="{ done: s.done }"></span>
+              <span v-if="i < scope.row.steps.length-1" class="proc-line" :class="{ done: stepPct(s)>=100 }"></span>
             </template>
           </div>
           <span v-else>—</span>
@@ -451,10 +453,24 @@ export default {
     getList() { this.loading=true; listWorkorder({ ...this.queryParams, includeProgress: true }).then(r=>{ this.workorderList=r.rows; this.total=r.total; }).catch(()=>{}).finally(()=>{ this.loading=false }) },
     formatRemaining(min) { if (min == null || min <= 0) return '—'; return min >= 60 ? (Math.round(min/60*10)/10) + 'h' : min + 'm'; },
     firstUndone(steps) { const i = (steps || []).findIndex(s => !s.done); return i < 0 ? -1 : i; },
+    stepPct(s) {
+      const q = Number(s.quantity) || 0, p = Number(s.quantityProduced) || 0;
+      if (q <= 0) return s.done ? 100 : 0;
+      return Math.max(0, Math.min(100, Math.round(p / q * 100)));
+    },
+    dotStyle(row, s, i) {
+      const current = s.done === false && i === this.firstUndone(row.steps) && row.status === 'PRODUCING';
+      return { '--pct': this.stepPct(s), '--fill': current ? '#409eff' : '#67c23a' };
+    },
     stepTip(row, s, i) {
-      if (s.done) return s.processName + '（已完成）'
-      if (row.status === 'PRODUCING' && i === this.firstUndone(row.steps)) return s.processName + '（进行中）'
-      return s.processName + '（未开始）'
+      const pct = this.stepPct(s);
+      const q = s.quantity == null ? '—' : Number(s.quantity);
+      const p = s.quantityProduced == null ? 0 : Number(s.quantityProduced);
+      let state;
+      if (pct >= 100) state = '已完成';
+      else if (row.status === 'PRODUCING' && i === this.firstUndone(row.steps)) state = '进行中';
+      else state = '未开始';
+      return s.processName + '（' + state + '） ' + p + '/' + q + ' · ' + pct + '%';
     },
     cancel() { this.open=false; this.reset() },
     reset() { this.form={ workorderId:null, workorderCode:null, workorderName:null, workorderType:'SELF', orderSource:'MANUAL', productId:null, productCode:null, productName:null, productSpc:null, unitOfMeasure:'PCS', unitName:'个', quantity:1, status:'PREPARE', clientOrderCode:null, orderType:'NEW', productSize:null, ropeSpec:null, printingReq:null, packageReq:null, lineAttrs:{}, requestDate:null, remark:null }; this.effAttrSchema=[]; this.autoGenFlag=false; this.step=1; this.prorouteId=null; this.bomList=[]; this.paramList=[]; this.routeProcesses=[]; this.routeOptions=[]; this.showProcessSelector=false },
@@ -813,21 +829,18 @@ export default {
 }
 .proc-dot {
   flex: 0 0 auto;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   box-sizing: border-box;
-  border: 2px solid #c0c4cc;
-  background: #fff;
+  border: 2px solid #dcdfe6;
+  background:
+    radial-gradient(circle, #fff 56%, transparent 57%),
+    conic-gradient(var(--fill, #67c23a) calc(var(--pct, 0) * 1%), #ebeef5 0);
   transition: all .2s;
-}
-.proc-dot.done {
-  border-color: #67c23a;
-  background: #67c23a;
 }
 .proc-dot.current {
   border-color: #409eff;
-  background: #409eff;
   box-shadow: 0 0 0 3px rgba(64,158,255,.2);
   animation: proc-pulse 1.4s ease-in-out infinite;
 }

@@ -299,6 +299,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         SELECT t.workorder_id   AS workorderId,
                rp.order_num     AS orderNum,
                t.process_name   AS processName,
+               SUM(t.quantity)           AS quantity,
+               SUM(t.quantity_produced)  AS quantityProduced,
                (NOT EXISTS (
                    SELECT 1 FROM qxx_pro_task x
                    WHERE x.workorder_id = t.workorder_id

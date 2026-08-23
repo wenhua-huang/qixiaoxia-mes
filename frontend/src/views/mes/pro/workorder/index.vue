@@ -26,10 +26,17 @@
       <el-table-column label="产品" align="center" prop="productName" :show-overflow-tooltip="true" />
       <el-table-column label="计划数量" align="center" prop="quantity" width="90" />
       <el-table-column label="已生产" align="center" prop="quantityProduced" width="80" />
-      <el-table-column label="完成率" align="center" width="130">
+      <el-table-column label="工序进度" align="center" min-width="160">
         <template #default="scope">
-          <el-progress :percentage="scope.row.completionRate ?? 0" :stroke-width="10"
-            :status="scope.row.status==='COMPLETED' ? 'success' : ''" />
+          <div v-if="scope.row.steps && scope.row.steps.length" class="proc-steps">
+            <template v-for="(s,i) in scope.row.steps" :key="i">
+              <el-tooltip :content="stepTip(scope.row, s, i)" placement="top">
+                <span class="proc-dot" :class="{ done: s.done, current: s.done===false && i===firstUndone(scope.row.steps) && scope.row.status==='PRODUCING' }"></span>
+              </el-tooltip>
+              <span v-if="i < scope.row.steps.length-1" class="proc-line" :class="{ done: s.done }"></span>
+            </template>
+          </div>
+          <span v-else>—</span>
         </template>
       </el-table-column>
       <el-table-column label="当前工序" align="center" min-width="120" :show-overflow-tooltip="true">
@@ -443,6 +450,12 @@ export default {
   methods: {
     getList() { this.loading=true; listWorkorder({ ...this.queryParams, includeProgress: true }).then(r=>{ this.workorderList=r.rows; this.total=r.total; }).catch(()=>{}).finally(()=>{ this.loading=false }) },
     formatRemaining(min) { if (min == null || min <= 0) return '—'; return min >= 60 ? (Math.round(min/60*10)/10) + 'h' : min + 'm'; },
+    firstUndone(steps) { const i = (steps || []).findIndex(s => !s.done); return i < 0 ? -1 : i; },
+    stepTip(row, s, i) {
+      if (s.done) return s.processName + '（已完成）'
+      if (row.status === 'PRODUCING' && i === this.firstUndone(row.steps)) return s.processName + '（进行中）'
+      return s.processName + '（未开始）'
+    },
     cancel() { this.open=false; this.reset() },
     reset() { this.form={ workorderId:null, workorderCode:null, workorderName:null, workorderType:'SELF', orderSource:'MANUAL', productId:null, productCode:null, productName:null, productSpc:null, unitOfMeasure:'PCS', unitName:'个', quantity:1, status:'PREPARE', clientOrderCode:null, orderType:'NEW', productSize:null, ropeSpec:null, printingReq:null, packageReq:null, lineAttrs:{}, requestDate:null, remark:null }; this.effAttrSchema=[]; this.autoGenFlag=false; this.step=1; this.prorouteId=null; this.bomList=[]; this.paramList=[]; this.routeProcesses=[]; this.routeOptions=[]; this.showProcessSelector=false },
     handleQuery() { this.queryParams.pageNum=1; this.getList() },
@@ -791,3 +804,43 @@ export default {
   },
 }
 </script>
+
+<style scoped>
+.proc-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.proc-dot {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  border: 2px solid #c0c4cc;
+  background: #fff;
+  transition: all .2s;
+}
+.proc-dot.done {
+  border-color: #67c23a;
+  background: #67c23a;
+}
+.proc-dot.current {
+  border-color: #409eff;
+  background: #409eff;
+  box-shadow: 0 0 0 3px rgba(64,158,255,.2);
+  animation: proc-pulse 1.4s ease-in-out infinite;
+}
+.proc-line {
+  flex: 0 0 14px;
+  height: 2px;
+  background: #c0c4cc;
+}
+.proc-line.done {
+  background: #67c23a;
+}
+@keyframes proc-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(64,158,255,.2); }
+  50% { box-shadow: 0 0 0 5px rgba(64,158,255,.08); }
+}
+</style>

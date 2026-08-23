@@ -289,4 +289,33 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
           AND t.status NOT IN ('COMPLETED','CANCEL')
     </select>
+
+    <!--
+      批量查询工序步骤点：一道工序一行，done 标注是否完工。
+      主表 t 的 factory_id 由 FactoryIdInterceptor 注入；JOIN route_process 带 factory_id 等值。
+    -->
+    <select id="selectProcessStepsByWorkorderIds"
+            resultType="com.ruoyi.system.domain.mes.pro.vo.ProTaskProgressStep">
+        SELECT t.workorder_id   AS workorderId,
+               rp.order_num     AS orderNum,
+               t.process_name   AS processName,
+               (NOT EXISTS (
+                   SELECT 1 FROM qxx_pro_task x
+                   WHERE x.workorder_id = t.workorder_id
+                     AND x.route_id = t.route_id
+                     AND x.process_id = t.process_id
+                     AND x.factory_id = t.factory_id
+                     AND x.status NOT IN ('COMPLETED','CANCEL')
+               ))              AS done
+        FROM qxx_pro_task t
+        INNER JOIN qxx_pro_route_process rp
+                ON rp.route_id = t.route_id
+               AND rp.process_id = t.process_id
+               AND rp.factory_id = t.factory_id
+        WHERE t.workorder_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+          AND t.status &lt;&gt; 'CANCEL'
+        GROUP BY t.workorder_id, rp.order_num, t.route_id, t.process_id, t.process_name
+        ORDER BY t.workorder_id, rp.order_num
+    </select>
 </mapper>

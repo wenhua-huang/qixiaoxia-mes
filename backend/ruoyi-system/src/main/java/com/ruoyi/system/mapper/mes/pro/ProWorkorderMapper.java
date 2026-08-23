@@ -4,6 +4,7 @@ import java.util.List;
 import java.math.BigDecimal;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
 import com.ruoyi.system.domain.mes.pro.vo.ProTaskProgressRow;
+import com.ruoyi.system.domain.mes.pro.vo.ProTaskProgressStep;
 
 public interface ProWorkorderMapper {
     ProWorkorder selectProWorkorderByWorkorderId(Long id);
@@ -39,5 +40,13 @@ public interface ProWorkorderMapper {
      * factory_id 由 FactoryIdInterceptor 注入主表 t；JOIN route_process 带 factory_id 等值。
      */
     List<ProTaskProgressRow> selectActiveTasksByWorkorderIds(
+            @org.apache.ibatis.annotations.Param("ids") List<Long> workorderIds);
+
+    /**
+     * 批量查询工单的工序步骤点（一道工序一行，标注是否完工），用于列表完成率步骤圈。
+     * 取每张工单全部任务（含 COMPLETED），按 (route_id,process_id) 聚合；该工序下存在
+     * 任一非 COMPLETED 任务即视为未完工。factory_id 由拦截器注入主表 t。
+     */
+    List<ProTaskProgressStep> selectProcessStepsByWorkorderIds(
             @org.apache.ibatis.annotations.Param("ids") List<Long> workorderIds);
 }

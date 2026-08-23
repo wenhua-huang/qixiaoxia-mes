@@ -96,6 +96,8 @@ public class ProWorkorder extends BaseEntity
     private Long remainingMinutes;
     /** 是否按期：estimatedEndTime <= planEndTime；无计划/未排产为 null */
     private Boolean onTime;
+    /** 工序步骤点（完成率步骤圈用），includeProgress=true 时填充 */
+    private List<com.ruoyi.system.domain.mes.pro.vo.ProTaskProgressStep> steps;
 
     public Long getWorkorderId() { return workorderId; }
     public void setWorkorderId(Long v) { this.workorderId = v; }
@@ -203,6 +205,8 @@ public class ProWorkorder extends BaseEntity
     public void setRemainingMinutes(Long v) { this.remainingMinutes = v; }
     public Boolean getOnTime() { return onTime; }
     public void setOnTime(Boolean v) { this.onTime = v; }
+    public List<com.ruoyi.system.domain.mes.pro.vo.ProTaskProgressStep> getSteps() { return steps; }
+    public void setSteps(List<com.ruoyi.system.domain.mes.pro.vo.ProTaskProgressStep> v) { this.steps = v; }
 
     @Override
     public String toString() {

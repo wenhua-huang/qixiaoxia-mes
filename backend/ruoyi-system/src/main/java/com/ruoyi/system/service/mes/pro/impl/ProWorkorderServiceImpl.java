@@ -30,6 +30,7 @@ import com.ruoyi.system.domain.mes.pro.ProWorkorderBom;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderDeviationVO;
 import com.ruoyi.system.domain.mes.pro.ProOutsourceWorkorderInfoVO;
 import com.ruoyi.system.domain.mes.pro.vo.ProTaskProgressRow;
+import com.ruoyi.system.domain.mes.pro.vo.ProTaskProgressStep;
 import com.ruoyi.system.service.mes.pro.IProWorkorderBomService;
 import com.ruoyi.system.service.mes.pro.IProWorkorderParamService;
 import com.ruoyi.system.service.mes.pro.IProWorkorderService;
@@ -539,10 +540,14 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         List<ProTaskProgressRow> rows = qxxProWorkorderMapper.selectActiveTasksByWorkorderIds(ids);
         Map<Long, List<ProTaskProgressRow>> byWo = rows.stream()
                 .collect(Collectors.groupingBy(ProTaskProgressRow::getWorkorderId));
+        Map<Long, List<ProTaskProgressStep>> stepMap = qxxProWorkorderMapper
+                .selectProcessStepsByWorkorderIds(ids).stream()
+                .collect(Collectors.groupingBy(ProTaskProgressStep::getWorkorderId));
         Long factoryId = SecurityUtils.getFactoryId();
         Date now = new Date();
         for (ProWorkorder wo : list)
         {
+            wo.setSteps(stepMap.getOrDefault(wo.getWorkorderId(), List.of()));
             fillOneProgress(wo, byWo.getOrDefault(wo.getWorkorderId(), List.of()), now, factoryId);
         }
     }

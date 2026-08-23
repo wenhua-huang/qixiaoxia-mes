@@ -79,6 +79,24 @@ public class ProWorkorder extends BaseEntity
     /** 已入库量（非DB字段，由 Mapper 子查询填充，前端可读） */
     private BigDecimal quantityRecpt;
 
+    // ---- 在制进度（非DB字段，includeProgress=true 时由 Service 批量回填） ----
+    /** 完成率 0-100 */
+    private Integer completionRate;
+    /** 当前阶段：PRODUCING(生产中) / PENDING(待开工) / UNSCHEDULED(未排产)；终态工单为 null */
+    private String currentStage;
+    /** 当前工序名（多道并行时逗号拼接）；终态/未排产为 null */
+    private String currentProcessName;
+    /** 计划完工时间（未终态任务 MAX(end_time)） */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date planEndTime;
+    /** 按标准工时 + 工作日历估算的预计完工时间 */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date estimatedEndTime;
+    /** 剩余标准工时（分钟） */
+    private Long remainingMinutes;
+    /** 是否按期：estimatedEndTime <= planEndTime；无计划/未排产为 null */
+    private Boolean onTime;
+
     public Long getWorkorderId() { return workorderId; }
     public void setWorkorderId(Long v) { this.workorderId = v; }
     public Long getFactoryId() { return factoryId; }
@@ -170,6 +188,21 @@ public class ProWorkorder extends BaseEntity
     public void setQuantityProducedMin(BigDecimal v) { this.quantityProducedMin = v; }
     public BigDecimal getQuantityRecpt() { return quantityRecpt; }
     public void setQuantityRecpt(BigDecimal v) { this.quantityRecpt = v; }
+
+    public Integer getCompletionRate() { return completionRate; }
+    public void setCompletionRate(Integer v) { this.completionRate = v; }
+    public String getCurrentStage() { return currentStage; }
+    public void setCurrentStage(String v) { this.currentStage = v; }
+    public String getCurrentProcessName() { return currentProcessName; }
+    public void setCurrentProcessName(String v) { this.currentProcessName = v; }
+    public Date getPlanEndTime() { return planEndTime; }
+    public void setPlanEndTime(Date v) { this.planEndTime = v; }
+    public Date getEstimatedEndTime() { return estimatedEndTime; }
+    public void setEstimatedEndTime(Date v) { this.estimatedEndTime = v; }
+    public Long getRemainingMinutes() { return remainingMinutes; }
+    public void setRemainingMinutes(Long v) { this.remainingMinutes = v; }
+    public Boolean getOnTime() { return onTime; }
+    public void setOnTime(Boolean v) { this.onTime = v; }
 
     @Override
     public String toString() {

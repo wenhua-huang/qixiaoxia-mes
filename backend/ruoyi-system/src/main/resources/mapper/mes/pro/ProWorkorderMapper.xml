@@ -264,4 +264,29 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           and status != 'CANCEL'
           and product_id is not null
     </select>
+
+    <!--
+      批量查询工单下非终态任务（进度列表聚合用）。
+      主表 t 的 factory_id 由 FactoryIdInterceptor 注入；JOIN route_process 显式带 factory_id 等值。
+    -->
+    <select id="selectActiveTasksByWorkorderIds"
+            resultType="com.ruoyi.system.domain.mes.pro.vo.ProTaskProgressRow">
+        SELECT t.workorder_id    AS workorderId,
+               t.process_name    AS processName,
+               t.status          AS status,
+               rp.order_num      AS orderNum,
+               t.quantity        AS quantity,
+               t.quantity_produced AS quantityProduced,
+               t.setup_duration  AS setupDuration,
+               t.unit_duration   AS unitDuration,
+               t.end_time        AS endTime
+        FROM qxx_pro_task t
+        LEFT JOIN qxx_pro_route_process rp
+               ON rp.route_id = t.route_id
+              AND rp.process_id = t.process_id
+              AND rp.factory_id = t.factory_id
+        WHERE t.workorder_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+          AND t.status NOT IN ('COMPLETED','CANCEL')
+    </select>
 </mapper>

@@ -67,13 +67,21 @@ public class ProWorkorderController extends BaseController
 
     /**
      * 查询生产工单列表
+     *
+     * @param includeProgress 为 true 时回填在制进度字段（完成率、当前工序、预计完工等），
+     *                        仅工单列表页使用，避免影响其他复用 /list 的下拉/看板。
      */
     @PreAuthorize("@ss.hasPermi('mes:pro:workorder:list')")
     @GetMapping("/list")
-    public TableDataInfo list(ProWorkorder proWorkorder)
+    public TableDataInfo list(ProWorkorder proWorkorder,
+            @RequestParam(required = false, defaultValue = "false") boolean includeProgress)
     {
         startPage();
         List<ProWorkorder> list = proWorkorderService.selectProWorkorderList(proWorkorder);
+        if (includeProgress)
+        {
+            proWorkorderService.enrichProgress(list);
+        }
         return getDataTable(list);
     }
 

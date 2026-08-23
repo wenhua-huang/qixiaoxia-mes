@@ -9,6 +9,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import com.ruoyi.common.utils.DateUtils;
@@ -23,19 +24,22 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.stereotype.Service;
 import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
+import com.ruoyi.system.domain.mes.pro.ProConstants;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderBom;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderDeviationVO;
 import com.ruoyi.system.domain.mes.pro.ProOutsourceWorkorderInfoVO;
+import com.ruoyi.system.domain.mes.pro.vo.ProTaskProgressRow;
+import com.ruoyi.system.service.mes.pro.IProWorkorderBomService;
+import com.ruoyi.system.service.mes.pro.IProWorkorderParamService;
+import com.ruoyi.system.service.mes.pro.IProWorkorderService;
+import com.ruoyi.system.service.mes.pro.ProProgressMath;
 import com.ruoyi.system.domain.mes.pro.ProCard;
 import com.ruoyi.system.domain.mes.wm.WmOutsourceOrder;
 import com.ruoyi.system.domain.mes.wm.WmMaterialStock;
 import com.ruoyi.system.domain.mes.wm.WmIssueHeader;
 import com.ruoyi.system.domain.mes.wm.WmIssueLine;
 import com.ruoyi.system.domain.mes.wm.WmWarehouse;
-import com.ruoyi.system.service.mes.pro.IProWorkorderBomService;
-import com.ruoyi.system.service.mes.pro.IProWorkorderParamService;
-import com.ruoyi.system.service.mes.pro.IProWorkorderService;
 import com.ruoyi.system.service.mes.wm.IWmMaterialStockService;
 import com.ruoyi.system.service.mes.wm.IWmIssueHeaderService;
 import com.ruoyi.system.service.mes.wm.IWmIssueLineService;
@@ -114,6 +118,9 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
 
     @Autowired
     private com.ruoyi.system.service.mes.wm.OutsourceIssueHelper outsourceIssueHelper;
+
+    @Autowired
+    private com.ruoyi.system.service.mes.cal.IWorkCalendarService workCalendarService;
 
     @Autowired
     private IProTaskService proTaskService;
@@ -515,6 +522,70 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
     public List<ProWorkorder> selectAll()
     {
         return qxxProWorkorderMapper.selectProWorkorderList(new ProWorkorder());
+    }
+
+    /**
+     * 批量回填在制进度：完成率、当前工序、计划/预计完工、剩余工时、是否按期。
+     * 一条 IN 聚合查询取回当前页所有工单的非终态任务，避免 N+1。
+     */
+    @Override
+    public void enrichProgress(List<ProWorkorder> list)
+    {
+        if (list == null || list.isEmpty())
+        {
+            return;
+        }
+        List<Long> ids = list.stream().map(ProWorkorder::getWorkorderId).collect(Collectors.toList());
+        List<ProTaskProgressRow> rows = qxxProWorkorderMapper.selectActiveTasksByWorkorderIds(ids);
+        Map<Long, List<ProTaskProgressRow>> byWo = rows.stream()
+                .collect(Collectors.groupingBy(ProTaskProgressRow::getWorkorderId));
+        Long factoryId = SecurityUtils.getFactoryId();
+        Date now = new Date();
+        for (ProWorkorder wo : list)
+        {
+            fillOneProgress(wo, byWo.getOrDefault(wo.getWorkorderId(), List.of()), now, factoryId);
+        }
+    }
+
+    private void fillOneProgress(ProWorkorder wo, List<ProTaskProgressRow> tasks, Date now, Long factoryId)
+    {
+        wo.setCompletionRate(ProProgressMath.percent(wo.getQuantityProduced(), wo.getQuantity()));
+        String status = wo.getStatus();
+        boolean terminal = ProConstants.WORKORDER_STATUS_COMPLETED.equals(status)
+                || ProConstants.WORKORDER_STATUS_CANCEL.equals(status);
+        if (terminal)
+        {
+            wo.setRemainingMinutes(0L);
+            return;
+        }
+        if (tasks.isEmpty())
+        {
+            wo.setCurrentStage(ProProgressMath.STAGE_UNSCHEDULED);
+            return;
+        }
+        wo.setCurrentStage(ProProgressMath.resolveStage(status, tasks));
+        wo.setCurrentProcessName(ProProgressMath.currentProcessName(tasks));
+        wo.setPlanEndTime(latestEndTime(tasks));
+        long remainingSecs = ProProgressMath.remainingSeconds(status, tasks);
+        wo.setRemainingMinutes(remainingSecs / 60);
+        if (remainingSecs > 0)
+        {
+            Date eta = workCalendarService.calculateEndTime(now, remainingSecs, factoryId);
+            wo.setEstimatedEndTime(eta);
+            if (wo.getPlanEndTime() != null)
+            {
+                wo.setOnTime(!eta.after(wo.getPlanEndTime()));
+            }
+        }
+    }
+
+    private Date latestEndTime(List<ProTaskProgressRow> tasks)
+    {
+        return tasks.stream()
+                .map(ProTaskProgressRow::getEndTime)
+                .filter(Objects::nonNull)
+                .max(Date::compareTo)
+                .orElse(null);
     }
 
     @Override

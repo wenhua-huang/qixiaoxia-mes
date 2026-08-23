@@ -3,6 +3,7 @@ package com.ruoyi.system.mapper.mes.pro;
 import java.util.List;
 import java.math.BigDecimal;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
+import com.ruoyi.system.domain.mes.pro.vo.ProTaskProgressRow;
 
 public interface ProWorkorderMapper {
     ProWorkorder selectProWorkorderByWorkorderId(Long id);
@@ -32,4 +33,11 @@ public interface ProWorkorderMapper {
             @org.apache.ibatis.annotations.Param("finishDate") java.util.Date finishDate,
             @org.apache.ibatis.annotations.Param("updateBy") String updateBy,
             @org.apache.ibatis.annotations.Param("updateTime") java.util.Date updateTime);
+
+    /**
+     * 批量查询工单下所有非终态（非 COMPLETED/CANCEL）任务，用于列表进度聚合。
+     * factory_id 由 FactoryIdInterceptor 注入主表 t；JOIN route_process 带 factory_id 等值。
+     */
+    List<ProTaskProgressRow> selectActiveTasksByWorkorderIds(
+            @org.apache.ibatis.annotations.Param("ids") List<Long> workorderIds);
 }

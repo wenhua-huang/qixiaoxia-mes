@@ -26,6 +26,37 @@
       <el-table-column label="产品" align="center" prop="productName" :show-overflow-tooltip="true" />
       <el-table-column label="计划数量" align="center" prop="quantity" width="90" />
       <el-table-column label="已生产" align="center" prop="quantityProduced" width="80" />
+      <el-table-column label="完成率" align="center" width="130">
+        <template #default="scope">
+          <el-progress :percentage="scope.row.completionRate ?? 0" :stroke-width="10"
+            :status="scope.row.status==='COMPLETED' ? 'success' : ''" />
+        </template>
+      </el-table-column>
+      <el-table-column label="当前工序" align="center" min-width="120" :show-overflow-tooltip="true">
+        <template #default="scope">
+          <el-tag v-if="scope.row.currentStage==='PRODUCING'" size="small" type="warning">{{ scope.row.currentProcessName || '生产中' }}</el-tag>
+          <el-tag v-else-if="scope.row.currentStage==='PENDING'" size="small" type="info">待开工·{{ scope.row.currentProcessName || '—' }}</el-tag>
+          <el-tag v-else-if="scope.row.currentStage==='UNSCHEDULED'" size="small" type="info">未排产</el-tag>
+          <span v-else>—</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="预计完工" align="center" width="140">
+        <template #default="scope">
+          <span>{{ scope.row.estimatedEndTime ? parseTime(scope.row.estimatedEndTime, '{y}-{m}-{d} {h}:{i}') : '—' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="剩余工时" align="center" width="90">
+        <template #default="scope">
+          <span>{{ formatRemaining(scope.row.remainingMinutes) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="按期" align="center" width="80">
+        <template #default="scope">
+          <el-tag v-if="scope.row.onTime===true" size="small" type="success">按计划</el-tag>
+          <el-tag v-else-if="scope.row.onTime===false" size="small" type="danger">将延期</el-tag>
+          <span v-else>—</span>
+        </template>
+      </el-table-column>
       <el-table-column label="状态" align="center" prop="status" width="80"><template #default="scope"><span :style="{color: statusColor[scope.row.status]}">{{ statusMap[scope.row.status] || scope.row.status }}</span></template></el-table-column>
       <el-table-column label="需求日期" align="center" prop="requestDate" width="100"><template #default="scope"><span>{{ parseTime(scope.row.requestDate, '{y}-{m}-{d}') }}</span></template></el-table-column>
       <el-table-column label="创建时间" align="center" prop="createTime" width="150"><template #default="scope"><span>{{ parseTime(scope.row.createTime, '{y}-{m}-{d} {h}:{i}:{s}') }}</span></template></el-table-column>
@@ -410,7 +441,8 @@ export default {
   },
   created() { this.getList(); listAllProcess().then(r=>{ this.processOptions=r.data||[] }) },
   methods: {
-    getList() { this.loading=true; listWorkorder(this.queryParams).then(r=>{ this.workorderList=r.rows; this.total=r.total; }).catch(()=>{}).finally(()=>{ this.loading=false }) },
+    getList() { this.loading=true; listWorkorder({ ...this.queryParams, includeProgress: true }).then(r=>{ this.workorderList=r.rows; this.total=r.total; }).catch(()=>{}).finally(()=>{ this.loading=false }) },
+    formatRemaining(min) { if (min == null || min <= 0) return '—'; return min >= 60 ? (Math.round(min/60*10)/10) + 'h' : min + 'm'; },
     cancel() { this.open=false; this.reset() },
     reset() { this.form={ workorderId:null, workorderCode:null, workorderName:null, workorderType:'SELF', orderSource:'MANUAL', productId:null, productCode:null, productName:null, productSpc:null, unitOfMeasure:'PCS', unitName:'个', quantity:1, status:'PREPARE', clientOrderCode:null, orderType:'NEW', productSize:null, ropeSpec:null, printingReq:null, packageReq:null, lineAttrs:{}, requestDate:null, remark:null }; this.effAttrSchema=[]; this.autoGenFlag=false; this.step=1; this.prorouteId=null; this.bomList=[]; this.paramList=[]; this.routeProcesses=[]; this.routeOptions=[]; this.showProcessSelector=false },
     handleQuery() { this.queryParams.pageNum=1; this.getList() },

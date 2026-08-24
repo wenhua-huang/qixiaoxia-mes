@@ -44,6 +44,7 @@
       <el-table-column label="当前工序" align="center" min-width="120" :show-overflow-tooltip="true">
         <template #default="scope">
           <el-tag v-if="scope.row.currentStage==='PRODUCING'" size="small" type="warning">{{ scope.row.currentProcessName || '生产中' }}</el-tag>
+          <el-tag v-else-if="scope.row.currentStage==='PENDING_COMPLETE'" size="small" type="success">待完工</el-tag>
           <el-tag v-else-if="scope.row.currentStage==='PENDING'" size="small" type="info">待开工·{{ scope.row.currentProcessName || '—' }}</el-tag>
           <el-tag v-else-if="scope.row.currentStage==='UNSCHEDULED'" size="small" type="info">未排产</el-tag>
           <span v-else>—</span>

@@ -108,16 +108,27 @@ class ProProgressMathTest
     void stage_terminal_returns_null()
     {
         ProTaskProgressRow t = task("COMPLETED", 1, "10", "10", 0, "1");
-        assertThat(ProProgressMath.resolveStage("COMPLETED", List.of(t))).isNull();
-        assertThat(ProProgressMath.resolveStage("CANCEL", List.of())).isNull();
+        assertThat(ProProgressMath.resolveStage("COMPLETED", List.of(t), true)).isNull();
+        assertThat(ProProgressMath.resolveStage("CANCEL", List.of(), false)).isNull();
     }
 
     @Test
-    void stage_no_tasks_unscheduled()
+    void stage_no_tasks_unscheduled_when_never_scheduled()
     {
-        assertThat(ProProgressMath.resolveStage("PRODUCING", List.of()))
+        assertThat(ProProgressMath.resolveStage("PRODUCING", List.of(), false))
                 .isEqualTo(ProProgressMath.STAGE_UNSCHEDULED);
-        assertThat(ProProgressMath.resolveStage("PREPARE", List.of()))
+        assertThat(ProProgressMath.resolveStage("PREPARE", List.of(), false))
+                .isEqualTo(ProProgressMath.STAGE_UNSCHEDULED);
+    }
+
+    @Test
+    void stage_pending_complete_when_producing_but_all_tasks_done()
+    {
+        // 工单 PRODUCING、活动任务为空，但工序步骤存在（任务全部 COMPLETED）→ 待完工
+        assertThat(ProProgressMath.resolveStage("PRODUCING", List.of(), true))
+                .isEqualTo(ProProgressMath.STAGE_PENDING_COMPLETE);
+        // 非 PRODUCING（如 PREPARE）即使已排产但无活动任务，仍为未排产
+        assertThat(ProProgressMath.resolveStage("PREPARE", List.of(), true))
                 .isEqualTo(ProProgressMath.STAGE_UNSCHEDULED);
     }
 
@@ -125,7 +136,7 @@ class ProProgressMathTest
     void stage_producing_when_workorder_producing()
     {
         ProTaskProgressRow t = task("NORMAL", 1, "10", "0", 0, "1");
-        assertThat(ProProgressMath.resolveStage("PRODUCING", List.of(t)))
+        assertThat(ProProgressMath.resolveStage("PRODUCING", List.of(t), true))
                 .isEqualTo(ProProgressMath.STAGE_PRODUCING);
     }
 
@@ -133,7 +144,7 @@ class ProProgressMathTest
     void stage_pending_when_workorder_prepare()
     {
         ProTaskProgressRow t = task("NORMAL", 1, "10", "0", 0, "1");
-        assertThat(ProProgressMath.resolveStage("PREPARE", List.of(t)))
+        assertThat(ProProgressMath.resolveStage("PREPARE", List.of(t), true))
                 .isEqualTo(ProProgressMath.STAGE_PENDING);
     }
 }

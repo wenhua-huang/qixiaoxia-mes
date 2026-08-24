@@ -82,9 +82,9 @@ public class ProWorkorder extends BaseEntity
     // ---- 在制进度（非DB字段，includeProgress=true 时由 Service 批量回填） ----
     /** 完成率 0-100 */
     private Integer completionRate;
-    /** 当前阶段：PRODUCING(生产中) / PENDING(待开工) / UNSCHEDULED(未排产)；终态工单为 null */
+    /** 当前阶段：PRODUCING(生产中) / PENDING(待开工) / UNSCHEDULED(未排产) / PENDING_COMPLETE(待完工)；终态工单为 null */
     private String currentStage;
-    /** 当前工序名（多道并行时逗号拼接）；终态/未排产为 null */
+    /** 当前工序名（按路线顺序第一道仍有剩余数量的工序）；终态/未排产为 null */
     private String currentProcessName;
     /** 计划完工时间（未终态任务 MAX(end_time)） */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")

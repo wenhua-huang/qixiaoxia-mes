@@ -547,28 +547,31 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         Date now = new Date();
         for (ProWorkorder wo : list)
         {
-            wo.setSteps(stepMap.getOrDefault(wo.getWorkorderId(), List.of()));
-            fillOneProgress(wo, byWo.getOrDefault(wo.getWorkorderId(), List.of()), now, factoryId);
+            List<ProTaskProgressStep> steps = stepMap.getOrDefault(wo.getWorkorderId(), List.of());
+            wo.setSteps(steps);
+            fillOneProgress(wo, byWo.getOrDefault(wo.getWorkorderId(), List.of()),
+                    !steps.isEmpty(), now, factoryId);
         }
     }
 
-    private void fillOneProgress(ProWorkorder wo, List<ProTaskProgressRow> tasks, Date now, Long factoryId)
+    private void fillOneProgress(ProWorkorder wo, List<ProTaskProgressRow> tasks,
+            boolean hasScheduledTasks, Date now, Long factoryId)
     {
         wo.setCompletionRate(ProProgressMath.percent(wo.getQuantityProduced(), wo.getQuantity()));
         String status = wo.getStatus();
-        boolean terminal = ProConstants.WORKORDER_STATUS_COMPLETED.equals(status)
-                || ProConstants.WORKORDER_STATUS_CANCEL.equals(status);
-        if (terminal)
+        String stage = ProProgressMath.resolveStage(status, tasks, hasScheduledTasks);
+        if (stage == null)
         {
             wo.setRemainingMinutes(0L);
             return;
         }
-        if (tasks.isEmpty())
+        wo.setCurrentStage(stage);
+        if (ProProgressMath.STAGE_PENDING_COMPLETE.equals(stage)
+                || ProProgressMath.STAGE_UNSCHEDULED.equals(stage))
         {
-            wo.setCurrentStage(ProProgressMath.STAGE_UNSCHEDULED);
+            wo.setRemainingMinutes(ProProgressMath.STAGE_PENDING_COMPLETE.equals(stage) ? 0L : null);
             return;
         }
-        wo.setCurrentStage(ProProgressMath.resolveStage(status, tasks));
         wo.setCurrentProcessName(ProProgressMath.currentProcessName(tasks));
         wo.setPlanEndTime(latestEndTime(tasks));
         long remainingSecs = ProProgressMath.remainingSeconds(status, tasks);

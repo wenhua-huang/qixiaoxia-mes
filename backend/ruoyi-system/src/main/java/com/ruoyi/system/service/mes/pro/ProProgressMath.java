@@ -23,8 +23,10 @@ public final class ProProgressMath
     public static final String STAGE_PRODUCING = ProConstants.TASK_STATUS_PRODUCING;
     /** 当前阶段：待开工 */
     public static final String STAGE_PENDING = "PENDING";
-    /** 当前阶段：未排产（工单下无非终态任务） */
+    /** 当前阶段：未排产（工单下无非终态任务，且从未排产） */
     public static final String STAGE_UNSCHEDULED = "UNSCHEDULED";
+    /** 当前阶段：待完工（工单生产中，所有任务已完工但工单尚未结转 COMPLETED） */
+    public static final String STAGE_PENDING_COMPLETE = "PENDING_COMPLETE";
 
     private static final Comparator<ProTaskProgressRow> BY_ORDER =
             Comparator.comparingInt((ProTaskProgressRow t) ->
@@ -45,8 +47,17 @@ public final class ProProgressMath
                 .divide(total, 0, RoundingMode.HALF_UP).intValue();
     }
 
-    /** 当前阶段：终态工单返回 null；无任务 UNSCHEDULED；工单 PRODUCING 则 PRODUCING；否则 PENDING。 */
-    public static String resolveStage(String workorderStatus, List<ProTaskProgressRow> tasks)
+    /**
+     * 当前阶段：
+     * <ul>
+     *   <li>终态工单 → null</li>
+     *   <li>有活动任务 → PRODUCING（工单已开工）或 PENDING（待开工）</li>
+     *   <li>无活动任务但已排产且工单生产中 → PENDING_COMPLETE（所有任务已完工，待工单结转）</li>
+     *   <li>无活动任务且从未排产 → UNSCHEDULED</li>
+     * </ul>
+     */
+    public static String resolveStage(String workorderStatus, List<ProTaskProgressRow> tasks,
+            boolean hasScheduledTasks)
     {
         if (isTerminal(workorderStatus))
         {
@@ -54,6 +65,11 @@ public final class ProProgressMath
         }
         if (tasks == null || tasks.isEmpty())
         {
+            if (hasScheduledTasks
+                    && ProConstants.WORKORDER_STATUS_PRODUCING.equals(workorderStatus))
+            {
+                return STAGE_PENDING_COMPLETE;
+            }
             return STAGE_UNSCHEDULED;
         }
         return ProConstants.WORKORDER_STATUS_PRODUCING.equals(workorderStatus)

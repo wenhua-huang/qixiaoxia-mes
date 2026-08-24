@@ -297,7 +297,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectProcessStepsByWorkorderIds"
             resultType="com.ruoyi.system.domain.mes.pro.vo.ProTaskProgressStep">
         SELECT t.workorder_id   AS workorderId,
-               rp.order_num     AS orderNum,
+               COALESCE(rp.order_num, 9999) AS orderNum,
                t.process_name   AS processName,
                SUM(t.quantity)           AS quantity,
                SUM(t.quantity_produced)  AS quantityProduced,
@@ -310,14 +310,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                      AND x.status NOT IN ('COMPLETED','CANCEL')
                ))              AS done
         FROM qxx_pro_task t
-        INNER JOIN qxx_pro_route_process rp
-                ON rp.route_id = t.route_id
-               AND rp.process_id = t.process_id
-               AND rp.factory_id = t.factory_id
+        LEFT JOIN qxx_pro_route_process rp
+               ON rp.route_id = t.route_id
+              AND rp.process_id = t.process_id
+              AND rp.factory_id = t.factory_id
         WHERE t.workorder_id IN
         <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
           AND t.status &lt;&gt; 'CANCEL'
         GROUP BY t.workorder_id, rp.order_num, t.route_id, t.process_id, t.process_name
-        ORDER BY t.workorder_id, rp.order_num
+        ORDER BY t.workorder_id, COALESCE(rp.order_num, 9999)
     </select>
 </mapper>

@@ -36,7 +36,12 @@
       <view v-for="item in list" :key="item.orderId" class="list-item" @click="goDetail(item)">
         <view class="item-header">
           <text class="bold">{{ item.orderCode }}</text>
+          <view class="header-tags">
+          <view class="qc-tag" v-if="item.qcStatus && item.qcStatus !== 'NONE'" @click.stop="goInspect(item)">
+            <uni-tag :type="qcTagType(item.qcStatus)" :text="qcTagText(item.qcStatus)" size="small" />
+          </view>
           <uni-tag :type="statusTagType(item.status)" :text="statusText(item.status)" size="small" />
+          </view>
         </view>
         <view class="item-body">
           <view class="item-row">
@@ -72,7 +77,12 @@
         </view>
         <!-- 我方视角：仅 SHIPPED（厂商已发货）可收货 -->
         <view v-if="!isVendorRole && item.status === 'SHIPPED'" class="item-actions">
+          <button v-if="item.iqcId" class="cu-btn bg-orange sm" @click.stop="goInspect(item)">去检验</button>
           <button class="cu-btn bg-green sm" @click.stop="goReceive(item)">收货入库</button>
+        </view>
+        <!-- 我方视角：已收货仍可查看检验结果 -->
+        <view v-else-if="!isVendorRole && item.status === 'RECEIVED' && item.iqcId" class="item-actions">
+          <button class="cu-btn bg-blue sm" @click.stop="goInspect(item)">检验单</button>
         </view>
       </view>
 
@@ -118,6 +128,13 @@ function statusTagType(s) {
 }
 const SOURCE_MAP = { GENERIC: '通用', SLITTING: '分切', PRINTING: '印刷' }
 function sourceText(s) { return SOURCE_MAP[s] || s || '-' }
+const QC_TAG = { PASSED: { type: 'success', text: '检验合格' }, CONCESSION: { type: 'warning', text: '让步接收' }, PENDING: { type: 'warning', text: '待检验' }, FAILED: { type: 'error', text: '检验不合格' } }
+function qcTagType(s) { return (QC_TAG[s] && QC_TAG[s].type) || 'default' }
+function qcTagText(s) { return (QC_TAG[s] && QC_TAG[s].text) || s || '' }
+function goInspect(item) {
+  if (!item.iqcId) return
+  proxy.$tab.navigateTo('/pages/mes/qc/inspect?type=IQC&id=' + item.iqcId)
+}
 function formatTime(t) {
   if (!t) return ''
   return t.substring(5, 16)
@@ -243,6 +260,8 @@ page { background-color: #f5f6f7; min-height: 100%; }
 .list-box { padding: 16rpx 24rpx; }
 .list-item { background: #fff; border-radius: 16rpx; padding: 24rpx; margin-bottom: 20rpx; }
 .item-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 16rpx; border-bottom: 1px solid #f5f5f5; }
+.header-tags { display: flex; align-items: center; gap: 12rpx; }
+.qc-tag { display: inline-flex; }
 .item-body { padding: 16rpx 0; }
 .item-row { display: flex; justify-content: space-between; padding: 6rpx 0; }
 .label { color: #999; font-size: 26rpx; }
@@ -254,4 +273,5 @@ page { background-color: #f5f6f7; min-height: 100%; }
 .cu-btn.sm { font-size: 24rpx; height: 56rpx; line-height: 56rpx; }
 .bg-blue { background: #007aff; color: #fff; }
 .bg-green { background: #67c23a; color: #fff; }
+.bg-orange { background: #e6a23c; color: #fff; }
 </style>

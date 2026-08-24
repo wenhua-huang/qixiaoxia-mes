@@ -46,6 +46,9 @@ public class WmOutsourceOrder extends BaseEntity
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private List<String> statusList;
     private Long feedbackId;
+    /** 首条来料检验单ID（source_doc_type=wm_outsource_order），多物料多张单时仅首张回填 */
+    private Long iqcId;
+    private String iqcCode;
 
     // 汇总
     private BigDecimal issueTotalQty;
@@ -69,6 +72,10 @@ public class WmOutsourceOrder extends BaseEntity
     /** 收货行（录结果/收货/详情时用） */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private List<WmOutsourceRecptLine> recptLines;
+
+    /** 来料检验状态汇总（列表计算列：PASSED/CONCESSION/PENDING/FAILED/NONE），非持久字段 */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String qcStatus;
 
     public Long getOrderId() { return orderId; }
     public void setOrderId(Long v) { this.orderId = v; }
@@ -108,6 +115,10 @@ public class WmOutsourceOrder extends BaseEntity
     public void setStatusList(List<String> v) { this.statusList = v; }
     public Long getFeedbackId() { return feedbackId; }
     public void setFeedbackId(Long v) { this.feedbackId = v; }
+    public Long getIqcId() { return iqcId; }
+    public void setIqcId(Long v) { this.iqcId = v; }
+    public String getIqcCode() { return iqcCode; }
+    public void setIqcCode(String v) { this.iqcCode = v; }
     public BigDecimal getIssueTotalQty() { return issueTotalQty; }
     public void setIssueTotalQty(BigDecimal v) { this.issueTotalQty = v; }
     public BigDecimal getRecptTotalQty() { return recptTotalQty; }
@@ -134,4 +145,6 @@ public class WmOutsourceOrder extends BaseEntity
     public void setIssueLines(List<WmOutsourceIssueLine> v) { this.issueLines = v; }
     public List<WmOutsourceRecptLine> getRecptLines() { return recptLines; }
     public void setRecptLines(List<WmOutsourceRecptLine> v) { this.recptLines = v; }
+    public String getQcStatus() { return qcStatus; }
+    public void setQcStatus(String v) { this.qcStatus = v; }
 }

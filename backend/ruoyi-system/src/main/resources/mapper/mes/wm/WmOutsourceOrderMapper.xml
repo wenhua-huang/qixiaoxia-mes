@@ -21,6 +21,9 @@
         <result property="sourceRefId" column="source_ref_id" />
         <result property="status" column="status" />
         <result property="feedbackId" column="feedback_id" />
+        <result property="iqcId" column="iqc_id" />
+        <result property="iqcCode" column="iqc_code" />
+        <result property="qcStatus" column="qc_status" />
         <result property="issueTotalQty" column="issue_total_qty" />
         <result property="recptTotalQty" column="recpt_total_qty" />
         <result property="operator" column="operator" />
@@ -42,7 +45,7 @@
     <sql id="selectVo">
         select order_id, factory_id, outsource_factory_id, order_code, vendor_id, vendor_code, vendor_name,
                workorder_id, workorder_code, card_id, route_id, process_id, process_code, process_name,
-               source_type, source_ref_id, status, feedback_id,
+               source_type, source_ref_id, status, feedback_id, iqc_id, iqc_code,
                issue_total_qty, recpt_total_qty, operator, issue_time,
                vendor_receive_time, vendor_receiver, finish_time, finish_by, ship_time, ship_by,
                receive_time,
@@ -50,9 +53,32 @@
         from qxx_wm_outsource_order
     </sql>
 
+    <!-- 列表带 qc_status 计算列：对外协单全部 IQC 单状态汇总（最差优先，
+         口径与 WmItemRecptMapper 一致：任一 FAIL→FAILED；CONCESSION→CONCESSION；
+         存在 PENDING/INSPECTING→PENDING；全 PASS→PASSED；无单→NONE）。 -->
     <select id="selectOutsourceOrderList" parameterType="com.ruoyi.system.domain.mes.wm.WmOutsourceOrder" resultMap="WmOutsourceOrderResult">
-        <include refid="selectVo"/>
+        select t.order_id, t.factory_id, t.outsource_factory_id, t.order_code, t.vendor_id, t.vendor_code, t.vendor_name,
+               t.workorder_id, t.workorder_code, t.card_id, t.route_id, t.process_id, t.process_code, t.process_name,
+               t.source_type, t.source_ref_id, t.status, t.feedback_id, t.iqc_id, t.iqc_code,
+               t.issue_total_qty, t.recpt_total_qty, t.operator, t.issue_time,
+               t.vendor_receive_time, t.vendor_receiver, t.finish_time, t.finish_by, t.ship_time, t.ship_by,
+               t.receive_time, t.remark, t.create_by, t.create_time, t.update_by, t.update_time,
+               (
+                   select case
+                       when max(case when i.status = 'COMPLETED' and i.check_result = 'FAIL' then 1 else 0 end) = 1 then 'FAILED'
+                       when max(case when i.status = 'COMPLETED' and i.check_result = 'CONCESSION' then 1 else 0 end) = 1 then 'CONCESSION'
+                       when max(case when i.status in ('PENDING', 'INSPECTING') then 1 else 0 end) = 1 then 'PENDING'
+                       when max(case when i.status = 'COMPLETED' and i.check_result = 'PASS' then 1 else 0 end) = 1 then 'PASSED'
+                       else 'NONE'
+                   end
+                   from qxx_qc_iqc i
+                   where i.source_doc_type = 'wm_outsource_order'
+                     and i.source_doc_id = t.order_id
+                     and i.factory_id = t.factory_id
+               ) as qc_status
+        from qxx_wm_outsource_order t
         <where>
+            t.order_id is not null
             <if test="orderCode != null and orderCode != ''"> and order_code like concat('%', #{orderCode}, '%')</if>
             <if test="vendorId != null"> and vendor_id = #{vendorId}</if>
             <if test="vendorName != null and vendorName != ''"> and vendor_name like concat('%', #{vendorName}, '%')</if>
@@ -152,6 +178,8 @@
         <trim prefix="SET" suffixOverrides=",">
             <if test="status != null">status = #{status},</if>
             <if test="feedbackId != null">feedback_id = #{feedbackId},</if>
+            <if test="iqcId != null">iqc_id = #{iqcId},</if>
+            <if test="iqcCode != null">iqc_code = #{iqcCode},</if>
             <if test="issueTotalQty != null">issue_total_qty = #{issueTotalQty},</if>
             <if test="recptTotalQty != null">recpt_total_qty = #{recptTotalQty},</if>
             <if test="cardId != null">card_id = #{cardId},</if>
@@ -173,5 +201,10 @@
     <delete id="deleteOutsourceOrderByOrderId" parameterType="Long">
         delete from qxx_wm_outsource_order where order_id = #{orderId}
     </delete>
+
+    <!-- 仅回写 IQC 挂点两列（工厂生成检验单后回填，避免并发覆盖整头） -->
+    <update id="updateOutsourceOrderHeaderRefs">
+        update qxx_wm_outsource_order set iqc_id = #{iqcId}, iqc_code = #{iqcCode} where order_id = #{orderId}
+    </update>
 
 </mapper>

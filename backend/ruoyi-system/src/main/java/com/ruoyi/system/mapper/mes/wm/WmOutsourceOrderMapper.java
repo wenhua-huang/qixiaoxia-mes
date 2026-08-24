@@ -1,6 +1,7 @@
 package com.ruoyi.system.mapper.mes.wm;
 
 import java.util.List;
+import org.apache.ibatis.annotations.Param;
 import com.ruoyi.system.domain.mes.wm.WmOutsourceOrder;
 
 /**
@@ -22,4 +23,9 @@ public interface WmOutsourceOrderMapper
 
     /** 删除外协单头（仅 DRAFT 状态，由 Service 层校验状态后调用） */
     int deleteOutsourceOrderByOrderId(Long orderId);
+
+    /** 仅回写 IQC 挂点两列（工厂生成检验单后回填，避免并发覆盖整头） */
+    int updateOutsourceOrderHeaderRefs(@Param("orderId") Long orderId,
+                                       @Param("iqcId") Long iqcId,
+                                       @Param("iqcCode") String iqcCode);
 }

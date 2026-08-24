@@ -9,6 +9,14 @@ import com.ruoyi.system.domain.mes.pro.ProTask;
 public interface ProTaskMapper {
     ProTask selectProTaskByTaskId(Long taskId);
     List<ProTask> selectProTaskList(ProTask task);
+
+    /**
+     * 查可报工任务：厂内 PRODUCING（workstation_code != 'VENDOR'）且所属工单处于
+     * PREPARE/PRODUCING。JOIN qxx_pro_workorder 过滤工单状态，避免查出工单已完工/
+     * 取消后仍残留在 PRODUCING 的僵尸任务（点进去会被 feedbackEntry 工单状态门控拦截）。
+     * factory_id 由拦截器自动注入（主表别名 t）。
+     */
+    List<ProTask> selectReportableTaskList(ProTask task);
     int insertProTask(ProTask task);
     int updateProTask(ProTask task);
     int deleteProTaskByTaskId(Long taskId);

@@ -51,6 +51,8 @@ import com.ruoyi.system.mapper.mes.wm.WmMaterialStockMapper;
 import com.ruoyi.system.mapper.mes.wm.WmOutsourceLineMapper;
 import com.ruoyi.system.mapper.mes.wm.WmOutsourceOrderMapper;
 import com.ruoyi.system.service.mes.pro.IProWorkorderDocService;
+import com.ruoyi.system.service.mes.qc.IQcFactoryService;
+import com.ruoyi.system.service.mes.qc.IQcGateService;
 import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 import com.ruoyi.system.service.mes.wm.IOutsourceService;
 import com.ruoyi.system.service.mes.wm.IWmBatchService;
@@ -113,6 +115,8 @@ public class OutsourceServiceImpl implements IOutsourceService
     @Autowired private WmMaterialStockMapper materialStockMapper;
     @Autowired private AutoCodeGenerator autoCodeGenerator;
     @Autowired private IProWorkorderDocService workorderDocService;
+    @Autowired private IQcFactoryService qcFactoryService;
+    @Autowired private IQcGateService qcGateService;
 
     private TransactionTemplate txTemplate;
 
@@ -766,6 +770,12 @@ public class OutsourceServiceImpl implements IOutsourceService
             upd.setUpdateBy(operator);
             upd.setUpdateTime(DateUtils.getNowDate());
             orderMapper.updateOutsourceOrder(upd);
+            // 厂商发货 = 物料到厂，按收货行生成来料检验单（PENDING），我方收货前需判定合格
+            List<WmOutsourceRecptLine> recptLines = lineMapper.selectRecptLinesByOrderId(orderId);
+            if (recptLines != null && !recptLines.isEmpty())
+            {
+                qcFactoryService.generateIqcForOutsource(order, recptLines);
+            }
             log.info("外协厂商发货: orderId={}, operator={}", orderId, operator);
             return orderMapper.selectOutsourceOrderByOrderId(orderId);
         }));
@@ -850,6 +860,9 @@ public class OutsourceServiceImpl implements IOutsourceService
         List<WmOutsourceRecptLine> recptLines = lineMapper.selectRecptLinesByOrderId(orderId);
         if (recptLines == null || recptLines.isEmpty())
             throw new ServiceException("无收货行，请先让厂商录入加工结果");
+
+        // 来料质检门：绑定了 IQC 模板的物料必须 COMPLETED+PASS/让步 才能收货入库
+        qcGateService.assertOutsourceReceivable(order, recptLines);
 
         // 逐行解析/生成成品独立批次（不沿用原材料批次），写回收货行，并捕获入库事务
         // （processTransaction 返回的 tx 携带实际影响的 materialStockId，用于写追溯边）

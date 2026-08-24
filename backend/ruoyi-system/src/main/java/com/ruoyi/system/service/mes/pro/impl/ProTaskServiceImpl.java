@@ -68,6 +68,12 @@ public class ProTaskServiceImpl implements IProTaskService
     }
 
     @Override
+    public List<ProTask> selectReportableTaskList(ProTask proTask)
+    {
+        return proTaskMapper.selectReportableTaskList(proTask);
+    }
+
+    @Override
     public List<ProTask> selectAll()
     {
         return proTaskMapper.selectProTaskList(new ProTask());

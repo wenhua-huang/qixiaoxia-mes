@@ -276,7 +276,7 @@
 
   // 生产管理入口
   function goReport() {
-    proxy.$tab.navigateTo('/pages/mes/pro/report')
+    proxy.$tab.navigateTo('/pages/mes/pro/report-list')
   }
   function goQc() {
     proxy.$tab.navigateTo('/pages/mes/qc/list')

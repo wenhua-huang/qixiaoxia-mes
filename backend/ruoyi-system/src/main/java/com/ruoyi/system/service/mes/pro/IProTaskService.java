@@ -14,6 +14,11 @@ public interface IProTaskService
 {
     public ProTask selectProTaskByTaskId(Long taskId);
     public List<ProTask> selectProTaskList(ProTask proTask);
+
+    /**
+     * 查可报工任务（厂内 PRODUCING + 工单 PREPARE/PRODUCING），供移动端待报工列表。
+     */
+    public List<ProTask> selectReportableTaskList(ProTask proTask);
     public List<ProTask> selectAll();
     public int insertProTask(ProTask proTask);
     public int updateProTask(ProTask proTask);

@@ -36,6 +36,13 @@
           <text class="label">报工ID</text>
           <text class="value">{{ record.feedbackId }}</text>
         </view>
+        <view class="info-row link-row" v-if="record.iqcId" @click="goInspect">
+          <text class="label">来料检验</text>
+          <view class="link-value">
+            <text class="link-text">{{ record.iqcCode || '查看检验单' }}</text>
+            <text class="link-arrow">›</text>
+          </view>
+        </view>
       </view>
 
       <!-- 发料明细 -->
@@ -91,6 +98,11 @@ onLoad((options) => {
     loading.value = false
   }).catch(() => { loading.value = false })
 })
+
+function goInspect() {
+  if (!record.value || !record.value.iqcId) return
+  proxy.$tab.navigateTo('/pages/mes/qc/inspect?type=IQC&id=' + record.value.iqcId)
+}
 </script>
 
 <style lang="scss" scoped>
@@ -102,6 +114,10 @@ page { background-color: #f5f6f7; min-height: 100%; }
 .label { color: #999; font-size: 26rpx; }
 .value { font-size: 28rpx; color: #333; }
 .bold { font-weight: 600; }
+.link-row { cursor: pointer; }
+.link-value { display: flex; align-items: center; gap: 8rpx; }
+.link-text { font-size: 28rpx; color: #409eff; }
+.link-arrow { font-size: 32rpx; color: #c0c4cc; }
 .detail-row { display: flex; justify-content: space-between; align-items: center; padding: 20rpx 0; border-bottom: 1px solid #f5f5f5; }
 .detail-row:last-child { border-bottom: none; }
 .detail-main { display: flex; flex-direction: column; gap: 4rpx; }

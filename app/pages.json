@@ -156,6 +156,12 @@
       "navigationBarTitleText": "生产报工"
     }
   }, {
+    "path": "pages/mes/pro/report-list",
+    "style": {
+      "navigationBarTitleText": "待报工",
+      "enablePullDownRefresh": true
+    }
+  }, {
     "path": "pages/mes/pro/scan",
     "style": {
       "navigationBarTitleText": "扫一扫"

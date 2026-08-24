@@ -31,6 +31,8 @@ import com.ruoyi.system.domain.mes.qc.QcTemplateIndex;
 import com.ruoyi.system.domain.mes.qc.QcTemplateProduct;
 import com.ruoyi.system.domain.mes.wm.WmItemRecpt;
 import com.ruoyi.system.domain.mes.wm.WmItemRecptLine;
+import com.ruoyi.system.domain.mes.wm.WmOutsourceOrder;
+import com.ruoyi.system.domain.mes.wm.WmOutsourceRecptLine;
 import com.ruoyi.system.domain.mes.wm.WmProductRecpt;
 import com.ruoyi.system.domain.mes.wm.WmProductRecptLine;
 import com.ruoyi.system.domain.mes.wm.WmProductSales;
@@ -48,6 +50,7 @@ import com.ruoyi.system.mapper.mes.qc.QcRqcMapper;
 import com.ruoyi.system.mapper.mes.qc.QcTemplateIndexMapper;
 import com.ruoyi.system.mapper.mes.qc.QcTemplateProductMapper;
 import com.ruoyi.system.mapper.mes.wm.WmItemRecptMapper;
+import com.ruoyi.system.mapper.mes.wm.WmOutsourceOrderMapper;
 import com.ruoyi.system.mapper.mes.wm.WmProductRecptLineMapper;
 import com.ruoyi.system.mapper.mes.wm.WmProductRecptMapper;
 import com.ruoyi.system.mapper.mes.wm.WmProductSalesMapper;
@@ -107,6 +110,9 @@ public class QcFactoryServiceImpl implements IQcFactoryService
 
     @Autowired
     private WmItemRecptMapper wmItemRecptMapper;
+
+    @Autowired
+    private WmOutsourceOrderMapper wmOutsourceOrderMapper;
 
     @Autowired
     private QcRqcMapper rqcMapper;
@@ -288,6 +294,106 @@ public class QcFactoryServiceImpl implements IQcFactoryService
         wmItemRecptMapper.updateWmItemRecptHeaderRefs(header.getRecptId(), iqc.getIqcId(), iqc.getIqcCode());
     }
 
+    // ──────────────────────── 外协收货 → IQC ────────────────────────
+
+    @Override
+    public void generateIqcForOutsource(WmOutsourceOrder order, List<WmOutsourceRecptLine> lines)
+    {
+        if (order == null || lines == null || lines.isEmpty())
+        {
+            return;
+        }
+        // 多行同物料合并为一组 → 一张检验单（与采购来料同范式）；未绑定模板 = 免检
+        Map<Long, List<WmOutsourceRecptLine>> byItem = lines.stream()
+            .filter(l -> l.getItemId() != null)
+            .collect(Collectors.groupingBy(WmOutsourceRecptLine::getItemId, LinkedHashMap::new, Collectors.toList()));
+        Map<Long, QcTemplateProduct> binds = resolveTemplates(QcConstants.TYPE_IQC, byItem.keySet(), null);
+        for (Map.Entry<Long, List<WmOutsourceRecptLine>> e : byItem.entrySet())
+        {
+            QcTemplateProduct bind = binds.get(e.getKey());
+            if (bind == null)
+            {
+                continue;
+            }
+            generateOneOutsourceIqc(order, e.getValue(), bind);
+        }
+    }
+
+    /** 先锁后事务：锁防同单并发重入，事务保证 头/行/挂点 三写原子 */
+    private void generateOneOutsourceIqc(WmOutsourceOrder order, List<WmOutsourceRecptLine> group, QcTemplateProduct bind)
+    {
+        String lockKey = QcConstants.LOCK_GENERATE + "iqc:os:" + order.getOrderId() + ":" + group.get(0).getItemId();
+        lockTemplate.execute(lockKey, () -> {
+            txTemplate.execute(tx -> {
+                doGenerateOneOutsourceIqc(order, group, bind);
+                return null;
+            });
+        });
+    }
+
+    /** 锁+事务内生成单物料 IQC：幂等检查 → 快照建单 → 建行 → 回填外协单头挂点 */
+    private void doGenerateOneOutsourceIqc(WmOutsourceOrder order, List<WmOutsourceRecptLine> group, QcTemplateProduct bind)
+    {
+        Long itemId = group.get(0).getItemId();
+        List<QcIqc> exist = iqcMapper.selectBySource(QcConstants.SOURCE_OUTSOURCE_ORDER, order.getOrderId(), itemId);
+        boolean hasActive = exist.stream().anyMatch(o -> !QcConstants.STATUS_CLOSED.equals(o.getStatus()));
+        if (hasActive)
+        {
+            return;  // 幂等：同来源+物料已有未关闭单
+        }
+        QcIqc iqc = buildOutsourceIqc(order, group, bind);
+        iqcMapper.insertQcIqc(iqc);
+        lineMapper.batchInsert(buildLinesFromTemplate(bind.getTemplateId(), QcConstants.TYPE_IQC, iqc.getIqcId()));
+        backfillOutsourceHeaderRefs(order, iqc);
+        qcTodoHelper.createTodo(QcConstants.TYPE_IQC, iqc.getIqcId(), iqc.getIqcCode(), iqc.getItemName());
+    }
+
+    /** 按绑定快照阈值构建外协 IQC 单头（收货行数量字段为 quantity；factory_id 由拦截器注入） */
+    private QcIqc buildOutsourceIqc(WmOutsourceOrder order, List<WmOutsourceRecptLine> group, QcTemplateProduct bind)
+    {
+        WmOutsourceRecptLine first = group.get(0);
+        BigDecimal received = group.stream().map(WmOutsourceRecptLine::getQuantity).map(this::nvl)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        Date now = new Date();
+        QcIqc iqc = new QcIqc();
+        iqc.setIqcCode(QcCodeGenerator.genIqcCode(autoCodeGenerator));
+        iqc.setIqcName("外协来料检验-" + StringUtils.defaultString(first.getItemName()));
+        iqc.setTemplateId(bind.getTemplateId());
+        iqc.setSourceDocId(order.getOrderId());
+        iqc.setSourceDocType(QcConstants.SOURCE_OUTSOURCE_ORDER);
+        iqc.setSourceDocCode(order.getOrderCode());
+        iqc.setVendorId(order.getVendorId());
+        iqc.setVendorCode(order.getVendorCode());
+        iqc.setVendorName(order.getVendorName());
+        iqc.setItemId(first.getItemId());
+        iqc.setItemCode(first.getItemCode());
+        iqc.setItemName(first.getItemName());
+        iqc.setSpecification(first.getSpecification());
+        iqc.setUnitOfMeasure(first.getUnitOfMeasure());
+        iqc.setQuantityReceived(received);
+        iqc.setQuantityMinCheck(bind.getQuantityCheck());
+        iqc.setQuantityMaxUnqualified(bind.getQuantityUnqualified());
+        iqc.setCrRateLimit(bind.getCrRate());
+        iqc.setMajRateLimit(bind.getMajRate());
+        iqc.setMinRateLimit(bind.getMinRate());
+        iqc.setReceiveDate(now);
+        iqc.setCreateTime(now);
+        iqc.setStatus(QcConstants.STATUS_PENDING);
+        return iqc;
+    }
+
+    /** 回填外协单头 IQC 挂点（仅首张；两列专用 UPDATE 避免并发覆盖整头） */
+    private void backfillOutsourceHeaderRefs(WmOutsourceOrder order, QcIqc iqc)
+    {
+        if (order.getIqcId() != null)
+        {
+            return;
+        }
+        order.setIqcId(iqc.getIqcId());
+        order.setIqcCode(iqc.getIqcCode());
+        wmOutsourceOrderMapper.updateOutsourceOrderHeaderRefs(order.getOrderId(), iqc.getIqcId(), iqc.getIqcCode());
+    }
+
     @Override
     public List<QcOrderLine> buildLinesFromTemplate(Long templateId, String qcType, Long qcId)
     {
@@ -328,7 +434,8 @@ public class QcFactoryServiceImpl implements IQcFactoryService
     @Override
     public void closeBySource(String sourceDocType, Long sourceDocId)
     {
-        if (QcConstants.SOURCE_ITEM_RECPT.equals(sourceDocType))
+        if (QcConstants.SOURCE_ITEM_RECPT.equals(sourceDocType)
+            || QcConstants.SOURCE_OUTSOURCE_ORDER.equals(sourceDocType))
         {
             List<QcIqc> orders = iqcMapper.selectBySource(sourceDocType, sourceDocId, null);
             for (QcIqc order : orders)

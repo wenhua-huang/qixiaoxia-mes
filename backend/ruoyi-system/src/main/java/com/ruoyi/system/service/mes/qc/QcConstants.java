@@ -54,6 +54,7 @@ public class QcConstants {
     public static final String SOURCE_PRODUCT_SALES = "wm_product_sales";
     public static final String SOURCE_CARD_PROCESS = "pro_card_process";
     public static final String SOURCE_RT_ISSUE = "wm_rt_issue";
+    public static final String SOURCE_OUTSOURCE_ORDER = "wm_outsource_order";
     // 判定锁 key 前缀
     public static final String LOCK_JUDGE = "qc:judge:";
     public static final String LOCK_GENERATE = "qc:generate:";

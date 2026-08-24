@@ -290,6 +290,7 @@ public class ProTaskServiceImpl implements IProTaskService
         if (!ProConstants.TASK_STATUS_PRODUCING.equals(task.getStatus()))
             throw new ServiceException("只有生产中的任务才能完成，当前状态：" + task.getStatus());
         task.setStatus(ProConstants.TASK_STATUS_COMPLETED);
+        task.setFinishDate(DateUtils.getNowDate());
         task.setUpdateTime(DateUtils.getNowDate());
         task.setUpdateBy(SecurityUtils.getUsername());
         proTaskMapper.updateProTask(task);

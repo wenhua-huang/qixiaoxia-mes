@@ -57,6 +57,12 @@ public class GanttDataServiceImpl implements IGanttDataService
     @Override
     public Map<String, Object> buildWorkOrderGantt(Long workorderId)
     {
+        return buildWorkOrderGantt(workorderId, true);
+    }
+
+    @Override
+    public Map<String, Object> buildWorkOrderGantt(Long workorderId, boolean autoSchedule)
+    {
         Map<String, Object> result = new LinkedHashMap<>();
         List<Map<String, Object>> tasks = new ArrayList<>();
         List<Map<String, Object>> links = new ArrayList<>();
@@ -94,9 +100,9 @@ public class GanttDataServiceImpl implements IGanttDataService
         taskQuery.setWorkorderId(workorderId);
         List<ProTask> taskList = proTaskMapper.selectProTaskList(taskQuery);
 
-        // 自动排产：无任务且有关联工艺路线时，先排产再返回数据
-        log.info("甘特图加载: workorderId={}, taskCount={}, routeId={}", workorderId, taskList.size(), routeId);
-        if (taskList.isEmpty() && routeId != null) {
+        // 自动排产：无任务且有关联工艺路线时，先排产再返回数据（仅编辑型甘特页；只读详情页不触发写操作）
+        log.info("甘特图加载: workorderId={}, taskCount={}, routeId={}, autoSchedule={}", workorderId, taskList.size(), routeId, autoSchedule);
+        if (autoSchedule && taskList.isEmpty() && routeId != null) {
             try {
                 scheduleService.scheduleWorkOrder(workorderId);
                 taskList = proTaskMapper.selectProTaskList(taskQuery);

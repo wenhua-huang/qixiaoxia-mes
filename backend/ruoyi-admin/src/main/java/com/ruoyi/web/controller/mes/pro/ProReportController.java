@@ -98,10 +98,14 @@ public class ProReportController extends BaseController
         return getDataTable(reportService.detail(range[0], range[1], workshopId, teamId));
     }
 
-    /** 默认本月 1 日 00:00 到 now */
+    /**
+     * 默认本月 1 日 00:00 到 now。
+     * 用户传的结束日（YYYY-MM-DD 解析为当天 00:00）补齐到 23:59:59.999，
+     * 否则 BETWEEN 会漏掉结束日当天 00:00 之后的数据。
+     */
     private Date[] defaultRange(Date begin, Date end)
     {
-        if (begin != null && end != null) return new Date[]{begin, end};
+        if (begin != null && end != null) return new Date[]{begin, endOfDay(end)};
         Calendar c = Calendar.getInstance();
         c.set(Calendar.DAY_OF_MONTH, 1);
         c.set(Calendar.HOUR_OF_DAY, 0);
@@ -109,5 +113,16 @@ public class ProReportController extends BaseController
         c.set(Calendar.SECOND, 0);
         c.set(Calendar.MILLISECOND, 0);
         return new Date[]{c.getTime(), new Date()};
+    }
+
+    private Date endOfDay(Date date)
+    {
+        Calendar c = Calendar.getInstance();
+        c.setTime(date);
+        c.set(Calendar.HOUR_OF_DAY, 23);
+        c.set(Calendar.MINUTE, 59);
+        c.set(Calendar.SECOND, 59);
+        c.set(Calendar.MILLISECOND, 999);
+        return c.getTime();
     }
 }

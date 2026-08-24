@@ -18,6 +18,13 @@ public interface IGanttDataService
     Map<String, Object> buildWorkOrderGantt(Long workorderId);
 
     /**
+     * 构建单工单甘特图数据（只读场景）。
+     * @param autoSchedule 无任务时是否触发自动排产；只读详情页传 false，避免 GET 请求产生写副作用
+     * @return { tasks: [...], links: [...] }
+     */
+    Map<String, Object> buildWorkOrderGantt(Long workorderId, boolean autoSchedule);
+
+    /**
      * 构建工作站维度甘特图（多工单聚合）
      */
     Map<String, Object> buildWorkstationGantt(Long workstationId, String startDate, String endDate);

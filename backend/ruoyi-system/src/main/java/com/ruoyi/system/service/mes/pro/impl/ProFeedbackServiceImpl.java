@@ -341,6 +341,7 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
         BigDecimal planned = task.getQuantity() != null ? task.getQuantity() : BigDecimal.ZERO;
         if (planned.compareTo(BigDecimal.ZERO) > 0 && produced.compareTo(planned) >= 0) {
             task.setStatus(ProConstants.TASK_STATUS_COMPLETED);
+            task.setFinishDate(DateUtils.getNowDate());
             task.setUpdateTime(DateUtils.getNowDate());
             task.setUpdateBy(SecurityUtils.getUsername());
             proTaskMapper.updateProTask(task);

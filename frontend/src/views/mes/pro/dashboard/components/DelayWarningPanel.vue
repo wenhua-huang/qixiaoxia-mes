@@ -13,8 +13,6 @@
         >
           <el-option label="临期" value="WARNING" />
           <el-option label="延期" value="DELAY" />
-          <el-option label="完工延期" value="FINISHED_DELAY" />
-          <el-option label="进度滞后" value="BEHIND" />
         </el-select>
       </div>
     </template>
@@ -59,7 +57,7 @@
           </el-table-column>
           <el-table-column label="状态" width="80" align="center">
             <template #default="{ row }">
-              <el-tag size="small" :type="workorderStatusType(row.status)">{{ statusText(row.status) }}</el-tag>
+              <dict-tag :options="statusOptions" :value="row.status" />
             </template>
           </el-table-column>
         </el-table>
@@ -112,7 +110,7 @@
           </el-table-column>
           <el-table-column label="状态" width="80" align="center">
             <template #default="{ row }">
-              <el-tag size="small" :type="workorderStatusType(row.status)">{{ statusText(row.status) }}</el-tag>
+              <dict-tag :options="statusOptions" :value="row.status" />
             </template>
           </el-table-column>
         </el-table>
@@ -135,13 +133,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, getCurrentInstance } from 'vue'
 import { listDelay } from '@/api/mes/pro/progress'
-import { delayText, delayType, statusText, workorderStatusType } from '@/utils/mes/progress'
+import { delayText, delayType, WORKORDER_STATUS_OPTIONS } from '@/utils/mes/progress'
 import { parseTime } from '@/utils/ruoyi'
 import WorkorderProgressDialog from '@/views/mes/pro/workorder/components/WorkorderProgressDialog.vue'
 
+const { proxy } = getCurrentInstance() as any
+const { mes_pro_task_status } = proxy.useDict('mes_pro_task_status')
+
 const activeTab = ref<'WORKORDER' | 'TASK'>('WORKORDER')
+// 工单状态暂无字典，用集中维护的选项；任务状态走 mes_pro_task_status 字典
+const statusOptions = computed(() =>
+  activeTab.value === 'TASK' ? mes_pro_task_status.value : WORKORDER_STATUS_OPTIONS
+)
 const loading = ref(false)
 const rows = ref<any[]>([])
 const total = ref(0)

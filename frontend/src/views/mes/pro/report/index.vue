@@ -107,7 +107,7 @@
         </el-table-column>
         <el-table-column label="状态" width="90" align="center">
           <template #default="{ row }">
-            <el-tag :type="workorderStatusType(row.status)">{{ statusText(row.status) }}</el-tag>
+            <dict-tag :options="WORKORDER_STATUS_OPTIONS" :value="row.status" />
           </template>
         </el-table-column>
         <el-table-column label="延期等级" width="100" align="center">
@@ -166,9 +166,14 @@ import { listDelay } from '@/api/mes/pro/progress'
 import { listAllWorkshop } from '@/api/mes/md/workshop'
 import { listTeam } from '@/api/mes/cal/team'
 import { parseTime } from '@/utils/ruoyi'
-import { statusText, workorderStatusType, delayType, delayText } from '@/utils/mes/progress'
+import { WORKORDER_STATUS_OPTIONS, delayType, delayText } from '@/utils/mes/progress'
 
 const { proxy } = getCurrentInstance() as any
+const { mes_pro_task_status } = proxy.useDict('mes_pro_task_status')
+
+function taskStatusLabel(v: string) {
+  return mes_pro_task_status.value?.find((d: any) => d.value === v)?.label || v
+}
 
 const dateRange = ref<[string, string] | []>(monthRange())
 const filterWorkshopIds = ref<number[]>([])
@@ -233,7 +238,7 @@ async function loadAll() {
   trendX.value = trend.map((x: any) => (x.statDate ? String(x.statDate).substring(0, 10) : ''))
   trendCreated.value = trend.map((x: any) => Number(x.createdCount) || 0)
   trendCompleted.value = trend.map((x: any) => Number(x.completedCount) || 0)
-  statusData.value = (s.data || []).map((x: any) => ({ name: statusText(x.status), value: Number(x.count) || 0 }))
+  statusData.value = (s.data || []).map((x: any) => ({ name: taskStatusLabel(x.status), value: Number(x.count) || 0 }))
   productivity.value = prod.data || []
   prodX.value = productivity.value.map((x: any) => x.groupName || '')
   prodPlan.value = productivity.value.map((x: any) => Number(x.standardOutput) || 0)

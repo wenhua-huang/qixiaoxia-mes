@@ -13,7 +13,7 @@
         <el-descriptions-item label="工单">{{ detail?.workorderCode }}</el-descriptions-item>
         <el-descriptions-item label="产品">{{ detail?.productName }}</el-descriptions-item>
         <el-descriptions-item label="状态">
-          <el-tag>{{ statusText(detail?.status) }}</el-tag>
+          <dict-tag v-if="detail" :options="WORKORDER_STATUS_OPTIONS" :value="detail.status" />
         </el-descriptions-item>
         <el-descriptions-item label="延期风险">
           <el-tag v-if="detail" :type="delayType(detail.delayLevel)">{{ delayText(detail.delayLevel) }}</el-tag>
@@ -59,9 +59,8 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { parseTime } from '@/utils/ruoyi'
 import GanttChart from '@/components/GanttChart/index.vue'
-import { getWorkorderProgress } from '@/api/mes/pro/progress'
-import { getWorkOrderGantt } from '@/api/mes/pro/gantt'
-import { statusText, delayText, delayType } from '@/utils/mes/progress'
+import { getWorkorderProgress, getWorkorderGanttReadonly } from '@/api/mes/pro/progress'
+import { WORKORDER_STATUS_OPTIONS, delayText, delayType } from '@/utils/mes/progress'
 import ProcessProgressTable from './ProcessProgressTable.vue'
 import CardSuborderTable from './CardSuborderTable.vue'
 
@@ -101,7 +100,7 @@ async function loadAll(id: number) {
   try {
     const [progRes, ganttRes] = await Promise.all([
       getWorkorderProgress(id).catch(() => null),
-      getWorkOrderGantt(id).catch(() => null)
+      getWorkorderGanttReadonly(id).catch(() => null)
     ])
     if (seq !== reqSeq) return
     detail.value = progRes?.data || null

@@ -11,6 +11,9 @@ import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.system.service.mes.pro.IProProgressService;
+import com.ruoyi.system.service.mes.pro.IGanttDataService;
+
+import java.util.Map;
 
 /**
  * 工单进度 Controller
@@ -24,6 +27,9 @@ public class ProProgressController extends BaseController
 {
     @Autowired
     private IProProgressService progressService;
+
+    @Autowired
+    private IGanttDataService ganttDataService;
 
     /**
      * 工单进度详情（含工序进度、流转卡进度）。
@@ -50,5 +56,17 @@ public class ProProgressController extends BaseController
         startPage();
         return getDataTable(progressService.selectDelayList(
                 objectType, riskLevel, workshopId, teamId, keyword));
+    }
+
+    /**
+     * 工单进度详情内嵌的甘特图（只读）。
+     * 复用工单查询权限，且不触发自动排产，避免只读弹窗产生写副作用或要求排产权限。
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:query')")
+    @GetMapping("/{workorderId}/gantt")
+    public AjaxResult getGantt(@PathVariable Long workorderId)
+    {
+        Map<String, Object> data = ganttDataService.buildWorkOrderGantt(workorderId, false);
+        return success(data);
     }
 }

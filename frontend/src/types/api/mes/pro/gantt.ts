@@ -14,6 +14,11 @@ export interface GanttTask {
   status?: string
   quantity?: number
   quantityProduced?: number
+  actualStartTime?: string | null
+  actualEndTime?: string | null
+  progressPercent?: number
+  delayLevel?: 'NORMAL' | 'WARNING' | 'DELAY' | 'FINISHED_DELAY' | 'BEHIND'
+  behindSchedule?: boolean
   children?: GanttTask[]
   materialStatus?: { status: 'ok' | 'shortage'; shortageNames: string }
 }

@@ -32,6 +32,14 @@ public interface IProWorkorderService
     public List<ProWorkorder> selectProWorkorderList(ProWorkorder proWorkorder);
 
     /**
+     * 批量回填在制进度字段（完成率、当前工序、计划/预计完工时间、剩余工时、是否按期）。
+     * 仅工单列表页 includeProgress=true 时调用，通过一次批量聚合查询填充，不影响列表主查询。
+     *
+     * @param list 已分页的工单列表
+     */
+    public void enrichProgress(List<ProWorkorder> list);
+
+    /**
      * 查询所有生产工单
      *
      * @return 生产工单集合

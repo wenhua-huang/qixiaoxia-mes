@@ -64,6 +64,10 @@ public class ProFeedback extends BaseEntity
     @Excel(name = "物料报废数量") private BigDecimal quantityMaterialScrap;
     @Excel(name = "其他报废数量") private BigDecimal quantityOtherScrap;
     @Excel(name = "报工人") private String userName;
+    @Excel(name = "报工人ID") private Long userId;
+    /** 班组ID(快照) */ private Long teamId;
+    /** 班组编码(快照) */ private String teamCode;
+    /** 班组名称(快照) */ private String teamName;
     @Excel(name = "报工人昵称") private String nickName;
     @Excel(name = "报工渠道") private String feedbackChannel;
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
@@ -173,6 +177,14 @@ public class ProFeedback extends BaseEntity
     public void setQuantityOtherScrap(BigDecimal v) { this.quantityOtherScrap = v; }
     public String getUserName() { return userName; }
     public void setUserName(String v) { this.userName = v; }
+    public Long getUserId() { return userId; }
+    public void setUserId(Long v) { this.userId = v; }
+    public Long getTeamId() { return teamId; }
+    public void setTeamId(Long v) { this.teamId = v; }
+    public String getTeamCode() { return teamCode; }
+    public void setTeamCode(String v) { this.teamCode = v; }
+    public String getTeamName() { return teamName; }
+    public void setTeamName(String v) { this.teamName = v; }
     public String getNickName() { return nickName; }
     public void setNickName(String v) { this.nickName = v; }
     public String getFeedbackChannel() { return feedbackChannel; }

@@ -18,6 +18,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="taskId"           column="task_id"          />
         <result property="taskCode"         column="task_code"        />
         <result property="processName"      column="process_name"     />
+        <result property="teamId"           column="team_id"          />
+        <result property="teamCode"         column="team_code"        />
+        <result property="teamName"         column="team_name"        />
         <result property="clockInTime"      column="clock_in_time"    />
         <result property="clockOutTime"     column="clock_out_time"   />
         <result property="workDuration"     column="work_duration"    />
@@ -33,6 +36,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select record_id, factory_id, user_id, user_name, nick_name,
                workstation_id, workstation_code, workstation_name,
                workorder_id, workorder_code, task_id, task_code, process_name,
+               team_id, team_code, team_name,
                clock_in_time, clock_out_time, work_duration, status,
                remark, create_by, create_time, update_by, update_time
         from qxx_pro_workrecord
@@ -94,6 +98,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="taskId != null">task_id,</if>
             <if test="taskCode != null and taskCode != ''">task_code,</if>
             <if test="processName != null and processName != ''">process_name,</if>
+            <if test="teamId != null">team_id,</if>
+            <if test="teamCode != null and teamCode != ''">team_code,</if>
+            <if test="teamName != null and teamName != ''">team_name,</if>
             <if test="clockInTime != null">clock_in_time,</if>
             <if test="clockOutTime != null">clock_out_time,</if>
             <if test="workDuration != null">work_duration,</if>
@@ -114,6 +121,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="taskId != null">#{taskId},</if>
             <if test="taskCode != null and taskCode != ''">#{taskCode},</if>
             <if test="processName != null and processName != ''">#{processName},</if>
+            <if test="teamId != null">#{teamId},</if>
+            <if test="teamCode != null and teamCode != ''">#{teamCode},</if>
+            <if test="teamName != null and teamName != ''">#{teamName},</if>
             <if test="clockInTime != null">#{clockInTime},</if>
             <if test="clockOutTime != null">#{clockOutTime},</if>
             <if test="workDuration != null">#{workDuration},</if>
@@ -149,6 +159,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="taskId != null">task_id = #{taskId},</if>
             <if test="taskCode != null and taskCode != ''">task_code = #{taskCode},</if>
             <if test="processName != null and processName != ''">process_name = #{processName},</if>
+            <if test="teamId != null">team_id = #{teamId},</if>
+            <if test="teamCode != null and teamCode != ''">team_code = #{teamCode},</if>
+            <if test="teamName != null and teamName != ''">team_name = #{teamName},</if>
             <if test="clockInTime != null">clock_in_time = #{clockInTime},</if>
             <if test="clockOutTime != null">clock_out_time = #{clockOutTime},</if>
             <if test="workDuration != null">work_duration = #{workDuration},</if>

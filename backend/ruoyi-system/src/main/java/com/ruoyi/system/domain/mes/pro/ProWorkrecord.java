@@ -38,6 +38,10 @@ public class ProWorkrecord extends BaseEntity
     private String taskCode;
     private String processName;
 
+    /** 班组ID(快照) */ private Long teamId;
+    /** 班组编码(快照) */ private String teamCode;
+    /** 班组名称(快照) */ private String teamName;
+
     /** 会话时间 */
     @Excel(name = "上工时间", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     private Date clockInTime;
@@ -75,6 +79,12 @@ public class ProWorkrecord extends BaseEntity
     public void setTaskCode(String v) { this.taskCode = v; }
     public String getProcessName() { return processName; }
     public void setProcessName(String v) { this.processName = v; }
+    public Long getTeamId() { return teamId; }
+    public void setTeamId(Long v) { this.teamId = v; }
+    public String getTeamCode() { return teamCode; }
+    public void setTeamCode(String v) { this.teamCode = v; }
+    public String getTeamName() { return teamName; }
+    public void setTeamName(String v) { this.teamName = v; }
     public Date getClockInTime() { return clockInTime; }
     public void setClockInTime(Date v) { this.clockInTime = v; }
     public Date getClockOutTime() { return clockOutTime; }

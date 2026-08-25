@@ -58,4 +58,21 @@ public class ProConstants
     public static final String WS_CODE_VENDOR = "VENDOR";
     /** 虚拟工作站编码：待自动分配（排产时尚未匹配到工作站） */
     public static final String WS_CODE_AUTO = "AUTO";
+
+    /** 报工状态 */
+    public static final String FEEDBACK_STATUS_PREPARE   = "PREPARE";
+    public static final String FEEDBACK_STATUS_CONFIRMED = "CONFIRMED";
+    public static final String FEEDBACK_STATUS_AUDITED   = "AUDITED";
+
+    /** 进度风险等级 */
+    public static final String DELAY_NORMAL         = "NORMAL";
+    public static final String DELAY_WARNING        = "WARNING";
+    public static final String DELAY_OVERDUE        = "DELAY";
+    public static final String DELAY_FINISHED_LATE  = "FINISHED_DELAY";
+    public static final String DELAY_BEHIND         = "BEHIND";
+
+    /** 进度阈值 sys_config key */
+    public static final String CFG_WARN_HOURS        = "mes.progress.warnHours";
+    public static final String CFG_WARN_DAYS         = "mes.progress.warnDays";
+    public static final String CFG_BEHIND_TOLERANCE  = "mes.progress.behindTolerance";
 }

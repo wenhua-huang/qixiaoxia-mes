@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.pro.ProProgressMapper">
+
+  <resultMap id="DelayItemMap" type="com.ruoyi.system.domain.mes.pro.vo.DelayItemVO">
+    <result property="objectType" column="object_type"/>
+    <result property="objectId" column="object_id"/>
+    <result property="objectCode" column="object_code"/>
+    <result property="workorderId" column="workorder_id"/>
+    <result property="workorderCode" column="workorder_code"/>
+    <result property="objectName" column="object_name"/>
+    <result property="productName" column="product_name"/>
+    <result property="workshopId" column="workshop_id"/>
+    <result property="workshopName" column="workshop_name"/>
+    <result property="teamId" column="team_id"/>
+    <result property="teamName" column="team_name"/>
+    <result property="workstationName" column="workstation_name"/>
+    <result property="planTime" column="plan_time"/>
+    <result property="requestDate" column="request_date"/>
+    <result property="actualEndTime" column="actual_end_time"/>
+    <result property="overdueDays" column="overdue_days"/>
+    <result property="progressPercent" column="progress_percent"/>
+    <result property="status" column="status"/>
+  </resultMap>
+
+  <select id="aggregateActualByTaskIds" resultType="java.util.HashMap">
+    SELECT cp.task_id AS taskId,
+           MIN(cp.input_time)  AS actualStart,
+           MAX(cp.output_time) AS actualEnd
+    FROM qxx_pro_card_process cp
+    WHERE cp.task_id IN
+    <foreach collection="taskIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    GROUP BY cp.task_id
+  </select>
+
+  <select id="aggregateWorkorderTime" resultType="java.util.HashMap">
+    SELECT MIN(t.start_time) AS planStart, MAX(t.end_time) AS planEnd,
+           MIN(cp.input_time) AS actualStart, MAX(cp.output_time) AS actualEnd
+    FROM qxx_pro_task t
+    LEFT JOIN qxx_pro_card_process cp ON cp.task_id = t.task_id AND cp.factory_id = t.factory_id
+    WHERE t.workorder_id = #{workorderId}
+  </select>
+
+  <select id="selectWorkorderDelays" resultMap="DelayItemMap">
+    SELECT 'WORKORDER' AS object_type, w.workorder_id AS object_id, w.workorder_code AS object_code,
+           w.workorder_id AS workorder_id, w.workorder_code AS workorder_code,
+           w.workorder_name AS object_name, w.product_name,
+           w.request_date, w.finish_date AS actual_end_time, w.status,
+           DATEDIFF(NOW(), w.request_date) AS overdue_days,
+           ROUND(IFNULL(w.quantity_produced,0)/NULLIF(w.quantity,0)*100,0) AS progress_percent
+    FROM qxx_pro_workorder w
+    <where>
+      w.status IN ('PREPARE','PRODUCING')
+      AND w.request_date IS NOT NULL
+      <choose>
+        <when test="riskLevel == 'DELAY'">AND w.request_date &lt; CURDATE()</when>
+        <when test="riskLevel == 'WARNING'">AND w.request_date &gt;= CURDATE()
+              AND w.request_date &lt;= DATE_ADD(CURDATE(), INTERVAL #{warnDays} DAY)</when>
+        <otherwise>
+          AND (w.request_date &lt; CURDATE()
+               OR (w.request_date &gt;= CURDATE()
+                   AND w.request_date &lt;= DATE_ADD(CURDATE(), INTERVAL #{warnDays} DAY)))
+        </otherwise>
+      </choose>
+      <if test="workshopId != null">
+        AND EXISTS (
+          SELECT 1 FROM qxx_pro_task pt
+          INNER JOIN qxx_md_workstation mws ON mws.workstation_id = pt.workstation_id AND mws.factory_id = pt.factory_id
+          WHERE pt.workorder_id = w.workorder_id AND pt.factory_id = w.factory_id AND mws.workshop_id = #{workshopId}
+        )
+      </if>
+      <if test="keyword != null and keyword != ''">
+        AND (w.workorder_code LIKE CONCAT('%',#{keyword},'%') OR w.workorder_name LIKE CONCAT('%',#{keyword},'%'))
+      </if>
+    </where>
+    ORDER BY w.request_date ASC
+  </select>
+
+  <select id="selectTaskDelays" resultMap="DelayItemMap">
+    SELECT 'TASK' AS object_type, t.task_id AS object_id, t.task_code AS object_code,
+           t.workorder_id AS workorder_id, w.workorder_code AS workorder_code,
+           t.task_name AS object_name, w.product_name,
+           ws.workshop_id, wshop.workshop_name, t.workstation_name,
+           t.end_time AS plan_time, w.request_date, t.finish_date AS actual_end_time, t.status,
+           DATEDIFF(NOW(), t.end_time) AS overdue_days,
+           ROUND(IFNULL(t.quantity_produced,0)/NULLIF(t.quantity,0)*100,0) AS progress_percent
+    FROM qxx_pro_task t
+    LEFT JOIN qxx_pro_workorder w ON w.workorder_id = t.workorder_id AND w.factory_id = t.factory_id
+    LEFT JOIN qxx_md_workstation ws ON ws.workstation_id = t.workstation_id AND ws.factory_id = t.factory_id
+    LEFT JOIN qxx_md_workshop wshop ON wshop.workshop_id = ws.workshop_id AND wshop.factory_id = t.factory_id
+    <where>
+      t.status IN ('PREPARE','NORMAL','PRODUCING','PAUSED')
+      AND t.end_time IS NOT NULL
+      <if test="workshopId != null"> AND ws.workshop_id = #{workshopId}</if>
+      <if test="teamId != null">
+        AND EXISTS (SELECT 1 FROM qxx_pro_feedback fb
+          WHERE fb.task_id = t.task_id AND fb.factory_id = t.factory_id AND fb.team_id = #{teamId} LIMIT 1)
+      </if>
+      <choose>
+        <when test="riskLevel == 'DELAY'">AND t.end_time &lt; NOW()</when>
+        <when test="riskLevel == 'WARNING'">AND t.end_time &gt;= NOW()
+              AND t.end_time &lt;= DATE_ADD(NOW(), INTERVAL #{warnHours} HOUR)</when>
+        <otherwise>
+          AND (t.end_time &lt; NOW()
+               OR (t.end_time &gt;= NOW()
+                   AND t.end_time &lt;= DATE_ADD(NOW(), INTERVAL #{warnHours} HOUR)))
+        </otherwise>
+      </choose>
+      <if test="keyword != null and keyword != ''">
+        AND (t.task_code LIKE CONCAT('%',#{keyword},'%') OR t.task_name LIKE CONCAT('%',#{keyword},'%'))
+      </if>
+    </where>
+    ORDER BY t.end_time ASC
+  </select>
+</mapper>

@@ -40,14 +40,10 @@
           <div v-for="(r,i) in rows" :key="'g'+i" class="gc-row" :style="{height:rowH+'px'}">
             <div v-for="(c,j) in cols" :key="'c'+j" class="gc-cell"
               :class="{we:c.isWE}" :style="{left:c.left+'px',width:colW+'px'}" />
-            <div v-if="r.t==='t' && r.s && r.e" class="gc-bar"
-              :class="{constrained: constrained}"
-              :style="{left:posX(r.s)+'px',width:Math.max(posX(r.e)-posX(r.s),4)+'px',background:r.c}"
-              @mouseup="onBarClick($event, r)"
-              @mousedown="onBarDown($event, r)" >
-              <div class="gc-resize-l" @mousedown.stop="onResizeDown($event, r, 'left')" />
-              <div class="gc-resize-r" @mousedown.stop="onResizeDown($event, r, 'right')" />
-            </div>
+            <GanttBar v-if="r.t==='t' && r.s && r.e" :row="r" :pos-x="posX" :readonly="readonly"
+              :constrained="constrained"
+              @bar-click="(e: MouseEvent)=>onBarClick(e,r)" @bar-down="(e: MouseEvent)=>onBarDown(e,r)"
+              @resize-down="(e: MouseEvent, s: 'left'|'right')=>onResizeDown(e,r,s)" />
           </div>
         </div>
       </div>
@@ -57,11 +53,12 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
-import { ElMessage } from 'element-plus'
 import type { GanttTask } from '@/types/api/mes/pro/gantt'
 import request from '@/utils/request'
+import GanttBar, { type GanttRow } from './GanttBar.vue'
+import { useGanttDrag } from './useGanttDrag'
 
-const props = defineProps<{ tasks: GanttTask[]; loading?: boolean }>()
+const props = withDefaults(defineProps<{ tasks: GanttTask[]; loading?: boolean; readonly?: boolean }>(), { readonly: false })
 const emit = defineEmits<{ (e: 'select', t: GanttTask): void; (e: 'barMove', t: GanttTask, newStart: string, newEnd: string): void }>()
 
 // ---- 配置 ----
@@ -79,8 +76,9 @@ const range = reactive({
 })
 
 // ---- 扁平行 ----
-interface Row { id: string; text: string; t: 'p'|'t'; s: Date|null; e: Date|null; c: string; raw: any; minStartMs?: number }
+type Row = GanttRow
 const rows = ref<Row[]>([])
+const rightRef = ref<HTMLElement>()
 
 // ---- 日历数据 ----
 const dayStatusMap = ref<Map<string, boolean>>(new Map()) // date → working?
@@ -113,6 +111,8 @@ const msPerUnit = computed(() => mode.value === 'day' ? 3600000 : 86400000)
 function posX(d: Date): number {
   return (d.getTime() - range.s.getTime()) / msPerUnit.value * colW.value
 }
+// 后端日期为 yyyy-MM-dd HH:mm:ss，空格分隔在部分 Safari 不可解析，统一转 T
+const parseDate = (s: string) => new Date(String(s).replace(' ', 'T'))
 
 // ---- 构建 ----
 function buildRows() {
@@ -125,13 +125,17 @@ function buildRows() {
       for (const c of p.children) {
         const row: Row = {
           id: c.id, text: c.processName || c.text, t: 't',
-          s: c.start ? new Date(c.start) : null,
-          e: c.end ? new Date(c.end) : null,
+          s: c.start ? parseDate(c.start) : null,
+          e: c.end ? parseDate(c.end) : null,
           c: c.colorCode || '#409eff', raw: c,
           // 首工序无约束，后续工序不能早于前道结束时间
-          minStartMs: isFirst ? 0 : prevEndMs
+          minStartMs: isFirst ? 0 : prevEndMs,
+          aS: c.actualStartTime ? parseDate(c.actualStartTime) : null,
+          aE: c.actualEndTime ? parseDate(c.actualEndTime) : null,
+          progress: typeof c.progressPercent === 'number' ? Math.min(100, Math.max(0, c.progressPercent)) : 0,
+          delayLevel: c.delayLevel || 'NORMAL'
         }
-        if (c.end) prevEndMs = new Date(c.end).getTime()
+        if (c.end) prevEndMs = parseDate(c.end).getTime()
         isFirst = false
         rr.push(row)
       }
@@ -168,75 +172,12 @@ async function render() {
 onMounted(render)
 watch(() => props.tasks, () => nextTick(render), { deep: true })
 
-// ---- 拖拽/拉伸 ----
-let dragRow: Row|null = null
-let dragType: 'move'|'resize-l'|'resize-r' = 'move'
-let dragStartX = 0
-let dragOrigStart = 0
-let dragOrigEnd = 0
-let dragNewStart = 0
-let dragNewEnd = 0
-let dragMoved = false
-let constraintShown = false
-const constrained = ref(false)  // 越界闪烁
-
-function onBarClick(_e: MouseEvent, row: Row) {
-  if (!dragMoved) emit('select', row.raw)
-}
-function onBarDown(e: MouseEvent, row: Row) { startDrag(e, row, 'move') }
-function onResizeDown(e: MouseEvent, row: Row, side: 'left'|'right') { startDrag(e, row, side==='left'?'resize-l':'resize-r') }
-
-function startDrag(e: MouseEvent, row: Row, type: 'move'|'resize-l'|'resize-r') {
-  if (!row.s || !row.e || !row.raw) return
-  dragType = type; dragRow = row; dragMoved = false
-  dragStartX = e.clientX
-  dragOrigStart = dragNewStart = row.s.getTime()
-  dragOrigEnd = dragNewEnd = row.e.getTime()
-  document.addEventListener('mousemove', onBarMove)
-  document.addEventListener('mouseup', onBarUp)
-  e.preventDefault()
-}
-
-function onBarMove(e: MouseEvent) {
-  if (!dragRow) return
-  dragMoved = true
-  const msDelta = (e.clientX - dragStartX) / colW.value * msPerUnit.value
-  if (dragType === 'resize-l') {
-    dragNewStart = Math.min(dragOrigStart + msDelta, dragNewEnd - 60000)
-  } else if (dragType === 'resize-r') {
-    dragNewEnd = Math.max(dragOrigEnd + msDelta, dragNewStart + 60000)
-  } else {
-    dragNewStart = dragOrigStart + msDelta
-    dragNewEnd = dragOrigEnd + msDelta
-  }
-  // 前置约束：不能越过前道工序结束时间
-  if (dragRow.minStartMs && dragRow.minStartMs > 0 && dragNewStart < dragRow.minStartMs) {
-    dragNewStart = dragRow.minStartMs
-    dragNewEnd = dragRow.minStartMs + (dragOrigEnd - dragOrigStart)
-    constrained.value = true
-    setTimeout(() => constrained.value = false, 800)
-    if (!constraintShown) { constraintShown = true; setTimeout(() => constraintShown = false, 2000)
-      ElMessage({ message: '受前置工序约束，不能往前移动', type: 'warning', duration: 1500 }) }
-  }
-  dragRow.s = new Date(dragNewStart)
-  dragRow.e = new Date(dragNewEnd)
-  rows.value = [...rows.value]
-}
-
-function onBarUp() {
-  document.removeEventListener('mousemove', onBarMove)
-  document.removeEventListener('mouseup', onBarUp)
-  if (!dragRow?.raw) { dragRow = null; return }
-  if (Math.abs(dragOrigStart - dragNewStart) < 300000 && Math.abs(dragOrigEnd - dragNewEnd) < 300000) {
-    dragRow = null; return
-  }
-  const localStr = (ms: number) => {
-    const d = new Date(ms)
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`
-  }
-  emit('barMove', dragRow.raw, localStr(dragNewStart), localStr(dragNewEnd))
-  dragRow = null
-}
+// ---- 拖拽/拉伸（抽到 composable，保持组件 ≤300 行）----
+const { constrained, onBarClick, onBarDown, onResizeDown } = useGanttDrag({
+  readonly: props.readonly, colW, msPerUnit, rows,
+  onSelect: (t) => emit('select', t),
+  onBarMove: (t, s, e) => emit('barMove', t, s, e)
+})
 
 // ---- 交互 ----
 function shiftRange(dir: number) {
@@ -271,7 +212,33 @@ function onScroll(e: Event) {
   }
 }
 
-defineExpose({ render })
+/** 按任务时间范围自动定位视窗（供只读详情/进度弹窗使用） */
+function fitToData() {
+  let min = Infinity, max = -Infinity
+  for (const p of props.tasks) {
+    for (const c of p.children || []) {
+      for (const v of [c.start, c.end, c.actualStartTime, c.actualEndTime]) {
+        if (!v) continue
+        const t = parseDate(v).getTime()
+        if (!Number.isNaN(t)) { if (t < min) min = t; if (t > max) max = t }
+      }
+    }
+  }
+  if (!Number.isFinite(min)) return
+  const HOUR = 3600000, DAY = 86400000
+  let s = min - HOUR, e = max + HOUR
+  const MAX = 60 * DAY
+  if (e - s > MAX) e = s + MAX
+  mode.value = e - s <= 2 * DAY ? 'day' : 'week'
+  const grid = mode.value === 'day' ? HOUR : DAY
+  s = Math.floor(s / grid) * grid
+  range.s = new Date(s)
+  range.e = new Date(e)
+  render()
+  nextTick(() => { if (rightRef.value) rightRef.value.scrollLeft = 0 })
+}
+
+defineExpose({ render, fitToData })
 </script>
 
 <style scoped lang="scss">
@@ -287,9 +254,4 @@ defineExpose({ render })
 .gc-grid { position:relative; }
 .gc-row { position:relative; border-bottom:1px solid #f2f3f5; }
 .gc-cell { position:absolute; top:0; height:100%; border-right:1px solid #f8f8f8; &.we { background:#fefafa; } }
-.gc-bar { position:absolute; top:3px; height:24px; border-radius:4px; cursor:grab; opacity:.9; z-index:1; display:flex; align-items:center; &:active { cursor:grabbing; } &:hover { opacity:1; box-shadow:0 2px 6px rgba(0,0,0,.2); } &.constrained { animation: flash .3s ease-in-out 2; border:2px solid #f56c6c; } }
-@keyframes flash { 0%,100% { opacity:.9; } 50% { opacity:.4; border-color:#f56c6c; } }
-.gc-resize-l, .gc-resize-r { width:6px; height:100%; position:absolute; top:0; cursor:ew-resize; }
-.gc-resize-l { left:0; border-radius:4px 0 0 4px; }
-.gc-resize-r { right:0; border-radius:0 4px 4px 0; }
 </style>

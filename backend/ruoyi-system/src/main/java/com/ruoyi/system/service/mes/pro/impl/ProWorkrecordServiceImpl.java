@@ -20,6 +20,7 @@ import com.ruoyi.system.mapper.mes.pro.ProTaskMapper;
 import com.ruoyi.system.mapper.mes.pro.ProUserWorkstationMapper;
 import com.ruoyi.system.mapper.mes.pro.ProWorkrecordMapper;
 import com.ruoyi.system.service.mes.pro.IProWorkrecordService;
+import com.ruoyi.system.service.mes.pro.TeamResolver;
 
 /**
  * 上下工会话记录Service业务层
@@ -40,6 +41,7 @@ public class ProWorkrecordServiceImpl implements IProWorkrecordService
     @Autowired private MdWorkstationMapper mdWorkstationMapper;
     @Autowired private ProTaskMapper proTaskMapper;
     @Autowired private RedisLockTemplate lockTemplate;
+    @Autowired private TeamResolver teamResolver;
 
     // ════════════════════════════════════════════
     // 业务方法：上工 / 下工
@@ -58,6 +60,12 @@ public class ProWorkrecordServiceImpl implements IProWorkrecordService
         e.setStatus(ProConstants.WORKRECORD_ACTIVE);
         e.setCreateTime(now);
         e.setCreateBy(SecurityUtils.getUsername());
+
+        // 班组快照：上工时按 userId 反查归属班组并固化（无班组不报错）
+        TeamResolver.TeamSnapshot snap = teamResolver.resolveByUserId(userId);
+        e.setTeamId(snap.teamId());
+        e.setTeamCode(snap.teamCode());
+        e.setTeamName(snap.teamName());
 
         // 冗余字段反查（工位编码名称 / 任务工序）
         fillRedundantFields(e);

@@ -79,37 +79,9 @@
         </el-card>
       </el-col>
 
-      <!-- 右侧：延迟预警列表 -->
+      <!-- 右侧：延期预警 -->
       <el-col :xs="24" :md="12">
-        <el-card class="panel-card" shadow="hover">
-          <template #header>
-            <div class="panel-header">
-              <span class="panel-title">延迟预警</span>
-              <el-tag type="danger" size="small" v-if="delayList.length">{{ delayList.length }} 条</el-tag>
-            </div>
-          </template>
-          <div class="delay-list" v-loading="delayLoading">
-            <div v-if="!delayList.length && !delayLoading" class="empty-hint" style="color:#67C23A">当前无延迟工单</div>
-            <el-table :data="delayList" size="small" max-height="380" :show-header="true" stripe>
-              <el-table-column label="工单" align="center" prop="workorderName" :show-overflow-tooltip="true" min-width="120" />
-              <el-table-column label="需求日期" align="center" prop="requestDate" width="100">
-                <template #default="scope">
-                  <span>{{ parseTime(scope.row.requestDate, '{y}-{m}-{d}') }}</span>
-                </template>
-              </el-table-column>
-              <el-table-column label="超期天数" align="center" width="90">
-                <template #default="scope">
-                  <el-tag type="danger" size="small">{{ getDelayDays(scope.row) }} 天</el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column label="状态" align="center" width="80">
-                <template #default="scope">
-                  <span :style="{ color: statusColor(scope.row.status) }">{{ statusMap[scope.row.status] || scope.row.status }}</span>
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
-        </el-card>
+        <DelayWarningPanel ref="delayPanelRef" />
       </el-col>
     </el-row>
 
@@ -127,16 +99,9 @@
 import { ref, reactive, onMounted, onUnmounted, getCurrentInstance } from 'vue'
 import { listWorkorder } from '@/api/mes/pro/workorder'
 import { listFeedback } from '@/api/mes/pro/feedback'
+import DelayWarningPanel from './components/DelayWarningPanel.vue'
 
 const { proxy } = getCurrentInstance() as any
-
-const statusMap: Record<string, string> = {
-  PREPARE: '待生产', PRODUCING: '生产中', COMPLETED: '已完成', CANCEL: '已取消', CLOSED: '已关闭'
-}
-function statusColor(s: string): string {
-  const map: Record<string, string> = { PREPARE: '#E6A23C', PRODUCING: '#1a3c5e', COMPLETED: '#67C23A', CANCEL: '#F56C6C', CLOSED: '#909399' }
-  return map[s] || '#909399'
-}
 
 // Stats
 const stats = reactive({
@@ -150,9 +115,8 @@ const stats = reactive({
 const progressList = ref<any[]>([])
 const progressLoading = ref(false)
 
-// Delay warning
-const delayList = ref<any[]>([])
-const delayLoading = ref(false)
+// Delay warning panel
+const delayPanelRef = ref()
 
 // Auto refresh
 const autoRefresh = ref(false)
@@ -168,14 +132,6 @@ function getProgressColor(item: any): string {
   if (pct >= 80) return '#67C23A'
   if (pct >= 50) return '#E6A23C'
   return '#1a3c5e'
-}
-function getDelayDays(item: any): number {
-  if (!item.requestDate) return 0
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const reqDate = new Date(item.requestDate)
-  reqDate.setHours(0, 0, 0, 0)
-  return Math.max(0, Math.floor((today.getTime() - reqDate.getTime()) / (1000 * 60 * 60 * 24)))
 }
 
 async function loadStats() {
@@ -200,24 +156,6 @@ async function loadProgress() {
   }
 }
 
-async function loadDelay() {
-  delayLoading.value = true
-  try {
-    const r: any = await listWorkorder({ pageNum: 1, pageSize: 100 } as any)
-    const all = r.rows || []
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    delayList.value = all.filter((wo: any) => {
-      if (!wo.requestDate || wo.status === 'COMPLETED') return false
-      const reqDate = new Date(wo.requestDate)
-      reqDate.setHours(0, 0, 0, 0)
-      return reqDate.getTime() < today.getTime()
-    })
-  } finally {
-    delayLoading.value = false
-  }
-}
-
 async function loadFeedbackStats() {
   try {
     // Today's feedback summary
@@ -238,7 +176,8 @@ async function loadFeedbackStats() {
 
 async function refreshData() {
   lastRefreshTime.value = proxy.parseTime(new Date(), '{y}-{m}-{d} {h}:{i}:{s}')
-  await Promise.all([loadStats(), loadProgress(), loadDelay(), loadFeedbackStats()])
+  await Promise.all([loadStats(), loadProgress(), loadFeedbackStats()])
+  delayPanelRef.value?.refresh()
 }
 
 function toggleAutoRefresh(v: boolean) {
@@ -370,14 +309,6 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer) })
         font-size: 11px;
         color: #c0c4cc;
       }
-    }
-  }
-
-  .delay-list {
-    .empty-hint {
-      text-align: center;
-      padding: 40px 0;
-      font-size: 14px;
     }
   }
 

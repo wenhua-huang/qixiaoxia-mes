@@ -50,6 +50,7 @@ import com.ruoyi.system.domain.mes.pro.ProMaterialTrace;
 import com.ruoyi.system.domain.mes.md.MdItem;
 import com.ruoyi.system.service.mes.pro.IProFeedbackService;
 import com.ruoyi.system.service.mes.pro.IProWorkorderDocService;
+import com.ruoyi.system.service.mes.pro.TeamResolver;
 import com.ruoyi.system.service.mes.qc.IQcFactoryService;
 
 /**
@@ -72,6 +73,7 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
         this.txTemplate.setTimeout(30);
     }
     @Autowired private ProFeedbackMapper qxxProFeedbackMapper;
+    @Autowired private TeamResolver teamResolver;
     @Autowired private ProFeedbackConsumeMapper consumeMapper;
     @Autowired private ProFeedbackParamMapper feedbackParamMapper;
     @Autowired private ProParamTemplateMapper proParamTemplateMapper;
@@ -232,10 +234,25 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
         }
     }
 
+    /**
+     * 填充班组快照：按 userId 优先、userName 兜底反查当前所属班组。
+     * 已存在 teamId 时跳过（幂等，审核/确认时不覆盖上工时固化的快照）。
+     * TeamResolver 无归属/解析失败返回空快照（字段 null），不阻断主流程。
+     */
+    private void fillTeamSnapshot(ProFeedback fb) {
+        if (fb == null || fb.getTeamId() != null) return;
+        TeamResolver.TeamSnapshot snap = fb.getUserId() != null
+                ? teamResolver.resolveByUserId(fb.getUserId())
+                : teamResolver.resolveByUserName(fb.getUserName());
+        fb.setTeamId(snap.teamId());
+        fb.setTeamCode(snap.teamCode());
+        fb.setTeamName(snap.teamName());
+    }
+
     private int doInsertProFeedback(ProFeedback proFeedback) {
         proFeedback.setCreateTime(DateUtils.getNowDate());
         proFeedback.setCreateBy(SecurityUtils.getUsername());
-        if (proFeedback.getStatus() == null) proFeedback.setStatus("PREPARE");
+        if (proFeedback.getStatus() == null) proFeedback.setStatus(ProConstants.FEEDBACK_STATUS_PREPARE);
         if (proFeedback.getFeedbackTime() == null) proFeedback.setFeedbackTime(DateUtils.getNowDate());
         // 报工编码：服务端权威生成（DB 唯一约束兜底）
         ensureFeedbackCode(proFeedback);
@@ -246,6 +263,12 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
                 proFeedback.setNickName(SecurityUtils.getLoginUser().getUser().getNickName());
             } catch (Exception ignored) {}
         }
+        // 报工人ID 兜底（用于班组快照反查；前端不传时取当前登录用户）
+        if (proFeedback.getUserId() == null) {
+            try { proFeedback.setUserId(SecurityUtils.getUserId()); } catch (Exception ignored) {}
+        }
+        // 班组快照：按 userId 反查归属班组并固化（无班组不报错）
+        fillTeamSnapshot(proFeedback);
         autoFillCodes(proFeedback);
         // 外协工序(is_outsource=1)禁止内部报工：走外协收货回写，避免厂内重复报工
         if ("INTERNAL".equals(proFeedback.getFeedbackType())
@@ -318,6 +341,7 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
         BigDecimal planned = task.getQuantity() != null ? task.getQuantity() : BigDecimal.ZERO;
         if (planned.compareTo(BigDecimal.ZERO) > 0 && produced.compareTo(planned) >= 0) {
             task.setStatus(ProConstants.TASK_STATUS_COMPLETED);
+            task.setFinishDate(DateUtils.getNowDate());
             task.setUpdateTime(DateUtils.getNowDate());
             task.setUpdateBy(SecurityUtils.getUsername());
             proTaskMapper.updateProTask(task);
@@ -490,10 +514,12 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
             txTemplate.execute(status -> {
                 ProFeedback fb = qxxProFeedbackMapper.selectProFeedbackByRecordIdForUpdate(recordId);
                 if (fb == null) throw new ServiceException("报工记录不存在");
-                if (!"CONFIRMED".equals(fb.getStatus())) throw new ServiceException("只有已确认状态的报工才能审核");
+                if (!ProConstants.FEEDBACK_STATUS_CONFIRMED.equals(fb.getStatus())) throw new ServiceException("只有已确认状态的报工才能审核");
 
                 // 更新报工状态
-                fb.setStatus("AUDITED");
+                fb.setStatus(ProConstants.FEEDBACK_STATUS_AUDITED);
+                // 历史数据兜底：插入时未固化班组的，审核时补填
+                fillTeamSnapshot(fb);
                 fb.setUpdateTime(DateUtils.getNowDate());
                 fb.setUpdateBy(SecurityUtils.getUsername());
                 qxxProFeedbackMapper.updateProFeedback(fb);
@@ -705,10 +731,12 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
     public String confirmFeedback(Long recordId) {
         ProFeedback fb = qxxProFeedbackMapper.selectProFeedbackByRecordId(recordId);
         if (fb == null) throw new ServiceException("报工记录不存在");
-        if (!"PREPARE".equals(fb.getStatus())) {
+        if (!ProConstants.FEEDBACK_STATUS_PREPARE.equals(fb.getStatus())) {
             throw new ServiceException("只有待确认状态的报工才能确认,当前状态:" + fb.getStatus());
         }
-        fb.setStatus("CONFIRMED");
+        fb.setStatus(ProConstants.FEEDBACK_STATUS_CONFIRMED);
+        // 历史数据兜底：插入时未固化班组的，确认时补填
+        fillTeamSnapshot(fb);
         fb.setUpdateTime(DateUtils.getNowDate());
         fb.setUpdateBy(SecurityUtils.getUsername());
         qxxProFeedbackMapper.updateProFeedback(fb);

@@ -264,4 +264,60 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           and status != 'CANCEL'
           and product_id is not null
     </select>
+
+    <!--
+      批量查询工单下非终态任务（进度列表聚合用）。
+      主表 t 的 factory_id 由 FactoryIdInterceptor 注入；JOIN route_process 显式带 factory_id 等值。
+    -->
+    <select id="selectActiveTasksByWorkorderIds"
+            resultType="com.ruoyi.system.domain.mes.pro.vo.ProTaskProgressRow">
+        SELECT t.workorder_id    AS workorderId,
+               t.process_name    AS processName,
+               t.status          AS status,
+               rp.order_num      AS orderNum,
+               t.quantity        AS quantity,
+               t.quantity_produced AS quantityProduced,
+               t.setup_duration  AS setupDuration,
+               t.unit_duration   AS unitDuration,
+               t.end_time        AS endTime
+        FROM qxx_pro_task t
+        LEFT JOIN qxx_pro_route_process rp
+               ON rp.route_id = t.route_id
+              AND rp.process_id = t.process_id
+              AND rp.factory_id = t.factory_id
+        WHERE t.workorder_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+          AND t.status NOT IN ('COMPLETED','CANCEL')
+    </select>
+
+    <!--
+      批量查询工序步骤点：一道工序一行，done 标注是否完工。
+      主表 t 的 factory_id 由 FactoryIdInterceptor 注入；JOIN route_process 带 factory_id 等值。
+    -->
+    <select id="selectProcessStepsByWorkorderIds"
+            resultType="com.ruoyi.system.domain.mes.pro.vo.ProTaskProgressStep">
+        SELECT t.workorder_id   AS workorderId,
+               COALESCE(rp.order_num, 9999) AS orderNum,
+               t.process_name   AS processName,
+               SUM(t.quantity)           AS quantity,
+               SUM(t.quantity_produced)  AS quantityProduced,
+               (NOT EXISTS (
+                   SELECT 1 FROM qxx_pro_task x
+                   WHERE x.workorder_id = t.workorder_id
+                     AND x.route_id = t.route_id
+                     AND x.process_id = t.process_id
+                     AND x.factory_id = t.factory_id
+                     AND x.status NOT IN ('COMPLETED','CANCEL')
+               ))              AS done
+        FROM qxx_pro_task t
+        LEFT JOIN qxx_pro_route_process rp
+               ON rp.route_id = t.route_id
+              AND rp.process_id = t.process_id
+              AND rp.factory_id = t.factory_id
+        WHERE t.workorder_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+          AND t.status &lt;&gt; 'CANCEL'
+        GROUP BY t.workorder_id, rp.order_num, t.route_id, t.process_id, t.process_name
+        ORDER BY t.workorder_id, COALESCE(rp.order_num, 9999)
+    </select>
 </mapper>

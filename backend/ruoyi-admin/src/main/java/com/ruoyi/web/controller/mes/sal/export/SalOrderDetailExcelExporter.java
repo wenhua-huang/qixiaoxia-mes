@@ -156,6 +156,7 @@ public class SalOrderDetailExcelExporter extends AbstractExcelExporter<SalOrder>
         {
             case "NEW" -> "新单";
             case "REPEAT" -> "返单";
+            case "STOCK" -> "备货订单";
             default -> str(s);
         };
     }

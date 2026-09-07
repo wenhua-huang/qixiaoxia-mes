@@ -50,6 +50,14 @@ public final class WmIssueConstants
     /** 终态（不可再流转） */
     public static final String[] TERMINAL_STATUSES = {STATUS_CLOSED, STATUS_CANCELED};
 
+    /**
+     * 已实际发料出库的状态（quantity_onhand 已扣、料已离库到车间）：
+     * 部分发料 / 全部发料 / 发料后关闭。报工领料校验据此放行；
+     * ALLOCATED 仅预占（料仍在仓库）不算已领料。
+     */
+    public static final String[] MATERIAL_ISSUED_STATUSES = {
+            STATUS_PARTIAL_ISSUED, STATUS_ISSUED, STATUS_CLOSED};
+
     // ==================== 库存事务类型（qxx_wm_transaction.transaction_type） ====================
     /** 预占：领料确认/预占时扣减可用库存（负数） */
     public static final String TX_ALLOCATE = "ALLOCATE";
@@ -106,6 +114,17 @@ public final class WmIssueConstants
     {
         if (status == null) return false;
         for (String s : TERMINAL_STATUSES)
+        {
+            if (s.equals(status)) return true;
+        }
+        return false;
+    }
+
+    /** 判断领料单是否已实际发料出库（料已离库到车间）；ALLOCATED 仅预占，不算 */
+    public static boolean isMaterialIssued(String status)
+    {
+        if (status == null) return false;
+        for (String s : MATERIAL_ISSUED_STATUSES)
         {
             if (s.equals(status)) return true;
         }

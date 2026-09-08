@@ -161,8 +161,10 @@ public class ProWorkorderController extends BaseController
     /**
      * 偏离检测：比较提交的 BOM/参数 与 路线标准。
      * 纯计算，不持久化。前端据此弹窗询问用户是否创建变体。
+     * 新增/编辑向导共用此接口，add 或 edit 权限任一即可（手工新增入口回收后，
+     * 仅有 edit 权限的角色编辑工单时偏离检测不能 403）。
      */
-    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:add')")
+    @PreAuthorize("@ss.hasAnyPermi('mes:pro:workorder:add,mes:pro:workorder:edit')")
     @PostMapping("/checkDeviation")
     public AjaxResult checkDeviation(@RequestBody ProWorkorderCreateRequest request)
     {

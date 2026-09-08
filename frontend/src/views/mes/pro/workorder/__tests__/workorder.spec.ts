@@ -387,10 +387,10 @@ describe('生产工单 — workorder/index.vue submitForm', () => {
   // 开工检查弹窗 — 豁免按钮显示条件（canOverrideStart）
   // ══════════════════════════════════════════════
 
-  it('开工检查排产FAIL时 canOverrideStart 应为 true（豁免按钮显示）', async () => {
+  it('开工检查排产FAIL（完全未排产，可豁免）时 canOverrideStart 应为 true（豁免按钮显示）', async () => {
     mockStartWithCheck.mockResolvedValueOnce({ data: [
       { step: 1, status: 'PASS', message: '齐套', details: [] },
-      { step: 2, status: 'FAIL', message: '工序未排产', details: [{ processId: 7 }] },
+      { step: 2, status: 'FAIL', overridable: true, message: '工序未排产', details: [{ processId: 7, execType: 'UNSCHEDULED', assigned: false }] },
     ] })
     const wrapper = mountWorkorder()
     await nextTick(); await nextTick()
@@ -401,7 +401,29 @@ describe('生产工单 — workorder/index.vue submitForm', () => {
     expect(vm.startCheckOpen).toBe(true)
     expect(vm.startCheckRunning).toBe(false)
     expect(vm.startCheckSteps[1].status).toBe('error') // 排产FAIL→error
+    expect(vm.startCheckSteps[1].overridable).toBe(true)
     expect(vm.canOverrideStart()).toBe(true)
+    expect(vm.isMachineHardBlock()).toBe(false) // 未排产不是机台硬拦截
+  })
+
+  it('开工检查厂内工序未指派机台（硬拦截）时不显示豁免、显示去指派按钮', async () => {
+    mockStartWithCheck.mockResolvedValueOnce({ data: [
+      { step: 1, status: 'PASS', message: '齐套', details: [] },
+      { step: 2, status: 'FAIL', overridable: false, message: '以下厂内工序尚未指派机台：印刷', details: [
+        { processId: 204, processName: '纸张分切', execType: 'OUTSOURCE', execTypeName: '外协', resourceName: '万隆', assigned: true },
+        { processId: 200, processName: '印刷', execType: 'INHOUSE', execTypeName: '厂内', resourceName: '待指派机台', assigned: false },
+      ] },
+    ] })
+    const wrapper = mountWorkorder()
+    await nextTick(); await nextTick()
+    const vm = wrapper.vm as any
+    vm.handleStart({ workorderId: 3, workorderName: 'WO-机台硬拦截' })
+    await nextTick(); await nextTick(); await nextTick()
+
+    expect(vm.startCheckSteps[1].status).toBe('error')
+    expect(vm.startCheckSteps[1].overridable).toBe(false)
+    expect(vm.canOverrideStart()).toBe(false)      // 厂内无机台不可豁免
+    expect(vm.isMachineHardBlock()).toBe(true)    // 显示"去甘特指派机台"
   })
 
   it('开工检查全通过时 canOverrideStart 应为 false（无豁免按钮）', async () => {

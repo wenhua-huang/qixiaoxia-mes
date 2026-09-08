@@ -15,7 +15,7 @@
           <el-tag size="small" :type="statusMap[wo.status]?.type">{{ statusMap[wo.status]?.label }}</el-tag>
           <span style="font-size:11px">数量: {{ wo.quantity }}</span>
         </div>
-        <el-button size="small" type="primary" plain @click.stop="scheduleOne(wo)"
+        <el-button v-if="autoEnabled" size="small" type="primary" plain @click.stop="scheduleOne(wo)"
           :loading="schedId === wo.workorderId">
           自动排产
         </el-button>
@@ -31,6 +31,9 @@ import request from '@/utils/request'
 import { listWorkorder } from '@/api/mes/pro/workorder'
 
 const emit = defineEmits<{ (e: 'select', id: number): void; (e: 'scheduled'): void }>()
+
+// 自动排产总开关：停用时隐藏卡片上的「自动排产」按钮（默认启用，由父页甘特页传入）
+withDefaults(defineProps<{ autoEnabled?: boolean }>(), { autoEnabled: true })
 
 const loading = ref(false)
 const schedId = ref<number | null>(null)
@@ -57,8 +60,14 @@ async function load() {
 async function scheduleOne(wo: any) {
   schedId.value = wo.workorderId
   try {
-    await request({ url: `/mes/pro/gantt/schedule/${wo.workorderId}`, method: 'post' })
-    ElMessage.success(`${wo.workorderCode} 排产完成`)
+    const res: any = await request({ url: `/mes/pro/gantt/schedule/${wo.workorderId}`, method: 'post' })
+    const rawPending: string[] = res?.data?.pendingProcesses || []
+    const pending: string[] = [...new Set(rawPending)]
+    if (pending.length) {
+      ElMessage.warning(`${wo.workorderCode} 已排产，但「${pending.join('、')}」未配机台、已置待指派，请在机台视图指派后再下发`)
+    } else {
+      ElMessage.success(`${wo.workorderCode} 排产完成，已落到具体机台`)
+    }
     emit('scheduled')
   } catch { ElMessage.error('排产失败') }
   finally { schedId.value = null }

@@ -404,7 +404,7 @@ describe('甘特图任务CRUD — 单元测试', () => {
       await vm.submitTaskEdit()
       await nextTick()
 
-      expect(warnSpy).toHaveBeenCalledWith('请选择工作站')
+      expect(warnSpy).toHaveBeenCalledWith('请选择机台')
       expect(addTask).not.toHaveBeenCalled()
     })
 
@@ -419,7 +419,7 @@ describe('甘特图任务CRUD — 单元测试', () => {
       await vm.submitTaskEdit()
       await nextTick()
 
-      expect(warnSpy).toHaveBeenCalledWith('请选择工作站')
+      expect(warnSpy).toHaveBeenCalledWith('请选择机台')
       const { updateTask } = await import('@/api/mes/pro/task')
       expect(updateTask).not.toHaveBeenCalled()
     })

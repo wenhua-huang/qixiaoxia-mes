@@ -2,7 +2,7 @@
   <div class="gantt-page">
     <!-- 搜索栏 -->
     <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="80px">
-      <el-form-item label="生产工单" prop="workorderId">
+      <el-form-item v-if="viewMode==='workorder'" label="生产工单" prop="workorderId">
         <el-select v-model="queryParams.workorderId" placeholder="输入编号/名称搜索" clearable
           filterable remote :remote-method="searchWorkorders" :loading="woLoading"
           @update:model-value="onWorkorderChange" style="width:340px">
@@ -11,23 +11,15 @@
             :value="wo.workorderId" />
         </el-select>
       </el-form-item>
-      <el-form-item label="工作站" prop="workstationId">
-        <el-select v-model="queryParams.workstationId" placeholder="输入工作站搜索" clearable
-          filterable remote :remote-method="searchWorkstations" :loading="wsLoading"
-          @change="loadGanttData" style="width:220px">
-          <el-option v-for="ws in workstationList" :key="ws.workstationId"
-            :label="ws.workstationName" :value="ws.workstationId" />
-        </el-select>
-      </el-form-item>
       <el-form-item label="视角">
-        <el-radio-group v-model="viewMode" @change="loadGanttData" size="small">
+        <el-radio-group v-model="viewMode" @change="onViewChange" size="small">
           <el-radio-button value="workorder">工单</el-radio-button>
-          <el-radio-button value="workstation">工作站</el-radio-button>
+          <el-radio-button value="machine">机台</el-radio-button>
         </el-radio-group>
       </el-form-item>
       <el-form-item>
         <el-button type="primary" @click="loadGanttData" :icon="Search">查询</el-button>
-        <el-button @click="resetQuery" :icon="Refresh">重置</el-button>
+        <el-button v-if="viewMode==='workorder'" @click="resetQuery" :icon="Refresh">重置</el-button>
       </el-form-item>
     </el-form>
 
@@ -37,7 +29,7 @@
         <el-button type="primary" plain @click="loadGanttData" :icon="Refresh" :loading="loading">刷新</el-button>
       </el-col>
       <el-col :span="1.5">
-        <el-button type="success" plain @click="autoSchedule" :loading="scheduling" v-hasPermi="['mes:pro:gantt:schedule']">
+        <el-button v-if="autoScheduleEnabled" type="success" plain @click="autoSchedule" :loading="scheduling" v-hasPermi="['mes:pro:gantt:schedule']">
           自动排产
         </el-button>
       </el-col>
@@ -55,14 +47,14 @@
     </el-row>
 
     <div class="gantt-layout">
-      <WorkOrderQueue ref="queueRef" @select="onQueueSelect" @scheduled="loadGanttData" />
+      <WorkOrderQueue v-if="viewMode==='workorder'" ref="queueRef" :auto-enabled="autoScheduleEnabled" @select="onQueueSelect" @scheduled="loadGanttData" />
       <div class="gantt-main">
-        <GanttChart ref="ganttRef" :tasks="ganttTasks" :loading="loading"
-          @select="onTaskSelect" @bar-move="onBarMove" />
+        <GanttChart ref="ganttRef" :tasks="ganttTasks" :lanes="viewMode==='machine' ? laneRows : null"
+          :loading="loading" @select="onTaskSelect" @bar-move="onBarMove" />
       </div>
     </div>
 
-    <UtilizationBar :tasks="ganttTasks" />
+    <UtilizationBar v-if="viewMode==='workorder'" :tasks="ganttTasks" />
 
     <!-- 排产快照面板暂时下线（半成品：预览未接通/列表未按工单过滤/数据可能截断），恢复时取消本注释即可
     <SnapShotPanel ref="snapRef" :workorder-id="queryParams.workorderId" :tasks="ganttTasks" @refresh="loadGanttData" />
@@ -70,8 +62,8 @@
 
     <!-- 任务详情/编辑弹窗 -->
     <el-dialog :title="taskDialogTitle" v-model="detailOpen" width="500px" append-to-body @close="onDialogClose">
-      <el-form :model="taskForm" label-width="110px" :disabled="taskDialogMode==='view'">
-        <el-form-item label="工序">
+      <el-form ref="taskFormRef" :model="taskForm" :rules="taskRules" label-width="110px" :disabled="taskDialogMode==='view'">
+        <el-form-item label="工序" prop="processId">
           <el-select v-model="taskForm.processId" style="width:100%" filterable
             :disabled="taskDialogMode==='view' || !!taskForm.taskId"
             placeholder="请选择工序"
@@ -80,9 +72,10 @@
               :label="p.processName" :value="p.processId" />
           </el-select>
         </el-form-item>
-        <el-form-item label="工作站">
-          <el-select v-model="taskForm.workstationId" style="width:100%" filterable clearable
+        <el-form-item label="工作站" prop="workstationId">
+          <el-select v-model="taskForm.workstationId" style="width:100%" filterable
             :disabled="taskDialogMode==='view'"
+            placeholder="请选择机台（必选）"
             @focus="onWorkstationFocus">
             <el-option v-for="ws in filteredWorkstationList" :key="ws.workstationId"
               :label="ws.workstationName + (ws.idle === false ? '（占用）' : (ws.idle === true ? '（空闲）' : ''))"
@@ -123,12 +116,12 @@
 </template>
 
 <script setup lang="ts" name="ProGantt">
-import { ref, reactive, onMounted, computed, watch, getCurrentInstance } from 'vue'
+import { ref, reactive, onMounted, computed, watch, nextTick, getCurrentInstance } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh } from '@element-plus/icons-vue'
 import request from '@/utils/request'
-import { getWorkOrderGantt, getWorkstationGantt, getAvailableWorkstations } from '@/api/mes/pro/gantt'
+import { getWorkOrderGantt, getAvailableWorkstations, getWorkstationView } from '@/api/mes/pro/gantt'
 import { listWorkorder, getWorkorderDetail } from '@/api/mes/pro/workorder'
 import { listWorkstation } from '@/api/mes/md/workstation'
 import { addTask, updateTask, delTask } from '@/api/mes/pro/task'
@@ -136,7 +129,7 @@ import GanttChart from '@/components/GanttChart/index.vue'
 // import SnapShotPanel from './SnapShotPanel.vue'  // 排产快照面板暂时下线，恢复时取消注释
 import WorkOrderQueue from './WorkOrderQueue.vue'
 import UtilizationBar from './UtilizationBar.vue'
-import type { GanttTask } from '@/types/api/mes/pro/gantt'
+import type { GanttTask, WorkstationLane } from '@/types/api/mes/pro/gantt'
 
 const route = useRoute()
 const { proxy } = getCurrentInstance() as any
@@ -147,15 +140,18 @@ const { mes_pro_task_status } = proxy.useDict('mes_pro_task_status')
 const showSearch = ref(true)
 const loading = ref(false)
 const scheduling = ref(false)
+// 自动排产总开关（sys_config: mes.pro.schedule.autoEnabled）；停用则隐藏自动排产入口，默认启用
+const autoScheduleEnabled = ref(true)
 const woLoading = ref(false)
 const wsLoading = ref(false)
 const ganttRef = ref()
 const queueRef = ref()
 const ganttTasks = ref<GanttTask[]>([])
+const laneRows = ref<WorkstationLane[]>([])
 const workorderList = ref<any[]>([])
 const workstationList = ref<any[]>([])
 
-const viewMode = ref<'workorder'|'workstation'>('workorder')
+const viewMode = ref<'workorder'|'machine'>('workorder')
 const queryParams = reactive({
   workorderId: null as number | null,
   workstationId: null as number | null
@@ -184,6 +180,12 @@ const taskForm = reactive({
   setupDuration: 0,
   colorCode: '#409eff',
 })
+// 排产弹窗表单 ref + 校验规则（机台必选，未选禁止保存）
+const taskFormRef = ref()
+const taskRules = {
+  processId: [{ required: true, message: '请选择工序', trigger: 'change' }],
+  workstationId: [{ required: true, message: '请选择机台', trigger: 'change' }]
+}
 const taskDialogTitle = computed(() => {
   const prefix = taskDialogMode.value === 'view' ? '任务详情 — ' : '编辑任务 — '
   return prefix + (selectedTask.value.processName || selectedTask.value.text || '')
@@ -208,6 +210,11 @@ const processOptions = computed(() => {
         list.push({ processId: pid, processName: c.processName || `工序#${pid}` })
       }
     }
+  }
+  // 机台视角兜底：当前编辑任务的工序不在列表中时补进来（否则工序下拉显示空白）
+  const st = selectedTask.value as any
+  if (st?.processId && !list.some((o: any) => o.processId === st.processId)) {
+    list.push({ processId: st.processId, processName: st.processName || `工序#${st.processId}`, processCode: st.processCode })
   }
   return list
 })
@@ -335,9 +342,20 @@ watch([() => taskForm.startTime, () => taskForm.endTime], () => {
   if (detailOpen.value) loadAvailableWorkstations()
 })
 
+// 弹窗每次打开时清除上一次的校验红框
+watch(detailOpen, (open) => {
+  if (open) nextTick(() => taskFormRef.value?.clearValidate?.())
+})
+
 onMounted(async () => {
   // 预加载完整工作站列表，供编辑弹窗下拉选择 + 根据 id 显示名称（避免弹窗显示裸 id）
   loadWorkstations()
+  // 读自动排产总开关：仅显式 "false" 停用（值在 response.msg）；接口失败/无此全局方法(测试环境)时默认启用
+  if (proxy.getConfigKey) {
+    proxy.getConfigKey('mes.pro.schedule.autoEnabled').then((res: any) => {
+      autoScheduleEnabled.value = String(res?.msg ?? 'true').trim().toLowerCase() !== 'false'
+    }).catch(() => {})
+  }
   // 从URL query参数获取workorderId（来自工单列表的"排产"按钮跳转）
   const rawId = route.query.workorderId
   const woId = Array.isArray(rawId) ? rawId[0] : rawId  // #7 防数组NaN
@@ -375,21 +393,7 @@ function searchWorkorders(kw: string) {
   }, 300)
 }
 
-// remote搜索工作站（300ms防抖）
-let wsTimer: any = null
-function searchWorkstations(kw: string) {
-  if (!kw) { workstationList.value = []; return }
-  clearTimeout(wsTimer)
-  wsTimer = setTimeout(async () => {
-    wsLoading.value = true
-    try {
-      const res: any = await listWorkstation({ workstationName: kw, pageSize: 20 } as any)
-      workstationList.value = res?.rows || []
-    } finally { wsLoading.value = false }
-  }, 300)
-}
-
-// 无条件加载完整工作站列表（供编辑弹窗下拉选择 + 根据 id 匹配名称显示，区别于搜索栏的 searchWorkstations）
+// 无条件加载完整工作站列表（供编辑弹窗下拉选择 + 根据 id 匹配名称显示）
 let wsLoadLock = false
 async function loadWorkstations() {
   if (wsLoadLock) return
@@ -425,9 +429,23 @@ function onWorkorderChange(val: number | null) {
   loadGanttData()
 }
 
+// 视角切换：机台视角查全量机台泳道，工单视角查选中工单
+function onViewChange() {
+  loadGanttData()
+}
+
 async function loadGanttData() {
   loading.value = true
   try {
+    // 机台泳道视图：全部启用机台分行 + 待指派/外协虚拟行
+    if (viewMode.value === 'machine') {
+      const res: any = await getWorkstationView()
+      laneRows.value = res?.data?.rows || []
+      ganttTasks.value = []
+      ganttRef.value?.render()
+      return
+    }
+    laneRows.value = []
     if (queryParams.workorderId) {
       const [ganttRes, matRes] = await Promise.all([
         getWorkOrderGantt(queryParams.workorderId),
@@ -443,9 +461,6 @@ async function loadGanttData() {
       } else if (matRes?.data) {
         ganttTasks.value.forEach(p => p.materialStatus = { status: 'ok', shortageNames: '' })
       }
-    } else if (queryParams.workstationId && viewMode.value === 'workstation') {
-      const res = await getWorkstationGantt(queryParams.workstationId)
-      ganttTasks.value = (res as any)?.data?.tasks || []
     } else {
       ganttTasks.value = []
     }
@@ -533,16 +548,22 @@ async function handleDeleteTask() {
 
 // 提交任务编辑
 async function submitTaskEdit() {
-  // 工作站为必填：DB 字段 workstation_id NOT NULL 无默认值，未选会导致后端 SQL 异常
+  // 表单校验：工序、机台必选（未选机台禁止保存，提示"请选择机台"）
+  const valid = taskFormRef.value?.validate
+    ? await taskFormRef.value.validate().catch(() => false)
+    : true
+  if (!valid) return
+  // 兜底：表单规则未生效（如测试桩/程序化调用）时也绝不放行无机器台任务
   if (!taskForm.workstationId) {
-    ElMessage.warning('请选择工作站')
+    ElMessage.warning('请选择机台')
     return
   }
   taskSaving.value = true
   try {
+    const ws = workstationList.value.find(w => w.workstationId === taskForm.workstationId)
     const payload: any = {
-      workorderId: queryParams.workorderId,
-      processId: taskForm.processId,           // #2 添加工序关联
+      workorderId: queryParams.workorderId || (selectedTask.value as any)?.workorderId,
+      processId: taskForm.processId,
       processName: taskForm.processName,
       quantity: taskForm.quantity,
       startTime: taskForm.startTime,
@@ -550,12 +571,10 @@ async function submitTaskEdit() {
       duration: taskForm.duration,
       setupDuration: taskForm.setupDuration,
       colorCode: taskForm.colorCode,
-    }
-    if (taskForm.workstationId) {
-      const ws = workstationList.value.find(w => w.workstationId === taskForm.workstationId)
-      payload.workstationId = taskForm.workstationId
-      payload.workstationCode = ws?.workstationCode || ''
-      payload.workstationName = ws?.workstationName || ''
+      workstationId: taskForm.workstationId,
+      // code/name 优先用所选机台（availableWorkstations 也可能含），避免全量列表未覆盖时丢名
+      workstationCode: ws?.workstationCode || (filteredWorkstationList.value.find((x: any) => x.workstationId === taskForm.workstationId)?.workstationCode) || '',
+      workstationName: ws?.workstationName || (filteredWorkstationList.value.find((x: any) => x.workstationId === taskForm.workstationId)?.workstationName) || ''
     }
     if (taskForm.taskId) {
       payload.taskId = taskForm.taskId
@@ -576,8 +595,14 @@ async function autoSchedule() {
   if (!queryParams.workorderId) return
   scheduling.value = true
   try {
-    await request({ url: '/mes/pro/gantt/schedule/' + queryParams.workorderId, method: 'post' })
-    ElMessage.success('排产计算完成')
+    const res: any = await request({ url: '/mes/pro/gantt/schedule/' + queryParams.workorderId, method: 'post' })
+    const rawPending: string[] = res?.data?.pendingProcesses || []
+    const pending: string[] = [...new Set(rawPending)]
+    if (pending.length) {
+      ElMessage.warning('排产完成，但以下工序未配置默认机台、已置「待指派机台」，请到【机台】视图点开红色行指派机台后再下发：' + pending.join('、'))
+    } else {
+      ElMessage.success('排产计算完成，全部工序已落到具体机台')
+    }
     loadGanttData()
   } catch { ElMessage.error('排产失败') }
   finally { scheduling.value = false }

@@ -30,6 +30,16 @@ public interface IGanttDataService
     Map<String, Object> buildWorkstationGantt(Long workstationId, String startDate, String endDate);
 
     /**
+     * 构建机台泳道视图：每个启用工作站一行、行内为该机台的任务条；
+     * 未指派机台的厂内任务归"⚠待指派机台"行，外协任务归"外协"行。
+     * @param startDate 起始日期 yyyy-MM-dd（可空，不过滤）
+     * @param endDate   截止日期 yyyy-MM-dd（可空）
+     * @param factoryId 工厂ID
+     * @return { rows: [ { workstationId, workstationName, workstationCode, tasks: [...] } ] }
+     */
+    Map<String, Object> buildWorkstationView(String startDate, String endDate, Long factoryId);
+
+    /**
      * 查询某工序的可用工作站：按 process_id / process_type 匹配候选，并标记给定时段是否空闲。
      * @param processId     工序ID（必填）
      * @param processType   工序类型（可选，process_id 无匹配时按类型兜底）

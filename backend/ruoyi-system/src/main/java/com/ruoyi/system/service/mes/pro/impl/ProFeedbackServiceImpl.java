@@ -144,20 +144,24 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
             try {
                 ProTask task = proTaskMapper.selectProTaskByTaskId(fb.getTaskId());
                 if (task != null) {
-                    if (fb.getWorkorderId() == null) fb.setWorkorderId(task.getWorkorderId());
-                    if (fb.getWorkorderCode() == null) fb.setWorkorderCode(task.getWorkorderCode());
-                    if (fb.getWorkorderName() == null) fb.setWorkorderName(task.getWorkorderName());
-                    if (fb.getTaskCode() == null) fb.setTaskCode(task.getTaskCode());
-                    if (fb.getProcessId() == null) fb.setProcessId(task.getProcessId());
-                    if (fb.getProcessCode() == null) fb.setProcessCode(task.getProcessCode());
-                    if (fb.getProcessName() == null) fb.setProcessName(task.getProcessName());
-                    if (fb.getRouteId() == null) fb.setRouteId(task.getRouteId());
+                    // 工单/工序/路线是任务的身份字段，外协拦截、工序顺序、领料校验都以它们为键，
+                    // 必须以任务为准，不能采信客户端传入值——否则伪造 routeId 即可把外协工序报成自制。
+                    fb.setWorkorderId(task.getWorkorderId());
+                    fb.setProcessId(task.getProcessId());
+                    fb.setRouteId(task.getRouteId());
+                    // 身份快照（编码/名称）同步以任务为准，避免与上面纠正后的 ID 不一致
+                    fb.setWorkorderCode(task.getWorkorderCode());
+                    fb.setWorkorderName(task.getWorkorderName());
+                    fb.setTaskCode(task.getTaskCode());
+                    fb.setProcessCode(task.getProcessCode());
+                    fb.setProcessName(task.getProcessName());
                     if (fb.getWorkstationId() == null) fb.setWorkstationId(task.getWorkstationId());
                     if (fb.getWorkstationCode() == null) fb.setWorkstationCode(task.getWorkstationCode());
                     if (fb.getWorkstationName() == null) fb.setWorkstationName(task.getWorkstationName());
-                    if (fb.getItemId() == null) fb.setItemId(task.getItemId());
-                    if (fb.getItemCode() == null) fb.setItemCode(task.getItemCode());
-                    if (fb.getItemName() == null) fb.setItemName(task.getItemName());
+                    // 产出物即任务产品（排产时 task.item_id = 工单产品），同样以任务为准
+                    fb.setItemId(task.getItemId());
+                    fb.setItemCode(task.getItemCode());
+                    fb.setItemName(task.getItemName());
                     if (fb.getUnitOfMeasure() == null) fb.setUnitOfMeasure(task.getUnitOfMeasure());
                     if (fb.getUnitName() == null) fb.setUnitName(task.getUnitName());
                 }
@@ -347,12 +351,18 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
                         || (fb.getTaskId() != null && fb.getTaskId().equals(h.getTaskId()));
                 if (sameProcess) return; // 已发料出库，放行
             }
-            // 行兜底：手工"从工单生成"的聚合领料单，头不挂工序、工序只记在领料行上
+            // 行兜底：手工"从工单生成"的聚合领料单，头不挂工序、工序只记在领料行上。
+            // 必须该行 quantity_issued>0——聚合单可部分发料（头 PARTIAL_ISSUED），未发料工序的行
+            // quantity_issued=0，不能仅凭"行存在"就放行。
             if (!issuedIssueIds.isEmpty()) {
                 List<com.ruoyi.system.domain.mes.wm.WmIssueLine> lines = wmIssueLineMapper.selectByIssueIds(issuedIssueIds);
                 if (lines != null) {
                     for (com.ruoyi.system.domain.mes.wm.WmIssueLine ln : lines) {
-                        if (processId.equals(ln.getProcessId())) return; // 该工序物料已随单发出，放行
+                        if (processId.equals(ln.getProcessId())
+                                && ln.getQuantityIssued() != null
+                                && ln.getQuantityIssued().compareTo(BigDecimal.ZERO) > 0) {
+                            return; // 该工序物料已实际发出，放行
+                        }
                     }
                 }
             }

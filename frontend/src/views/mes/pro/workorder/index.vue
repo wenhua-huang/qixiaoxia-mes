@@ -303,11 +303,34 @@
               <el-table-column label="缺口" align="center" width="100"><template #default="scope"><span :style="{color:scope.row.sufficient?'#67C23A':'#F56C6C'}">{{ scope.row.shortageQty }} {{ scope.row.unitName }}</span></template></el-table-column>
             </el-table>
 
-            <!-- Step 2: 缺排产工序列表 -->
-            <el-table v-if="i===1 && s.details && s.details.length>0 && s.status==='error'" :data="s.details" size="small">
-              <el-table-column label="工序编码" align="center" prop="processCode" width="130" />
-              <el-table-column label="工序名称" align="center" prop="processName" />
-              <el-table-column label="工序序号" align="center" prop="orderNum" width="90" />
+            <!-- Step 2: 逐道工序执行方式（厂内机台 / 外协厂商 / 未排产） -->
+            <el-table v-if="i===1 && s.details && s.details.length>0" :data="s.details" size="small" max-height="300">
+              <el-table-column label="序号" align="center" prop="orderNum" width="60" />
+              <el-table-column label="工序名称" align="center" prop="processName" :show-overflow-tooltip="true" />
+              <el-table-column label="执行方式" align="center" width="90">
+                <template #default="scope">
+                  <el-tag :type="scope.row.execType === 'OUTSOURCE' ? 'warning' : (scope.row.execType === 'INHOUSE' ? 'primary' : 'danger')" size="small">
+                    {{ scope.row.execTypeName || '-' }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="机台 / 外协厂商" align="center" :show-overflow-tooltip="true">
+                <template #default="scope">
+                  <span v-if="scope.row.execType === 'OUTSOURCE'">{{ scope.row.resourceName || '-' }}</span>
+                  <span v-else-if="scope.row.assigned">{{ scope.row.resourceName || '-' }}</span>
+                  <span v-else style="color:#F56C6C">{{ scope.row.resourceName || '待指派机台' }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="状态" align="center" width="100">
+                <template #default="scope">
+                  <el-tag v-if="scope.row.assigned" type="success" size="small">
+                    {{ scope.row.execType === 'OUTSOURCE' ? '外协加工' : '已派机台' }}
+                  </el-tag>
+                  <el-tag v-else type="danger" size="small">
+                    {{ scope.row.execType === 'UNSCHEDULED' ? '未排产' : '待指派机台' }}
+                  </el-tag>
+                </template>
+              </el-table-column>
             </el-table>
 
             <!-- Step 3: 生成的领料单/外协领料单列表 -->
@@ -336,6 +359,7 @@
       </div>
 
       <template #footer>
+        <el-button v-if="isMachineHardBlock()" type="danger" @click="goAssignMachine">去甘特指派机台</el-button>
         <el-button v-if="canOverrideStart()" v-hasPermi="['mes:pro:workorder:override']" type="warning" @click="handleOverrideStart">豁免开工</el-button>
         <el-button type="primary" @click="startCheckOpen=false">{{ startCheckAllPassed ? '完 成' : '关 闭' }}</el-button>
       </template>
@@ -737,10 +761,10 @@ export default {
       this.startCheckWorkorderName = row.workorderName
       // 重置步骤状态
       this.startCheckSteps = [
-        { name: '物料齐套检查', status: 'wait', message: '', details: [] },
-        { name: '排产检查', status: 'wait', message: '', details: [] },
-        { name: '生成领料单', status: 'wait', message: '', details: [] },
-        { name: '确认开工', status: 'wait', message: '', details: [] },
+        { name: '物料齐套检查', status: 'wait', message: '', details: [], overridable: false },
+        { name: '排产检查', status: 'wait', message: '', details: [], overridable: false },
+        { name: '生成领料单', status: 'wait', message: '', details: [], overridable: false },
+        { name: '确认开工', status: 'wait', message: '', details: [], overridable: false },
       ]
       this.startCheckRunning = true
       this.startCheckAllPassed = false
@@ -769,6 +793,7 @@ export default {
           this.startCheckSteps[i].status = statusMap[s.status] || 'wait'
           this.startCheckSteps[i].message = s.message || ''
           this.startCheckSteps[i].details = s.details || []
+          this.startCheckSteps[i].overridable = s.overridable === true
         }
       })
       // 第一个 FAIL 为 active；无 FAIL 则指向最后一步
@@ -777,12 +802,26 @@ export default {
       // 全通过 = 无 FAIL（PASS 或 OVERRIDE 都算走通）
       this.startCheckAllPassed = steps.length === 4 && steps.every(s => s.status === 'PASS' || s.status === 'OVERRIDE')
     },
-    // 是否可豁免：非加载中、未全通过、且排产检查(step1)为 FAIL
+    // 是否可豁免：非加载中、未全通过、排产检查(step1)为 FAIL 且后端标记可豁免
+    // （仅"完全未排产"的急单可豁免；厂内工序未指派机台为硬约束，不能豁免，须先去甘特派机台）
     canOverrideStart() {
       return !this.startCheckRunning
         && !this.startCheckAllPassed
         && this.startCheckSteps[1]
         && this.startCheckSteps[1].status === 'error'
+        && this.startCheckSteps[1].overridable === true
+    },
+    // 排产检查硬性拦截（厂内工序未指派机台）：提示去甘特派机台，不提供豁免
+    isMachineHardBlock() {
+      const s = this.startCheckSteps[1]
+      return !this.startCheckRunning && !this.startCheckAllPassed
+        && s && s.status === 'error' && s.overridable === false
+        && (s.details || []).some(d => d.execType === 'INHOUSE' && !d.assigned)
+    },
+    // 硬性拦截时跳转甘特排产指派机台
+    goAssignMachine() {
+      this.startCheckOpen = false
+      this.$router.push({ path: '/mes/pro/gantt', query: { workorderId: this.startCheckWorkorderId } })
     },
     // 豁免开工：填理由 → force=true 重走四步
     handleOverrideStart() {

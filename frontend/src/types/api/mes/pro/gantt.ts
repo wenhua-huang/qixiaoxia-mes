@@ -10,6 +10,10 @@ export interface GanttTask {
   processId?: number
   processName?: string
   workstationId?: number
+  workstationName?: string
+  workorderId?: number
+  workorderName?: string
+  itemName?: string
   predecessorId?: number
   status?: string
   quantity?: number
@@ -36,4 +40,12 @@ export interface GanttData {
   tasks: GanttTask[]
   links: GanttLink[]
   calendars?: { workingRanges: any[]; holidays: string[] }
+}
+
+/** 机台泳道行（机台视角）：workstationId 为 -1=待指派、-2=外协 */
+export interface WorkstationLane {
+  workstationId: number
+  workstationName: string
+  workstationCode: string
+  tasks: GanttTask[]
 }

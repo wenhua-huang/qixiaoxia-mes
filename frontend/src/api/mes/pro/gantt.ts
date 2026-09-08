@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-import type { GanttData } from '@/types/api/mes/pro/gantt'
+import type { GanttData, WorkstationLane } from '@/types/api/mes/pro/gantt'
 
 /** 获取单工单甘特图数据 */
 export function getWorkOrderGantt(workorderId: number) {
@@ -13,6 +13,15 @@ export function getWorkOrderGantt(workorderId: number) {
 export function getWorkstationGantt(workstationId: number, startDate?: string, endDate?: string) {
   return request<{ code: number; data: GanttData; msg: string }>({
     url: '/mes/pro/gantt/workstation/' + workstationId,
+    method: 'get',
+    params: { startDate, endDate }
+  })
+}
+
+/** 机台泳道视图：每个启用工作站一行 + 行内任务条；含「待指派」「外协」虚拟行 */
+export function getWorkstationView(startDate?: string, endDate?: string) {
+  return request<{ code: number; data: { rows: WorkstationLane[] }; msg: string }>({
+    url: '/mes/pro/gantt/workstationView',
     method: 'get',
     params: { startDate, endDate }
   })

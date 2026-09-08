@@ -14,8 +14,10 @@ import com.ruoyi.system.domain.mes.pro.ProWorkorder;
 import com.ruoyi.system.mapper.mes.md.MdWorkstationMapper;
 import com.ruoyi.system.mapper.mes.pro.ProRouteProcessMapper;
 import com.ruoyi.system.mapper.mes.pro.ProRouteProductMapper;
+import com.ruoyi.system.mapper.mes.pro.ProProcessMapper;
 import com.ruoyi.system.mapper.mes.pro.ProTaskMapper;
 import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
+import com.ruoyi.system.service.ISysConfigService;
 import com.ruoyi.system.service.mes.cal.IWorkCalendarService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -35,6 +37,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -56,6 +59,8 @@ class ScheduleServiceImplUnitTest
     @Mock
     private ProTaskMapper taskMapper;
     @Mock
+    private ProProcessMapper proProcessMapper;
+    @Mock
     private IWorkCalendarService calendarService;
     @Mock
     private MdWorkstationMapper workstationMapper;
@@ -63,6 +68,8 @@ class ScheduleServiceImplUnitTest
     private RedisLockTemplate lockTemplate;
     @Mock
     private PlatformTransactionManager transactionManager;
+    @Mock
+    private ISysConfigService configService;
 
     @BeforeEach
     void setUp() {
@@ -77,6 +84,8 @@ class ScheduleServiceImplUnitTest
                 .thenReturn(new SimpleTransactionStatus());
         // 手动创建 txTemplate（@PostConstruct 在 Mockito 下不触发）
         ReflectionTestUtils.setField(service, "txTemplate", new TransactionTemplate(transactionManager));
+        // 默认开启自动排产开关（停用场景的用例自行 stub 为 "false"）
+        lenient().when(configService.selectConfigByKey(anyString())).thenReturn("true");
     }
 
     private MdWorkstation ws(long id, String code, String name) {
@@ -175,5 +184,20 @@ class ScheduleServiceImplUnitTest
         ArgumentCaptor<ProTask> captor = ArgumentCaptor.forClass(ProTask.class);
         verify(taskMapper).updateProTask(captor.capture());
         assertThat(captor.getValue().getWorkstationId()).isEqualTo(202L); // 选了空闲的 ws2
+    }
+
+    @Test
+    @DisplayName("scheduleWorkOrder: 开关为 false 时不排产，返回 error 且不建任务/不加锁")
+    void should_skip_schedule_when_switch_disabled() {
+        when(configService.selectConfigByKey(anyString())).thenReturn("false");
+
+        Map<String, Object> result = service.scheduleWorkOrder(1L);
+
+        assertThat(result).containsKey("error");
+        assertThat(result.get("error").toString()).contains("自动排产已停用");
+        // 闸门口径：停用时既不加锁、也不加载工单，更不会写任务
+        verify(lockTemplate, never()).executeWithResult(anyString(), anyLong(), any());
+        verify(workorderMapper, never()).selectProWorkorderByWorkorderId(anyLong());
+        verify(taskMapper, never()).insertProTask(any(ProTask.class));
     }
 }

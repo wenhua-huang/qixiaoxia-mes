@@ -1129,9 +1129,11 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
             return steps;
         }
 
-        // Step 2: 排产检查（软约束，forceSchedule=true 且填了理由可豁免）
+        // Step 2: 排产检查。完全未排产可填理由豁免（急单事后补排）；厂内工序未指派机台为硬约束，不可豁免
         Map<String, Object> step2 = doSchedulingCheck(wo);
-        if ("FAIL".equals(step2.get("status")) && forceSchedule)
+        boolean schedulable = "FAIL".equals(step2.get("status")) && forceSchedule
+                && Boolean.TRUE.equals(step2.get("overridable"));
+        if (schedulable)
         {
             step2 = overrideSchedulingStep(wo, step2, overrideReason);
         }
@@ -1194,67 +1196,63 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         return step;
     }
 
-    /** Step 2: 排产检查 — 确认每个工序都有排产任务 */
+    /** Step 2: 排产检查 — 逐道工序确认已排产；厂内工序须指派有效机台，外协工序用外厂机器只显示厂商不校验机台 */
     private Map<String, Object> doSchedulingCheck(ProWorkorder wo)
     {
         Map<String, Object> step = new HashMap<>();
         step.put("step", 2);
         step.put("stepName", "排产检查");
 
-        // 获取工单关联的工艺路线
-        ProRouteProduct rp = null;
-        if (wo.getRouteProductId() != null)
-            rp = proRouteProductService.selectProRouteProductByRecordId(wo.getRouteProductId());
-        if (rp == null)
-        {
-            step.put("status", "FAIL");
-            step.put("message", "工单未关联工艺路线，无法进行排产检查");
-            step.put("details", new ArrayList<>());
-            return step;
-        }
+        ProRouteProduct rp = wo.getRouteProductId() != null
+                ? proRouteProductService.selectProRouteProductByRecordId(wo.getRouteProductId()) : null;
+        if (rp == null) return schedulingFail(step, "工单未关联工艺路线，无法进行排产检查", false);
 
-        // 获取工艺路线的所有工序
         List<ProRouteProcess> routeProcesses = proRouteProcessService.selectProRouteProcessByRouteId(rp.getRouteId());
         if (routeProcesses == null || routeProcesses.isEmpty())
-        {
-            step.put("status", "FAIL");
-            step.put("message", "工艺路线下无工序定义");
-            step.put("details", new ArrayList<>());
-            return step;
-        }
+            return schedulingFail(step, "工艺路线下无工序定义", false);
 
-        // 检查每个工序是否都有排产任务
-        List<Map<String, Object>> missingProcesses = new ArrayList<>();
-        for (ProRouteProcess rproc : routeProcesses)
-        {
-            ProTask taskQuery = new ProTask();
-            taskQuery.setWorkorderId(wo.getWorkorderId());
-            taskQuery.setProcessId(rproc.getProcessId());
-            List<ProTask> tasks = proTaskService.selectProTaskList(taskQuery);
-            if (tasks == null || tasks.isEmpty())
-            {
-                Map<String, Object> missing = new HashMap<>();
-                missing.put("processId", rproc.getProcessId());
-                missing.put("processCode", rproc.getProcessCode());
-                missing.put("processName", rproc.getProcessName());
-                missing.put("orderNum", rproc.getOrderNum());
-                missingProcesses.add(missing);
-            }
-        }
+        // 逐道工序执行方式明细：外协→厂商 / 厂内→机台 / 未排产
+        List<Map<String, Object>> rows = proTaskService.listProcessExecutionRows(wo.getWorkorderId(), routeProcesses);
+        step.put("details", rows);
 
-        if (!missingProcesses.isEmpty())
+        List<String> pendingMachine = execNames(rows, ProConstants.EXEC_TYPE_INHOUSE, false);
+        List<String> unscheduled = execNames(rows, ProConstants.EXEC_TYPE_UNSCHEDULED, false);
+        // 厂内工序无机台是硬约束：即使同时存在未排产工序，也不可豁免（豁免后下发仍会被机台闸门拒绝）
+        if (!pendingMachine.isEmpty())
         {
-            step.put("status", "FAIL");
-            step.put("message", "以下工序尚未排产，请先进行排产操作");
-            step.put("details", missingProcesses);
+            String msg = "以下厂内工序尚未指派机台，请先在甘特排产中指派机台后再开工：" + String.join("、", pendingMachine);
+            if (!unscheduled.isEmpty())
+                msg += "；另有工序尚未排产：" + String.join("、", unscheduled);
+            return schedulingFail(step, msg, false);
         }
-        else
-        {
-            step.put("status", "PASS");
-            step.put("message", "所有工序已排产（共" + routeProcesses.size() + "道工序）");
-            step.put("details", new ArrayList<>());
-        }
+        if (!unscheduled.isEmpty())
+            return schedulingFail(step, "以下工序尚未排产，请先进行排产操作：" + String.join("、", unscheduled), true);
+
+        long outsourceCount = rows.stream().filter(r -> ProConstants.EXEC_TYPE_OUTSOURCE.equals(r.get("execType"))).count();
+        step.put("status", "PASS");
+        step.put("overridable", false);
+        step.put("message", "所有工序已排产并落实执行方式（共" + rows.size() + "道工序，其中外协" + outsourceCount + "道）");
         return step;
+    }
+
+    /** 排产检查失败：overridable=true 表示可填理由豁免（仅用于完全未排产的急单），厂内无机台为硬性拦截不可豁免 */
+    private Map<String, Object> schedulingFail(Map<String, Object> step, String message, boolean overridable)
+    {
+        step.put("status", "FAIL");
+        step.put("overridable", overridable);
+        step.put("message", message);
+        if (!step.containsKey("details")) step.put("details", new ArrayList<>());
+        return step;
+    }
+
+    /** 取指定执行类型、且按 assigned 过滤后的工序名（assigned=false 取未落实：未排产 / 厂内待指派机台） */
+    private List<String> execNames(List<Map<String, Object>> rows, String execType, boolean assigned)
+    {
+        List<String> names = new ArrayList<>();
+        for (Map<String, Object> r : rows)
+            if (execType.equals(r.get("execType")) && Boolean.TRUE.equals(r.get("assigned")) == assigned)
+                names.add(String.valueOf(r.get("processName")));
+        return names;
     }
 
     /** Step 3: 按工序分组生成领料单 — 一个工序一张领料单，无物料消耗的工序跳过 */

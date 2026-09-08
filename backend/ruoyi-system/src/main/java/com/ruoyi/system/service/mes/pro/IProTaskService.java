@@ -3,6 +3,7 @@ package com.ruoyi.system.service.mes.pro;
 import java.util.List;
 import java.util.Map;
 import com.ruoyi.system.domain.mes.pro.ProTask;
+import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
 
 /**
  * 生产任务/排产Service接口
@@ -47,6 +48,14 @@ public interface IProTaskService
      * 取消单个任务：非终态（非 COMPLETED/CANCEL）→ CANCEL
      */
     public void cancelTask(Long taskId);
+
+    /**
+     * 开工排产检查：逐道工序给出执行方式明细。
+     * 每行含 processId/processCode/processName/orderNum、execType（OUTSOURCE 外协 / INHOUSE 厂内 / UNSCHEDULED 未排产）、
+     * execTypeName、resourceName（外协厂商名 或 厂内机台名）、assigned（外协恒为 true；厂内仅指派有效机台为 true）。
+     * 外协工序用外厂机器，不校验厂内机台；厂内工序 assigned=false 即"待指派机台"，开工前必须先指派。
+     */
+    public List<Map<String, Object>> listProcessExecutionRows(Long workorderId, List<ProRouteProcess> routeProcesses);
 
     /**
      * 工单开工级联：把该工单下所有 NORMAL/PREPARE 任务自动下发为 PRODUCING

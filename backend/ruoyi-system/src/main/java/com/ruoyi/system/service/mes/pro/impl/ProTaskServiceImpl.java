@@ -300,6 +300,8 @@ public class ProTaskServiceImpl implements IProTaskService
         if (task == null) throw new ServiceException("任务不存在");
         if (!TASK_DISPATCHABLE.contains(task.getStatus()))
             throw new ServiceException("只有待排产/正常状态的任务才能下发，当前状态：" + task.getStatus());
+        // 机台闸门：厂内工序必须指派真实且启用的机台才能下发（外协 VENDOR 不占厂内机台，放行）
+        assertWorkstationAssigned(task);
         task.setStatus(ProConstants.TASK_STATUS_PRODUCING);
         task.setUpdateTime(DateUtils.getNowDate());
         task.setUpdateBy(SecurityUtils.getUsername());
@@ -339,9 +341,112 @@ public class ProTaskServiceImpl implements IProTaskService
     // ==================== 工单级联 ====================
 
     @Override
+    public List<Map<String, Object>> listProcessExecutionRows(Long workorderId, List<ProRouteProcess> routeProcesses)
+    {
+        // 工单任务按工序归组，逐道路线工序判定执行方式（外协/厂内/未排产）与机台落实情况
+        ProTask q = new ProTask();
+        q.setWorkorderId(workorderId);
+        Map<Long, List<ProTask>> tasksByProc = new HashMap<>();
+        for (ProTask t : proTaskMapper.selectProTaskList(q))
+            tasksByProc.computeIfAbsent(t.getProcessId(), k -> new ArrayList<>()).add(t);
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (ProRouteProcess rp : routeProcesses)
+            rows.add(buildExecRow(rp, tasksByProc.get(rp.getProcessId())));
+        return rows;
+    }
+
+    /** 单道工序执行方式明细：外协→厂商（视为已落实，不校验厂内机台）；厂内→机台名或待指派；无任务→未排产 */
+    private Map<String, Object> buildExecRow(ProRouteProcess rp, List<ProTask> tasks)
+    {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("processId", rp.getProcessId());
+        row.put("processCode", rp.getProcessCode());
+        row.put("processName", rp.getProcessName());
+        row.put("orderNum", rp.getOrderNum());
+        if (tasks == null || tasks.isEmpty())
+        {
+            row.put("execType", ProConstants.EXEC_TYPE_UNSCHEDULED);
+            row.put("execTypeName", "未排产");
+            row.put("resourceName", "");
+            row.put("assigned", false);
+            return row;
+        }
+        // 外协工序：任一任务挂厂商即按外协（外厂机器，不校验厂内机台）
+        ProTask vendor = tasks.stream()
+                .filter(t -> ProConstants.WS_CODE_VENDOR.equals(t.getWorkstationCode())).findFirst().orElse(null);
+        if (vendor != null)
+        {
+            row.put("execType", ProConstants.EXEC_TYPE_OUTSOURCE);
+            row.put("execTypeName", "外协");
+            row.put("resourceName", vendor.getWorkstationName() != null ? vendor.getWorkstationName() : "外协");
+            row.put("assigned", true);
+            return row;
+        }
+        // 厂内工序：任一"可下发"任务未指派有效机台即待指派（与 dispatchByWorkorder 闸门口径一致）
+        boolean pending = tasks.stream()
+                .anyMatch(t -> TASK_DISPATCHABLE.contains(t.getStatus()) && !isWorkstationAssigned(t));
+        row.put("execType", ProConstants.EXEC_TYPE_INHOUSE);
+        row.put("execTypeName", "厂内");
+        if (pending)
+        {
+            row.put("resourceName", ProConstants.WS_NAME_PENDING);
+            row.put("assigned", false);
+            return row;
+        }
+        // 机台名取自已指派真实机台的任务（避免取到终态/占位任务导致名称为空）
+        ProTask assignedTask = tasks.stream().filter(this::isWorkstationAssigned).findFirst().orElse(tasks.get(0));
+        row.put("resourceName", assignedTask.getWorkstationName() != null ? assignedTask.getWorkstationName() : "已指派机台");
+        row.put("assigned", true);
+        return row;
+    }
+
+    @Override
     public void dispatchByWorkorder(Long workorderId)
     {
+        // 机台闸门：批量下发前，若有厂内任务未指派有效机台则整体拒绝并列出工序（外协 VENDOR 放行）
+        List<String> pendingNames = collectPendingInHouseNames(workorderId);
+        if (!pendingNames.isEmpty())
+            throw new ServiceException("以下工序尚未指派有效机台，请先在甘特排产中指派后再下发：" + String.join("、", pendingNames));
         proTaskMapper.updateStatusByWorkorder(workorderId, TASK_DISPATCHABLE, ProConstants.TASK_STATUS_PRODUCING);
+    }
+
+    /** 收集工单下"待指派机台"的厂内可下发任务工序名（外协 VENDOR 放行，不占厂内机台） */
+    private List<String> collectPendingInHouseNames(Long workorderId)
+    {
+        ProTask q = new ProTask();
+        q.setWorkorderId(workorderId);
+        List<String> pendingNames = new ArrayList<>();
+        for (ProTask t : proTaskMapper.selectProTaskList(q))
+        {
+            if (!TASK_DISPATCHABLE.contains(t.getStatus())) continue;
+            if (ProConstants.WS_CODE_VENDOR.equals(t.getWorkstationCode())) continue;
+            if (isWorkstationAssigned(t)) continue;
+            String name = t.getProcessName() != null ? t.getProcessName() : ("任务#" + t.getTaskId());
+            if (!pendingNames.contains(name)) pendingNames.add(name);
+        }
+        return pendingNames;
+    }
+
+    /** 厂内任务是否已指派真实且启用的机台（外协 VENDOR 视为已分配，不占厂内机台） */
+    private boolean isWorkstationAssigned(ProTask task)
+    {
+        if (ProConstants.WS_CODE_VENDOR.equals(task.getWorkstationCode())) return true;
+        Long wsId = task.getWorkstationId();
+        if (wsId == null || wsId <= 0) return false;
+        MdWorkstation ws = mdWorkstationMapper.selectMdWorkstationByWorkstationId(wsId);
+        return ws != null && "1".equals(ws.getEnableFlag());
+    }
+
+    /** 下发前机台闸门：厂内任务未指派真实启用机台则拒绝 */
+    private void assertWorkstationAssigned(ProTask task)
+    {
+        if (ProConstants.WS_CODE_VENDOR.equals(task.getWorkstationCode())) return;
+        Long wsId = task.getWorkstationId();
+        if (wsId == null || wsId <= 0)
+            throw new ServiceException("该任务尚未指派机台，请先在甘特排产中指派机台后再下发");
+        MdWorkstation ws = mdWorkstationMapper.selectMdWorkstationByWorkstationId(wsId);
+        if (ws == null || !"1".equals(ws.getEnableFlag()))
+            throw new ServiceException("该任务指派的机台不存在或已停用，请在甘特排产中重新指派机台后再下发");
     }
 
     @Override

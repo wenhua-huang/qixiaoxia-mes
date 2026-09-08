@@ -8,6 +8,7 @@ import static com.ruoyi.system.domain.mes.pro.ProConstants.*;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.system.domain.mes.pro.*;
 import com.ruoyi.system.mapper.mes.pro.*;
+import com.ruoyi.system.service.ISysConfigService;
 import com.ruoyi.system.service.mes.cal.IWorkCalendarService;
 import com.ruoyi.system.service.mes.pro.IProChangeoverService;
 import com.ruoyi.system.service.mes.pro.IScheduleService;
@@ -44,9 +45,13 @@ public class ScheduleServiceImpl implements IScheduleService
     @Autowired
     private com.ruoyi.system.mapper.mes.md.MdWorkstationMapper workstationMapper;
     @Autowired
+    private ProProcessMapper proProcessMapper;
+    @Autowired
     private RedisLockTemplate lockTemplate;
     @Autowired
     private PlatformTransactionManager transactionManager;
+    @Autowired
+    private ISysConfigService configService;
 
     private TransactionTemplate txTemplate;
 
@@ -71,13 +76,29 @@ public class ScheduleServiceImpl implements IScheduleService
 
     @Override
     public Map<String, Object> scheduleWorkOrder(Long workorderId) {
+        // 自动排产总开关：停用时不排产（前端已隐藏入口，此处后端兜底；返回 error 而非抛异常，
+        // 使建/改工单、甘特懒排产等自动触发方静默跳过、工单照常保存，手动按钮则收到提示）
+        if (!autoScheduleEnabled()) {
+            Map<String, Object> r = new LinkedHashMap<>();
+            r.put("error", "自动排产已停用：如需排产请在甘特图手工新增任务/指派机台，"
+                    + "或在【系统管理-参数设置】将 " + CFG_AUTO_SCHEDULE_ENABLED + " 设为 true");
+            return r;
+        }
         // 先锁后事务：同工单并发排产会重复建任务，按工单加 Redis 锁串行化
         return lockTemplate.executeWithResult("pro:schedule:" + workorderId, 10,
                 () -> txTemplate.execute(status -> doScheduleWorkOrder(workorderId)));
     }
 
+    /** 读自动排产开关：仅显式 "false"（忽略大小写/空白）才停用，缺省/空/其他值一律启用（缺省安全、保持现状）。 */
+    private boolean autoScheduleEnabled() {
+        String v = configService.selectConfigByKey(CFG_AUTO_SCHEDULE_ENABLED);
+        return v == null || v.isBlank() || !"false".equalsIgnoreCase(v.trim());
+    }
+
     private Map<String, Object> doScheduleWorkOrder(Long workorderId) {
         Map<String, Object> result = new LinkedHashMap<>();
+        // 未匹配到机台的厂内工序（任务照建、机台置"待指派"），返回给前端提示排产员指派
+        List<String> pendingProcesses = new ArrayList<>();
 
         // 1. 加载工单
         ProWorkorder wo = workorderMapper.selectProWorkorderByWorkorderId(workorderId);
@@ -155,9 +176,12 @@ public class ScheduleServiceImpl implements IScheduleService
                     newTask.setWorkstationCode(first.getWorkstationCode());
                     newTask.setWorkstationName(first.getWorkstationName());
                 } else {
+                    // 无匹配机台：任务照建（时间照排、甘特图可拖拽），机台置"待指派"，
+                    // 排产员在甘特图指派具体机台后才能下发（不再静默写"自动分配"）
                     newTask.setWorkstationId(WS_VIRTUAL_ID);
-                    newTask.setWorkstationCode(WS_CODE_AUTO);
-                    newTask.setWorkstationName("自动分配");
+                    newTask.setWorkstationCode(WS_CODE_PENDING);
+                    newTask.setWorkstationName(WS_NAME_PENDING);
+                    pendingProcesses.add(rp.getProcessName() != null ? rp.getProcessName() : rp.getProcessCode());
                 }
                 // 从产能计算 unitDuration（个/分钟 = 产能/60）
                 BigDecimal unitDur = BigDecimal.ZERO;
@@ -249,6 +273,7 @@ public class ScheduleServiceImpl implements IScheduleService
 
         result.put("updatedTasks", updated);
         result.put("workorderId", workorderId);
+        result.put("pendingProcesses", pendingProcesses);
         return result;
     }
 
@@ -450,18 +475,43 @@ public class ScheduleServiceImpl implements IScheduleService
      */
     @Override
     public List<MdWorkstation> matchCandidates(Long processId, String processType, Long factoryId) {
-        MdWorkstation q = new MdWorkstation();
-        q.setFactoryId(factoryId);
-        q.setEnableFlag("1");
-        q.setProcessId(processId);
-        List<MdWorkstation> list = workstationMapper.selectMdWorkstationList(q);
+        // 1. process_id 精确匹配
+        List<MdWorkstation> list = queryWorkstations(processId, factoryId);
         if (!list.isEmpty()) return list;
+        // 2. process_type 设备码兜底
         if (processType != null && !processType.isEmpty()) {
             MdWorkstation q2 = new MdWorkstation();
             q2.setFactoryId(factoryId);
             q2.setEnableFlag("1");
             q2.setProcessType(processType);
-            return workstationMapper.selectMdWorkstationList(q2);
+            list = workstationMapper.selectMdWorkstationList(q2);
+            if (!list.isEmpty()) return list;
+        }
+        // 3. 同名工序兜底：主数据存在重复工序（如多个"印刷"）时，机台可能挂在同名的另一个工序 id 上
+        return matchBySameNameProcess(processId, factoryId);
+    }
+
+    private List<MdWorkstation> queryWorkstations(Long processId, Long factoryId) {
+        MdWorkstation q = new MdWorkstation();
+        q.setFactoryId(factoryId);
+        q.setEnableFlag("1");
+        q.setProcessId(processId);
+        return workstationMapper.selectMdWorkstationList(q);
+    }
+
+    /** 找与给定工序同名的其他启用工序，返回挂在其上的启用工作站（解决重复工序主数据导致的匹配失败） */
+    private List<MdWorkstation> matchBySameNameProcess(Long processId, Long factoryId) {
+        if (processId == null) return Collections.emptyList();
+        ProProcess me = proProcessMapper.selectProProcessByProcessId(processId);
+        if (me == null || me.getProcessName() == null || me.getProcessName().isBlank()) return Collections.emptyList();
+        ProProcess nameQ = new ProProcess();
+        nameQ.setProcessName(me.getProcessName());
+        nameQ.setEnableFlag("1");
+        for (ProProcess sp : proProcessMapper.selectProProcessList(nameQ)) {
+            if (sp.getProcessId().equals(processId)) continue;
+            if (!me.getProcessName().equals(sp.getProcessName())) continue; // LIKE 结果做精确名过滤
+            List<MdWorkstation> wl = queryWorkstations(sp.getProcessId(), factoryId);
+            if (!wl.isEmpty()) return wl;
         }
         return Collections.emptyList();
     }

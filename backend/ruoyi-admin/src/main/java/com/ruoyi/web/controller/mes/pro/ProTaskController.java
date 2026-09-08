@@ -111,6 +111,9 @@ public class ProTaskController extends BaseController
         // 校验
         if (proTask.getQuantity() != null && proTask.getQuantity().compareTo(java.math.BigDecimal.ZERO) <= 0)
             return error("排产数量必须大于0！");
+        // 机台必填：厂内工序排产必须落到具体工作站（外协任务由自动排产生成，不走手工新增）
+        if (proTask.getWorkstationId() == null || proTask.getWorkstationId() <= 0)
+            return error("请选择机台");
         if (proTask.getDuration() != null && proTask.getDuration() <= 0)
             proTask.setDuration(1);
         proTaskService.insertProTask(proTask);
@@ -122,6 +125,9 @@ public class ProTaskController extends BaseController
     @PutMapping
     public AjaxResult edit(@RequestBody ProTask proTask)
     {
+        // 机台校验：传了机台则必须是真实工作站(>0)；外协任务(VENDOR,id=0)编辑时不传机台、动态SQL不改机台列
+        if (proTask.getWorkstationId() != null && proTask.getWorkstationId() <= 0)
+            return error("请选择机台");
         return toAjax(proTaskService.updateProTask(proTask));
     }
 

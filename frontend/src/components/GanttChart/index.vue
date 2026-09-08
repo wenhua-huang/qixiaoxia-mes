@@ -19,13 +19,14 @@
       <!-- 左侧 -->
       <div class="gc-left" :style="{width:leftW+'px'}">
         <div class="gc-left-hd">任务</div>
-        <div v-for="(r,i) in rows" :key="'l'+i" class="gc-left-cell" :class="{proj:r.t==='p'}"
+        <div v-for="(r,i) in rows" :key="'l'+i" class="gc-left-cell"
+          :class="{proj:r.t==='p', lane:!!r.bars, 'lane-pending':r.laneType==='PENDING', 'lane-vendor':r.laneType==='VENDOR'}"
           :style="{height:rowH+'px'}">
           <span v-if="r.t==='p' && (r.raw as any).materialStatus?.status==='shortage'"
             :title="'缺料：' + ((r.raw as any).materialStatus?.shortageNames || '')" style="cursor:help">🔴</span>
           <span v-else-if="r.t==='p' && (r.raw as any).materialStatus?.status==='ok'"
             :title="物料齐套" style="cursor:help">🟢</span>
-          <span :style="{paddingLeft:r.t==='p'?'4px':'20px'}">{{ r.text }}</span>
+          <span :style="{paddingLeft:r.t==='p'||r.bars?'4px':'20px'}">{{ r.text }}</span>
         </div>
       </div>
       <!-- 右侧 -->
@@ -40,10 +41,14 @@
           <div v-for="(r,i) in rows" :key="'g'+i" class="gc-row" :style="{height:rowH+'px'}">
             <div v-for="(c,j) in cols" :key="'c'+j" class="gc-cell"
               :class="{we:c.isWE}" :style="{left:c.left+'px',width:colW+'px'}" />
-            <GanttBar v-if="r.t==='t' && r.s && r.e" :row="r" :pos-x="posX" :readonly="readonly"
+            <!-- 工单视图：单任务条（可拖拽/拉伸） -->
+            <GanttBar v-if="r.t==='t' && r.s && r.e && !r.bars" :row="r" :pos-x="posX" :readonly="readonly"
               :constrained="constrained"
               @bar-click="(e: MouseEvent)=>onBarClick(e,r)" @bar-down="(e: MouseEvent)=>onBarDown(e,r)"
               @resize-down="(e: MouseEvent, s: 'left'|'right')=>onResizeDown(e,r,s)" />
+            <!-- 机台泳道视图：一行多条任务条（仅点击派工/查看，不拖拽） -->
+            <GanttBar v-for="b in (r.bars||[])" :key="'bar'+b.id" :row="b" :pos-x="posX" :readonly="true"
+              @bar-click="(e: MouseEvent)=>onLaneBarClick(e,b)" />
           </div>
         </div>
       </div>
@@ -53,12 +58,19 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
-import type { GanttTask } from '@/types/api/mes/pro/gantt'
+import type { GanttTask, WorkstationLane } from '@/types/api/mes/pro/gantt'
 import request from '@/utils/request'
 import GanttBar, { type GanttRow } from './GanttBar.vue'
 import { useGanttDrag } from './useGanttDrag'
+import { buildLaneRows } from './useWorkstationRows'
 
-const props = withDefaults(defineProps<{ tasks: GanttTask[]; loading?: boolean; readonly?: boolean }>(), { readonly: false })
+const props = withDefaults(defineProps<{
+  tasks: GanttTask[]
+  loading?: boolean
+  readonly?: boolean
+  /** 机台泳道数据：传入后按机台分行（一行多条任务条），与 tasks 工单视图互斥 */
+  lanes?: WorkstationLane[] | null
+}>(), { readonly: false, lanes: null })
 const emit = defineEmits<{ (e: 'select', t: GanttTask): void; (e: 'barMove', t: GanttTask, newStart: string, newEnd: string): void }>()
 
 // ---- 配置 ----
@@ -116,6 +128,11 @@ const parseDate = (s: string) => new Date(String(s).replace(' ', 'T'))
 
 // ---- 构建 ----
 function buildRows() {
+  // 机台泳道视图：每个工作站一行、行内多条任务条
+  if (props.lanes && props.lanes.length) {
+    rows.value = buildLaneRows(props.lanes, parseDate)
+    return
+  }
   const rr: Row[] = []
   for (const p of props.tasks) {
     rr.push({ id: p.id, text: p.text, t: 'p', s: null, e: null, c: '', raw: p })
@@ -168,9 +185,41 @@ async function render() {
   buildCols()
 }
 
+/** 机台泳道视图：按 lanes 内全部任务的时间范围自动定位视窗（默认窗口只覆盖本周，8 月任务会落到视口外） */
+function fitRangeToLanes() {
+  let min = Infinity, max = -Infinity
+  for (const lane of props.lanes || []) {
+    for (const t of lane.tasks || []) {
+      for (const v of [t.start, t.end, t.actualStartTime, t.actualEndTime]) {
+        if (!v) continue
+        const tm = parseDate(v).getTime()
+        if (!Number.isNaN(tm)) { if (tm < min) min = tm; if (tm > max) max = tm }
+      }
+    }
+  }
+  if (!Number.isFinite(min)) return
+  const HOUR = 3600000, DAY = 86400000
+  let s = min - HOUR, e = max + HOUR
+  const MAX = 60 * DAY
+  if (e - s > MAX) e = s + MAX
+  mode.value = e - s <= 2 * DAY ? 'day' : 'week'
+  const grid = mode.value === 'day' ? HOUR : DAY
+  range.s = new Date(Math.floor(s / grid) * grid)
+  range.e = new Date(e)
+}
+
 // ---- init ----
 onMounted(render)
-watch(() => props.tasks, () => nextTick(render), { deep: true })
+watch(() => [props.tasks, props.lanes], () => nextTick(render), { deep: true })
+// 机台泳道数据切换（切视角/刷新）时自动定位时间窗；引用变化才触发，用户手动翻页/缩放不受影响
+watch(() => props.lanes, (lanes) => {
+  if (lanes && lanes.length) { fitRangeToLanes(); nextTick(render) }
+})
+
+// 机台泳道任务条点击：直接派工/查看（不走拖拽逻辑）
+function onLaneBarClick(_e: MouseEvent, bar: GanttRow) {
+  if (bar.raw) emit('select', bar.raw)
+}
 
 // ---- 拖拽/拉伸（抽到 composable，保持组件 ≤300 行）----
 const { constrained, onBarClick, onBarDown, onResizeDown } = useGanttDrag({
@@ -247,7 +296,7 @@ defineExpose({ render, fitToData })
 .gc-main { display:flex; }
 .gc-left { flex-shrink:0; border-right:1px solid #e4e7ed; }
 .gc-left-hd { height:32px; line-height:32px; padding:0 8px; font-weight:600; font-size:12px; background:#f5f7fa; border-bottom:1px solid #dcdfe6; }
-.gc-left-cell { display:flex; align-items:center; padding:0 4px; font-size:12px; border-bottom:1px solid #f2f3f5; overflow:hidden; white-space:nowrap; &.proj { font-weight:600; background:#fafafa; } }
+.gc-left-cell { display:flex; align-items:center; padding:0 4px; font-size:12px; border-bottom:1px solid #f2f3f5; overflow:hidden; white-space:nowrap; &.proj { font-weight:600; background:#fafafa; } &.lane { font-weight:600; background:#f5f7fa; } &.lane-pending { color:#f56c6c; background:#fef0f0; } &.lane-vendor { color:#909399; background:#f4f4f5; } }
 .gc-right { flex:1; overflow:auto; max-height:calc(100vh - 280px); }
 .gc-time-hd { height:32px; position:sticky; top:0; z-index:2; background:#f5f7fa; border-bottom:1px solid #dcdfe6; }
 .gc-time-cell { position:absolute; top:0; height:100%; line-height:32px; text-align:center; font-size:10px; border-right:1px solid #e4e7ed; color:#606266; &.we { background:#fef0f0; color:#f56c6c; } }

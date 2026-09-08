@@ -68,6 +68,18 @@ public class ProGanttController extends BaseController
         return success(data);
     }
 
+    /**
+     * 机台泳道视图：每个启用工作站一行 + 任务条；未指派机台的任务归"待指派"行。
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:gantt:query')")
+    @GetMapping("/workstationView")
+    public AjaxResult workstationView(
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate)
+    {
+        return success(ganttDataService.buildWorkstationView(startDate, endDate, currentFactoryId()));
+    }
+
     /** 从登录用户获取 factoryId */
     private Long currentFactoryId() {
         try { return SecurityUtils.getLoginUser().getUser().getFactoryId(); } catch (Exception e) { return 1L; }

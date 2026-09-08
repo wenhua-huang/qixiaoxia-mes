@@ -13,6 +13,12 @@ export interface GanttRow {
   aE?: Date | null
   progress?: number
   delayLevel?: string
+  /** 机台泳道视图：一行内的多条任务条（与单条 s/e 互斥） */
+  bars?: GanttRow[]
+  /** 泳道任务条：仅点击查看/派工，不支持拖拽 */
+  noDrag?: boolean
+  /** 泳道行类型：PENDING=待指派 / VENDOR=外协（用于行样式） */
+  laneType?: string
 }
 </script>
 

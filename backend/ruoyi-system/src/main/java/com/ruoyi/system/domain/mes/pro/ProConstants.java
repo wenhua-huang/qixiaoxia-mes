@@ -56,8 +56,17 @@ public class ProConstants
     public static final Long WS_VIRTUAL_ID = 0L;
     /** 虚拟工作站编码：外协工序（任务挂厂商，不占厂内工作站） */
     public static final String WS_CODE_VENDOR = "VENDOR";
-    /** 虚拟工作站编码：待自动分配（排产时尚未匹配到工作站） */
+    /** 虚拟工作站编码：待自动分配（历史数据；新排产改用 PENDING） */
     public static final String WS_CODE_AUTO = "AUTO";
+    /** 虚拟工作站编码：待指派机台（自动排产未匹配到工作站，任务照建，须排产员指派真实机台后才能下发） */
+    public static final String WS_CODE_PENDING = "PENDING";
+    /** 待指派机台的占位名称 */
+    public static final String WS_NAME_PENDING = "待指派机台";
+
+    /** 开工排产检查：工序执行方式 */
+    public static final String EXEC_TYPE_OUTSOURCE = "OUTSOURCE";   // 外协（外厂机器，厂内不校验机台）
+    public static final String EXEC_TYPE_INHOUSE = "INHOUSE";       // 厂内（须指派有效机台）
+    public static final String EXEC_TYPE_UNSCHEDULED = "UNSCHEDULED"; // 未排产
 
     /** 报工状态 */
     public static final String FEEDBACK_STATUS_PREPARE   = "PREPARE";
@@ -75,4 +84,7 @@ public class ProConstants
     public static final String CFG_WARN_HOURS        = "mes.progress.warnHours";
     public static final String CFG_WARN_DAYS         = "mes.progress.warnDays";
     public static final String CFG_BEHIND_TOLERANCE  = "mes.progress.behindTolerance";
+
+    /** 自动排产总开关 sys_config key：值为 "false" 时停用（前端隐藏自动排产入口、后端不自动排产）；缺省/其他值视为启用 */
+    public static final String CFG_AUTO_SCHEDULE_ENABLED = "mes.pro.schedule.autoEnabled";
 }

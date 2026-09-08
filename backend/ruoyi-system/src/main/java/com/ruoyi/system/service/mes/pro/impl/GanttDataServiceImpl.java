@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 
 import com.ruoyi.system.domain.mes.md.MdWorkstation;
 import com.ruoyi.system.domain.mes.pro.*;
+import com.ruoyi.system.mapper.mes.md.MdWorkstationMapper;
 import com.ruoyi.system.mapper.mes.pro.*;
 import com.ruoyi.system.service.ISysConfigService;
 import com.ruoyi.system.service.mes.pro.DelayLevelEvaluator;
@@ -52,7 +53,11 @@ public class GanttDataServiceImpl implements IGanttDataService
     @Autowired
     private ISysConfigService configService;
 
+    @Autowired
+    private MdWorkstationMapper mdWorkstationMapper;
+
     private static final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    private static final SimpleDateFormat sdfDay = new SimpleDateFormat("yyyy-MM-dd");
 
     @Override
     public Map<String, Object> buildWorkOrderGantt(Long workorderId)
@@ -235,6 +240,123 @@ public class GanttDataServiceImpl implements IGanttDataService
         result.put("tasks", tasks);
         result.put("links", links);
         return result;
+    }
+
+    @Override
+    public Map<String, Object> buildWorkstationView(String startDate, String endDate, Long factoryId)
+    {
+        Date from = parseDay(startDate, -30, false);
+        Date to = parseDay(endDate, 90, true);
+
+        MdWorkstation wsQ = new MdWorkstation();
+        wsQ.setFactoryId(factoryId);
+        wsQ.setEnableFlag("1");
+        List<MdWorkstation> stations = mdWorkstationMapper.selectMdWorkstationList(wsQ);
+
+        List<ProTask> all = proTaskMapper.selectProTaskList(new ProTask());
+        List<ProTask> tasks = all.stream()
+                .filter(t -> !ProConstants.TASK_STATUS_CANCEL.equals(t.getStatus()))
+                .filter(t -> overlapsRange(t, from, to))
+                .collect(Collectors.toList());
+
+        Map<Long, Map<String, Object>> actualMap = loadActualMap(tasks);
+        int warnHours = cfgInt(ProConstants.CFG_WARN_HOURS, 24);
+        int tol = cfgInt(ProConstants.CFG_BEHIND_TOLERANCE, 10);
+
+        Map<Long, List<ProTask>> byWs = tasks.stream()
+                .collect(Collectors.groupingBy(t -> t.getWorkstationId() != null ? t.getWorkstationId() : 0L));
+        // 真实启用机台 id 集合：任务挂的机台不在其中（0/空/不存在/已停用）即视为未落实
+        Set<Long> realWsIds = stations.stream().map(MdWorkstation::getWorkstationId).collect(Collectors.toSet());
+        List<String> terminal = Arrays.asList(ProConstants.TASK_STATUS_INACTIVE);
+        // 待指派行：未完成、非外协、且未挂到真实启用机台的厂内任务
+        List<ProTask> pending = tasks.stream()
+                .filter(t -> !ProConstants.WS_CODE_VENDOR.equals(t.getWorkstationCode()))
+                .filter(t -> !terminal.contains(t.getStatus()))
+                .filter(t -> t.getWorkstationId() == null || !realWsIds.contains(t.getWorkstationId()))
+                .collect(Collectors.toList());
+        List<ProTask> vendor = tasks.stream()
+                .filter(t -> ProConstants.WS_CODE_VENDOR.equals(t.getWorkstationCode())).collect(Collectors.toList());
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        if (!pending.isEmpty())
+            rows.add(laneRow(-1L, "⚠ 待指派机台", ProConstants.WS_CODE_PENDING, pending, actualMap, warnHours, tol));
+        for (MdWorkstation ws : stations)
+            rows.add(laneRow(ws.getWorkstationId(), ws.getWorkstationName(), ws.getWorkstationCode(),
+                    byWs.getOrDefault(ws.getWorkstationId(), Collections.emptyList()), actualMap, warnHours, tol));
+        if (!vendor.isEmpty())
+            rows.add(laneRow(-2L, "外协", ProConstants.WS_CODE_VENDOR, vendor, actualMap, warnHours, tol));
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("rows", rows);
+        return result;
+    }
+
+    /** 构建单条机台泳道行（含行内任务条） */
+    private Map<String, Object> laneRow(Long wsId, String wsName, String wsCode, List<ProTask> ts,
+                                        Map<Long, Map<String, Object>> actualMap, int warnHours, int tol)
+    {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("workstationId", wsId);
+        row.put("workstationName", wsName);
+        row.put("workstationCode", wsCode);
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (ProTask pt : ts)
+        {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", pt.getTaskId().toString());
+            String label = pt.getProcessName() != null ? pt.getProcessName() : "工序";
+            item.put("text", label + " → " + (pt.getWorkstationName() != null ? pt.getWorkstationName() : ""));
+            item.put("start", pt.getStartTime() != null ? sdf.format(pt.getStartTime()) : null);
+            item.put("end", pt.getEndTime() != null ? sdf.format(pt.getEndTime()) : null);
+            item.put("duration", pt.getDuration());
+            item.put("processId", pt.getProcessId());
+            item.put("processName", pt.getProcessName());
+            item.put("workstationId", pt.getWorkstationId());
+            item.put("workstationName", pt.getWorkstationName());
+            item.put("workorderId", pt.getWorkorderId());
+            item.put("workorderName", pt.getWorkorderName());
+            item.put("itemName", pt.getItemName());
+            item.put("colorCode", pt.getColorCode() != null ? pt.getColorCode() : ProConstants.DEFAULT_COLOR_CODE);
+            item.put("status", pt.getStatus());
+            item.put("quantity", pt.getQuantity());
+            item.put("quantityProduced", pt.getQuantityProduced());
+            enrichItem(pt, item, actualMap, warnHours, tol);
+            items.add(item);
+        }
+        row.put("tasks", items);
+        return row;
+    }
+
+    private boolean overlapsRange(ProTask t, Date from, Date to)
+    {
+        if (t.getStartTime() == null || t.getEndTime() == null) return true;  // 未排时间的待指派任务也保留
+        return !t.getEndTime().before(from) && !t.getStartTime().after(to);
+    }
+
+    private Date parseDay(String s, int defaultOffsetDays, boolean endOfDay)
+    {
+        Date d;
+        if (s != null && !s.isBlank())
+        {
+            try { d = sdfDay.parse(s); } catch (Exception e) { d = defaultDay(defaultOffsetDays); }
+        } else {
+            d = defaultDay(defaultOffsetDays);
+        }
+        if (endOfDay)
+        {
+            Calendar c = Calendar.getInstance();
+            c.setTime(d);
+            c.add(Calendar.DATE, 1);
+            d = c.getTime();
+        }
+        return d;
+    }
+
+    private Date defaultDay(int offsetDays)
+    {
+        Calendar c = Calendar.getInstance();
+        c.add(Calendar.DAY_OF_MONTH, offsetDays);
+        return c.getTime();
     }
 
     @Override

@@ -19,12 +19,14 @@ import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
 import com.ruoyi.system.mapper.mes.pro.ProProcessMapper;
 import com.ruoyi.system.mapper.mes.pro.ProRouteMapper;
 import com.ruoyi.system.mapper.mes.pro.ProRouteProcessMapper;
+import com.ruoyi.system.mapper.mes.pro.ProRouteProductMapper;
 import com.ruoyi.system.mapper.mes.md.MdWorkstationMapper;
 import com.ruoyi.system.domain.mes.pro.ProTask;
 import com.ruoyi.system.domain.mes.pro.ProConstants;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
 import com.ruoyi.system.domain.mes.pro.ProProcess;
 import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
+import com.ruoyi.system.domain.mes.pro.ProRouteProduct;
 import com.ruoyi.system.domain.mes.md.MdWorkstation;
 import com.ruoyi.system.service.mes.pro.IProTaskService;
 
@@ -51,6 +53,9 @@ public class ProTaskServiceImpl implements IProTaskService
 
     @Autowired
     private ProRouteProcessMapper proRouteProcessMapper;
+
+    @Autowired
+    private ProRouteProductMapper proRouteProductMapper;
 
     @Autowired
     private MdWorkstationMapper mdWorkstationMapper;
@@ -85,9 +90,10 @@ public class ProTaskServiceImpl implements IProTaskService
     private void autoFillRelatedFields(ProTask proTask)
     {
         // 从工单获取关联信息
+        ProWorkorder wo = null;
         if (proTask.getWorkorderId() != null)
         {
-            ProWorkorder wo = proWorkorderMapper.selectProWorkorderByWorkorderId(proTask.getWorkorderId());
+            wo = proWorkorderMapper.selectProWorkorderByWorkorderId(proTask.getWorkorderId());
             if (wo != null)
             {
                 if (proTask.getWorkorderCode() == null) proTask.setWorkorderCode(wo.getWorkorderCode());
@@ -142,21 +148,23 @@ public class ProTaskServiceImpl implements IProTaskService
         if (proTask.getItemName() == null || proTask.getItemName().isEmpty()) proTask.setItemName("-");
         if (proTask.getUnitOfMeasure() == null || proTask.getUnitOfMeasure().isEmpty()) proTask.setUnitOfMeasure("PCS");
 
-        // 尝试从工单路线获取 route_id
-        if (proTask.getRouteId() == null && proTask.getWorkorderId() != null && proTask.getProcessId() != null)
+        // 定位本工序在【工单自己的工艺路线】上的定义。route_id 必须取工单路线，
+        // 不能在"所有含该工序的路线"里 findFirst——同一工序可同时挂在多条自制/外协路线上，
+        // 捞错路线会把外协工序误判成自制（历史 bug：手动建任务 route_id 错乱）。
+        ProRouteProcess routeStep = resolveWorkorderRouteStep(wo, proTask.getProcessId());
+        if (routeStep != null)
         {
-            ProRouteProcess query = new ProRouteProcess();
-            query.setProcessId(proTask.getProcessId());
-            List<ProRouteProcess> routes = proRouteProcessMapper.selectProRouteProcessList(query);
-            if (routes != null && !routes.isEmpty())
+            if (proTask.getRouteId() == null) proTask.setRouteId(routeStep.getRouteId());
+            // 外协工序：不占厂内工作站，打外协虚拟站 + 厂商标记（与排产 ScheduleServiceImpl 一致）；
+            // 否则待报工列表只认 workstation_code='VENDOR' 排除外协，会把它当厂内任务推到手机端报工
+            if ("1".equals(routeStep.getIsOutsource()))
             {
-                ProRouteProcess match = routes.stream()
-                    .filter(r -> r.getProcessId().equals(proTask.getProcessId()))
-                    .findFirst().orElse(null);
-                if (match != null && match.getRouteId() != null)
-                {
-                    proTask.setRouteId(match.getRouteId());
-                }
+                proTask.setWorkstationId(ProConstants.WS_VIRTUAL_ID);
+                proTask.setWorkstationCode(ProConstants.WS_CODE_VENDOR);
+                proTask.setWorkstationName(routeStep.getVendorName() != null ? routeStep.getVendorName() : "外协");
+                if (routeStep.getVendorId() != null) proTask.setVendorId(routeStep.getVendorId());
+                if (routeStep.getVendorCode() != null) proTask.setVendorCode(routeStep.getVendorCode());
+                if (routeStep.getOutsourceFactoryId() != null) proTask.setOutsourceFactoryId(routeStep.getOutsourceFactoryId());
             }
         }
         // fallback: set route_id = 0 if still null (to satisfy NOT NULL constraint)
@@ -164,6 +172,22 @@ public class ProTaskServiceImpl implements IProTaskService
         {
             proTask.setRouteId(0L);
         }
+    }
+
+    /**
+     * 取某工序在工单所属工艺路线（工单 route_product → route）上的路线工序定义；
+     * 工单未挂路线或该工序不在该路线上时返回 null。
+     */
+    private ProRouteProcess resolveWorkorderRouteStep(ProWorkorder wo, Long processId)
+    {
+        if (wo == null || processId == null || wo.getRouteProductId() == null) return null;
+        ProRouteProduct rp = proRouteProductMapper.selectProRouteProductByRecordId(wo.getRouteProductId());
+        if (rp == null || rp.getRouteId() == null) return null;
+        ProRouteProcess q = new ProRouteProcess();
+        q.setRouteId(rp.getRouteId());
+        List<ProRouteProcess> steps = proRouteProcessMapper.selectProRouteProcessList(q);
+        if (steps == null) return null;
+        return steps.stream().filter(s -> processId.equals(s.getProcessId())).findFirst().orElse(null);
     }
 
     @Override

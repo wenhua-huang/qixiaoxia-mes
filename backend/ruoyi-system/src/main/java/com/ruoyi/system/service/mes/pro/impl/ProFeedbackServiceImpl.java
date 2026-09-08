@@ -88,6 +88,7 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
     @Autowired private MdItemMapper mdItemMapper;
     @Autowired private com.ruoyi.system.mapper.mes.wm.WmIssueHeaderMapper wmIssueHeaderMapper;
     @Autowired private com.ruoyi.system.mapper.mes.wm.WmIssueDetailMapper wmIssueDetailMapper;
+    @Autowired private com.ruoyi.system.mapper.mes.wm.WmIssueLineMapper wmIssueLineMapper;
 
     @Override
     public ProFeedback selectProFeedbackByRecordId(Long recordId) {
@@ -143,20 +144,24 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
             try {
                 ProTask task = proTaskMapper.selectProTaskByTaskId(fb.getTaskId());
                 if (task != null) {
-                    if (fb.getWorkorderId() == null) fb.setWorkorderId(task.getWorkorderId());
-                    if (fb.getWorkorderCode() == null) fb.setWorkorderCode(task.getWorkorderCode());
-                    if (fb.getWorkorderName() == null) fb.setWorkorderName(task.getWorkorderName());
-                    if (fb.getTaskCode() == null) fb.setTaskCode(task.getTaskCode());
-                    if (fb.getProcessId() == null) fb.setProcessId(task.getProcessId());
-                    if (fb.getProcessCode() == null) fb.setProcessCode(task.getProcessCode());
-                    if (fb.getProcessName() == null) fb.setProcessName(task.getProcessName());
-                    if (fb.getRouteId() == null) fb.setRouteId(task.getRouteId());
+                    // 工单/工序/路线是任务的身份字段，外协拦截、工序顺序、领料校验都以它们为键，
+                    // 必须以任务为准，不能采信客户端传入值——否则伪造 routeId 即可把外协工序报成自制。
+                    fb.setWorkorderId(task.getWorkorderId());
+                    fb.setProcessId(task.getProcessId());
+                    fb.setRouteId(task.getRouteId());
+                    // 身份快照（编码/名称）同步以任务为准，避免与上面纠正后的 ID 不一致
+                    fb.setWorkorderCode(task.getWorkorderCode());
+                    fb.setWorkorderName(task.getWorkorderName());
+                    fb.setTaskCode(task.getTaskCode());
+                    fb.setProcessCode(task.getProcessCode());
+                    fb.setProcessName(task.getProcessName());
                     if (fb.getWorkstationId() == null) fb.setWorkstationId(task.getWorkstationId());
                     if (fb.getWorkstationCode() == null) fb.setWorkstationCode(task.getWorkstationCode());
                     if (fb.getWorkstationName() == null) fb.setWorkstationName(task.getWorkstationName());
-                    if (fb.getItemId() == null) fb.setItemId(task.getItemId());
-                    if (fb.getItemCode() == null) fb.setItemCode(task.getItemCode());
-                    if (fb.getItemName() == null) fb.setItemName(task.getItemName());
+                    // 产出物即任务产品（排产时 task.item_id = 工单产品），同样以任务为准
+                    fb.setItemId(task.getItemId());
+                    fb.setItemCode(task.getItemCode());
+                    fb.setItemName(task.getItemName());
                     if (fb.getUnitOfMeasure() == null) fb.setUnitOfMeasure(task.getUnitOfMeasure());
                     if (fb.getUnitName() == null) fb.setUnitName(task.getUnitName());
                 }
@@ -281,6 +286,8 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
         }
         // 工序顺序校验：严格串行推进，拦跳序+拦倒序（仅纯串行 SS 路线生效）
         validateProcessSequence(proFeedback.getCardId(), proFeedback.getRouteId(), proFeedback.getProcessId());
+        // 领料校验（缺料不生产）：该工序有物料消耗时，必须已发料出库才能报工
+        validateIssueBeforeFeedback(proFeedback);
         // 物料消耗默认值：若未传 consumeList 但有工单ID，从工单BOM自动填充
         if ((proFeedback.getConsumeList() == null || proFeedback.getConsumeList().isEmpty())
                 && proFeedback.getWorkorderId() != null) {
@@ -305,6 +312,62 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
         }
         writeMaterialTrace(proFeedback);
         return rows;
+    }
+
+    /**
+     * 报工前领料校验（缺料不生产）：该工序在工单 BOM 中有物料消耗时，必须存在已发料出库的生产领料单。
+     * <p>BOM 中无物料行的工序（检验、打包等不耗料工序）自动豁免——领料单生成本就跳过这些工序
+     * （见 ProWorkorderDocServiceImpl / ProWorkorderServiceImpl#doGenerateIssueOrders），无需额外开关。
+     * <p>仅校验厂内自制报工；外协报工走外协发料，且外协工序已在前面禁止内部报工。
+     */
+    private void validateIssueBeforeFeedback(ProFeedback fb) {
+        if (!"INTERNAL".equals(fb.getFeedbackType())) return;
+        Long workorderId = fb.getWorkorderId();
+        Long processId = fb.getProcessId();
+        if (workorderId == null || processId == null) return;
+
+        // 1) 该工序在本工单 BOM 是否有物料消耗：无物料行 → 无需领料，放行
+        List<ProWorkorderBom> boms = proWorkorderBomMapper.selectProWorkorderBomByWorkorderId(workorderId);
+        boolean consumesMaterial = false;
+        if (boms != null) {
+            for (ProWorkorderBom b : boms) {
+                if (processId.equals(b.getProcessId())) { consumesMaterial = true; break; }
+            }
+        }
+        if (!consumesMaterial) return;
+
+        // 2) 有物料消耗 → 必须有已发料出库的生产领料单
+        com.ruoyi.system.domain.mes.wm.WmIssueHeader q = new com.ruoyi.system.domain.mes.wm.WmIssueHeader();
+        q.setWorkorderId(workorderId);
+        List<com.ruoyi.system.domain.mes.wm.WmIssueHeader> headers = wmIssueHeaderMapper.selectWmIssueHeaderList(q);
+        if (headers != null) {
+            List<Long> issuedIssueIds = new ArrayList<>();
+            for (com.ruoyi.system.domain.mes.wm.WmIssueHeader h : headers) {
+                if (!com.ruoyi.common.enums.WmIssueConstants.TYPE_PRODUCE.equals(h.getIssueType())) continue;
+                if (!com.ruoyi.common.enums.WmIssueConstants.isMaterialIssued(h.getStatus())) continue;
+                issuedIssueIds.add(h.getIssueId());
+                // 头匹配：自动生成的领料单一头对一工序（process_id），排产后另有 task_id
+                boolean sameProcess = processId.equals(h.getProcessId())
+                        || (fb.getTaskId() != null && fb.getTaskId().equals(h.getTaskId()));
+                if (sameProcess) return; // 已发料出库，放行
+            }
+            // 行兜底：手工"从工单生成"的聚合领料单，头不挂工序、工序只记在领料行上。
+            // 必须该行 quantity_issued>0——聚合单可部分发料（头 PARTIAL_ISSUED），未发料工序的行
+            // quantity_issued=0，不能仅凭"行存在"就放行。
+            if (!issuedIssueIds.isEmpty()) {
+                List<com.ruoyi.system.domain.mes.wm.WmIssueLine> lines = wmIssueLineMapper.selectByIssueIds(issuedIssueIds);
+                if (lines != null) {
+                    for (com.ruoyi.system.domain.mes.wm.WmIssueLine ln : lines) {
+                        if (processId.equals(ln.getProcessId())
+                                && ln.getQuantityIssued() != null
+                                && ln.getQuantityIssued().compareTo(BigDecimal.ZERO) > 0) {
+                            return; // 该工序物料已实际发出，放行
+                        }
+                    }
+                }
+            }
+        }
+        throw new ServiceException("该工序尚未领料（发料出库），不能报工");
     }
 
     /**

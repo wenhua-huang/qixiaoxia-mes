@@ -92,9 +92,11 @@ public class ProWorkorderChangeController extends BaseController
     }
 
     /**
-     * 新增工单变更记录
+     * 发起工单变更（对已有工单提变更申请，属修改范畴；与修改/审批同为 edit 权限）。
+     * 注意：不能用 mes:pro:workorder:add —— 该权限已随"工单仅能由销售订单生成"收口给超管，
+     * 工单变更是对在制工单的改动，生产角色凭 edit 权限发起。
      */
-    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:add')")
+    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:edit')")
     @Log(title = "工单变更记录", businessType = BusinessType.INSERT)
     @PostMapping
     public AjaxResult add(@RequestBody ProWorkorderChange proWorkorderChange)

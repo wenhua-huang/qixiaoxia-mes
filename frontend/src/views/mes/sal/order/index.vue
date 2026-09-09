@@ -10,6 +10,11 @@
           <el-option label="内贸" value="DOMESTIC" /><el-option label="外贸" value="FOREIGN" /><el-option label="现货" value="SPOT" />
         </el-select>
       </el-form-item>
+      <el-form-item label="订单类型" prop="orderType">
+        <el-select v-model="queryParams.orderType" placeholder="全部" clearable style="width:110px">
+          <el-option v-for="d in salOrderTypeOptions" :key="d.dictValue" :label="d.dictLabel" :value="d.dictValue" />
+        </el-select>
+      </el-form-item>
       <el-form-item label="状态" prop="status">
         <el-select v-model="queryParams.status" placeholder="全部" clearable style="width:110px">
           <el-option v-for="d in salStatusOptions" :key="d.dictValue" :label="d.dictLabel" :value="d.dictValue" />
@@ -39,6 +44,7 @@
         <template #default="s"><el-link type="primary" @click="handleView(s.row)">{{ s.row.orderCode }}</el-link></template>
       </el-table-column>
       <el-table-column label="订单名称" align="center" prop="orderName" :show-overflow-tooltip="true" />
+      <el-table-column label="订单类型" align="center" prop="orderType" width="90"><template #default="s"><el-tag :type="orderTypeMeta(s.row.orderType).type" size="small">{{ orderTypeMeta(s.row.orderType).text }}</el-tag></template></el-table-column>
       <el-table-column label="客户" align="center" prop="clientName" :show-overflow-tooltip="true" />
       <el-table-column label="客户PO号" align="center" prop="clientOrderCode" width="120" />
       <el-table-column label="业务线" align="center" prop="businessLine" width="80"><template #default="s">{{ businessLineText(s.row.businessLine) }}</template></el-table-column>
@@ -90,7 +96,7 @@
         </el-row>
         <el-row>
           <el-col :span="6"><el-form-item label="业务线" prop="businessLine"><el-select v-model="form.businessLine" placeholder="请选择" style="width:100%"><el-option label="内贸" value="DOMESTIC" /><el-option label="外贸" value="FOREIGN" /><el-option label="现货" value="SPOT" /></el-select></el-form-item></el-col>
-          <el-col :span="6"><el-form-item label="订单类型" prop="orderType"><el-select v-model="form.orderType" style="width:100%"><el-option label="新单" value="NEW" /><el-option label="返单" value="REPEAT" /></el-select></el-form-item></el-col>
+          <el-col :span="6"><el-form-item label="订单类型" prop="orderType"><el-select v-model="form.orderType" style="width:100%"><el-option v-for="d in salOrderTypeOptions" :key="d.dictValue" :label="d.dictLabel" :value="d.dictValue" /></el-select></el-form-item></el-col>
           <el-col :span="6"><el-form-item label="是否有样品" prop="sampleFlag"><el-switch v-model="form.sampleFlag" active-value="Y" inactive-value="N" /></el-form-item></el-col>
           <el-col :span="6"><el-form-item label="付款方式" prop="paymentMethod"><el-select v-model="form.paymentMethod" placeholder="请选择" clearable style="width:100%"><el-option label="月结30天" value="月结30天" /><el-option label="月结60天" value="月结60天" /><el-option label="月结90天" value="月结90天" /><el-option label="现结" value="现结" /><el-option label="预付款" value="预付款" /><el-option label="货到付款" value="货到付款" /><el-option label="信用证" value="信用证" /></el-select></el-form-item></el-col>
         </el-row>
@@ -160,7 +166,6 @@
         </el-row>
         <el-row>
           <el-col :span="12"><el-form-item label="客户PO号"><el-input v-model="twForm.clientOrderCode" placeholder="客户PO号" /></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="订单类型"><el-select v-model="twForm.orderType" style="width:100%"><el-option label="新单" value="NEW" /><el-option label="返单" value="REPEAT" /></el-select></el-form-item></el-col>
         </el-row>
         <el-row>
           <el-col :span="12"><el-form-item label="产品尺寸"><el-input v-model="twForm.productSize" placeholder="如254*127*330mm" /></el-form-item></el-col>
@@ -290,11 +295,13 @@ export default {
       orderList: [], title: '', open: false, optType: undefined, autoGenFlag: true,
       // 销售订单状态字典(mes_sal_order_status)
       salStatusOptions: [],
+      // 销售订单类型字典(mes_sal_order_type)
+      salOrderTypeOptions: [],
       // 审核驳回弹窗
       rejectOpen: false, rejectTargetId: null, rejectTargetCode: '', rejectRemark: '',
       // 业务员选项列表(SysUser,存展示用姓名 nickName,与客户/成品销售的 salesperson 口径一致)
       userOptions: [],
-      queryParams: { pageNum: 1, pageSize: 10, orderCode: null, orderName: null, clientName: null, clientOrderCode: null, businessLine: null, status: null, source: null },
+      queryParams: { pageNum: 1, pageSize: 10, orderCode: null, orderName: null, clientName: null, clientOrderCode: null, businessLine: null, orderType: null, status: null, source: null },
       form: {}, lineList: [],
       lineEditOpen: false, editingLine: null,
       twOpen: false, twLines: [], twOrderCode: '', twAutoGenFlag: true,
@@ -303,7 +310,7 @@ export default {
       twBomList: [], twParamList: [],
       twSkuDialogOpen: false, twSkuChoice: '', twDeviationList: [],
       twBomEditOpen: false, twBomEditIdx: -1, twBomEditForm: {},
-      twForm: { lineId: null, quantity: undefined, workorderCode: '', workorderName: '', requestDate: null, routeProductId: null, clientOrderCode: '', orderType: 'NEW', productSize: '', ropeSpec: '', printingReq: '', packageReq: '', createSkuVariant: false, skuCode: '', skuName: '', remark: '' },
+      twForm: { lineId: null, quantity: undefined, workorderCode: '', workorderName: '', requestDate: null, routeProductId: null, clientOrderCode: '', productSize: '', ropeSpec: '', printingReq: '', packageReq: '', createSkuVariant: false, skuCode: '', skuName: '', remark: '' },
       rules: {
         orderCode: [{ required: true, message: '销售订单号不能为空', trigger: 'blur' }],
         orderName: [{ required: true, message: '订单名称不能为空', trigger: 'blur' }],
@@ -311,7 +318,7 @@ export default {
       }
     }
   },
-  created() { this.loadUserOptions(); this.loadStatusDict(); this.getList() },
+  created() { this.loadUserOptions(); this.loadStatusDict(); this.loadOrderTypeDict(); this.getList() },
   methods: {
     /** 业务员下拉数据源：按展示名去重(重复 value 会导致 el-select 的 filterable 过滤失效) */
     loadUserOptions() {
@@ -327,10 +334,17 @@ export default {
     getList() { this.loading = true; listOrder(this.queryParams).then(r => { this.orderList = r.rows; this.total = r.total; this.loading = false }).catch(() => { this.loading = false }) },
     /** 加载销售订单状态字典 */
     loadStatusDict() { getDicts('mes_sal_order_status').then(r => { this.salStatusOptions = r.data || [] }) },
+    /** 加载销售订单类型字典 */
+    loadOrderTypeDict() { getDicts('mes_sal_order_type').then(r => { this.salOrderTypeOptions = r.data || [] }) },
     /** 状态 → {text, type}，由字典驱动渲染 */
     statusMeta(s) {
       const d = this.salStatusOptions.find(o => o.dictValue === s)
       return { text: d ? d.dictLabel : (s || ''), type: d && d.listClass ? d.listClass : '' }
+    },
+    /** 订单类型 → {text, type}，由字典驱动渲染 */
+    orderTypeMeta(t) {
+      const d = this.salOrderTypeOptions.find(o => o.dictValue === t)
+      return { text: d ? d.dictLabel : (t || ''), type: d && d.listClass ? d.listClass : '' }
     },
     businessLineText(b) { return { DOMESTIC: '内贸', FOREIGN: '外贸', SPOT: '现货' }[b] || b },
     sourceText(s) { return { 1: '直接新增', 2: 'CRM系统' }[s] || (s == null ? '' : s) },
@@ -345,7 +359,7 @@ export default {
     handleSelectionChange(sel) { this.selectedRows = sel; this.ids = sel.map(i => i.orderId); this.single = sel.length !== 1; this.multiple = !sel.length },
     handleAutoGenChange(v) { if (v) { genSerialCode('ORDER_NO').then(r => { this.form.orderCode = r.data }) } else { this.form.orderCode = '' } },
     handleSelectClient() { this.$refs.clientSelectRef.open() },
-    onClientSelected(row) { this.form.clientId = row.clientId; this.form.clientCode = row.clientCode; this.form.clientName = row.clientName; this.form.clientNick = row.clientNick; if (row.salesperson) this.form.salesperson = row.salesperson; if (row.clientType) this.form.businessLine = row.clientType },
+    onClientSelected(row) { this.form.clientId = row.clientId; this.form.clientCode = row.clientCode; this.form.clientName = row.clientName; this.form.clientNick = row.clientNick; this.form.salesperson = row.salesperson || null; this.form.businessLine = row.clientType || null },
     handleAdd() { this.reset(); this.optType = 'add'; this.handleAutoGenChange(true); this.open = true; this.title = '新增销售订单' },
     /** 跳转只读详情页（展示审核人/审核时间/明细） */
     handleView(row) { this.$router.push({ path: '/mes/sal/order_detail', query: { orderId: row.orderId } }) },
@@ -402,7 +416,7 @@ export default {
     handleToWorkorder(row) {
       this.twOrderCode = row.orderCode; this.twOpen = true; this.twStep = 1; this.twAutoGenFlag = true
       this.twLines = []; this.twRouteOptions = []; this.twProductId = null; this.twProductCode = ''; this.twProductName = ''; this.twBomList = []; this.twParamList = []; this.twRouteProcesses = []
-      this.twForm = { lineId: null, quantity: undefined, workorderCode: '', workorderName: '', requestDate: row.requestDate ? row.requestDate + ' 00:00:00' : null, routeProductId: null, clientOrderCode: '', orderType: 'NEW', productSize: '', ropeSpec: '', printingReq: '', packageReq: '', createSkuVariant: false, skuCode: '', skuName: '', remark: '' }
+      this.twForm = { lineId: null, quantity: undefined, workorderCode: '', workorderName: '', requestDate: row.requestDate ? row.requestDate + ' 00:00:00' : null, routeProductId: null, clientOrderCode: '', productSize: '', ropeSpec: '', printingReq: '', packageReq: '', createSkuVariant: false, skuCode: '', skuName: '', remark: '' }
       getOrderDetail(row.orderId).then(r => { this.twLines = r.data.lines || [] }).catch(() => {})
       this.twAutoGen()
     },

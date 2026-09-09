@@ -7,6 +7,8 @@ export interface SalOrderQueryParams extends PageDomain {
   clientName?: string;
   clientOrderCode?: string;
   businessLine?: string;
+  /** 订单类型：NEW=新单 REPEAT=返单 STOCK=备货订单（字典 mes_sal_order_type） */
+  orderType?: string;
   status?: string;
   /** 订单来源：1=直接新增 2=CRM系统 */
   source?: number;

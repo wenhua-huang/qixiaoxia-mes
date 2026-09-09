@@ -97,7 +97,7 @@ import { getOrderDetail } from '@/api/mes/sal/order'
 import type { SalOrder, SalOrderLine } from '@/types'
 
 const { proxy } = getCurrentInstance() as any
-const { mes_sal_order_status: statusDict } = proxy.useDict('mes_sal_order_status')
+const { mes_sal_order_status: statusDict, mes_sal_order_type: orderTypeDict } = proxy.useDict('mes_sal_order_status', 'mes_sal_order_type')
 
 const route = useRoute()
 const router = useRouter()
@@ -122,7 +122,11 @@ const approveHint = computed(() => {
   if (s === 'PREPARE') return '未提交'
   return '-'
 })
-const orderTypeText = computed(() => ({ NEW: '新单', REPEAT: '返单' }[order.value.orderType || ''] || order.value.orderType || '-'))
+const orderTypeText = computed(() => {
+  const v = order.value.orderType
+  const d = orderTypeDict.value?.find((x: any) => x.value === v || x.dictValue === v)
+  return d ? (d.label || d.dictLabel) : (v || '-')
+})
 const businessLineText = computed(() => ({ DOMESTIC: '内贸', FOREIGN: '外贸', SPOT: '现货' }[order.value.businessLine || ''] || order.value.businessLine || '-'))
 const sourceText = computed(() => ({ 1: '直接新增', 2: 'CRM系统' }[String(order.value.source)] || '-'))
 

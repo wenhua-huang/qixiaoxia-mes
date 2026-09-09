@@ -47,6 +47,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="clientName != null  and clientName != ''"> and client_name like concat('%', #{clientName}, '%')</if>
             <if test="clientOrderCode != null  and clientOrderCode != ''"> and client_order_code like concat('%', #{clientOrderCode}, '%')</if>
             <if test="businessLine != null  and businessLine != ''"> and business_line = #{businessLine}</if>
+            <if test="orderType != null  and orderType != ''"> and order_type = #{orderType}</if>
             <if test="status != null  and status != ''"> and status = #{status}</if>
         </where>
         order by order_id desc

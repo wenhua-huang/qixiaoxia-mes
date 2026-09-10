@@ -195,13 +195,13 @@ WHERE r.factory_id=1 AND r.route_code='RT-GIFT'
 
 -- ---------- ⑤d 三个演示物料(按 item_code 幂等) ----------
 INSERT INTO qxx_md_item (factory_id, item_code, item_name, specification, unit_of_measure, unit_name, enable_flag, create_by, create_time)
-SELECT 1, 'ITEM-PLATE-DEMO', '制版演示印版', '标准版式', 'GE', '个', '1', 'admin', NOW()
+SELECT 1, 'ITEM-PLATE-DEMO', '制版演示印版', '标准版式', 'PCS', '个', '1', 'admin', NOW()
 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM qxx_md_item WHERE factory_id=1 AND item_code='ITEM-PLATE-DEMO');
 INSERT INTO qxx_md_item (factory_id, item_code, item_name, specification, unit_of_measure, unit_name, enable_flag, create_by, create_time)
-SELECT 1, 'ITEM-SMALL-DEMO', '小批量演示纸袋', '小批量规格', 'GE', '个', '1', 'admin', NOW()
+SELECT 1, 'ITEM-SMALL-DEMO', '小批量演示纸袋', '小批量规格', 'PCS', '个', '1', 'admin', NOW()
 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM qxx_md_item WHERE factory_id=1 AND item_code='ITEM-SMALL-DEMO');
 INSERT INTO qxx_md_item (factory_id, item_code, item_name, specification, unit_of_measure, unit_name, enable_flag, create_by, create_time)
-SELECT 1, 'ITEM-GIFT-DEMO', '礼品盒演示产品', '礼盒装', 'GE', '个', '1', 'admin', NOW()
+SELECT 1, 'ITEM-GIFT-DEMO', '礼品盒演示产品', '礼盒装', 'PCS', '个', '1', 'admin', NOW()
 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM qxx_md_item WHERE factory_id=1 AND item_code='ITEM-GIFT-DEMO');
 
 -- ---------- ⑤e 物料-路线绑定 + 维度标签(按 route+item 幂等) ----------
@@ -231,19 +231,23 @@ WHERE rp.factory_id=1 AND r.route_code='RT-STANDARD' AND rp.apply_order_type IS 
 UPDATE qxx_pro_route_process rp
 JOIN qxx_pro_route r ON r.route_id=rp.route_id
 JOIN qxx_md_vendor v ON v.factory_id=1 AND v.vendor_code='OUT-WANLONG'
-SET rp.vendor_id=v.vendor_id, rp.vendor_code=v.vendor_code, rp.vendor_name=v.vendor_name,
-    rp.outsource_factory_id=1
+SET rp.vendor_id=v.vendor_id, rp.vendor_code=v.vendor_code, rp.vendor_name=v.vendor_name
 WHERE rp.factory_id=1 AND r.route_code='RT-OUTSRC' AND rp.is_outsource='1'
   AND rp.vendor_id IS NULL;
+-- 注: outsource_factory_id 保持 NULL, 与现网既有万隆外协节点口径一致(万隆无对应系统工厂)
 ```
 
 > DDL 写法已对齐 V100/V106 生产先例（裸 CREATE PROCEDURE，无 DELIMITER，Flyway 可直接执行）。
 
 - [ ] **Step 2: 本地库执行验证（Flyway 随后端启动执行，也可手动）**
 
+注意：`mysql` 客户端**不能**直接执行裸 CREATE PROCEDURE（内部分号会被当语句结束，报 1064）；Flyway 能识别 BEGIN…END 块，提交文件必须保持 V100/V106 风格（无 DELIMITER）。本地 CLI 手测时用 awk 包一层 DELIMITER 生成临时文件：
+
 Run:
 ```bash
-docker exec -i qxx-mysql mysql -uroot -pqxx123456 mes < backend/ruoyi-admin/src/main/resources/db/migration/V150__order_type_flags_route_resolve.sql 2>&1 | grep -v "Warning" ; echo "exit=$?"
+awk '/^DROP PROCEDURE IF EXISTS add_col_if_missing;$/&&!d{print;print "DELIMITER //";p=1;next} p&&/^END;$/{print "END //";print "DELIMITER ;";p=0;d=1;next}{print}' \
+  backend/ruoyi-admin/src/main/resources/db/migration/V150__order_type_flags_route_resolve.sql > /tmp/V150_cli_test.sql
+docker exec -i qxx-mysql mysql -uroot -pqxx123456 mes < /tmp/V150_cli_test.sql 2>&1 | grep -v "Using a password" ; echo "exit=$?"
 docker exec -i qxx-mysql mysql -uroot -pqxx123456 mes -e "
 SELECT dict_value,dict_label FROM sys_dict_data WHERE dict_type='mes_sal_order_type' ORDER BY dict_sort;
 SELECT route_code, COUNT(*) FROM qxx_pro_route_process rp JOIN qxx_pro_route r ON r.route_id=rp.route_id WHERE r.route_code IN ('RT-PLATE','RT-SMALL','RT-GIFT') GROUP BY route_code;
@@ -255,7 +259,7 @@ Expected: 字典返回 5 行（STANDARD/SMALL_BATCH/GIFT/STOCK/PLATE）；3 条�
 
 - [ ] **Step 3: 再跑一次验证幂等**
 
-Run: `docker exec -i qxx-mysql mysql -uroot -pqxx123456 mes < backend/ruoyi-admin/src/main/resources/db/migration/V150__order_type_flags_route_resolve.sql`
+Run: `docker exec -i qxx-mysql mysql -uroot -pqxx123456 mes < /tmp/V150_cli_test.sql`（沿用 Step 2 包装文件）
 Expected: 无报错；重复 Step 2 的查询，行数/计数不变（字典仍 5 行、绑定不重复）。
 说明：手动 mysql 执行不写 flyway_schema_history；后端首次启动时 Flyway 会再跑一遍同一文件并登记历史——因全部语句幂等（存储过程判列存在、DML 均 WHERE NOT EXISTS），二遍执行安全无副作用，不需要 repair。
 

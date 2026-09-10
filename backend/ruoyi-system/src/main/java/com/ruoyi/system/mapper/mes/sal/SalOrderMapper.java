@@ -1,7 +1,9 @@
 package com.ruoyi.system.mapper.mes.sal;
 
+import java.util.Date;
 import java.util.List;
 import org.apache.ibatis.annotations.Param;
+import com.ruoyi.common.annotation.SkipFactoryId;
 import com.ruoyi.system.domain.mes.sal.SalOrder;
 import com.ruoyi.system.domain.mes.sal.vo.SalOrderProgressRow;
 
@@ -29,4 +31,11 @@ public interface SalOrderMapper
      * 主表 l 的 factory_id 由 FactoryIdInterceptor 注入。
      */
     public List<SalOrderProgressRow> selectProgressByOrderIds(@Param("ids") List<Long> orderIds);
+
+    /** 仅 CONFIRMED 订单推进 PRODUCING（开工事件）。跳过拦截器：跨表事件链路显式带 factoryId */
+    @SkipFactoryId
+    int confirmProducing(@Param("orderId") Long orderId,
+                         @Param("factoryId") Long factoryId,
+                         @Param("updateBy") String updateBy,
+                         @Param("updateTime") Date updateTime);
 }

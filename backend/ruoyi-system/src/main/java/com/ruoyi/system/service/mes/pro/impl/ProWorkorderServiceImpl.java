@@ -19,6 +19,7 @@ import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.core.redis.RedisLockTemplate;
 import com.ruoyi.common.enums.WmIssueConstants;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -65,6 +66,7 @@ import com.ruoyi.system.service.mes.pro.IProRouteProductBomService;
 import com.ruoyi.system.service.mes.pro.IProRouteProcessParamService;
 import com.ruoyi.system.domain.mes.pro.ProRouteProductBom;
 import com.ruoyi.system.domain.mes.pro.ProRouteProcessParam;
+import com.ruoyi.system.event.mes.WorkorderStartedEvent;
 
 /**
  * 生产工单Service业务层处理
@@ -161,6 +163,9 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
 
     @Autowired
     private com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator autoCodeGenerator;
+
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ProWorkorderServiceImpl.class);
 
@@ -751,6 +756,11 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
             ensureDefaultCardForWorkorder(wo);
         } catch (Exception e) {
             log.error("开工自动建流转卡失败, workorderId={}", workorderId, e);
+        }
+        // 销售来源工单：发布开工事件，sal 域事务提交后推进订单 CONFIRMED→PRODUCING
+        if (wo.getSalesOrderLineId() != null) {
+            eventPublisher.publishEvent(new WorkorderStartedEvent(
+                    workorderId, wo.getSalesOrderLineId(), wo.getFactoryId()));
         }
         return rows;
     }

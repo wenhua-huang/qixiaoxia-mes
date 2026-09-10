@@ -188,4 +188,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         GROUP BY l.order_id
     </select>
 
+    <!-- 开工推进：仅 CONFIRMED→PRODUCING，幂等；factory_id 显式（事件链路 @SkipFactoryId） -->
+    <update id="confirmProducing">
+        update qxx_sal_order
+        set status = 'PRODUCING', update_by = #{updateBy}, update_time = #{updateTime}
+        where order_id = #{orderId} and factory_id = #{factoryId} and status = 'CONFIRMED'
+    </update>
+
 </mapper>

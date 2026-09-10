@@ -30,6 +30,8 @@
           <el-descriptions-item label="业务员">{{ order.salesperson || '-' }}</el-descriptions-item>
           <el-descriptions-item label="业务线">{{ businessLineText }}</el-descriptions-item>
           <el-descriptions-item label="是否有样品">{{ order.sampleFlag === 'Y' ? '是' : '否' }}</el-descriptions-item>
+          <el-descriptions-item label="是否外发">{{ order.outsourceFlag === 'Y' ? '是' : '否' }}</el-descriptions-item>
+          <el-descriptions-item label="是否包装">{{ order.packageFlag === 'Y' ? '是' : '否' }}</el-descriptions-item>
           <el-descriptions-item label="订单日期">{{ fmtDate(order.orderDate) }}</el-descriptions-item>
           <el-descriptions-item label="需求交期">{{ fmtDate(order.requestDate) }}</el-descriptions-item>
           <el-descriptions-item label="总金额">
@@ -78,6 +80,9 @@
           <el-table-column label="尺寸" align="center" prop="productSize" width="130" :show-overflow-tooltip="true" />
           <el-table-column label="印刷要求" align="center" prop="printingReq" min-width="120" :show-overflow-tooltip="true" />
           <el-table-column label="包装要求" align="center" prop="packageReq" min-width="120" :show-overflow-tooltip="true" />
+          <el-table-column label="工艺路线" align="center" prop="routeName" min-width="130" :show-overflow-tooltip="true">
+            <template #default="s">{{ s.row.routeName || '-' }}</template>
+          </el-table-column>
         </el-table>
       </el-card>
 

@@ -1,7 +1,6 @@
 package com.ruoyi.system.service.mes.sal;
 
 import java.util.List;
-import java.util.Map;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
 import com.ruoyi.system.domain.mes.sal.CrmOrderCreateRequest;
 import com.ruoyi.system.domain.mes.sal.SalOrder;
@@ -26,24 +25,14 @@ public interface ISalOrderService
     public SalOrder createWithLines(SalOrderCreateRequest req);
     /** CRM 等外部系统推单：productCode 反查物料，orderCode 缺省自动生成，source 标记为 CRM */
     public SalOrder createFromCrm(CrmOrderCreateRequest req);
-    /** 修改订单(头+全量替换行,仅 PREPARE 状态可改明细) */
+    /** 修改订单(头+全量替换行,仅 CONFIRMED 状态可改) */
     public SalOrder updateWithLines(SalOrderCreateRequest req);
     /** 详情(头+行,行带已转量/可转量) */
     public SalOrder getDetail(Long orderId);
 
-    /** 提交审核:PREPARE->PENDING */
-    public int submitOrder(Long orderId);
-    /** 审核通过:PENDING->CONFIRMED */
-    public int approveOrder(Long orderId);
-    /** 驳回:PENDING->PREPARE(remark 必填) */
-    public int rejectOrder(Long orderId, String remark);
-    /** 批量提交审核 */
-    public Map<String, Object> batchSubmit(Long[] orderIds);
-    /** 批量审核通过 */
-    public Map<String, Object> batchApprove(Long[] orderIds);
-    /** 关闭:CONFIRMED->CLOSED */
+    /** 结单:SHIPPED->CLOSED */
     public int closeOrder(Long orderId);
-    /** 取消:PREPARE/PENDING/CONFIRMED->CANCEL */
+    /** 取消:CONFIRMED/PRODUCING->CANCEL（SHIPPED/CLOSED/CANCEL 不可取消） */
     public int cancelOrder(Long orderId);
 
     public int deleteSalOrderByOrderIds(Long[] orderIds);

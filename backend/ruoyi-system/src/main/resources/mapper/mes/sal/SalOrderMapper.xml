@@ -48,14 +48,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="clientOrderCode != null  and clientOrderCode != ''"> and client_order_code like concat('%', #{clientOrderCode}, '%')</if>
             <if test="businessLine != null  and businessLine != ''"> and business_line = #{businessLine}</if>
             <if test="orderType != null  and orderType != ''"> and order_type = #{orderType}</if>
-            <if test="status != null  and status != ''"> and status = #{status}</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+            <if test="statusList != null and statusList.size() > 0">
+                and status in
+                <foreach collection="statusList" item="st" open="(" separator="," close=")">#{st}</foreach>
+            </if>
         </where>
         order by order_id desc
     </select>
 
     <select id="selectSalOrderAllConvertible" resultMap="SalOrderResult">
         <include refid="selectSalOrderVo"/>
-        where status = 'CONFIRMED'
+        where status in ('CONFIRMED', 'PRODUCING')
         order by order_id desc
     </select>
 

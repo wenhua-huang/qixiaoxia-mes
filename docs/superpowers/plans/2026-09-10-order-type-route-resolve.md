@@ -439,7 +439,7 @@ git commit -m "refactor(sal): 新增 SalOrderType 枚举并切换为 5 值订单
             <if test="applyPackage != null">#{applyPackage},</if>
             <if test="isDefault != null">#{isDefault},</if>
 ```
-4. update SET 加同样 4 行（`col = #{prop},`）。
+4. update SET：三维度列 + is_default **无条件写入**（`apply_order_type = #{applyOrderType},` …），不用 `<if>`——updateProRouteProduct 仅控制器编辑一处调用（全对象绑定），这样从「标品」改回「不限」(null) 才能真正清空；insert 仍用 `<if>` 跳过 null。
 
 - [ ] **Step 3: 编译**
 

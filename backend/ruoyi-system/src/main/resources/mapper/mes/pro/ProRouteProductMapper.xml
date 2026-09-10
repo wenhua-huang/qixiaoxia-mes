@@ -17,6 +17,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="quantity"    column="quantity"    />
         <result property="productionTime"    column="production_time"    />
         <result property="timeUnitType"    column="time_unit_type"    />
+        <result property="applyOrderType"    column="apply_order_type"    />
+        <result property="applyOutsource"    column="apply_outsource"    />
+        <result property="applyPackage"    column="apply_package"    />
+        <result property="isDefault"    column="is_default"    />
         <result property="remark"    column="remark"    />
         <result property="createBy"    column="create_by"    />
         <result property="createTime"    column="create_time"    />
@@ -25,7 +29,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectProRouteProductVo">
-        select record_id, factory_id, route_id, item_id, item_code, item_name, specification, unit_of_measure, unit_name, quantity, production_time, time_unit_type, remark, create_by, create_time, update_by, update_time from qxx_pro_route_product
+        select record_id, factory_id, route_id, item_id, item_code, item_name, specification, unit_of_measure, unit_name, quantity, production_time, time_unit_type, apply_order_type, apply_outsource, apply_package, is_default, remark, create_by, create_time, update_by, update_time from qxx_pro_route_product
     </sql>
 
     <select id="selectProRouteProductList" parameterType="ProRouteProduct" resultMap="ProRouteProductResult">
@@ -63,6 +67,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="quantity != null">quantity,</if>
             <if test="productionTime != null">production_time,</if>
             <if test="timeUnitType != null and timeUnitType != ''">time_unit_type,</if>
+            <if test="applyOrderType != null">apply_order_type,</if>
+            <if test="applyOutsource != null">apply_outsource,</if>
+            <if test="applyPackage != null">apply_package,</if>
+            <if test="isDefault != null">is_default,</if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
@@ -78,6 +86,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="quantity != null">#{quantity},</if>
             <if test="productionTime != null">#{productionTime},</if>
             <if test="timeUnitType != null and timeUnitType != ''">#{timeUnitType},</if>
+            <if test="applyOrderType != null">#{applyOrderType},</if>
+            <if test="applyOutsource != null">#{applyOutsource},</if>
+            <if test="applyPackage != null">#{applyPackage},</if>
+            <if test="isDefault != null">#{isDefault},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
@@ -97,6 +109,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="quantity != null">quantity = #{quantity},</if>
             <if test="productionTime != null">production_time = #{productionTime},</if>
             <if test="timeUnitType != null and timeUnitType != ''">time_unit_type = #{timeUnitType},</if>
+            apply_order_type = #{applyOrderType},
+            apply_outsource = #{applyOutsource},
+            apply_package = #{applyPackage},
+            is_default = #{isDefault},
             <if test="remark != null">remark = #{remark},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="updateTime != null">update_time = #{updateTime},</if>

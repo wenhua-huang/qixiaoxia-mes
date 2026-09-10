@@ -60,6 +60,9 @@ public class QcIpqc extends BaseEntity
     /** 工单ID */
     private Long workorderId;
 
+    /** 工艺路线ID（非持久化：qxx_qc_ipqc 无此列，FAIL 联动下道工序时由任务反查兜底） */
+    private transient Long routeId;
+
     /** 工单编码 */
     @Excel(name = "工单编码")
     private String workorderCode;
@@ -313,6 +316,16 @@ public class QcIpqc extends BaseEntity
     public void setWorkorderId(Long workorderId)
     {
         this.workorderId = workorderId;
+    }
+
+    public Long getRouteId()
+    {
+        return routeId;
+    }
+
+    public void setRouteId(Long routeId)
+    {
+        this.routeId = routeId;
     }
 
     public String getWorkorderCode()

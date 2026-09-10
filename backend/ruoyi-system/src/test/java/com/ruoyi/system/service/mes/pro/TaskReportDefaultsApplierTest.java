@@ -46,6 +46,9 @@ class TaskReportDefaultsApplierTest {
     @Mock
     private ProFeedbackMapper feedbackMapper;
 
+    @Mock
+    private IProQcBlockService qcBlockService;
+
     private TaskReportDefaultsApplier applier;
 
     private ProRouteProcess node(long pid, int order) {
@@ -74,6 +77,7 @@ class TaskReportDefaultsApplierTest {
         applier = new TaskReportDefaultsApplier();
         ReflectionTestUtils.setField(applier, "inputResolver", resolver);
         ReflectionTestUtils.setField(applier, "flow", flow);
+        ReflectionTestUtils.setField(applier, "qcBlockService", qcBlockService);
     }
 
     @Test

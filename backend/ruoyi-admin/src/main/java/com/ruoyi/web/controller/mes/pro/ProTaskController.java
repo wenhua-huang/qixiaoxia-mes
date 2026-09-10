@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.controller.BaseController;
@@ -36,6 +37,9 @@ public class ProTaskController extends BaseController
 
     @Autowired(required = false)
     private com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator autoCodeGenerator;
+
+    @Autowired
+    private com.ruoyi.system.service.mes.pro.IProQcBlockService qcBlockService;
 
     @PreAuthorize("@ss.hasPermi('mes:pro:task:list')")
     @GetMapping("/list")
@@ -173,5 +177,30 @@ public class ProTaskController extends BaseController
     public AjaxResult remove(@PathVariable Long[] taskIds)
     {
         return toAjax(proTaskService.deleteProTaskByTaskIds(taskIds));
+    }
+
+    /**
+     * 质检不合格拦截授权放行：留痕 + 关闭拦截待办（理由至少 2 个字符）
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:task:release')")
+    @Log(title = "质检拦截放行", businessType = BusinessType.UPDATE)
+    @PutMapping("/releaseQcBlock/{taskId}")
+    public AjaxResult releaseQcBlock(@PathVariable("taskId") Long taskId,
+                                     @RequestParam("reason") String reason)
+    {
+        qcBlockService.release(taskId, reason);
+        return success();
+    }
+
+    /**
+     * 批量查询任务质检锁态（PC 放行工作台用，单次最多 100 个任务）
+     *
+     * @return key=任务ID字符串，value={blocked:boolean, reason:string}
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:task:list')")
+    @PostMapping("/qcBlockState")
+    public AjaxResult qcBlockState(@RequestBody List<Long> taskIds)
+    {
+        return success(qcBlockService.qcBlockState(taskIds));
     }
 }

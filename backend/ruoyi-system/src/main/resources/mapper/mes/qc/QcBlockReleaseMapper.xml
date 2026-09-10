@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.qc.QcBlockReleaseMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.qc.QcBlockRelease" id="QcBlockReleaseResult">
+        <result property="releaseId"         column="release_id"          />
+        <result property="factoryId"         column="factory_id"          />
+        <result property="ipqcId"            column="ipqc_id"             />
+        <result property="ipqcCode"          column="ipqc_code"           />
+        <result property="workorderId"       column="workorder_id"        />
+        <result property="workorderCode"     column="workorder_code"      />
+        <result property="cardId"            column="card_id"             />
+        <result property="cardCode"          column="card_code"           />
+        <result property="checkProcessId"    column="check_process_id"    />
+        <result property="checkProcessName"  column="check_process_name"  />
+        <result property="targetTaskId"      column="target_task_id"      />
+        <result property="targetProcessId"   column="target_process_id"   />
+        <result property="targetProcessName" column="target_process_name" />
+        <result property="releaseReason"     column="release_reason"      />
+        <result property="approverId"        column="approver_id"         />
+        <result property="approverName"      column="approver_name"       />
+        <result property="approveTime"       column="approve_time"        />
+        <result property="createBy"          column="create_by"           />
+        <result property="createTime"        column="create_time"         />
+    </resultMap>
+
+    <sql id="selectQcBlockReleaseVo">
+        select release_id, factory_id, ipqc_id, ipqc_code, workorder_id, workorder_code,
+               card_id, card_code, check_process_id, check_process_name,
+               target_task_id, target_process_id, target_process_name,
+               release_reason, approver_id, approver_name, approve_time, create_by, create_time
+        from qxx_qc_block_release
+    </sql>
+
+    <!-- factory_id 由 FactoryIdInterceptor 注入，业务 INSERT 不写 factory_id 列 -->
+    <insert id="insertQcBlockRelease" parameterType="com.ruoyi.system.domain.mes.qc.QcBlockRelease"
+            useGeneratedKeys="true" keyProperty="releaseId">
+        insert into qxx_qc_block_release
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="ipqcId != null">ipqc_id,</if>
+            <if test="ipqcCode != null">ipqc_code,</if>
+            <if test="workorderId != null">workorder_id,</if>
+            <if test="workorderCode != null">workorder_code,</if>
+            <if test="cardId != null">card_id,</if>
+            <if test="cardCode != null">card_code,</if>
+            <if test="checkProcessId != null">check_process_id,</if>
+            <if test="checkProcessName != null">check_process_name,</if>
+            <if test="targetTaskId != null">target_task_id,</if>
+            <if test="targetProcessId != null">target_process_id,</if>
+            <if test="targetProcessName != null">target_process_name,</if>
+            <if test="releaseReason != null">release_reason,</if>
+            <if test="approverId != null">approver_id,</if>
+            <if test="approverName != null">approver_name,</if>
+            <if test="approveTime != null">approve_time,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="ipqcId != null">#{ipqcId},</if>
+            <if test="ipqcCode != null">#{ipqcCode},</if>
+            <if test="workorderId != null">#{workorderId},</if>
+            <if test="workorderCode != null">#{workorderCode},</if>
+            <if test="cardId != null">#{cardId},</if>
+            <if test="cardCode != null">#{cardCode},</if>
+            <if test="checkProcessId != null">#{checkProcessId},</if>
+            <if test="checkProcessName != null">#{checkProcessName},</if>
+            <if test="targetTaskId != null">#{targetTaskId},</if>
+            <if test="targetProcessId != null">#{targetProcessId},</if>
+            <if test="targetProcessName != null">#{targetProcessName},</if>
+            <if test="releaseReason != null">#{releaseReason},</if>
+            <if test="approverId != null">#{approverId},</if>
+            <if test="approverName != null">#{approverName},</if>
+            <if test="approveTime != null">#{approveTime},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+        </trim>
+    </insert>
+
+    <select id="existsByIpqcAndTask" resultType="boolean">
+        select exists(
+            select 1 from qxx_qc_block_release
+            where ipqc_id = #{ipqcId}
+              and target_task_id = #{targetTaskId}
+        )
+    </select>
+
+    <select id="existsByIpqc" resultType="boolean">
+        select exists(
+            select 1 from qxx_qc_block_release
+            where ipqc_id = #{ipqcId}
+        )
+    </select>
+
+    <select id="selectByIpqc" resultMap="QcBlockReleaseResult">
+        <include refid="selectQcBlockReleaseVo"/>
+        where ipqc_id = #{ipqcId}
+        order by release_id desc
+    </select>
+</mapper>

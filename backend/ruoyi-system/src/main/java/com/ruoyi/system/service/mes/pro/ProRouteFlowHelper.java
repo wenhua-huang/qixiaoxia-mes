@@ -80,7 +80,16 @@ public class ProRouteFlowHelper {
         if (curOrder == null) {
             return Optional.empty();
         }
-        return nodes(routeId).stream()
+        return prevCheckNode(nodes(routeId), processId);
+    }
+
+    /** 前驱中最近的检验节点（基于预载节点列表，批量富化场景按路线复用） */
+    public Optional<ProRouteProcess> prevCheckNode(List<ProRouteProcess> nodes, Long processId) {
+        Integer curOrder = currentOrder(nodes, processId);
+        if (curOrder == null) {
+            return Optional.empty();
+        }
+        return nodes.stream()
                 .filter(n -> n.getOrderNum() != null && n.getOrderNum() < curOrder)
                 .filter(n -> "Y".equals(n.getIsCheck()))
                 .max(Comparator.comparing(ProRouteProcess::getOrderNum));

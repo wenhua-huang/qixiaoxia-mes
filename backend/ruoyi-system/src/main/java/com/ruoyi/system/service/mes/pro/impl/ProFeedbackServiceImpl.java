@@ -92,6 +92,7 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
     @Autowired private com.ruoyi.system.mapper.mes.wm.WmIssueLineMapper wmIssueLineMapper;
     @Autowired private ProInputQuantityResolver inputQuantityResolver;
     @Autowired private com.ruoyi.system.service.mes.pro.IProFeedbackChangeService feedbackChangeService;
+    @Autowired private com.ruoyi.system.service.mes.pro.IProQcBlockService qcBlockService;
 
     @Override
     public ProFeedback selectProFeedbackByRecordId(Long recordId) {
@@ -308,6 +309,8 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
         }
         // 工序顺序校验：严格串行推进，拦跳序+拦倒序（仅纯串行 SS 路线生效）
         validateProcessSequence(proFeedback.getCardId(), proFeedback.getRouteId(), proFeedback.getProcessId());
+        // 跟单质检门控：上道检验工序判不合格且未授权放行时，硬拦本工序报工（外协报工不拦）
+        qcBlockService.assertReportable(proFeedback);
         // 领料校验（缺料不生产）：该工序有物料消耗时，必须已发料出库才能报工
         validateIssueBeforeFeedback(proFeedback);
         // 物料消耗默认值：若未传 consumeList 但有工单ID，从工单BOM自动填充

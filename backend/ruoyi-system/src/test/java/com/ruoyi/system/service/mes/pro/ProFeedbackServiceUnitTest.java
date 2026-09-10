@@ -47,6 +47,7 @@ class ProFeedbackServiceUnitTest {
     @Mock private TeamResolver teamResolver;
     @Mock private ProInputQuantityResolver inputQuantityResolver;
     @Mock private IProFeedbackChangeService feedbackChangeService;
+    @Mock private IProQcBlockService qcBlockService;
     @InjectMocks private ProFeedbackServiceImpl feedbackService;
 
     private ProFeedback testFeedback;

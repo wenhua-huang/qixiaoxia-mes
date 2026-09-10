@@ -58,4 +58,16 @@ public interface QcIpqcMapper
     public int closeIfActive(@Param("id") Long id,
                              @Param("updateBy") String updateBy,
                              @Param("updateTime") Date updateTime);
+
+    /**
+     * 取工单在指定检验工序上最新一张已完成(COMPLETED)检验单（跟单质检门控核心查询）。
+     *
+     * @param workorderId 工单ID
+     * @param processId   检验工序ID（前驱 is_check='Y' 节点）
+     * @param cardId      流转卡ID（null=工单维度，不加卡过滤）
+     * @return 最新判定单；无已判定单返回 null
+     */
+    public QcIpqc selectLatestCompletedByProcess(@Param("workorderId") Long workorderId,
+                                                 @Param("processId") Long processId,
+                                                 @Param("cardId") Long cardId);
 }

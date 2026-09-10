@@ -27,8 +27,11 @@ public interface ISalOrderService
     public SalOrder createFromCrm(CrmOrderCreateRequest req);
     /** 修改订单(头+全量替换行,仅 CONFIRMED 状态可改) */
     public SalOrder updateWithLines(SalOrderCreateRequest req);
-    /** 详情(头+行,行带已转量/可转量) */
+    /** 详情(头+行,行带已转量/可转量,头带生产进度) */
     public SalOrder getDetail(Long orderId);
+
+    /** 批量回填订单生产进度（任务数量口径，无任务订单回填 0） */
+    public void enrichOrderProgress(List<SalOrder> list);
 
     /** 结单:SHIPPED->CLOSED */
     public int closeOrder(Long orderId);

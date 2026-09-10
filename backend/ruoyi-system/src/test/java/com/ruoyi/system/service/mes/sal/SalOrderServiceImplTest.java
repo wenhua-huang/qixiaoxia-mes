@@ -37,6 +37,7 @@ import com.ruoyi.system.service.mes.sal.impl.SalOrderServiceImpl;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
@@ -288,6 +289,46 @@ class SalOrderServiceImplTest
         assertThat(wo.getClientId()).isEqualTo(5L);
         assertThat(wo.getProductId()).isEqualTo(4L);
         assertThat(result.getWorkorderId()).isEqualTo(98L);
+    }
+
+    @Test
+    @DisplayName("enrichOrderProgress - 批量回填，无聚合行订单=0，封顶100由SQL保证")
+    void enrichOrderProgress_batch() {
+        SalOrder o1 = buildOrder(1L, "SO1", "PRODUCING");
+        SalOrder o2 = buildOrder(2L, "SO2", "CONFIRMED");
+        SalOrder o3 = buildOrder(3L, "SO3", "PRODUCING");
+        com.ruoyi.system.domain.mes.sal.vo.SalOrderProgressRow row =
+                new com.ruoyi.system.domain.mes.sal.vo.SalOrderProgressRow();
+        row.setOrderId(3L); row.setProgressPercent(42);
+        when(salOrderMapper.selectProgressByOrderIds(anyList())).thenReturn(java.util.List.of(row));
+
+        salOrderService.enrichOrderProgress(java.util.List.of(o1, o2, o3));
+
+        assertThat(o1.getProgressPercent()).isZero();
+        assertThat(o2.getProgressPercent()).isZero();
+        assertThat(o3.getProgressPercent()).isEqualTo(42);
+    }
+
+    @Test
+    @DisplayName("enrichOrderProgress - 空列表直接返回不查库")
+    void enrichOrderProgress_empty() {
+        salOrderService.enrichOrderProgress(java.util.Collections.emptyList());
+        verify(salOrderMapper, never()).selectProgressByOrderIds(anyList());
+    }
+
+    @Test
+    @DisplayName("getDetail - 头节点带 progressPercent")
+    void getDetail_withProgress() {
+        when(salOrderMapper.selectSalOrderByOrderId(1L)).thenReturn(buildOrder(1L, "SO1", "PRODUCING"));
+        when(salOrderLineMapper.selectSalOrderLineByOrderId(1L)).thenReturn(java.util.Collections.emptyList());
+        com.ruoyi.system.domain.mes.sal.vo.SalOrderProgressRow row =
+                new com.ruoyi.system.domain.mes.sal.vo.SalOrderProgressRow();
+        row.setOrderId(1L); row.setProgressPercent(88);
+        when(salOrderMapper.selectProgressByOrderIds(anyList())).thenReturn(java.util.List.of(row));
+
+        SalOrder d = salOrderService.getDetail(1L);
+
+        assertThat(d.getProgressPercent()).isEqualTo(88);
     }
 
     // ============ 测试数据构造 ============

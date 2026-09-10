@@ -1,7 +1,10 @@
 package com.ruoyi.system.service.mes.sal.impl;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -24,6 +27,7 @@ import com.ruoyi.system.domain.mes.sal.SalOrder;
 import com.ruoyi.system.domain.mes.sal.SalOrderCreateRequest;
 import com.ruoyi.system.domain.mes.sal.SalOrderLine;
 import com.ruoyi.system.domain.mes.sal.SalOrderToWorkorderRequest;
+import com.ruoyi.system.domain.mes.sal.vo.SalOrderProgressRow;
 import com.ruoyi.system.mapper.mes.md.MdItemMapper;
 import com.ruoyi.system.mapper.mes.sal.SalOrderLineMapper;
 import com.ruoyi.system.mapper.mes.sal.SalOrderMapper;
@@ -221,8 +225,26 @@ public class SalOrderServiceImpl implements ISalOrderService
                 fillConvertible(line);
             }
         }
+        enrichOrderProgress(List.of(order));
         order.setLines(lines);
         return order;
+    }
+
+    @Override
+    public void enrichOrderProgress(List<SalOrder> list)
+    {
+        if (list == null || list.isEmpty()) return;
+        List<Long> ids = list.stream().map(SalOrder::getOrderId).collect(Collectors.toList());
+        Map<Long, Integer> pmap = new HashMap<>();
+        for (SalOrderProgressRow r : salOrderMapper.selectProgressByOrderIds(ids))
+        {
+            pmap.put(r.getOrderId(), r.getProgressPercent());
+        }
+        // 无聚合行（无未取消任务）的订单在 SQL 结果中缺席，回填 0
+        for (SalOrder o : list)
+        {
+            o.setProgressPercent(pmap.getOrDefault(o.getOrderId(), 0));
+        }
     }
 
     @Override

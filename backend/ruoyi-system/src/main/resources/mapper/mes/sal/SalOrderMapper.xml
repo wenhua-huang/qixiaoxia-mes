@@ -172,4 +172,20 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </foreach>
     </delete>
 
+    <!-- 订单进度=Σ任务已报工数/Σ任务计划数（排已取消工单/任务）。主表 l.factory_id 由拦截器注入 -->
+    <select id="selectProgressByOrderIds"
+            resultType="com.ruoyi.system.domain.mes.sal.vo.SalOrderProgressRow">
+        SELECT l.order_id AS orderId,
+               LEAST(100, ROUND(COALESCE(SUM(t.quantity_produced), 0)
+                     / NULLIF(SUM(t.quantity), 0) * 100, 0)) AS progressPercent
+        FROM qxx_sal_order_line l
+        INNER JOIN qxx_pro_workorder w ON w.sales_order_line_id = l.line_id AND w.factory_id = l.factory_id
+                                      AND w.status != 'CANCEL'
+        INNER JOIN qxx_pro_task t ON t.workorder_id = w.workorder_id AND t.factory_id = w.factory_id
+                                 AND t.status != 'CANCEL'
+        WHERE l.order_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+        GROUP BY l.order_id
+    </select>
+
 </mapper>

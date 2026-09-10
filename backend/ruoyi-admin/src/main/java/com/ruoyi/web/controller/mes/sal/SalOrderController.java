@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.controller.BaseController;
@@ -48,12 +49,19 @@ public class SalOrderController extends BaseController
     @Autowired
     private SalOrderDetailExcelExporter excelExporter;
 
+    /**
+     * 查询销售订单列表
+     *
+     * @param includeProgress 为 true 时批量回填生产进度（任务数量口径），仅列表页需要时传入
+     */
     @PreAuthorize("@ss.hasPermi('mes:sal:order:list')")
     @GetMapping("/list")
-    public TableDataInfo list(SalOrder salOrder)
+    public TableDataInfo list(SalOrder salOrder,
+            @RequestParam(required = false, defaultValue = "false") boolean includeProgress)
     {
         startPage();
         List<SalOrder> list = salOrderService.selectSalOrderList(salOrder);
+        if (includeProgress) salOrderService.enrichOrderProgress(list);
         return getDataTable(list);
     }
 

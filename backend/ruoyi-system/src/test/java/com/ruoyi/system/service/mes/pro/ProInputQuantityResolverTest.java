@@ -10,10 +10,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -154,6 +158,59 @@ class ProInputQuantityResolverTest {
         BigDecimal result = resolver.resolveDefaultInput(
                 WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, null, new BigDecimal("1000"));
         assertThat(result).isEqualByComparingTo("100");
+    }
+
+    @Test
+    @DisplayName("预载重载·非首道: 基于 nodesLoader 提供的节点计算且 loader 只调一次")
+    void should_resolve_from_preloaded_nodes() {
+        List<ProRouteProcess> nodes = List.of(
+                node(PREV_PROCESS_ID, 1), node(CURRENT_PROCESS_ID, 2));
+        AtomicInteger loaderCalls = new AtomicInteger();
+        Function<Long, List<ProRouteProcess>> loader = rid -> {
+            loaderCalls.incrementAndGet();
+            return rid.equals(ROUTE_ID) ? nodes : List.of();
+        };
+        when(flow.currentNode(nodes, CURRENT_PROCESS_ID))
+                .thenReturn(Optional.of(node(CURRENT_PROCESS_ID, 2)));
+        when(flow.prevNode(nodes, CURRENT_PROCESS_ID))
+                .thenReturn(Optional.of(node(PREV_PROCESS_ID, 1)));
+        when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, PREV_PROCESS_ID, CARD_ID))
+                .thenReturn(new BigDecimal("500"));
+        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, CURRENT_PROCESS_ID, CARD_ID))
+                .thenReturn(new BigDecimal("120"));
+        BigDecimal result = resolver.resolveDefaultInput(
+                WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, CARD_ID,
+                new BigDecimal("1000"), loader);
+        assertThat(result).isEqualByComparingTo("380");
+        assertThat(loaderCalls.get()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("预载重载·首道: 节点内无前驱 → 直接返回排产数，不查报工聚合")
+    void should_return_task_quantity_when_first_process_with_preloaded_nodes() {
+        List<ProRouteProcess> nodes = List.of(node(CURRENT_PROCESS_ID, 1));
+        Function<Long, List<ProRouteProcess>> loader = rid -> nodes;
+        when(flow.currentNode(nodes, CURRENT_PROCESS_ID))
+                .thenReturn(Optional.of(node(CURRENT_PROCESS_ID, 1)));
+        when(flow.prevNode(nodes, CURRENT_PROCESS_ID)).thenReturn(Optional.empty());
+        BigDecimal result = resolver.resolveDefaultInput(
+                WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, CARD_ID,
+                new BigDecimal("888"), loader);
+        assertThat(result).isEqualByComparingTo("888");
+        verifyNoInteractions(feedbackMapper);
+    }
+
+    @Test
+    @DisplayName("预载重载·当前节点缺失 → null，且不查报工聚合")
+    void should_return_null_when_current_node_missing_with_preloaded_nodes() {
+        List<ProRouteProcess> nodes = List.of(node(PREV_PROCESS_ID, 1));
+        Function<Long, List<ProRouteProcess>> loader = rid -> nodes;
+        when(flow.currentNode(nodes, CURRENT_PROCESS_ID)).thenReturn(Optional.empty());
+        BigDecimal result = resolver.resolveDefaultInput(
+                WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, CARD_ID,
+                new BigDecimal("1000"), loader);
+        assertThat(result).isNull();
+        verifyNoInteractions(feedbackMapper);
     }
 
     @Test

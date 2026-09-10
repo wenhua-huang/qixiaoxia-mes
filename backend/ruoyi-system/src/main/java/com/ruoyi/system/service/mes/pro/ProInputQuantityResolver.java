@@ -1,7 +1,9 @@
 package com.ruoyi.system.service.mes.pro;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -45,7 +47,35 @@ public class ProInputQuantityResolver {
         if (current.isEmpty()) {
             return null;
         }
-        Optional<ProRouteProcess> prev = flow.prevNode(routeId, processId);
+        return resolveAfterCurrent(workorderId, processId, cardId, firstProcessDefault,
+                flow.prevNode(routeId, processId));
+    }
+
+    /**
+     * 批量富化专用重载：节点列表由 nodesLoader 提供（调用方可按 routeId 缓存，
+     * 同一批任务同一路线只查一次库），解析规则与 {@link #resolveDefaultInput} 完全一致。
+     *
+     * @param nodesLoader 按 routeId 返回已排序节点列表（路线不存在返回空列表）
+     */
+    public BigDecimal resolveDefaultInput(Long workorderId, Long routeId, Long processId,
+                                          Long cardId, BigDecimal firstProcessDefault,
+                                          Function<Long, List<ProRouteProcess>> nodesLoader) {
+        if (routeId == null || processId == null) {
+            return null;
+        }
+        List<ProRouteProcess> nodes = nodesLoader.apply(routeId);
+        Optional<ProRouteProcess> current = flow.currentNode(nodes, processId);
+        if (current.isEmpty()) {
+            return null;
+        }
+        return resolveAfterCurrent(workorderId, processId, cardId, firstProcessDefault,
+                flow.prevNode(nodes, processId));
+    }
+
+    /** 当前节点已确认存在后的统一收尾：首道返回排产数，其余返回上道产出−本道上机（钳 0） */
+    private BigDecimal resolveAfterCurrent(Long workorderId, Long processId, Long cardId,
+                                           BigDecimal firstProcessDefault,
+                                           Optional<ProRouteProcess> prev) {
         if (prev.isEmpty()) {
             // 首道工序：默认带出任务排产数量
             return firstProcessDefault;

@@ -12,6 +12,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -123,5 +126,35 @@ class ProRouteFlowHelperTest {
                 .thenReturn(List.of(node(1, 1, "N")));
         assertThat(helper.currentNode(9L, 99L)).isEmpty();
         assertThat(helper.prevNode(9L, 99L)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("currentNode(预载列表): 直接基于传入列表定位，不查 mapper")
+    void should_locate_current_node_from_preloaded_nodes() {
+        List<ProRouteProcess> nodes = List.of(node(1, 1, "N"), node(2, 2, "Y"));
+        assertThat(helper.currentNode(nodes, 2L)).get()
+                .extracting(ProRouteProcess::getProcessId).isEqualTo(2L);
+        assertThat(helper.currentNode(nodes, 99L)).isEmpty();
+        verifyNoInteractions(mapper);
+    }
+
+    @Test
+    @DisplayName("prevNode(预载列表): 取严格更小序号的最大节点；首道返回 empty")
+    void should_locate_prev_node_from_preloaded_nodes() {
+        List<ProRouteProcess> nodes = List.of(node(1, 1, "N"), node(2, 2, "Y"), node(3, 3, "N"));
+        assertThat(helper.prevNode(nodes, 3L)).get()
+                .extracting(ProRouteProcess::getProcessId).isEqualTo(2L);
+        assertThat(helper.prevNode(nodes, 1L)).isEmpty();
+        assertThat(helper.prevNode(nodes, 99L)).isEmpty();
+        verifyNoInteractions(mapper);
+    }
+
+    @Test
+    @DisplayName("prevNode(routeId): 单次定位内部只查一次 mapper（旧实现查 2 次）")
+    void should_query_mapper_only_once_for_prevNode() {
+        when(mapper.selectProRouteProcessByRouteId(9L))
+                .thenReturn(List.of(node(1, 1, "N"), node(2, 2, "Y"), node(3, 3, "N")));
+        assertThat(helper.prevNode(9L, 3L)).isPresent();
+        verify(mapper, times(1)).selectProRouteProcessByRouteId(9L);
     }
 }

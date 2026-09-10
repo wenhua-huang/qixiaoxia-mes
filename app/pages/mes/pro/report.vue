@@ -412,6 +412,8 @@ function searchWorkorder() {
 
 // 选择工序任务
 function selectTask(task) {
+  // 重复点击当前已选任务卡：保留用户手改值（上机数量/参数模板等），不重新选中与重载
+  if (selectedTaskId.value != null && selectedTaskId.value === task.taskId) return
   selectedTaskId.value = task.taskId
   selectedTask.value = task
   // 上机数量重置为该任务的系统默认值（数字或 null，子组件挂载后会自动带出）

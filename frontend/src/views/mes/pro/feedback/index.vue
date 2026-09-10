@@ -677,7 +677,10 @@ function onTaskSelected(row: any) {
     form.quantityInput = null
     getInputDefault(row.taskId).then((res: any) => {
       if (form.taskId === row.taskId) form.quantityInput = res.data ?? null
-    }).catch(() => {})
+    }).catch(() => {
+      // 温和提示但不阻断：物料/参数默认值照常加载，用户可手工填写上机数量
+      proxy.$modal.msgWarning('上机数量默认值获取失败，请手工填写')
+    })
     fetchConsumeDefaults(row.workorderId)
     if (row.processId) loadParamTemplates(row.processId)
   }

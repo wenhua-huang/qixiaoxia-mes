@@ -1,6 +1,6 @@
 <template>
   <view class="qty-row input-qty-row">
-    <text class="qty-label">上机数量</text>
+    <text class="qty-label">上机数量<text v-if="noDefault" class="no-default-tip">（无默认值，请填写）</text></text>
     <view class="qty-right">
       <text v-if="changed" class="changed-tip">已改·默认 {{ defaultVal }}，保存后留痕</text>
       <view class="qty-input">
@@ -19,7 +19,9 @@ import UniNumberBox from '@/uni_modules/uni-number-box/components/uni-number-box
  * - 父级未给值（modelValue 为 null/undefined）时自动带出系统默认值 defaultVal；
  * - 人工值与默认值不一致时橙色提示「已改·默认 x，保存后留痕」；
  * - 不做清空成 null 的交互（后端 update 不支持值→null）。
- * 默认值为 null（无路线/无任务排产数等异常场景）时允许 0 起步手填。
+ * 默认值为 null（无路线/无任务排产数等异常场景）时不伪造 0：number-box 的 0 仅为
+ * 空白控件展示态，modelValue 仍为 null（提交 null 由后端处理），标签旁灰字提示
+ * 「（无默认值，请填写）」；用户一旦操作控件即带出真实数值。
  */
 export default {
   name: 'InputQtyRow',
@@ -42,6 +44,10 @@ export default {
     },
     changed() {
       return this.defaultVal != null && Number(this.modelValue) !== Number(this.defaultVal)
+    },
+    // 无系统默认值且用户尚未输入：展示态 0 不算真实值，仍提交 null
+    noDefault() {
+      return this.defaultVal == null && this.modelValue == null
     }
   },
   watch: {
@@ -88,4 +94,5 @@ export default {
 .changed-tip {
   font-size: 22rpx; color: #e6a23c; max-width: 320rpx; text-align: right;
 }
+.no-default-tip { font-size: 22rpx; color: #999; font-weight: normal; }
 </style>

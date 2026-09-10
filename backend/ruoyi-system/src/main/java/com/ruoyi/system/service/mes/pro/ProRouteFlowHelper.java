@@ -42,18 +42,34 @@ public class ProRouteFlowHelper {
         if (routeId == null || processId == null) {
             return Optional.empty();
         }
-        return nodes(routeId).stream()
+        return currentNode(nodes(routeId), processId);
+    }
+
+    /** 当前工序节点（基于预载节点列表，批量场景按路线复用、避免重复查库） */
+    public Optional<ProRouteProcess> currentNode(List<ProRouteProcess> nodes, Long processId) {
+        if (processId == null || nodes == null) {
+            return Optional.empty();
+        }
+        return nodes.stream()
                 .filter(n -> processId.equals(n.getProcessId()))
                 .findFirst();
     }
 
     /** 前驱节点：order_num 严格小于当前节点的最大节点（首道工序返回 empty） */
     public Optional<ProRouteProcess> prevNode(Long routeId, Long processId) {
-        Integer curOrder = currentOrder(routeId, processId);
+        if (routeId == null) {
+            return Optional.empty();
+        }
+        return prevNode(nodes(routeId), processId);
+    }
+
+    /** 前驱节点（基于预载节点列表）：首道工序返回 empty */
+    public Optional<ProRouteProcess> prevNode(List<ProRouteProcess> nodes, Long processId) {
+        Integer curOrder = currentOrder(nodes, processId);
         if (curOrder == null) {
             return Optional.empty();
         }
-        return nodes(routeId).stream()
+        return nodes.stream()
                 .filter(n -> n.getOrderNum() != null && n.getOrderNum() < curOrder)
                 .max(Comparator.comparing(ProRouteProcess::getOrderNum));
     }
@@ -92,7 +108,13 @@ public class ProRouteFlowHelper {
     }
 
     private Integer currentOrder(Long routeId, Long processId) {
-        Optional<ProRouteProcess> cur = currentNode(routeId, processId);
-        return cur.map(ProRouteProcess::getOrderNum).orElse(null);
+        if (routeId == null) {
+            return null;
+        }
+        return currentOrder(nodes(routeId), processId);
+    }
+
+    private Integer currentOrder(List<ProRouteProcess> nodes, Long processId) {
+        return currentNode(nodes, processId).map(ProRouteProcess::getOrderNum).orElse(null);
     }
 }

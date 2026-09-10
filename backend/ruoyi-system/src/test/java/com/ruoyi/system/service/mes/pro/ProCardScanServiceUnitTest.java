@@ -50,6 +50,7 @@ class ProCardScanServiceUnitTest {
     @Mock private RedisLockTemplate lockTemplate;
     @Mock private PlatformTransactionManager transactionManager;
     @Mock private AutoCodeGenerator autoCodeGenerator;
+    @Mock private TaskReportDefaultsApplier defaultsApplier;
 
     @InjectMocks private ProCardServiceImpl service;
 

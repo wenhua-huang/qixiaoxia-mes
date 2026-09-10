@@ -12,6 +12,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.system.domain.mes.sal.SalOrderLine;
+import com.ruoyi.system.event.mes.SalesShipmentCompletedEvent;
 import com.ruoyi.system.event.mes.WorkorderStartedEvent;
 import com.ruoyi.system.mapper.mes.sal.SalOrderLineMapper;
 import com.ruoyi.system.mapper.mes.sal.SalOrderMapper;
@@ -35,6 +36,16 @@ public class SalOrderLifecycleListener {
         if (line == null || line.getOrderId() == null) return;
         int rows = salOrderMapper.confirmProducing(line.getOrderId(), e.getFactoryId(), currentUser(), DateUtils.getNowDate());
         log.info("开工事件推进订单生产中: orderId={}, workorderId={}, affected={}", line.getOrderId(), e.getWorkorderId(), rows);
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void onSalesShipped(SalesShipmentCompletedEvent e) {
+        if (e.getSalesOrderId() == null) return;
+        int rows = salOrderMapper.markShippedIfFullyDelivered(
+                e.getSalesOrderId(), e.getFactoryId(), currentUser(), DateUtils.getNowDate());
+        log.info("发运事件推进订单已出货: orderId={}, salesId={}, affected={}",
+                e.getSalesOrderId(), e.getSalesId(), rows);
     }
 
     private String currentUser() {

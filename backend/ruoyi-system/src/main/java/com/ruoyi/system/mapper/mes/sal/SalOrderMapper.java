@@ -38,4 +38,14 @@ public interface SalOrderMapper
                          @Param("factoryId") Long factoryId,
                          @Param("updateBy") String updateBy,
                          @Param("updateTime") Date updateTime);
+
+    /**
+     * 订单全部行已发齐（SHIPPED 箱量按订单行汇总 ≥ 行数量）且状态为 CONFIRMED/PRODUCING 时置 SHIPPED。
+     * 返回 0=未发齐或状态不符。@SkipFactoryId + 显式 factory_id（事件链路）。
+     */
+    @SkipFactoryId
+    int markShippedIfFullyDelivered(@Param("orderId") Long orderId,
+                                    @Param("factoryId") Long factoryId,
+                                    @Param("updateBy") String updateBy,
+                                    @Param("updateTime") Date updateTime);
 }

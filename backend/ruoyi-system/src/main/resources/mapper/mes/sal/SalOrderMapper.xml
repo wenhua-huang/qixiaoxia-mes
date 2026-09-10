@@ -195,4 +195,30 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where order_id = #{orderId} and factory_id = #{factoryId} and status = 'CONFIRMED'
     </update>
 
+    <!-- 发齐推进：不存在「订单行数量 > 该行在非作废出库单下 SHIPPED 箱量合计」的行 -->
+    <update id="markShippedIfFullyDelivered">
+        update qxx_sal_order o
+        set o.status = 'SHIPPED', o.update_by = #{updateBy}, o.update_time = #{updateTime}
+        where o.order_id = #{orderId}
+          and o.factory_id = #{factoryId}
+          and o.status in ('CONFIRMED', 'PRODUCING')
+          and not exists (
+              select 1 from qxx_sal_order_line l
+              left join (
+                  select sl.sales_order_line_id as sol_id, sum(b.quantity) as shipped_qty
+                  from qxx_wm_product_sales s
+                  inner join qxx_wm_product_sales_line sl on sl.sales_id = s.sales_id and sl.factory_id = s.factory_id
+                  inner join qxx_wm_product_sales_box b on b.line_id = sl.line_id and b.factory_id = sl.factory_id
+                                                       and b.status = 'SHIPPED'
+                  where s.sales_order_id = #{orderId}
+                    and s.factory_id = #{factoryId}
+                    and s.status &lt;&gt; 'CANCELED'
+                  group by sl.sales_order_line_id
+              ) x on x.sol_id = l.line_id
+              where l.order_id = #{orderId}
+                and l.factory_id = #{factoryId}
+                and l.quantity &gt; coalesce(x.shipped_qty, 0)
+          )
+    </update>
+
 </mapper>

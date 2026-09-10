@@ -11,6 +11,7 @@ import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.core.redis.RedisLockTemplate;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ import com.ruoyi.system.domain.mes.wm.WmProductSalesShipment;
 import com.ruoyi.system.mapper.mes.wm.WmProductSalesBoxMapper;
 import com.ruoyi.system.mapper.mes.wm.WmProductSalesMapper;
 import com.ruoyi.system.mapper.mes.wm.WmProductSalesShipmentMapper;
+import com.ruoyi.system.event.mes.SalesShipmentCompletedEvent;
 import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 import com.ruoyi.system.service.mes.wm.IWmProductSalesShipmentService;
 
@@ -45,6 +47,7 @@ public class WmProductSalesShipmentServiceImpl implements IWmProductSalesShipmen
     @Autowired private AutoCodeGenerator autoCodeGenerator;
     @Autowired private RedisLockTemplate lockTemplate;
     @Autowired private PlatformTransactionManager transactionManager;
+    @Autowired private ApplicationEventPublisher eventPublisher;
 
     private TransactionTemplate txTemplate;
 
@@ -189,6 +192,11 @@ public class WmProductSalesShipmentServiceImpl implements IWmProductSalesShipmen
             newShipStatus = WmProductSalesConstants.SHIP_STATUS_SHIPPED;
             // 全部发运完成时同步主状态到 SHIPPED
             header.setStatus(WmProductSalesConstants.STATUS_SHIPPED);
+            // 仅挂销售订单的出库单发齐才发事件；监听器在订单维度复核箱量，幂等可补偿
+            if (header.getSalesOrderId() != null) {
+                eventPublisher.publishEvent(new SalesShipmentCompletedEvent(
+                        header.getSalesId(), header.getSalesOrderId(), header.getFactoryId()));
+            }
         } else {
             newShipStatus = WmProductSalesConstants.SHIP_STATUS_PARTIAL_SHIPPED;
         }

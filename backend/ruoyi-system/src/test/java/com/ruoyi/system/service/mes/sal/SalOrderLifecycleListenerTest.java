@@ -1,8 +1,6 @@
 package com.ruoyi.system.service.mes.sal;
 
 import java.lang.reflect.Method;
-import java.math.BigDecimal;
-import java.util.Collections;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -49,6 +47,18 @@ class SalOrderLifecycleListenerTest {
         when(salOrderLineMapper.selectSalOrderLineByLineId(404L)).thenReturn(null);
         listener.onWorkorderStarted(new WorkorderStartedEvent(99L, 404L, 1L));
         verify(salOrderMapper, never()).confirmProducing(anyLong(), anyLong(), anyString(), any());
+    }
+
+    @Test
+    void shipped_event_calls_conditional_update() {
+        listener.onSalesShipped(new com.ruoyi.system.event.mes.SalesShipmentCompletedEvent(5L, 1L, 1L));
+        verify(salOrderMapper).markShippedIfFullyDelivered(eq(1L), eq(1L), anyString(), any());
+    }
+
+    @Test
+    void shipped_event_null_order_ignored() {
+        listener.onSalesShipped(new com.ruoyi.system.event.mes.SalesShipmentCompletedEvent(5L, null, 1L));
+        verify(salOrderMapper, never()).markShippedIfFullyDelivered(anyLong(), anyLong(), anyString(), any());
     }
 
     @Test

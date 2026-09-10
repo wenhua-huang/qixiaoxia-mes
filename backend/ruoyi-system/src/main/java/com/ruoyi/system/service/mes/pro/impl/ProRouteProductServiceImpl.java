@@ -1,6 +1,7 @@
 package com.ruoyi.system.service.mes.pro.impl;
 
 import java.util.List;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,6 +51,7 @@ public class ProRouteProductServiceImpl implements IProRouteProductService
     @Override
     @Transactional
     public int insertProRouteProduct(ProRouteProduct p) {
+        validateSingleDefault(p);
         p.setCreateTime(DateUtils.getNowDate());
         p.setCreateBy(SecurityUtils.getUsername());
         return qxxProRouteProductMapper.insertProRouteProduct(p);
@@ -57,9 +59,23 @@ public class ProRouteProductServiceImpl implements IProRouteProductService
 
     @Override
     public int updateProRouteProduct(ProRouteProduct p) {
+        validateSingleDefault(p);
         p.setUpdateTime(DateUtils.getNowDate());
         p.setUpdateBy(SecurityUtils.getUsername());
         return qxxProRouteProductMapper.updateProRouteProduct(p);
+    }
+
+    /** 同一产品至多一条 is_default='Y'，保证默认路线解析结果确定 */
+    private void validateSingleDefault(ProRouteProduct p) {
+        if (!"Y".equals(p.getIsDefault()) || p.getItemId() == null) return;
+        ProRouteProduct query = new ProRouteProduct();
+        query.setItemId(p.getItemId());
+        List<ProRouteProduct> siblings = qxxProRouteProductMapper.selectProRouteProductList(query);
+        for (ProRouteProduct sib : siblings) {
+            if ("Y".equals(sib.getIsDefault()) && !sib.getRecordId().equals(p.getRecordId())) {
+                throw new ServiceException("产品[" + p.getItemName() + "]已存在默认路线，同产品只能设一条默认路线");
+            }
+        }
     }
 
     @Override

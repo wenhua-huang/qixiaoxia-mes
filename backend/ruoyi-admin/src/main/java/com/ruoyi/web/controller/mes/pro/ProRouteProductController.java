@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.controller.BaseController;
@@ -21,6 +22,8 @@ import com.ruoyi.system.service.mes.pro.IProRouteProductService;
 import com.ruoyi.system.service.mes.pro.IProRouteProcessParamService;
 import com.ruoyi.system.service.mes.pro.IProRouteProcessService;
 import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
+import com.ruoyi.system.domain.mes.pro.dto.RouteBatchResolveRequest;
+import com.ruoyi.system.service.mes.pro.ProRouteResolveService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.page.TableDataInfo;
 
@@ -43,6 +46,9 @@ public class ProRouteProductController extends BaseController
     @Autowired
     private IProRouteProcessService proRouteProcessService;
 
+    @Autowired
+    private ProRouteResolveService proRouteResolveService;
+
     /**
      * 查询工艺路线产品列表
      */
@@ -64,6 +70,30 @@ public class ProRouteProductController extends BaseController
     {
         List<ProRouteProduct> list = proRouteProductService.selectProRouteProductByRouteId(routeId);
         return success(list);
+    }
+
+    /**
+     * 按 订单类型+外发+包装 预览某产品的默认路线（开单联动用，纯读）
+     */
+    @PreAuthorize("@ss.hasPermi('mes:sal:order:list')")
+    @GetMapping("/resolve")
+    public AjaxResult resolve(@RequestParam Long itemId,
+                              @RequestParam(required = false) String orderType,
+                              @RequestParam(required = false) String outsourceFlag,
+                              @RequestParam(required = false) String packageFlag)
+    {
+        return success(proRouteResolveService.resolve(itemId, orderType, outsourceFlag, packageFlag));
+    }
+
+    /**
+     * 批量预览默认路线（头维度变更后一键重算用，纯读）
+     */
+    @PreAuthorize("@ss.hasPermi('mes:sal:order:list')")
+    @PostMapping("/resolveBatch")
+    public AjaxResult resolveBatch(@RequestBody RouteBatchResolveRequest req)
+    {
+        return success(proRouteResolveService.resolveBatch(req.getItemIds(), req.getOrderType(),
+                req.getOutsourceFlag(), req.getPackageFlag()));
     }
 
     /**

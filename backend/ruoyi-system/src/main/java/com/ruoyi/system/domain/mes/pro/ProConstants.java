@@ -73,6 +73,13 @@ public class ProConstants
     public static final String FEEDBACK_STATUS_CONFIRMED = "CONFIRMED";
     public static final String FEEDBACK_STATUS_AUDITED   = "AUDITED";
 
+    /** 报工字段变更痕迹来源 */
+    public static final String CHANGE_SOURCE_MANUAL = "MANUAL";  // 人工修改（与系统默认值不一致）
+    public static final String CHANGE_SOURCE_SYSTEM = "SYSTEM";  // 系统填充
+
+    /** 报工变更痕迹-字段名：本次上机数量 */
+    public static final String CHANGE_FIELD_QUANTITY_INPUT = "quantity_input";
+
     /** 进度风险等级 */
     public static final String DELAY_NORMAL         = "NORMAL";
     public static final String DELAY_WARNING        = "WARNING";

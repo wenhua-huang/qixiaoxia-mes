@@ -45,6 +45,8 @@ class ProFeedbackServiceUnitTest {
     @Mock private RedisLockTemplate lockTemplate;
     @Mock private PlatformTransactionManager transactionManager;
     @Mock private TeamResolver teamResolver;
+    @Mock private ProInputQuantityResolver inputQuantityResolver;
+    @Mock private IProFeedbackChangeService feedbackChangeService;
     @InjectMocks private ProFeedbackServiceImpl feedbackService;
 
     private ProFeedback testFeedback;

@@ -56,6 +56,8 @@ public class ProFeedback extends BaseEntity
     private Date expireDate;
     @Excel(name = "批次号") private String lotNumber;
     @Excel(name = "数量") private BigDecimal quantity;
+    /** 本次上机数量(投入数量)；新增报工不传时由后端按路线流解析默认值，人工改成与默认值不一致会写痕迹表 */
+    @Excel(name = "本次上机数量") private BigDecimal quantityInput;
     @Excel(name = "报工数量") private BigDecimal quantityFeedback;
     @Excel(name = "合格数量") private BigDecimal quantityQualified;
     @Excel(name = "不合格数量") private BigDecimal quantityUnqualified;
@@ -161,6 +163,8 @@ public class ProFeedback extends BaseEntity
     public void setLotNumber(String v) { this.lotNumber = v; }
     public BigDecimal getQuantity() { return quantity; }
     public void setQuantity(BigDecimal v) { this.quantity = v; }
+    public BigDecimal getQuantityInput() { return quantityInput; }
+    public void setQuantityInput(BigDecimal v) { this.quantityInput = v; }
     public BigDecimal getQuantityFeedback() { return quantityFeedback; }
     public void setQuantityFeedback(BigDecimal v) { this.quantityFeedback = v; }
     public BigDecimal getQuantityQualified() { return quantityQualified; }

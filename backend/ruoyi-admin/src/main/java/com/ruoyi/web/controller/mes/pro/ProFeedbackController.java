@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.controller.BaseController;
@@ -33,6 +34,9 @@ public class ProFeedbackController extends BaseController
 {
     @Autowired
     private IProFeedbackService proFeedbackService;
+
+    @Autowired
+    private com.ruoyi.system.service.mes.pro.IProFeedbackChangeService proFeedbackChangeService;
 
     @Autowired(required = false)
     private com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator autoCodeGenerator;
@@ -81,6 +85,20 @@ public class ProFeedbackController extends BaseController
         List<ProFeedback> list = proFeedbackService.selectProFeedbackList(proFeedback);
         ExcelUtil<ProFeedback> util = new ExcelUtil<ProFeedback>(ProFeedback.class);
         util.exportExcel(response, list, "报工记录数据");
+    }
+
+    /**
+     * 查询报工字段变更痕迹（上机数量默认值人工调整 / 报工修改留痕）；feedbackId 优先，缺省按 taskId 查
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:feedback:query')")
+    @GetMapping("/change/list")
+    public AjaxResult changeList(@RequestParam(required = false) Long feedbackId,
+                                 @RequestParam(required = false) Long taskId)
+    {
+        if (feedbackId != null) {
+            return success(proFeedbackChangeService.selectByFeedback(feedbackId));
+        }
+        return success(proFeedbackChangeService.selectByTask(taskId));
     }
 
     /**

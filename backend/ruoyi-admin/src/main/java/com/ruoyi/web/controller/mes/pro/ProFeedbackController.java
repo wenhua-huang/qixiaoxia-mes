@@ -18,7 +18,10 @@ import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.system.domain.mes.pro.ProFeedback;
+import com.ruoyi.system.domain.mes.pro.ProTask;
 import com.ruoyi.system.service.mes.pro.IProFeedbackService;
+import com.ruoyi.system.service.mes.pro.IProTaskService;
+import com.ruoyi.system.service.mes.pro.TaskReportDefaultsApplier;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.page.TableDataInfo;
 
@@ -40,6 +43,12 @@ public class ProFeedbackController extends BaseController
 
     @Autowired(required = false)
     private com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator autoCodeGenerator;
+
+    @Autowired
+    private IProTaskService proTaskService;
+
+    @Autowired
+    private TaskReportDefaultsApplier defaultsApplier;
 
     /**
      * 获取工单默认物料消耗（新增报工时预填）
@@ -99,6 +108,22 @@ public class ProFeedbackController extends BaseController
             return success(proFeedbackChangeService.selectByFeedback(feedbackId));
         }
         return success(proFeedbackChangeService.selectByTask(taskId));
+    }
+
+    /**
+     * 查询单个任务的「本次上机数量」系统默认值（PC 报工选择任务后预填，不自算）
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:feedback:query')")
+    @GetMapping("/inputDefault/{taskId}")
+    public AjaxResult inputDefault(@PathVariable Long taskId)
+    {
+        ProTask task = proTaskService.selectProTaskByTaskId(taskId);
+        if (task == null)
+        {
+            return error("任务不存在");
+        }
+        defaultsApplier.apply(task, null);
+        return success(task.getDefaultQuantityInput());
     }
 
     /**

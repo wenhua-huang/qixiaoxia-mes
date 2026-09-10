@@ -90,6 +90,12 @@
     <view v-if="selectedTask" class="section">
       <uni-section title="报工数量" type="line"></uni-section>
       <view class="form-box">
+        <view class="worker-row">
+          <text class="qty-label">报工人</text>
+          <text class="worker-val">{{ workerDisplay }}</text>
+        </view>
+        <input-qty-row v-model="form.quantityInput" :default-val="selectedTask.defaultQuantityInput"
+          :unit="workorder.unitName || 'PCS'" />
         <view class="qty-row">
           <text class="qty-label"><text class="required">*</text>合格数</text>
           <view class="qty-input">
@@ -179,9 +185,12 @@ import { addFeedback, getFeedbackEntry } from '@/api/mes/pro/feedback'
 import { getCardScanResult } from '@/api/mes/pro/procard'
 import { parseQrPayload } from '@/utils/qrPayload'
 import { listParamTemplateByProcessId } from '@/api/mes/pro/paramtemplate'
+import InputQtyRow from './components/input-qty-row.vue'
+import { useUserStore } from '@/store/modules/user'
 import config from '@/config.js'
 
 const { proxy } = getCurrentInstance()
+const userStore = useUserStore()
 const workorderCode = ref('')
 const workorder = ref(null)
 const taskList = ref([])
@@ -191,6 +200,7 @@ const selectedTask = ref(null)
 const submitting = ref(false)
 
 const form = reactive({
+  quantityInput: null,
   quantityQualified: 0,
   quantityUnqualified: 0,
   quantityLaborScrap: 0,
@@ -208,6 +218,11 @@ const totalQuantity = computed(() => {
     + Number(form.quantityUnqualified || 0)
     + Number(form.quantityLaborScrap || 0)
     + Number(form.quantityMaterialScrap || 0)
+})
+
+// 报工人：优先任务派工人昵称，未派工显示当前登录人账号（store 仅持久化 userName）
+const workerDisplay = computed(() => {
+  return selectedTask.value?.workerNick || userStore.name || '当前登录人'
 })
 
 const WO_STATUS_MAP = {
@@ -281,7 +296,7 @@ function scanByCard(cardCode) {
     selectedTaskId.value = null
     selectedTask.value = null
     paramList.value = []
-    Object.assign(form, { quantityQualified: 0, quantityUnqualified: 0, quantityLaborScrap: 0, quantityMaterialScrap: 0, remark: '' })
+    Object.assign(form, { quantityInput: null, quantityQualified: 0, quantityUnqualified: 0, quantityLaborScrap: 0, quantityMaterialScrap: 0, remark: '' })
 
     card.value = data.card
     // 用卡的冗余字段填充 workorder 供 doSubmit 复用 + 页面展示工单信息/外协任务（字段名与 doSubmit body 一致）
@@ -362,7 +377,7 @@ function searchWorkorder() {
   selectedTaskId.value = null
   selectedTask.value = null
   paramList.value = []
-  Object.assign(form, { quantityQualified: 0, quantityUnqualified: 0, quantityLaborScrap: 0, quantityMaterialScrap: 0, remark: '' })
+  Object.assign(form, { quantityInput: null, quantityQualified: 0, quantityUnqualified: 0, quantityLaborScrap: 0, quantityMaterialScrap: 0, remark: '' })
 
   getFeedbackEntry(workorderCode.value.trim()).then(res => {
     proxy.$modal.closeLoading()
@@ -399,6 +414,8 @@ function searchWorkorder() {
 function selectTask(task) {
   selectedTaskId.value = task.taskId
   selectedTask.value = task
+  // 上机数量重置为该任务的系统默认值（数字或 null，子组件挂载后会自动带出）
+  form.quantityInput = task.defaultQuantityInput != null ? Number(task.defaultQuantityInput) : null
   // 加载该工序报工可见的参数模板
   paramList.value = []
   if (task.processId) {
@@ -515,6 +532,7 @@ function doSubmit() {
       unitOfMeasure: w.unitOfMeasure || t.unitOfMeasure,
       unitName: w.unitName || t.unitName,
       routeId: t.routeId,
+      quantityInput: form.quantityInput != null ? Number(form.quantityInput) : null,
       quantityFeedback: totalQuantity.value,
       quantityQualified: Number(form.quantityQualified || 0),
       quantityUnqualified: Number(form.quantityUnqualified || 0),
@@ -661,6 +679,12 @@ page { background-color: #f5f6f7; min-height: 100%; }
   padding: 16rpx 0;
   border-bottom: 1px solid #f5f5f5;
 }
+.worker-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16rpx 0;
+  border-bottom: 1px solid #f5f5f5;
+}
+.worker-val { font-size: 28rpx; color: #606266; }
 .qty-row:last-child { border-bottom: none; }
 .qty-label { font-size: 28rpx; color: #333; }
 .required { color: #f56c6c; margin-right: 4rpx; }

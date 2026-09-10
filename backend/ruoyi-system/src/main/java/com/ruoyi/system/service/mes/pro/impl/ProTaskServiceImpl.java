@@ -32,6 +32,7 @@ import com.ruoyi.system.domain.mes.pro.ProRouteProduct;
 import com.ruoyi.system.domain.mes.md.MdWorkstation;
 import com.ruoyi.system.service.ISysUserService;
 import com.ruoyi.system.service.mes.pro.IProTaskService;
+import com.ruoyi.system.service.mes.pro.TaskReportDefaultsApplier;
 
 /**
  * 生产任务/排产Service业务层处理
@@ -66,6 +67,9 @@ public class ProTaskServiceImpl implements IProTaskService
     @Autowired
     private ISysUserService userService;
 
+    @Autowired
+    private TaskReportDefaultsApplier defaultsApplier;
+
     @Override
     public ProTask selectProTaskByTaskId(Long taskId)
     {
@@ -81,7 +85,10 @@ public class ProTaskServiceImpl implements IProTaskService
     @Override
     public List<ProTask> selectReportableTaskList(ProTask proTask)
     {
-        return proTaskMapper.selectReportableTaskList(proTask);
+        List<ProTask> list = proTaskMapper.selectReportableTaskList(proTask);
+        // 待报工列表为工单维度，cardId 传 null（不按流转卡限定上道产出差额）
+        defaultsApplier.apply(list, null);
+        return list;
     }
 
     @Override

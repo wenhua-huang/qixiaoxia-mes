@@ -46,6 +46,10 @@
             <text class="label">排产 / 已产</text>
             <text class="value bold">{{ num(item.quantity) }} / {{ num(item.quantityProduced) }} {{ item.unitName || '' }}</text>
           </view>
+          <view class="item-row">
+            <text class="label">报工人</text>
+            <text class="value">{{ item.workerNick || '未派工' }}</text>
+          </view>
         </view>
         <view class="item-footer">
           <text class="text-grey">{{ item.workorderName || '-' }}</text>

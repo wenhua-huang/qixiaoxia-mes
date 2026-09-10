@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - 分支 `B3_feature`（基于 main f6aa06b），每个 Task 结束一次 commit；提交信息中文，格式 `feat(sal): ...` / `test(sal): ...` / `fix(wm,sal): ...`。
-- SQL：所有业务查询带 factory_id 条件；Flyway 迁移裸 JDBC，DML 显式处理 factory_id，DML 必须幂等；不得修改已执行的迁移文件，新增版本号 **V150**（当前最大 V149）。
+- SQL：所有业务查询带 factory_id 条件；Flyway 迁移裸 JDBC，DML 显式处理 factory_id，DML 必须幂等；不得修改已执行的迁移文件，新增版本号 **V151**（当前最大 V149）。
 - 后端函数 ≤50 行；状态比较一律用 `SalOrderStatus` 枚举常量，禁止新写裸状态字符串（pro/wm 域自身状态常量除外）。
 - 后端改完必须 `mvn -pl ruoyi-admin -am package -DskipTests` 重新打包 + 重启 jar + token 实测接口（Task 8 红线）。
 - 前端组件 ≤300 行；本功能不改 app/、不改报表。
@@ -24,10 +24,10 @@
 
 ---
 
-### Task 1: V150 Flyway 迁移（字典四态 + 存量刷态 + 默认值 + 按钮权限回收）
+### Task 1: V151 Flyway 迁移（字典四态 + 存量刷态 + 默认值 + 按钮权限回收）
 
 **Files:**
-- Create: `backend/ruoyi-admin/src/main/resources/db/migration/V150__sal_order_four_status.sql`
+- Create: `backend/ruoyi-admin/src/main/resources/db/migration/V151__sal_order_four_status.sql`
 
 **Interfaces:**
 - Produces: DB 状态——字典 `mes_sal_order_status` 有效项为 CONFIRMED(success,默认)/PRODUCING(warning)/SHIPPED(primary)/CLOSED(info,文案已结单)/CANCEL(danger)，PREPARE/PENDING 停用；`qxx_sal_order.status` 默认 'CONFIRMED'；菜单 2909/2916（submit/approve，V124 建）及其角色授权删除。
@@ -36,7 +36,7 @@
 
 ```sql
 -- ============================================================
--- V150: 销售订单状态收敛四态（已确认→生产中→已出货→已结单，CANCEL 链外保留）
+-- V151: 销售订单状态收敛四态（已确认→生产中→已出货→已结单，CANCEL 链外保留）
 -- ① 停用旧审核态字典项 PREPARE/PENDING（保留行以翻译历史数据）
 -- ② CLOSED 文案「已关闭」→「已结单」，新增 PRODUCING/SHIPPED
 -- ③ 存量在途单（PREPARE/PENDING）一律刷为 CONFIRMED（审核流已废弃，无审核入口）
@@ -58,10 +58,10 @@ UPDATE sys_dict_data SET dict_label = '已结单', list_class = 'info'
 WHERE dict_type = 'mes_sal_order_status' AND dict_value = 'CLOSED';
 
 INSERT INTO sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, remark)
-SELECT 6, '生产中', 'PRODUCING', 'mes_sal_order_status', '', 'warning', 'N', '0', 'admin', sysdate(), '关联工单已开工'
+SELECT 2, '生产中', 'PRODUCING', 'mes_sal_order_status', '', 'warning', 'N', '0', 'admin', sysdate(), '关联工单已开工'
 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM sys_dict_data WHERE dict_type = 'mes_sal_order_status' AND dict_value = 'PRODUCING');
 INSERT INTO sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, remark)
-SELECT 7, '已出货', 'SHIPPED', 'mes_sal_order_status', '', 'primary', 'N', '0', 'admin', sysdate(), '订单全部明细已发齐'
+SELECT 3, '已出货', 'SHIPPED', 'mes_sal_order_status', '', 'primary', 'N', '0', 'admin', sysdate(), '订单全部明细已发齐'
 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM sys_dict_data WHERE dict_type = 'mes_sal_order_status' AND dict_value = 'SHIPPED');
 
 -- 活跃项重排展示顺序（旧 PREPARE/PENDING 已停用不显示）并设默认
@@ -69,6 +69,9 @@ UPDATE sys_dict_data SET dict_sort = 1, is_default = 'Y'
 WHERE dict_type = 'mes_sal_order_status' AND dict_value = 'CONFIRMED';
 UPDATE sys_dict_data SET dict_sort = 4 WHERE dict_type = 'mes_sal_order_status' AND dict_value = 'CLOSED';
 UPDATE sys_dict_data SET dict_sort = 5 WHERE dict_type = 'mes_sal_order_status' AND dict_value = 'CANCEL';
+-- 旧审核态取消默认标记并沉底，保证唯一默认项与生命周期排序
+UPDATE sys_dict_data SET is_default = 'N', dict_sort = 8 WHERE dict_type = 'mes_sal_order_status' AND dict_value = 'PREPARE';
+UPDATE sys_dict_data SET is_default = 'N', dict_sort = 9 WHERE dict_type = 'mes_sal_order_status' AND dict_value = 'PENDING';
 
 -- ③ 存量刷态（跨工厂全量，有意）
 UPDATE qxx_sal_order SET status = 'CONFIRMED' WHERE status IN ('PREPARE', 'PENDING');
@@ -97,8 +100,8 @@ Expected: PREPARE/PENDING 的 status=1；PRODUCING/SHIPPED 存在；menu 查询�
 - [ ] **Step 3: Commit**
 
 ```bash
-git add backend/ruoyi-admin/src/main/resources/db/migration/V150__sal_order_four_status.sql
-git commit -m "feat(sal): V150 订单四态字典/存量刷态/默认值/回收审核按钮权限"
+git add backend/ruoyi-admin/src/main/resources/db/migration/V151__sal_order_four_status.sql
+git commit -m "feat(sal): V151 订单四态字典/存量刷态/默认值/回收审核按钮权限"
 ```
 
 ---
@@ -245,7 +248,7 @@ Expected: 编译失败（枚举无 PREPARE/PENDING、Service 无 submitOrder 等
  *                 CANCEL(已取消，链外终态)
  * </pre>
  * 工序任务报工不改变订单状态，只驱动进度百分比。
- * 对应字典：sys_dict_type = 'mes_sal_order_status'（V124 建，V150 收敛）
+ * 对应字典：sys_dict_type = 'mes_sal_order_status'（V124 建，V151 收敛）
  */
 public enum SalOrderStatus {
     CONFIRMED("CONFIRMED", "已确认"),
@@ -1317,7 +1320,7 @@ SalOrderQueryParams 的 `status?: string` 下加 `statusList?: SalOrderStatus[]`
 - getList 改为请求带 includeProgress：`listOrder({ ...this.queryParams, includeProgress: true })`。
 - reset()（:354）status 初值改 'CONFIRMED'。
 - canEditSelected（:524）改 `r.status === 'CONFIRMED'`。
-- `statusMeta`（:340）与查询区状态下拉均由 `mes_sal_order_status` 字典驱动，V150 改字典后自动生效，**不动代码**；组件挂载处 `getDicts('mes_sal_order_status')` 保留。
+- `statusMeta`（:340）与查询区状态下拉均由 `mes_sal_order_status` 字典驱动，V151 改字典后自动生效，**不动代码**；组件挂载处 `getDicts('mes_sal_order_status')` 保留。
 - handleClose 文案改 `确认结单 "${row.orderCode}"？结单后不可恢复。`、成功提示「结单成功」。
 - handleCancel 成功提示追加：`this.$modal.msgSuccess('取消成功，关联工单需另行处理')`。
 
@@ -1473,7 +1476,7 @@ git commit -m "chore(sal): spec 口径细化（SHIPPED箱量）；全量回归�
 | §3 状态机四态 + CANCEL 门控 | T1（字典/存量）、T2（枚举/门控） |
 | §4 领域事件（开工/发齐、AFTER_COMMIT、条件 UPDATE） | T4、T5 |
 | §4.3 订单维度发齐 NOT EXISTS | T5（箱量口径，已细化） |
-| §5 V150 迁移全部 5 项 | T1 |
+| §5 V151 迁移全部 5 项 | T1 |
 | §6.1-6.2 枚举/删审核端点/门控/convertible | T2 |
 | §6.3 进度聚合 + includeProgress + 详情 | T3 |
 | §6.4 三处导出文案 | 实体 @Excel 在 T2；PDF/Excel 走枚举 getInfo 自动生效，无需改（T8 实测验证） |

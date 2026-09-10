@@ -121,6 +121,8 @@ public class SalOrderServiceImpl implements ISalOrderService
         if (order.getStatus() == null) order.setStatus(SalOrderStatus.PREPARE.getCode());
         if (order.getOrderType() == null) order.setOrderType(SalOrderType.STANDARD.getCode());
         if (order.getSampleFlag() == null) order.setSampleFlag("N");
+        if (order.getOutsourceFlag() == null) order.setOutsourceFlag("N");
+        if (order.getPackageFlag() == null) order.setPackageFlag("N");
         if (order.getSource() == null) order.setSource(SalConstants.SOURCE_DIRECT);
         order.setCreateBy(SecurityUtils.getUsername());
         order.setCreateTime(DateUtils.getNowDate());
@@ -147,6 +149,8 @@ public class SalOrderServiceImpl implements ISalOrderService
         order.setRemark(req.getRemark());
         order.setOrderType(SalOrderType.STANDARD.getCode());
         order.setSampleFlag("N");
+        order.setOutsourceFlag("N");
+        order.setPackageFlag("N");
         // CRM 推单无 MES 内"提交"动作，到 MES 即待审核
         order.setStatus(SalOrderStatus.PENDING.getCode());
         order.setSource(SalConstants.SOURCE_CRM);

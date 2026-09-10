@@ -51,6 +51,12 @@ public class SalOrder extends BaseEntity
     @Excel(name = "是否有样品", readConverterExp = "Y=是,N=否")
     private String sampleFlag;
 
+    @Excel(name = "是否外发", readConverterExp = "Y=是,N=否")
+    private String outsourceFlag;
+
+    @Excel(name = "是否包装", readConverterExp = "Y=是,N=否")
+    private String packageFlag;
+
     @Excel(name = "订单来源", readConverterExp = "1=直接新增,2=CRM系统")
     private Integer source;
 
@@ -110,6 +116,10 @@ public class SalOrder extends BaseEntity
     public void setBusinessLine(String v) { this.businessLine = v; }
     public String getSampleFlag() { return sampleFlag; }
     public void setSampleFlag(String v) { this.sampleFlag = v; }
+    public String getOutsourceFlag() { return outsourceFlag; }
+    public void setOutsourceFlag(String v) { this.outsourceFlag = v; }
+    public String getPackageFlag() { return packageFlag; }
+    public void setPackageFlag(String v) { this.packageFlag = v; }
     public Integer getSource() { return source; }
     public void setSource(Integer v) { this.source = v; }
     public Date getOrderDate() { return orderDate; }

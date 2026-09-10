@@ -30,7 +30,10 @@ vi.mock('@/api/mes/md/client', () => ({
   listClient: vi.fn().mockResolvedValue({ rows: [], total: 0 }),
 }))
 // 断开 index.vue 新增的 pro 域 API 导入->request->Navbar 链
-vi.mock('@/api/mes/pro/routeproduct', () => ({ listRouteProduct: vi.fn().mockResolvedValue({ rows: [], total: 0 }) }))
+vi.mock('@/api/mes/pro/routeproduct', () => ({
+  listRouteProduct: vi.fn().mockResolvedValue({ rows: [], total: 0 }),
+  resolveRouteProductBatch: vi.fn().mockResolvedValue({ data: {} }),
+}))
 vi.mock('@/api/mes/pro/proroute', () => ({ listRoute: vi.fn().mockResolvedValue({ rows: [] }) }))
 vi.mock('@/api/mes/pro/routeprocess', () => ({ listRouteProcessByRouteId: vi.fn().mockResolvedValue({ data: [] }) }))
 vi.mock('@/api/mes/pro/routeproductbom', () => ({ listRouteProductBomByRouteId: vi.fn().mockResolvedValue({ data: [] }) }))
@@ -39,7 +42,7 @@ vi.mock('@/api/mes/pro/paramtemplate', () => ({ listParamTemplate: vi.fn().mockR
 vi.mock('@/api/mes/pro/workorder', () => ({ checkDeviation: vi.fn().mockResolvedValue({ data: { hasDeviation: false, deviations: [] } }) }))
 
 const globalStubs = {
-  stubs: { ClientSelect: true, LineEdit: true, 'right-toolbar': true, pagination: true },
+  stubs: { ClientSelect: true, LineEdit: true, ToWorkorderDialog: true, 'right-toolbar': true, pagination: true },
   mocks: { parseTime: (t: any) => (t ? String(t).slice(0, 10) : '') },
 }
 
@@ -75,16 +78,24 @@ describe('SalOrder index.vue', () => {
     expect(html).toContain('圣享')
   })
 
-  it('状态文本/标签/业务线 纯函数映射正确', async () => {
+  it('状态/订单类型由字典驱动, 业务线纯映射', async () => {
     mockListOrder.mockResolvedValue({ rows: [], total: 0 })
     const wrapper = mount(SalOrder, { global: globalStubs })
     await nextTick()
     const vm: any = wrapper.vm
-    expect(vm.statusText('PREPARE')).toBe('待确认')
-    expect(vm.statusText('CONFIRMED')).toBe('已确认')
-    expect(vm.statusText('CANCEL')).toBe('已取消')
-    expect(vm.statusTag('CONFIRMED')).toBe('success')
-    expect(vm.statusTag('CANCEL')).toBe('danger')
+    vm.salStatusOptions = [
+      { dictValue: 'PREPARE', dictLabel: '待提交', listClass: 'info' },
+      { dictValue: 'CONFIRMED', dictLabel: '已确认', listClass: 'success' },
+      { dictValue: 'CANCEL', dictLabel: '已取消', listClass: 'danger' },
+    ]
+    expect(vm.statusMeta('PREPARE')).toMatchObject({ text: '待提交', type: 'info' })
+    expect(vm.statusMeta('CONFIRMED')).toMatchObject({ text: '已确认', type: 'success' })
+    expect(vm.statusMeta('CANCEL')).toMatchObject({ text: '已取消', type: 'danger' })
+    vm.salOrderTypeOptions = [
+      { dictValue: 'STANDARD', dictLabel: '标品', listClass: 'primary' },
+      { dictValue: 'PLATE', dictLabel: '制版', listClass: 'success' },
+    ]
+    expect(vm.orderTypeMeta('PLATE')).toMatchObject({ text: '制版', type: 'success' })
     expect(vm.businessLineText('FOREIGN')).toBe('外贸')
     expect(vm.businessLineText('SPOT')).toBe('现货')
   })

@@ -31,6 +31,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="quantityQualified"    column="quantity_qualified"    />
         <result property="quantityUnqualified"    column="quantity_unqualified"    />
         <result property="quantityChanged"    column="quantity_changed"    />
+        <result property="workerId"    column="worker_id"    />
+        <result property="workerName"    column="worker_name"    />
+        <result property="workerNick"    column="worker_nick"    />
+        <result property="leaderId"    column="leader_id"    />
+        <result property="leaderName"    column="leader_name"    />
+        <result property="leaderNick"    column="leader_nick"    />
         <result property="clientId"    column="client_id"    />
         <result property="clientCode"    column="client_code"    />
         <result property="clientName"    column="client_name"    />
@@ -61,7 +67,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectProTaskVo">
-        select task_id, factory_id, task_code, task_name, workorder_id, workorder_code, workorder_name, workstation_id, workstation_code, workstation_name, route_id, route_code, process_id, process_code, process_name, item_id, item_code, item_name, specification, unit_of_measure, unit_name, quantity, quantity_produced, quantity_qualified, quantity_unqualified, quantity_changed, client_id, client_code, client_name, client_nick, machine_code, setup_duration, unit_duration, offline_qty, start_time, duration, end_time, color_code, request_date, finish_date, cancel_date, vendor_id, vendor_code, outsource_factory_id, status, predecessor_id, snapshot_id, gantt_sort, remark, create_by, create_time, update_by, update_time from qxx_pro_task
+        select task_id, factory_id, task_code, task_name, workorder_id, workorder_code, workorder_name, workstation_id, workstation_code, workstation_name, route_id, route_code, process_id, process_code, process_name, item_id, item_code, item_name, specification, unit_of_measure, unit_name, quantity, quantity_produced, quantity_qualified, quantity_unqualified, quantity_changed, worker_id, worker_name, worker_nick, leader_id, leader_name, leader_nick, client_id, client_code, client_name, client_nick, machine_code, setup_duration, unit_duration, offline_qty, start_time, duration, end_time, color_code, request_date, finish_date, cancel_date, vendor_id, vendor_code, outsource_factory_id, status, predecessor_id, snapshot_id, gantt_sort, remark, create_by, create_time, update_by, update_time from qxx_pro_task
     </sql>
 
     <select id="selectProTaskList" parameterType="ProTask" resultMap="ProTaskResult">
@@ -142,6 +148,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="quantityQualified != null">quantity_qualified,</if>
             <if test="quantityUnqualified != null">quantity_unqualified,</if>
             <if test="quantityChanged != null">quantity_changed,</if>
+            <if test="workerId != null">worker_id,</if>
+            <if test="workerName != null">worker_name,</if>
+            <if test="workerNick != null">worker_nick,</if>
+            <if test="leaderId != null">leader_id,</if>
+            <if test="leaderName != null">leader_name,</if>
+            <if test="leaderNick != null">leader_nick,</if>
             <if test="clientId != null">client_id,</if>
             <if test="clientCode != null">client_code,</if>
             <if test="clientName != null">client_name,</if>
@@ -193,6 +205,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="quantityQualified != null">#{quantityQualified},</if>
             <if test="quantityUnqualified != null">#{quantityUnqualified},</if>
             <if test="quantityChanged != null">#{quantityChanged},</if>
+            <if test="workerId != null">#{workerId},</if>
+            <if test="workerName != null">#{workerName},</if>
+            <if test="workerNick != null">#{workerNick},</if>
+            <if test="leaderId != null">#{leaderId},</if>
+            <if test="leaderName != null">#{leaderName},</if>
+            <if test="leaderNick != null">#{leaderNick},</if>
             <if test="clientId != null">#{clientId},</if>
             <if test="clientCode != null">#{clientCode},</if>
             <if test="clientName != null">#{clientName},</if>
@@ -248,6 +266,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="quantityQualified != null">quantity_qualified = #{quantityQualified},</if>
             <if test="quantityUnqualified != null">quantity_unqualified = #{quantityUnqualified},</if>
             <if test="quantityChanged != null">quantity_changed = #{quantityChanged},</if>
+            <!-- 派工报工人/负责人：id 动态（状态流转的部分更新对象不携带，跳过）；name/nick 恒更新，
+                 由 service 保证 id 为 null 时 name/nick 同为 null，实现清空；仅全量 updateProTask 语句如此 -->
+            <if test="workerId != null">worker_id = #{workerId},</if>
+            worker_name = #{workerName},
+            worker_nick = #{workerNick},
+            <if test="leaderId != null">leader_id = #{leaderId},</if>
+            leader_name = #{leaderName},
+            leader_nick = #{leaderNick},
             <if test="clientId != null">client_id = #{clientId},</if>
             <if test="clientCode != null">client_code = #{clientCode},</if>
             <if test="clientName != null">client_name = #{clientName},</if>
@@ -274,6 +300,17 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="updateTime != null">update_time = #{updateTime},</if>
         </trim>
+        where task_id = #{taskId}
+    </update>
+
+    <!-- 取消派人：id 列在 updateProTask 中为动态 <if>（无法 SET NULL），清空走本专用语句。
+         仅 ProTaskServiceImpl.updateProTask（手工编辑）调用，状态流转/批量改态/甘特拖拽均不调用。 -->
+    <update id="clearTaskAssignee">
+        update qxx_pro_task
+        <set>
+            <if test="clearWorker">worker_id = null, worker_name = null, worker_nick = null,</if>
+            <if test="clearLeader">leader_id = null, leader_name = null, leader_nick = null,</if>
+        </set>
         where task_id = #{taskId}
     </update>
 

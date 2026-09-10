@@ -411,6 +411,13 @@ public class GanttDataServiceImpl implements IGanttDataService
         item.put("actualStartTime", aStart != null ? sdf.format(aStart) : null);
         item.put("actualEndTime", aEnd != null ? sdf.format(aEnd) : null);
         item.put("progressPercent", percent(pt.getQuantityProduced(), pt.getQuantity()));
+        // 派工报工人/负责人快照（供甘特弹窗编辑回显，避免前端按 id 补查用户）
+        item.put("workerId", pt.getWorkerId());
+        item.put("workerName", pt.getWorkerName());
+        item.put("workerNick", pt.getWorkerNick());
+        item.put("leaderId", pt.getLeaderId());
+        item.put("leaderName", pt.getLeaderName());
+        item.put("leaderNick", pt.getLeaderNick());
         String level = DelayLevelEvaluator.evaluateTask(pt.getStartTime(), pt.getEndTime(),
             aStart, aEnd, pt.getStatus(), pt.getQuantity(), pt.getQuantityProduced(),
             warnHours, tol, new Date());

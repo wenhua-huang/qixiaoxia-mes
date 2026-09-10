@@ -8,6 +8,8 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
+import com.ruoyi.common.core.domain.entity.SysUser;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.exception.ServiceException;
@@ -28,6 +30,7 @@ import com.ruoyi.system.domain.mes.pro.ProProcess;
 import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
 import com.ruoyi.system.domain.mes.pro.ProRouteProduct;
 import com.ruoyi.system.domain.mes.md.MdWorkstation;
+import com.ruoyi.system.service.ISysUserService;
 import com.ruoyi.system.service.mes.pro.IProTaskService;
 
 /**
@@ -60,6 +63,9 @@ public class ProTaskServiceImpl implements IProTaskService
     @Autowired
     private MdWorkstationMapper mdWorkstationMapper;
 
+    @Autowired
+    private ISysUserService userService;
+
     @Override
     public ProTask selectProTaskByTaskId(Long taskId)
     {
@@ -82,6 +88,33 @@ public class ProTaskServiceImpl implements IProTaskService
     public List<ProTask> selectAll()
     {
         return proTaskMapper.selectProTaskList(new ProTask());
+    }
+
+    /**
+     * 回填派工报工人/负责人快照：客户端只传 id，这里按 id 查 sys_user 补账号(userName)与姓名(nickName)；
+     * id 为 null 表示取消派人，name/nick 一并置 null（配合 updateProTask 的无条件 SET 实现清空）。
+     * 仅手工新增/编辑调用；状态流转、甘特拖拽、批量改态均不走此方法。
+     */
+    private void fillWorkerSnapshot(ProTask task)
+    {
+        fillOne(task.getWorkerId(), task::setWorkerId, task::setWorkerName, task::setWorkerNick);
+        fillOne(task.getLeaderId(), task::setLeaderId, task::setLeaderName, task::setLeaderNick);
+    }
+
+    private void fillOne(Long userId, Consumer<Long> idSetter,
+                         Consumer<String> nameSetter, Consumer<String> nickSetter)
+    {
+        if (userId == null)
+        {
+            idSetter.accept(null);
+            nameSetter.accept(null);
+            nickSetter.accept(null);
+            return;
+        }
+        SysUser u = userService.selectUserById(userId);
+        if (u == null) throw new ServiceException("指定的人员不存在：" + userId);
+        nameSetter.accept(u.getUserName());
+        nickSetter.accept(u.getNickName());
     }
 
     /**
@@ -194,6 +227,7 @@ public class ProTaskServiceImpl implements IProTaskService
     @Transactional
     public int insertProTask(ProTask proTask)
     {
+        fillWorkerSnapshot(proTask);
         proTask.setCreateTime(DateUtils.getNowDate());
         proTask.setCreateBy(SecurityUtils.getUsername());
         if (proTask.getStatus() == null) proTask.setStatus(ProConstants.TASK_STATUS_NORMAL);
@@ -265,11 +299,22 @@ public class ProTaskServiceImpl implements IProTaskService
     }
 
     @Override
+    @Transactional
     public int updateProTask(ProTask proTask)
     {
+        // 显式传 null id = 取消派人：先记下标记（fillWorkerSnapshot 会把 id 置 null，
+        // updateProTask 的动态 <if> 无法把 id 列 SET NULL，需追加 clearTaskAssignee）
+        boolean clearWorker = proTask.getWorkerId() == null;
+        boolean clearLeader = proTask.getLeaderId() == null;
+        fillWorkerSnapshot(proTask);
         proTask.setUpdateTime(DateUtils.getNowDate());
         proTask.setUpdateBy(SecurityUtils.getUsername());
-        return proTaskMapper.updateProTask(proTask);
+        int rows = proTaskMapper.updateProTask(proTask);
+        if (proTask.getTaskId() != null && (clearWorker || clearLeader))
+        {
+            proTaskMapper.clearTaskAssignee(proTask.getTaskId(), clearWorker, clearLeader);
+        }
+        return rows;
     }
 
     @Override

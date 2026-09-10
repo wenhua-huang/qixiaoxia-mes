@@ -19,6 +19,16 @@ public interface ProTaskMapper {
     List<ProTask> selectReportableTaskList(ProTask task);
     int insertProTask(ProTask task);
     int updateProTask(ProTask task);
+
+    /**
+     * 清空任务派工报工人/负责人快照（含 id 列）。
+     * updateProTask 的 id 列是动态 {@code <if>}，无法把 id 更新成 NULL；
+     * 手工编辑显式传 null 表示取消派人时，由 service 追加调用本语句。
+     * factory_id 由拦截器自动注入。
+     */
+    int clearTaskAssignee(@Param("taskId") Long taskId,
+                          @Param("clearWorker") boolean clearWorker,
+                          @Param("clearLeader") boolean clearLeader);
     int deleteProTaskByTaskId(Long taskId);
     int deleteProTaskByTaskIds(Long[] taskIds);
     /** 审核报工时原子增量更新任务已生产数量 */

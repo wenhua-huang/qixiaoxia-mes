@@ -54,6 +54,12 @@
       <el-table-column label="任务名称" align="center" prop="taskName" width="150" :show-overflow-tooltip="true" />
       <el-table-column label="生产工单" align="center" prop="workorderName" width="150" :show-overflow-tooltip="true" />
       <el-table-column label="工位" align="center" prop="workstationName" width="120" :show-overflow-tooltip="true" />
+      <el-table-column label="报工人" align="center" prop="workerNick" width="100" :show-overflow-tooltip="true">
+        <template #default="scope">{{ scope.row.workerNick || '-' }}</template>
+      </el-table-column>
+      <el-table-column label="负责人" align="center" prop="leaderNick" width="100" :show-overflow-tooltip="true">
+        <template #default="scope">{{ scope.row.leaderNick || '-' }}</template>
+      </el-table-column>
       <el-table-column label="工序" align="center" prop="processName" width="120" :show-overflow-tooltip="true" />
       <el-table-column label="计划数量" align="center" prop="quantity" width="90" />
       <el-table-column label="已生产" align="center" prop="quantityProduced" width="80" />

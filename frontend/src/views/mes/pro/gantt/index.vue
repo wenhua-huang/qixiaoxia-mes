@@ -82,6 +82,24 @@
               :value="ws.workstationId" />
           </el-select>
         </el-form-item>
+        <el-form-item label="报工人（派工）">
+          <el-select v-model="taskForm.workerId" style="width:100%" filterable remote clearable
+            :remote-method="searchWorkers" :loading="workerLoading"
+            placeholder="不派则报工时默认当前登录人"
+            :disabled="taskDialogMode==='view'">
+            <el-option v-for="u in workerOptions" :key="u.userId"
+              :label="`${u.nickName}（${u.userName}）`" :value="u.userId" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="负责人">
+          <el-select v-model="taskForm.leaderId" style="width:100%" filterable remote clearable
+            :remote-method="searchLeaders" :loading="leaderLoading"
+            placeholder="不派则报工时默认当前登录人"
+            :disabled="taskDialogMode==='view'">
+            <el-option v-for="u in leaderOptions" :key="u.userId"
+              :label="`${u.nickName}（${u.userName}）`" :value="u.userId" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="排产数量">
           <el-input-number v-model="taskForm.quantity" :min="1" style="width:100%" :disabled="taskDialogMode==='view'" />
         </el-form-item>
@@ -125,6 +143,7 @@ import { getWorkOrderGantt, getAvailableWorkstations, getWorkstationView } from 
 import { listWorkorder, getWorkorderDetail } from '@/api/mes/pro/workorder'
 import { listWorkstation } from '@/api/mes/md/workstation'
 import { addTask, updateTask, delTask } from '@/api/mes/pro/task'
+import { listUser } from '@/api/system/user'
 import GanttChart from '@/components/GanttChart/index.vue'
 // import SnapShotPanel from './SnapShotPanel.vue'  // 排产快照面板暂时下线，恢复时取消注释
 import WorkOrderQueue from './WorkOrderQueue.vue'
@@ -179,7 +198,45 @@ const taskForm = reactive({
   duration: 1,
   setupDuration: 0,
   colorCode: '#409eff',
+  workerId: null as number | null,
+  leaderId: null as number | null,
 })
+// 报工人/负责人下拉选项（remote 搜索；编辑回显时用行内快照直接构造，不发请求）
+const workerOptions = ref<any[]>([])
+const leaderOptions = ref<any[]>([])
+const workerLoading = ref(false)
+const leaderLoading = ref(false)
+let workerTimer: any = null
+let leaderTimer: any = null
+function searchWorkers(kw: string) {
+  clearTimeout(workerTimer)
+  workerTimer = setTimeout(() => doSearchUsers(kw, workerOptions, workerLoading), 300)
+}
+function searchLeaders(kw: string) {
+  clearTimeout(leaderTimer)
+  leaderTimer = setTimeout(() => doSearchUsers(kw, leaderOptions, leaderLoading), 300)
+}
+async function doSearchUsers(kw: string, opts: typeof workerOptions, loading: typeof workerLoading) {
+  loading.value = true
+  try {
+    // 系统用户列表仅支持账号/手机号模糊（不支持姓名），两路并发查询后按 userId 去重合并
+    const [byName, byPhone] = await Promise.all([
+      listUser({ userName: kw || undefined, status: '0', pageNum: 1, pageSize: 20 } as any),
+      listUser({ phonenumber: kw || undefined, status: '0', pageNum: 1, pageSize: 20 } as any)
+    ])
+    const rows: any[] = [...((byName as any)?.rows || []), ...((byPhone as any)?.rows || [])]
+    const dedup = rows.filter((r, i) => rows.findIndex(x => x.userId === r.userId) === i)
+    // 保留已选中但不在搜索结果里的回显项
+    const keep = opts.value.filter((o: any) => !dedup.some((r: any) => r.userId === o.userId) && o.__echo)
+    opts.value = [...keep, ...dedup.map((r: any) => ({ ...r, __echo: false }))]
+  } finally { loading.value = false }
+}
+/** 用任务行内的人员快照构造回显 option（快照存在时无需请求用户接口） */
+function echoUserOption(row: any, idKey: string, nameKey: string, nickKey: string) {
+  const id = row?.[idKey]
+  if (!id) return null
+  return { userId: id, userName: row?.[nameKey] || '', nickName: row?.[nickKey] || '', __echo: true }
+}
 // 排产弹窗表单 ref + 校验规则（机台必选，未选禁止保存）
 const taskFormRef = ref()
 const taskRules = {
@@ -281,6 +338,10 @@ function resetTaskForm() {
   taskForm.duration = 1
   taskForm.setupDuration = 0
   taskForm.colorCode = '#409eff'
+  taskForm.workerId = null
+  taskForm.leaderId = null
+  workerOptions.value = []
+  leaderOptions.value = []
 }
 
 /** 将 ISO 格式时间转换为 yyyy-MM-dd HH:mm:ss（#6） */
@@ -491,6 +552,13 @@ async function onTaskSelect(task: GanttTask) {
   taskForm.duration = task.duration || 1
   taskForm.setupDuration = (task as any).setupDuration || 0
   taskForm.colorCode = task.colorCode || '#409eff'
+  // 报工人/负责人回显：优先用甘特行内已有快照构造 option，不额外发请求
+  taskForm.workerId = (task as any).workerId || null
+  taskForm.leaderId = (task as any).leaderId || null
+  const wo2 = echoUserOption(task as any, 'workerId', 'workerName', 'workerNick')
+  workerOptions.value = wo2 ? [wo2] : []
+  const lo = echoUserOption(task as any, 'leaderId', 'leaderName', 'leaderNick')
+  leaderOptions.value = lo ? [lo] : []
   // 确保工作站列表已加载，使下拉能根据 id 显示名称（而非裸 id）
   const wid = (task as any).workstationId
   if (wid && !workstationList.value.some(w => w.workstationId === wid)) {
@@ -571,6 +639,9 @@ async function submitTaskEdit() {
       duration: taskForm.duration,
       setupDuration: taskForm.setupDuration,
       colorCode: taskForm.colorCode,
+      // 人员只提交 id，后端查 sys_user 回填账号/姓名快照；null 表示取消派人（后端清空快照）
+      workerId: taskForm.workerId,
+      leaderId: taskForm.leaderId,
       workstationId: taskForm.workstationId,
       // code/name 优先用所选机台（availableWorkstations 也可能含），避免全量列表未覆盖时丢名
       workstationCode: ws?.workstationCode || (filteredWorkstationList.value.find((x: any) => x.workstationId === taskForm.workstationId)?.workstationCode) || '',

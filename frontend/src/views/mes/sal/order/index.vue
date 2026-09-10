@@ -96,9 +96,13 @@
         </el-row>
         <el-row>
           <el-col :span="6"><el-form-item label="业务线" prop="businessLine"><el-select v-model="form.businessLine" placeholder="请选择" style="width:100%"><el-option label="内贸" value="DOMESTIC" /><el-option label="外贸" value="FOREIGN" /><el-option label="现货" value="SPOT" /></el-select></el-form-item></el-col>
-          <el-col :span="6"><el-form-item label="订单类型" prop="orderType"><el-select v-model="form.orderType" style="width:100%"><el-option v-for="d in salOrderTypeOptions" :key="d.dictValue" :label="d.dictLabel" :value="d.dictValue" /></el-select></el-form-item></el-col>
+          <el-col :span="6"><el-form-item label="订单类型" prop="orderType"><el-select v-model="form.orderType" style="width:100%" @change="onHeadDimensionChange"><el-option v-for="d in salOrderTypeOptions" :key="d.dictValue" :label="d.dictLabel" :value="d.dictValue" /></el-select></el-form-item></el-col>
           <el-col :span="6"><el-form-item label="是否有样品" prop="sampleFlag"><el-switch v-model="form.sampleFlag" active-value="Y" inactive-value="N" /></el-form-item></el-col>
           <el-col :span="6"><el-form-item label="付款方式" prop="paymentMethod"><el-select v-model="form.paymentMethod" placeholder="请选择" clearable style="width:100%"><el-option label="月结30天" value="月结30天" /><el-option label="月结60天" value="月结60天" /><el-option label="月结90天" value="月结90天" /><el-option label="现结" value="现结" /><el-option label="预付款" value="预付款" /><el-option label="货到付款" value="货到付款" /><el-option label="信用证" value="信用证" /></el-select></el-form-item></el-col>
+        </el-row>
+        <el-row>
+          <el-col :span="6"><el-form-item label="是否外发" prop="outsourceFlag"><el-switch v-model="form.outsourceFlag" active-value="Y" inactive-value="N" @change="onHeadDimensionChange" /></el-form-item></el-col>
+          <el-col :span="6"><el-form-item label="是否包装" prop="packageFlag"><el-switch v-model="form.packageFlag" active-value="Y" inactive-value="N" @change="onHeadDimensionChange" /></el-form-item></el-col>
         </el-row>
         <el-row>
           <el-col :span="8"><el-form-item label="订单日期" prop="orderDate"><el-date-picker v-model="form.orderDate" type="date" value-format="YYYY-MM-DD" style="width:100%" /></el-form-item></el-col>
@@ -118,6 +122,9 @@
         <el-table-column label="单价" align="center" prop="unitPrice" width="90" />
         <el-table-column label="行金额" align="center" prop="lineAmount" width="100" />
         <el-table-column label="尺寸" align="center" prop="productSize" width="130" :show-overflow-tooltip="true" />
+        <el-table-column label="工艺路线" align="center" prop="routeName" width="140" :show-overflow-tooltip="true">
+          <template #default="scope">{{ scope.row.routeName || '—' }}</template>
+        </el-table-column>
         <el-table-column label="操作" align="center" width="140">
           <template #default="scope">
             <el-button link type="primary" size="small" @click="handleEditLine(scope.row)">改</el-button>
@@ -267,7 +274,7 @@
     </el-dialog>
 
     <ClientSelect ref="clientSelectRef" @onSelected="onClientSelected" />
-    <LineEdit v-model="lineEditOpen" :line="editingLine" @confirm="onLineConfirm" />
+    <LineEdit v-model="lineEditOpen" :line="editingLine" :order-type="form.orderType" :outsource-flag="form.outsourceFlag" :package-flag="form.packageFlag" @confirm="onLineConfirm" />
   </div>
 </template>
 
@@ -275,7 +282,7 @@
 import { listOrder, getOrderDetail, createOrderWithLines, updateOrderWithLines, submitOrder, approveOrder, rejectOrder, batchSubmitOrder, batchApproveOrder, closeOrder, cancelOrder, toWorkorder, delOrder } from '@/api/mes/sal/order'
 import { getDicts } from '@/api/system/dict/data'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
-import { listRouteProduct } from '@/api/mes/pro/routeproduct'
+import { listRouteProduct, resolveRouteProductBatch } from '@/api/mes/pro/routeproduct'
 import { listRoute } from '@/api/mes/pro/proroute'
 import { listRouteProcessByRouteId } from '@/api/mes/pro/routeprocess'
 import { listRouteProductBomByRouteId } from '@/api/mes/pro/routeproductbom'
@@ -351,7 +358,7 @@ export default {
     sourceTag(s) { return s === 2 ? 'warning' : 'info' },
     cancel() { this.open = false; this.reset() },
     reset() {
-      this.form = { orderId: null, orderCode: null, orderName: null, orderType: 'NEW', clientId: null, clientCode: null, clientName: null, clientOrderCode: null, salesperson: null, businessLine: null, sampleFlag: 'N', orderDate: null, requestDate: null, totalAmount: 0, paymentMethod: null, status: 'PREPARE', remark: null }
+      this.form = { orderId: null, orderCode: null, orderName: null, orderType: 'STANDARD', clientId: null, clientCode: null, clientName: null, clientOrderCode: null, salesperson: null, businessLine: null, sampleFlag: 'N', outsourceFlag: 'N', packageFlag: 'N', orderDate: null, requestDate: null, totalAmount: 0, paymentMethod: null, status: 'PREPARE', remark: null }
       this.optType = undefined; this.lineList = []; this.autoGenFlag = true; this.resetForm('form')
     },
     handleQuery() { this.queryParams.pageNum = 1; this.getList() },
@@ -373,6 +380,35 @@ export default {
       this.recalcTotalAmount()
     },
     handleEditLine(row) { this.editingLine = { ...row }; this.lineEditOpen = true },
+    /** 订单类型/外发/包装变更后, 按新头维度批量重算明细默认路线(手空行同样重算, 命中才覆盖) */
+    async onHeadDimensionChange() {
+      if (!this.lineList.length) return
+      try { await this.$modal.confirm('订单类型/标志已变更，是否按新条件重新匹配全部明细的工艺路线？') }
+      catch { return }
+      const itemIds = [...new Set(this.lineList.map(l => l.productId).filter(Boolean))]
+      if (!itemIds.length) return
+      const [batchRes, routeRes] = await Promise.all([
+        resolveRouteProductBatch({ itemIds, orderType: this.form.orderType, outsourceFlag: this.form.outsourceFlag, packageFlag: this.form.packageFlag }),
+        listRoute({ pageSize: 1000 })
+      ])
+      const map = batchRes.data || {}
+      const routeMap = {}
+      ;(routeRes.rows || []).forEach(rt => { routeMap[rt.routeId] = rt })
+      const blocked = []
+      this.lineList.forEach(l => {
+        const m = map[l.productId]
+        if (!m) return
+        if (m.hardBlocked) { blocked.push(l.productName); return }
+        if (m.matched) {
+          l.routeProductId = m.routeProductId
+          const rt = routeMap[m.routeId]
+          l.routeCode = rt ? rt.routeCode : null
+          l.routeName = rt ? (rt.routeName || rt.routeCode) : null
+        }
+      })
+      if (blocked.length) this.$modal.msgError('以下产品无匹配的外发工艺路线：' + blocked.join('、'))
+      else this.$modal.msgSuccess('已按新条件重新匹配工艺路线')
+    },
     handleDeleteLine(idx) { this.lineList.splice(idx, 1); this.lineList.forEach((l, i) => { l.lineNo = i + 1 }); this.recalcTotalAmount() },
     recalcTotalAmount() { this.form.totalAmount = this.lineList.reduce((s, l) => s + (Number(l.lineAmount) || Number(l.unitPrice || 0) * Number(l.quantity || 0) || 0), 0) },
     handleAddLine() { this.editingLine = null; this.lineEditOpen = true },

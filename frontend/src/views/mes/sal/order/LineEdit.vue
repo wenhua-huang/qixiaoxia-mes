@@ -47,6 +47,20 @@
             </el-col>
           </el-row>
           <el-row>
+            <el-col :span="16">
+              <el-form-item label="工艺路线">
+                <el-select v-model="form.routeProductId" clearable placeholder="留空则转工单时手选" style="width:100%" @change="onRouteChange">
+                  <el-option v-for="r in routeOptions" :key="r.recordId"
+                    :label="r._routeName + ' — ' + r.itemName" :value="r.recordId">
+                    <span>{{ r._routeName }} — {{ r.itemName }}</span>
+                    <el-tag v-if="r.isDefault === 'Y'" size="small" type="success" style="margin-left:6px">默认</el-tag>
+                  </el-option>
+                </el-select>
+                <div v-if="routeBlocked" style="color:#f56c6c;font-size:12px;line-height:1.4">{{ routeBlockMsg }}</div>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row>
             <el-col :span="12">
               <el-form-item label="印刷要求" prop="printingReq">
                 <el-input v-model="form.printingReq" placeholder="如1色满版黑印刷" />
@@ -93,10 +107,18 @@ import ExtAttrForm from '@/components/ExtAttrForm/index.vue'
 import { ElMessage } from 'element-plus'
 import { getItem } from '@/api/mes/md/item'
 import { getEffAttrSchema } from '@/api/mes/md/attr'
+import { listRouteProduct, resolveRouteProduct } from '@/api/mes/pro/routeproduct'
+import { listRoute } from '@/api/mes/pro/proroute'
 import type { SalOrderLine } from '@/types'
 import type { MdItemTypeAttr } from '@/types/api/mes/md/attr'
 
-const props = defineProps<{ modelValue: boolean; line: SalOrderLine | null }>()
+const props = defineProps<{
+  modelValue: boolean
+  line: SalOrderLine | null
+  orderType?: string
+  outsourceFlag?: string
+  packageFlag?: string
+}>()
 const emit = defineEmits<{
   'update:modelValue': [v: boolean]
   confirm: [line: SalOrderLine]
@@ -111,6 +133,9 @@ const extAttrFormRef = ref()
 const title = ref('新增明细行')
 const activeTab = ref('basic')
 const effAttrSchema = ref<MdItemTypeAttr[]>([])
+const routeOptions = ref<any[]>([])
+const routeBlocked = ref(false)
+const routeBlockMsg = ref('')
 const form = reactive<SalOrderLine>({})
 const rules = {
   productName: [{ required: true, message: '请选择产品', trigger: 'change' }],
@@ -125,10 +150,58 @@ function initForm() {
     lineId: null, productId: null, productCode: null, productName: null, productSpc: null,
     unitOfMeasure: null, unitName: null, quantity: undefined, unitPrice: undefined, lineAmount: undefined,
     spacing: null, productSize: null, printingReq: null, ropeSpec: null, packageReq: null,
-    shippingReq: null, requestDate: null, remark: null, lineAttrs: {}, lineNo: src?.lineNo
+    shippingReq: null, routeProductId: null, routeCode: null, routeName: null,
+    requestDate: null, remark: null, lineAttrs: {}, lineNo: src?.lineNo
   }, src || {})
   // 编辑已有行：若带产品，按产品分类拉 schema + 回填扩展属性
-  if (src?.productId) loadExtAttrsByProduct(src.productId, src.lineAttrs)
+  if (src?.productId) {
+    loadExtAttrsByProduct(src.productId, src.lineAttrs)
+    // 已有路线选择(自动带出或手选)时只拉候选不重算, 保留原选择
+    loadRouteOptions(!src.routeProductId)
+  }
+}
+
+/** 拉产品绑定的路线候选, 并按头维度预览默认路线 */
+async function loadRouteOptions(selectResolved = true) {
+  routeBlocked.value = false
+  routeBlockMsg.value = ''
+  if (!form.productId) { routeOptions.value = []; return }
+  const [bindRes, routeRes] = await Promise.all([
+    listRouteProduct({ itemId: form.productId, pageSize: 100 }),
+    listRoute({ pageSize: 1000 })
+  ])
+  const routeMap: Record<number, string> = {}
+  ;(routeRes.rows || []).forEach((rt: any) => { routeMap[rt.routeId] = rt.routeName || rt.routeCode })
+  routeOptions.value = (bindRes.rows || []).map((rp: any) => ({
+    ...rp, _routeName: routeMap[rp.routeId] || ('路线#' + rp.routeId)
+  }))
+  if (selectResolved) await applyResolvedRoute()
+}
+
+async function applyResolvedRoute() {
+  if (!form.productId) return
+  const r = await resolveRouteProduct({
+    itemId: form.productId, orderType: props.orderType,
+    outsourceFlag: props.outsourceFlag, packageFlag: props.packageFlag
+  })
+  const d = r.data || {}
+  if (d.hardBlocked) {
+    routeBlocked.value = true
+    routeBlockMsg.value = d.message || '该产品未配置含外发工序的工艺路线，请先在工艺路线主数据配置'
+    form.routeProductId = null
+    form.routeCode = null
+    form.routeName = null
+  } else if (d.matched && d.routeProductId) {
+    form.routeProductId = d.routeProductId
+    const hit = routeOptions.value.find((o: any) => o.recordId === d.routeProductId)
+    if (hit) { form.routeCode = hit.routeCode || null; form.routeName = hit._routeName || null }
+  }
+}
+
+function onRouteChange(recordId: number | undefined) {
+  const hit = routeOptions.value.find((o: any) => o.recordId === recordId)
+  form.routeCode = hit?.routeCode || null
+  form.routeName = hit?._routeName || null
 }
 
 /** 选物料后拉详情：取 extAttrs（物料扩展属性快照）+ 按分类拉 schema */
@@ -152,7 +225,10 @@ function onProductSelected(row: any) {
   form.productSpc = row.specification
   form.unitOfMeasure = row.unitOfMeasure
   form.unitName = row.unitName
-  if (row.itemId) loadExtAttrsByProduct(row.itemId)
+  if (row.itemId) {
+    loadExtAttrsByProduct(row.itemId)
+    loadRouteOptions(true)
+  }
 }
 function calcAmount() {
   if (form.unitPrice != null && form.quantity != null) {
@@ -161,6 +237,7 @@ function calcAmount() {
 }
 async function confirm() {
   if (!form.productName) { emit('update:modelValue', false); return }
+  if (routeBlocked.value) { ElMessage.error(routeBlockMsg.value || '外发路线未配置'); return }
   // 扩展属性必填校验
   if (extAttrFormRef.value) {
     try { await extAttrFormRef.value.validate() }

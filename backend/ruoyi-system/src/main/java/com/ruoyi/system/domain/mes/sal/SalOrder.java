@@ -27,7 +27,7 @@ public class SalOrder extends BaseEntity
     @Excel(name = "订单名称")
     private String orderName;
 
-    @Excel(name = "订单类型", readConverterExp = "NEW=新单,REPEAT=返单,STOCK=备货订单")
+    @Excel(name = "订单类型", readConverterExp = "STANDARD=标品,SMALL_BATCH=小批量,GIFT=礼品,STOCK=备货订单,PLATE=制版")
     private String orderType;
 
     @Excel(name = "客户编码")

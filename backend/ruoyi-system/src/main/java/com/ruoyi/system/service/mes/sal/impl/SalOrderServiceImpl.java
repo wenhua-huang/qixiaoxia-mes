@@ -16,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.ruoyi.common.core.redis.RedisLockTemplate;
 import com.ruoyi.common.enums.SalOrderStatus;
+import com.ruoyi.common.enums.SalOrderType;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
@@ -118,7 +119,7 @@ public class SalOrderServiceImpl implements ISalOrderService
         SalOrder order = req.getOrder();
         validateOrderCode(order);
         if (order.getStatus() == null) order.setStatus(SalOrderStatus.PREPARE.getCode());
-        if (order.getOrderType() == null) order.setOrderType("NEW");
+        if (order.getOrderType() == null) order.setOrderType(SalOrderType.STANDARD.getCode());
         if (order.getSampleFlag() == null) order.setSampleFlag("N");
         if (order.getSource() == null) order.setSource(SalConstants.SOURCE_DIRECT);
         order.setCreateBy(SecurityUtils.getUsername());
@@ -144,7 +145,7 @@ public class SalOrderServiceImpl implements ISalOrderService
         order.setOrderDate(req.getOrderDate() != null ? req.getOrderDate() : DateUtils.getNowDate());
         order.setRequestDate(req.getRequestDate());
         order.setRemark(req.getRemark());
-        order.setOrderType("NEW");
+        order.setOrderType(SalOrderType.STANDARD.getCode());
         order.setSampleFlag("N");
         // CRM 推单无 MES 内"提交"动作，到 MES 即待审核
         order.setStatus(SalOrderStatus.PENDING.getCode());
@@ -407,7 +408,7 @@ public class SalOrderServiceImpl implements ISalOrderService
         wo.setShippingReq(line.getShippingReq());
         // 扩展属性（分类驱动的动态属性）从销售明细继承到工单（深拷贝避免共享引用）
         wo.setLineAttrs(line.getLineAttrs() == null ? null : new java.util.HashMap<>(line.getLineAttrs()));
-        wo.setOrderType(StringUtils.isNotEmpty(order.getOrderType()) ? order.getOrderType() : "NEW");
+        wo.setOrderType(StringUtils.isNotEmpty(order.getOrderType()) ? order.getOrderType() : SalOrderType.STANDARD.getCode());
         wo.setRequestDate(req.getRequestDate() != null ? req.getRequestDate()
                 : (line.getRequestDate() != null ? line.getRequestDate() : order.getRequestDate()));
         wo.setRouteProductId(req.getRouteProductId());

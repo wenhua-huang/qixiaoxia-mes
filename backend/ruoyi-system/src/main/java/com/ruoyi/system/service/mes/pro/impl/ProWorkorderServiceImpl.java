@@ -17,6 +17,7 @@ import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.core.redis.RedisLockTemplate;
+import com.ruoyi.common.enums.SalOrderType;
 import com.ruoyi.common.enums.WmIssueConstants;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
@@ -631,7 +632,7 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         proWorkorder.setCreateBy(SecurityUtils.getUsername());
         if (proWorkorder.getStatus() == null) proWorkorder.setStatus("PREPARE");
         if (proWorkorder.getWorkorderType() == null) proWorkorder.setWorkorderType("SELF");
-        if (proWorkorder.getOrderType() == null) proWorkorder.setOrderType("NEW");
+        if (proWorkorder.getOrderType() == null) proWorkorder.setOrderType(SalOrderType.STANDARD.getCode());
         if (proWorkorder.getOrderSource() == null) proWorkorder.setOrderSource("MANUAL");
         return qxxProWorkorderMapper.insertProWorkorder(proWorkorder);
     }
@@ -1525,7 +1526,7 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         if (workorder.getWorkorderType() == null)
             workorder.setWorkorderType("SELF");
         if (workorder.getOrderType() == null)
-            workorder.setOrderType("NEW");
+            workorder.setOrderType(SalOrderType.STANDARD.getCode());
         if (workorder.getOrderSource() == null)
             workorder.setOrderSource("MANUAL");
 

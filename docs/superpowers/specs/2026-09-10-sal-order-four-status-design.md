@@ -122,9 +122,9 @@ UPDATE 的 WHERE 同时要求：
 
 Mapper 方法命名 `markShippedIfFullyDelivered(orderId)`，返回受影响行数：0 表示未发齐或状态不符，监听器不报错。
 
-## 5. 数据库迁移 V150
+## 5. 数据库迁移 V151
 
-新建 `backend/ruoyi-admin/src/main/resources/db/migration/V150__sal_order_four_status.sql`。Flyway 裸 JDBC，**所有 DML 显式 factory_id**；DML 需幂等（可重入）。
+新建 `backend/ruoyi-admin/src/main/resources/db/migration/V151__sal_order_four_status.sql`。Flyway 裸 JDBC，**所有 DML 显式 factory_id**；DML 需幂等（可重入）。
 
 1. 字典 `mes_sal_order_status`：
    - 停用 PREPARE、PENDING（`sys_dict_data.status='1'`），不删除（保留历史值可翻译）。
@@ -192,7 +192,7 @@ Mapper 方法命名 `markShippedIfFullyDelivered(orderId)`，返回受影响行�
   - 结单（原"关闭"改文案）：仅 SHIPPED 可见。
   - 取消：CONFIRMED、PRODUCING 可见。
 - 新增「生产进度」列：`el-progress :percentage="row.progressPercent"`，不返进度时按 0 展示；一律显示任务口径真实聚合值，不按状态特判（允许生产中直接发齐出货，故 SHIPPED 时进度可能未满 100）。
-- 新建表单默认 status 改 CONFIRMED（实际由后端落，前端仅占位）；状态筛选、tag 渲染已走字典，V150 后自动生效。
+- 新建表单默认 status 改 CONFIRMED（实际由后端落，前端仅占位）；状态筛选、tag 渲染已走字典，V151 后自动生效。
 
 ### 7.2 `src/views/mes/sal/order/detail.vue`
 
@@ -231,7 +231,7 @@ Mapper 方法命名 `markShippedIfFullyDelivered(orderId)`，返回受影响行�
 7. 剩余发齐 → SHIPPED；
 8. 人工结单 → CLOSED；
 9. 另一单：PRODUCING 途中取消 → CANCEL，再收开工/发货事件状态不变；
-10. V150 迁移校验：预置 PREPARE/PENDING 单，迁移后均 CONFIRMED；字典 5 个有效项齐全。
+10. V151 迁移校验：预置 PREPARE/PENDING 单，迁移后均 CONFIRMED；字典 5 个有效项齐全。
 
 ### 8.3 实测红线（AGENTS.md，不可跳过）
 
@@ -247,13 +247,13 @@ Mapper 方法命名 `markShippedIfFullyDelivered(orderId)`，返回受影响行�
 | 一张订单多张出库单，误把"出库单发齐"当"订单发齐" | 只在出库单 SHIPPED 时发事件，是否转 SHIPPED 由 sal 侧订单维度 NOT EXISTS 重算（4.3），两层判定 |
 | 取消订单后关联出库/工单数据悬挂 | 取消前置态仅 CONFIRMED/PRODUCING（SHIPPED 后不可取消）；不级联，提示用户另行处理工单；出库选单只列 CONFIRMED/PRODUCING，CANCEL 单无法再建出库 |
 | 进度用任务数量口径跨工序重复计数质疑 | 该字段仅作"工序平均完工率"展示，命名/文档明确不是产量；产量口径仍以工单 quantity_produced 为准；分子分母同时包含全部任务，加权后语义自洽，全部任务完成恰为 100% |
-| V150 刷存量 PENDING 单"绕过审核" | 审核流已废弃，在途单无审核入口；刷为 CONFIRMED 是唯一可继续业务的选择，上线说明中注明 |
+| V151 刷存量 PENDING 单"绕过审核" | 审核流已废弃，在途单无审核入口；刷为 CONFIRMED 是唯一可继续业务的选择，上线说明中注明 |
 
 ## 10. 影响文件一览
 
 **新增**
 
-- `V150__sal_order_four_status.sql`
+- `V151__sal_order_four_status.sql`
 - `event/mes/WorkorderStartedEvent.java`、`event/mes/SalesShipmentCompletedEvent.java`
 - `service/mes/sal/.../SalOrderLifecycleListener.java`（+ 单测）
 - 后端：发齐判定/进度聚合 Mapper 方法与 XML

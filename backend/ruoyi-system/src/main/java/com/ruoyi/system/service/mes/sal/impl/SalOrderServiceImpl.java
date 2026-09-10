@@ -195,6 +195,10 @@ public class SalOrderServiceImpl implements ISalOrderService
             throw new ServiceException("仅已确认(CONFIRMED)订单可修改,生产中已派生工单不可改,如需调整请取消后重建");
         }
         order.setStatus(existing.getStatus()); // 状态不允许经编辑接口篡改
+        // 审核历史列为留存字段,不允许经编辑接口覆写,强制以库中值为准
+        order.setApproveBy(existing.getApproveBy());
+        order.setApproveTime(existing.getApproveTime());
+        order.setApproveRemark(existing.getApproveRemark());
         order.setUpdateBy(SecurityUtils.getUsername());
         order.setUpdateTime(DateUtils.getNowDate());
         salOrderMapper.updateSalOrder(order);

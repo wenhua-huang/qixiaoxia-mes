@@ -15,7 +15,7 @@ public interface SalOrderMapper
     public SalOrder selectSalOrderByOrderCode(String orderCode);
     public SalOrder checkOrderCodeUnique(SalOrder salOrder);
     public List<SalOrder> selectSalOrderList(SalOrder salOrder);
-    /** 工单选择器用:查已确认且未关闭/取消的订单 */
+    /** 工单选择器用:查已确认/生产中两态（CONFIRMED/PRODUCING）可转订单 */
     public List<SalOrder> selectSalOrderAllConvertible();
     public int insertSalOrder(SalOrder salOrder);
     public int updateSalOrder(SalOrder salOrder);

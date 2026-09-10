@@ -249,6 +249,47 @@ class SalOrderServiceImplTest
         assertThat(result.getWorkorderId()).isEqualTo(99L);
     }
 
+    @Test
+    @DisplayName("toWorkorder - PRODUCING 同样可转:正常建工单并回填来源")
+    void toWorkorder_producing_ok()
+    {
+        SalOrderLine line = buildLine(20L, 2L, new BigDecimal("100"));
+        line.setProductId(4L);
+        line.setProductCode("P004");
+        line.setProductName("纸袋");
+        when(salOrderLineMapper.selectSalOrderLineByLineId(20L)).thenReturn(line);
+        SalOrder order = buildOrder(2L, "SO002", "PRODUCING");
+        order.setClientId(5L);
+        order.setClientCode("C005");
+        order.setClientName("客户");
+        order.setClientOrderCode("PO2");
+        when(salOrderMapper.selectSalOrderByOrderId(2L)).thenReturn(order);
+        when(salOrderLineMapper.sumProducedQtyByLineId(20L)).thenReturn(BigDecimal.ZERO);
+        when(proWorkorderService.createWorkorderWithBom(any(), any(), any())).thenAnswer(inv -> {
+            ProWorkorder wo = inv.getArgument(0);
+            wo.setWorkorderId(98L);
+            return wo;
+        });
+
+        SalOrderToWorkorderRequest req = new SalOrderToWorkorderRequest();
+        req.setLineId(20L);
+        req.setQuantity(new BigDecimal("50"));
+        req.setWorkorderCode("WO002");
+
+        ProWorkorder result = salOrderService.toWorkorder(req);
+
+        ArgumentCaptor<ProWorkorder> captor = ArgumentCaptor.forClass(ProWorkorder.class);
+        verify(proWorkorderService, times(1)).createWorkorderWithBom(captor.capture(), any(), any());
+        ProWorkorder wo = captor.getValue();
+        assertThat(wo.getOrderSource()).isEqualTo("SALES_ORDER");
+        assertThat(wo.getSourceCode()).isEqualTo("SO002");
+        assertThat(wo.getSalesOrderLineId()).isEqualTo(20L);
+        assertThat(wo.getQuantity()).isEqualByComparingTo("50");
+        assertThat(wo.getClientId()).isEqualTo(5L);
+        assertThat(wo.getProductId()).isEqualTo(4L);
+        assertThat(result.getWorkorderId()).isEqualTo(98L);
+    }
+
     // ============ 测试数据构造 ============
     private SalOrder buildOrder(Long id, String code, String status)
     {

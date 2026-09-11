@@ -114,13 +114,17 @@ UPDATE 的 WHERE 同时要求：
 
 1. `id = #{orderId}` 且 `status IN ('CONFIRMED','PRODUCING')`；
 2. NOT EXISTS 任一订单行未发齐：不存在满足下式的订单行——
-   `行订单量 > 该行在全部非取消出库单上的累计发运明细量`
+   `行订单量 > 该行在全部非取消出库单上的累计已发运箱量（b.status='SHIPPED'）`
 
-聚合路径：`sal_order_line l LEFT JOIN wm_product_sales s ON s.sales_order_id = o.id AND s.status != 'CANCEL' LEFT JOIN wm_product_sales_line sl ON sl.sales_id = s.sales_id AND sl.sales_order_line_id = l.line_id LEFT JOIN wm_product_sales_detail d ON d.line_id = sl.line_id`，按 l.line_id 汇总 `COALESCE(SUM(d.quantity),0)`，与 `l.quantity` 比较。
+聚合路径（实现口径，2026-09-11 订正）：子查询按订单行汇总**已发运箱量**——
+`wm_product_sales s INNER JOIN wm_product_sales_line sl ON sl.sales_id=s.sales_id AND sl.factory_id=s.factory_id INNER JOIN wm_product_sales_box b ON b.line_id=sl.line_id AND b.factory_id=sl.factory_id AND b.status='SHIPPED' WHERE s.sales_order_id=#{orderId} AND s.status<>'CANCELED' GROUP BY sl.sales_order_line_id` 得 `SUM(b.quantity)`；
+外层 `sal_order_line l LEFT JOIN 该子查询 x ON x.sol_id=l.line_id`，判 `l.quantity > COALESCE(x.shipped_qty,0)`。
 
-数量口径与出库单 header 现有 shippedQuantity 推导一致（发运明细 quantity 累加）。SQL 须带 factory_id 条件（拦截器注入参数值，XML 写 `<if>` 条件；本接口由已登录用户事件链路触发，拦截器生效）。
+口径说明：以**箱（box）为发运事实表**而非出库行/明细——只有装箱并随发运单置为 SHIPPED 的箱才算真实出货，与 wm 出库侧 `updateHeaderAfterShip` 仅在箱回写 SHIPPED 后发事件的时点一致；同一订单行跨多张出库单的箱量累计比较，故"出库单发齐 ≠ 订单发齐"。出库行 quantity_sales 只是计划量，不作数。
 
-Mapper 方法命名 `markShippedIfFullyDelivered(orderId)`，返回受影响行数：0 表示未发齐或状态不符，监听器不报错。
+SQL 显式写全所有表的 factory_id 等值条件并标 `@SkipFactoryId`（监听器以 REQUIRES_NEW 独立事务执行，事件载荷携带 factoryId，不依赖线程参数注入，口径更显式）。
+
+Mapper 方法 `markShippedIfFullyDelivered(orderId, factoryId, updateBy, updateTime)`，返回受影响行数：0 表示未发齐或状态不符，监听器不报错。
 
 ## 5. 数据库迁移 V151
 
@@ -218,9 +222,13 @@ Mapper 方法命名 `markShippedIfFullyDelivered(orderId)`，返回受影响行�
 - 报工回归：扩 `ProFeedbackServiceUnitTest`，断言审核链路不调用任何 SalOrder 更新（当前本就不调用，固化防线）。
 - 进度算法：纯 SQL 聚合放集成测试验证；若抽出计算工具方法则单测加权/封顶/零分母/排 CANCEL。
 
-### 8.2 集成测试（Testcontainers，扩 SalOrderIT）
+### 8.2 集成测试（Testcontainers，重写 SalOrderIT）
 
-主链路（核心验收）：
+**测试分层（实现实际形态，2026-09-11 订正）**：IT 只负责"状态机 + 聚合 SQL + 事件链路"的端到端正确性——任务进度以直插 `qxx_pro_task.quantity_produced` 模拟（两道任务分母恒 200，经真实 `/list?includeProgress=true` 读聚合值断言 0→25→50→50→100），不走报工审核接口。"报工不改订单状态"这一 D1 反面约束由两道更轻的防线固化：① 架构防线——监听器只订阅 WorkorderStarted / SalesShipmentCompleted 两个事件，报工链路无任何事件出口；② 单测防线——ProFeedbackServiceUnitTest 反射断言反馈服务不依赖 `com.ruoyi.system.**.mes.sal.**` 任何类型。发运事件由测试在真实事务内 publish，触发的是真实 markShippedIfFullyDelivered 5 表 SQL，故部分发货/发齐判定为真端到端。
+
+落地为 3 个用例：主链路四态 + 进度递增；PRODUCING 中取消后重复开工事件幂等 noop；门控（超转/PRODUCING 结单/删除均 500）。上列第 5 步（工单完工仍 PRODUCING）由"进度 100% 时状态仍 PRODUCING"断言覆盖；第 10 步（V151 迁移）由迁移在 IT 容器内真实执行（Flyway repair + migrate 成功即建表/字典 DDL 有效）与 Task 1 单测覆盖，不另设数据预置用例。
+
+主链路（核心验收点对照）：
 
 1. 建单 → CONFIRMED，进度 0；
 2. 转工单（多工序工艺路线）→ 仍 CONFIRMED，进度 0；

@@ -506,8 +506,9 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
         {
             QcIpqc latest = latestIpqcByPair.get(
                     pairKey(task.getWorkorderId(), checkNode.getProcessId()));
-            boolean released = releaseKeys.contains(latest == null ? null
-                    : latest.getIpqcId() + ":" + taskId);
+            // Set.of() 不接受 contains(null)：无判定单即未放行，短路掉
+            boolean released = latest != null
+                    && releaseKeys.contains(latest.getIpqcId() + ":" + taskId);
             if (latest != null && QcConstants.RESULT_FAIL.equals(latest.getCheckResult()) && !released)
             {
                 block = buildBlockInfo(latest, checkNode);

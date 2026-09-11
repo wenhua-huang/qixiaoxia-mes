@@ -508,4 +508,23 @@ class ProQcBlockServiceImplTest {
         // PASS 单不查放行记录
         verify(blockReleaseMapper, never()).selectByIpqcIds(anyCollection());
     }
+
+    @Test
+    @DisplayName("11d. qcBlockState：检验前驱无任何判定单时不 NPE（Set.of 不容忍 contains(null)），返回未拦截")
+    void should_not_npe_when_no_ipqc_for_check_node() {
+        when(proTaskMapper.selectProTaskByTaskIds(anyCollection()))
+                .thenReturn(List.of(targetTask("PRODUCING")));
+        when(flow.nodes(ROUTE_ID)).thenReturn(List.of(checkNode()));
+        when(flow.prevCheckNode(anyList(), eq(TARGET_PROCESS_ID)))
+                .thenReturn(Optional.of(checkNode()));
+        // 该（工单,检验工序）从未质检：空结果，loadReleaseKeys 得到 Set.of()
+        when(qcIpqcMapper.selectLatestCompletedByProcessPairs(anyList()))
+                .thenReturn(List.of());
+
+        Map<String, Map<String, Object>> state = service.qcBlockState(List.of(TASK_ID));
+
+        assertThat(state.get(String.valueOf(TASK_ID)).get("blocked")).isEqualTo(false);
+        assertThat(state.get(String.valueOf(TASK_ID)).get("reason")).isNull();
+        verify(blockReleaseMapper, never()).selectByIpqcIds(anyCollection());
+    }
 }

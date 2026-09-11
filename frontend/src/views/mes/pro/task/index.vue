@@ -206,13 +206,15 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 跟单质检不合格放行 -->
+    <QcReleaseDialog ref="qcReleaseRef" @success="getList" />
   </div>
 </template>
 
 <script setup lang="ts" name="ProSchedule">
 import { ref, reactive, toRefs, getCurrentInstance } from 'vue'
-import { ElMessageBox } from 'element-plus'
-import { listTask, getTask, delTask, addTask, updateTask, dispatchTask, completeTask, cancelTask, releaseQcBlock, getQcBlockState } from '@/api/mes/pro/task'
+import { listTask, getTask, delTask, addTask, updateTask, dispatchTask, completeTask, cancelTask, getQcBlockState } from '@/api/mes/pro/task'
 import { listWorkorder, getWorkorder } from '@/api/mes/pro/workorder'
 import { listAllProcess } from '@/api/mes/pro/process'
 import { listRouteProcessByRouteId } from '@/api/mes/pro/routeprocess'
@@ -220,6 +222,7 @@ import { listRouteProduct } from '@/api/mes/pro/routeproduct'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import WorkstationSelect from '@/components/workstationSelect/single.vue'
 import workorderSelect from '@/components/workorderSelect/single.vue'
+import QcReleaseDialog from './components/QcReleaseDialog.vue'
 
 const { proxy } = getCurrentInstance() as any
 
@@ -249,8 +252,8 @@ const statusColor: Record<string, string> = {
 
 // 跟单质检锁态：list 接口不富化，列表加载后对本页 PRODUCING 任务批量查询
 const QC_STATE_BATCH = 100  // 后端单次最多 100 个任务
-const RELEASE_REASON_MAX_LEN = 500
 const qcBlockMap = ref<Record<string, { blocked: boolean; reason: string | null }>>({})
+const qcReleaseRef = ref<InstanceType<typeof QcReleaseDialog>>()
 function isQcBlocked(row: any) {
   return !!qcBlockMap.value[String(row.taskId)]?.blocked
 }
@@ -267,27 +270,7 @@ function loadQcBlockStates(rows: any[]) {
     .catch(() => { qcBlockMap.value = {} })
 }
 function handleReleaseQcBlock(row: any) {
-  const state = qcBlockMap.value[String(row.taskId)]
-  ElMessageBox.prompt(state?.reason
-    ? `${state.reason}\n\n请填写放行理由（必填，2~${RELEASE_REASON_MAX_LEN}字）`
-    : `该工序被跟单质检不合格拦截，请填写放行理由（必填，2~${RELEASE_REASON_MAX_LEN}字）`,
-    `质检放行 · ${row.processName || row.taskCode}`, {
-    confirmButtonText: '确认放行',
-    cancelButtonText: '取消',
-    type: 'warning',
-    inputType: 'textarea',
-    inputProps: { maxlength: RELEASE_REASON_MAX_LEN, showWordLimit: true, rows: 3 },
-    inputValidator: (val: string) => {
-      const len = (val || '').trim().length
-      return (len >= 2 && len <= RELEASE_REASON_MAX_LEN)
-        || `放行理由需 2~${RELEASE_REASON_MAX_LEN} 个字`
-    }
-  }).then(({ value }: { value: string }) => {
-    return releaseQcBlock(row.taskId, value.trim())
-  }).then(() => {
-    proxy.$modal.msgSuccess('已放行')
-    getList()
-  }).catch(() => {})
+  qcReleaseRef.value?.open(row, qcBlockMap.value[String(row.taskId)]?.reason || null)
 }
 
 const data = reactive({

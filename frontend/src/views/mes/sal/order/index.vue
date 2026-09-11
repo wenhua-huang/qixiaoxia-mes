@@ -51,8 +51,7 @@
       <el-table-column label="总金额" align="center" prop="totalAmount" width="100" />
       <el-table-column label="生产进度" align="center" width="150">
         <template #default="s">
-          <el-progress :percentage="Number(s.row.progressPercent || 0)" :stroke-width="10"
-            :status="s.row.status==='CLOSED' || s.row.status==='CANCEL' ? 'exception' : (Number(s.row.progressPercent || 0) >= 100 ? 'success' : '')" />
+          <el-progress :percentage="progressBar(s.row).percentage" :stroke-width="10" :status="progressBar(s.row).status" />
         </template>
       </el-table-column>
       <el-table-column label="状态" align="center" prop="status" width="90"><template #default="s"><el-tag :type="statusMeta(s.row.status).type">{{ statusMeta(s.row.status).text }}</el-tag></template></el-table-column>
@@ -274,6 +273,9 @@ import { listUser } from '@/api/system/user'
 import ClientSelect from '@/components/clientSelect/single.vue'
 import LineEdit from './LineEdit.vue'
 
+// 进度满格阈值（百分比）；CLOSED/CANCEL 由进度条 exception 态标识
+const PROGRESS_FULL = 100
+
 export default {
   name: 'SalOrder',
   components: { ClientSelect, LineEdit },
@@ -306,6 +308,12 @@ export default {
   },
   created() { this.loadUserOptions(); this.loadStatusDict(); this.loadOrderTypeDict(); this.getList() },
   methods: {
+    /** 进度条展示模型：百分比兜底 0；CLOSED/CANCEL 走 exception，满进度走 success */
+    progressBar(row) {
+      const percentage = Number(row.progressPercent || 0)
+      const terminated = row.status === 'CLOSED' || row.status === 'CANCEL'
+      return { percentage, status: terminated ? 'exception' : percentage >= PROGRESS_FULL ? 'success' : '' }
+    },
     /** 业务员下拉数据源：按展示名去重(重复 value 会导致 el-select 的 filterable 过滤失效) */
     loadUserOptions() {
       listUser({ pageSize: 999 }).then(r => {

@@ -89,11 +89,29 @@ describe('SalOrder index.vue', () => {
     ], total: 1 })
     const wrapper = mount(SalOrder, { global: globalStubs })
     await nextTick(); await nextTick()
+    const bar = wrapper.findComponent({ name: 'ElProgress' })
+    expect(bar.exists()).toBe(true)
+    expect(bar.props('percentage')).toBe(40)  // 真实进度绑定，非文本巧合
+    expect(bar.props('status')).toBe('')
     const html = wrapper.html()
-    expect(html).toContain('40')              // 进度
+    expect(html).toMatch(/\b40%/)
     expect(html).not.toContain('提交审核')
     expect(html).not.toContain('审核通过')
     expect(html).toContain('生成工单')        // PRODUCING 可追加转单
+  })
+
+  it('已结单订单进度条走 exception 态且不渲染任何流转操作', async () => {
+    mockListOrder.mockResolvedValue({ rows: [
+      { orderId: 3, orderCode: 'SO003', orderName: 'x', clientName: 'c', status: 'CLOSED', progressPercent: 100 }
+    ], total: 1 })
+    const wrapper = mount(SalOrder, { global: globalStubs })
+    await nextTick(); await nextTick()
+    expect(wrapper.findComponent({ name: 'ElProgress' }).props('status')).toBe('exception')
+    const actionText = wrapper.findAll('tbody tr')[0]?.text() || ''
+    expect(actionText).not.toContain('生成工单')
+    expect(actionText).not.toContain('结单')
+    expect(actionText).not.toContain('取消')
+    expect(actionText).toContain('查看')
   })
 
   it('已出货订单显示结单按钮，不显示取消', async () => {

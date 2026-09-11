@@ -365,6 +365,28 @@ class ProQcBlockServiceImplTest {
     }
 
     @Test
+    @DisplayName("9c. onIpqcFailed：App 手工单无 taskId/routeId 时按工单+检验工序任务反查路线")
+    void should_resolve_route_via_workorder_when_ipqc_has_no_task() {
+        QcIpqc failed = ipqc("FAIL");   // routeId/taskId 均为 null，仅 workorderId+processId
+        ProRouteProcess targetNode = new ProRouteProcess();
+        targetNode.setProcessId(TARGET_PROCESS_ID);
+        targetNode.setProcessName(TARGET_PROCESS_NAME);
+        targetNode.setOrderNum(2);
+        ProTask checkTask = targetTask("PRODUCING");
+        checkTask.setProcessId(CHECK_PROCESS_ID);  // 同工单同检验工序的任务携带 routeId
+        when(proTaskMapper.selectProTaskList(any(ProTask.class)))
+                .thenReturn(List.of(checkTask), List.of(checkTask));
+        when(flow.nextWave(ROUTE_ID, CHECK_PROCESS_ID)).thenReturn(List.of(targetNode));
+        when(sysTodoListMapper.selectPendingByDocAndCode(eq("IPQC"), eq(IPQC_ID), anyString()))
+                .thenReturn(null);
+
+        List<String> names = service.onIpqcFailed(failed);
+
+        assertThat(names).containsExactly(TARGET_PROCESS_NAME);
+        verify(sysTodoListMapper).insertSysTodoList(any(SysTodoList.class));
+    }
+
+    @Test
     @DisplayName("10. onIpqcFailed：下一波无任务时仍返回工序名（供检验页提示）")
     void should_return_process_names_even_without_tasks() {
         QcIpqc failed = ipqc("FAIL");

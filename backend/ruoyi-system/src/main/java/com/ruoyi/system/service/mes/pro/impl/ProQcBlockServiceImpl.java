@@ -284,7 +284,10 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
                 .stream().collect(java.util.stream.Collectors.toList());
     }
 
-    /** 解析下一波并行工序；IPQC 头不存 route_id，缺路由任务反查（成品入库检等无任务场景返回空波） */
+    /**
+     * 解析下一波并行工序；IPQC 头不存 route_id，按 检验单任务 → 同工单同检验工序任务 反查
+     * （App 手工建单只带 workorderId+processId+cardId 不带 taskId；成品入库检等都查不到时返回空波）
+     */
     private List<ProRouteProcess> resolveNextWave(QcIpqc ipqc)
     {
         if (ipqc == null || ipqc.getProcessId() == null)
@@ -296,6 +299,15 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
         {
             ProTask sourceTask = proTaskMapper.selectProTaskByTaskId(ipqc.getTaskId());
             routeId = sourceTask == null ? null : sourceTask.getRouteId();
+        }
+        if (routeId == null && ipqc.getWorkorderId() != null)
+        {
+            ProTask query = new ProTask();
+            query.setWorkorderId(ipqc.getWorkorderId());
+            query.setProcessId(ipqc.getProcessId());
+            routeId = proTaskMapper.selectProTaskList(query).stream()
+                    .map(ProTask::getRouteId).filter(java.util.Objects::nonNull)
+                    .findFirst().orElse(null);
         }
         if (routeId == null)
         {
@@ -373,8 +385,10 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
 
     private String buildBlockTodoTitle(QcIpqc ipqc, ProTask task, ProRouteProcess node)
     {
+        String workorderCode = ipqc.getWorkorderCode() != null
+                ? ipqc.getWorkorderCode() : task.getWorkorderCode();
         String processName = task.getProcessName() != null ? task.getProcessName() : node.getProcessName();
-        return "质检不合格拦截：" + ipqc.getWorkorderCode() + "-" + processName + " 待放行/处理";
+        return "质检不合格拦截：" + workorderCode + "-" + processName + " 待放行/处理";
     }
 
     @Override

@@ -31,7 +31,7 @@
     <el-row :gutter="10" class="mb8">
       <el-col :span="1.5"><el-button type="primary" plain size="small" @click="handleAdd" v-hasPermi="['mes:sal:order:add']">新增</el-button></el-col>
       <el-col :span="1.5"><el-button type="success" plain size="small" :disabled="single || !canEditSelected" @click="handleUpdate" v-hasPermi="['mes:sal:order:edit']">修改</el-button></el-col>
-      <el-col :span="1.5"><el-button type="danger" plain size="small" :disabled="multiple" @click="handleDelete" v-hasPermi="['mes:sal:order:remove']">删除</el-button></el-col>
+      <el-col :span="1.5"><el-button type="danger" plain size="small" :disabled="multiple || !canDeleteSelected" @click="handleDelete" v-hasPermi="['mes:sal:order:remove']">删除</el-button></el-col>
       <el-col :span="1.5"><el-button type="warning" plain size="small" @click="handleExport" v-hasPermi="['mes:sal:order:export']">导出</el-button></el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
@@ -58,11 +58,11 @@
       <el-table-column label="操作" align="center" width="360" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="View" @click="handleView(scope.row)">查看</el-button>
-          <el-button v-if="scope.row.status==='CONFIRMED'" link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:sal:order:edit']">改</el-button>
+          <el-button v-if="scope.row.status==='CONFIRMED' && !hasWorkorder(scope.row)" link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:sal:order:edit']">改</el-button>
           <el-button v-if="scope.row.status==='CONFIRMED' || scope.row.status==='PRODUCING'" link type="warning" size="small" @click="handleToWorkorder(scope.row)" v-hasPermi="['mes:sal:order:workorder']">生成工单</el-button>
           <el-button v-if="scope.row.status==='SHIPPED'" link type="success" size="small" @click="handleClose(scope.row)" v-hasPermi="['mes:sal:order:edit']">结单</el-button>
           <el-button v-if="scope.row.status==='CONFIRMED' || scope.row.status==='PRODUCING'" link type="danger" size="small" @click="handleCancel(scope.row)" v-hasPermi="['mes:sal:order:edit']">取消</el-button>
-          <el-button v-if="scope.row.status==='CONFIRMED'" link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:sal:order:remove']"></el-button>
+          <el-button v-if="scope.row.status==='CONFIRMED' && !hasWorkorder(scope.row)" link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:sal:order:remove']"></el-button>
           <el-dropdown @command="(cmd) => handleRowExport(scope.row, cmd)" v-hasPermi="['mes:sal:order:exportDetail']">
             <el-button link type="primary" size="small">导出<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
             <template #dropdown>
@@ -314,6 +314,8 @@ export default {
       const terminated = row.status === 'CLOSED' || row.status === 'CANCEL'
       return { percentage, status: terminated ? 'exception' : percentage >= PROGRESS_FULL ? 'success' : '' }
     },
+    /** 已派生未取消工单（含未开工）：改/删必须隐藏，后端闸门同样拦截 */
+    hasWorkorder(row) { return Number(row.workorderCount || 0) > 0 },
     /** 业务员下拉数据源：按展示名去重(重复 value 会导致 el-select 的 filterable 过滤失效) */
     loadUserOptions() {
       listUser({ pageSize: 999 }).then(r => {
@@ -489,8 +491,10 @@ export default {
     }
   },
   computed: {
-    /** 顶部「修改」仅当选中行均为已确认(CONFIRMED)才可用 */
-    canEditSelected() { return this.selectedRows.length > 0 && this.selectedRows.every(r => r.status === 'CONFIRMED') },
+    /** 顶部「修改」：选中行均 CONFIRMED 且均未派生工单（含未开工）才可用 */
+    canEditSelected() { return this.selectedRows.length > 0 && this.selectedRows.every(r => r.status === 'CONFIRMED' && !this.hasWorkorder(r)) },
+    /** 顶部「删除」：同修改口径，CONFIRMED 且未派生工单 */
+    canDeleteSelected() { return this.selectedRows.length > 0 && this.selectedRows.every(r => r.status === 'CONFIRMED' && !this.hasWorkorder(r)) },
     twProcessGroupList() {
       const procs = this.twRouteProcesses
       return procs.map(p => ({

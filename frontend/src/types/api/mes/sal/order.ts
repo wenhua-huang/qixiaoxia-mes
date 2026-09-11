@@ -44,6 +44,8 @@ export interface SalOrder extends BaseEntity {
   status?: SalOrderStatus;
   /** 生产进度百分比（includeProgress=true 时后端返回，0-100） */
   progressPercent?: number;
+  /** 已派生未取消工单数（includeProgress=true 时后端返回；>0 时改/删隐藏） */
+  workorderCount?: number;
   /** @deprecated 审核流已废弃，历史数据 */
   approveBy?: string;
   /** @deprecated 审核流已废弃，历史数据 */

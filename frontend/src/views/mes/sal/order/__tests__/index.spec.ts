@@ -114,6 +114,22 @@ describe('SalOrder index.vue', () => {
     expect(actionText).toContain('查看')
   })
 
+  it('CONFIRMED 但已派生工单（未开工）时隐藏改/删除，仍可追加转单', async () => {
+    mockListOrder.mockResolvedValue({ rows: [
+      { orderId: 4, orderCode: 'SO004', orderName: 'x', clientName: 'c', status: 'CONFIRMED', progressPercent: 0, workorderCount: 1 }
+    ], total: 1 })
+    const wrapper = mount(SalOrder, { global: globalStubs })
+    await nextTick(); await nextTick()
+    const row = wrapper.findAll('tbody tr')[0]!
+    const btnTexts = row.findAll('button').map(b => b.text().trim())
+    expect(btnTexts).toContain('查看')
+    expect(btnTexts).toContain('生成工单')
+    expect(btnTexts).not.toContain('改')
+    expect(btnTexts).not.toContain('结单')
+    // 删除图标按钮是行内唯一无文本按钮：不应出现
+    expect(btnTexts.filter(t => t === '')).toHaveLength(0)
+  })
+
   it('已出货订单显示结单按钮，不显示取消', async () => {
     mockListOrder.mockResolvedValue({ rows: [
       { orderId: 2, orderCode: 'SO002', orderName: 'x', clientName: 'c', status: 'SHIPPED', progressPercent: 100 }

@@ -1508,6 +1508,8 @@ CREATE TABLE IF NOT EXISTS `qxx_pro_workorder_param` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
+-- 对齐 V65 重建后的生产结构（V64/V65 在测试 baseline=136 之下不重放）；
+-- V142 再在其上补 team_id/team_code/team_name 并建 (clock_in_time, team_id) 索引。
 CREATE TABLE IF NOT EXISTS `qxx_pro_workrecord` (
   `record_id` bigint NOT NULL AUTO_INCREMENT COMMENT '记录ID',
   `factory_id` bigint NOT NULL COMMENT '工厂ID(关联qxx_md_factory)',
@@ -1517,18 +1519,25 @@ CREATE TABLE IF NOT EXISTS `qxx_pro_workrecord` (
   `workstation_id` bigint NOT NULL COMMENT '工作站ID(关联qxx_md_workstation)',
   `workstation_code` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '工作站编码',
   `workstation_name` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '工作站名称',
-  `task_id` bigint DEFAULT NULL COMMENT '生产任务ID(关联qxx_pro_task)',
+  `workorder_id` bigint DEFAULT NULL COMMENT '生产工单ID(关联qxx_pro_workorder,可选)',
+  `workorder_code` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '生产工单编码',
+  `task_id` bigint DEFAULT NULL COMMENT '生产任务ID(关联qxx_pro_task,可选)',
   `task_code` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '生产任务编码',
-  `operation_flag` char(1) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '操作类型:ON-上工,OFF-下工',
-  `operation_time` datetime DEFAULT NULL COMMENT '操作时间',
+  `process_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '工序名称(冗余便于展示)',
+  `clock_in_time` datetime NOT NULL COMMENT '上工时间',
+  `clock_out_time` datetime DEFAULT NULL COMMENT '下工时间(下工结算时填)',
+  `work_duration` int DEFAULT '0' COMMENT '工作时长(分钟,下工时计算=下工时间-上工时间)',
+  `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'ACTIVE' COMMENT '会话状态:ACTIVE-在岗,CLOSED-已下工',
   `remark` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '备注',
   `create_by` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '创建者',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_by` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '更新者',
   `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`record_id`),
-  KEY `idx_factory_id` (`factory_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='上下工记录表';
+  KEY `idx_factory_id` (`factory_id`),
+  KEY `idx_user_status` (`factory_id`,`user_id`,`status`),
+  KEY `idx_workstation` (`factory_id`,`workstation_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='上下工会话记录表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -3669,4 +3678,59 @@ CREATE TABLE IF NOT EXISTS `sys_user_role` (
   PRIMARY KEY (`user_id`,`role_id`,`factory_id`),
   KEY `idx_factory_id` (`factory_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='用户和角色关联表';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+-- qxx_wm_outsource_order: V100 建表迁移在测试 baseline(136) 之下被跳过，
+-- 此处按生产库当前形态（V100 + V104/V105/V109/V113 + V141）补建，
+-- 否则 V141 的幂等 ALTER 在 IT 容器里报 1146。
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `qxx_wm_outsource_order` (
+  `order_id` bigint NOT NULL AUTO_INCREMENT COMMENT '外协订单ID',
+  `factory_id` bigint NOT NULL COMMENT '工厂ID',
+  `outsource_factory_id` bigint DEFAULT NULL COMMENT '外协场景:供应商对应系统工厂ID',
+  `order_code` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '外协单编码(OUTSOURCE_CODE自动生成)',
+  `vendor_id` bigint NOT NULL COMMENT '外协厂商ID(qxx_md_vendor)',
+  `vendor_code` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '厂商编码',
+  `vendor_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '厂商名称',
+  `workorder_id` bigint DEFAULT NULL COMMENT '工单ID(可空,独立外协)',
+  `workorder_code` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '工单编码',
+  `card_id` bigint DEFAULT NULL COMMENT '流转卡ID(联动OUTSOURCING状态)',
+  `route_id` bigint DEFAULT NULL COMMENT '工艺路线ID(判断末工序)',
+  `process_id` bigint DEFAULT NULL COMMENT '外协工序ID',
+  `process_code` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '工序编码',
+  `process_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '工序名称',
+  `source_type` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT 'GENERIC' COMMENT '来源类型:GENERIC-通用,SLITTING-分切,PRINTING-印刷',
+  `source_ref_id` bigint DEFAULT NULL COMMENT '来源业务单ID(如slitting_record.slit_id)',
+  `status` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT 'DRAFT' COMMENT '状态:DRAFT-草稿,ISSUED-已发料,VENDOR_RCVD-厂商已签收,PROCESSING-加工中,FINISHED-已完工,SHIPPED-已发货,RECEIVED-已收货,CLOSED-已关闭',
+  `feedback_id` bigint DEFAULT NULL COMMENT '收货时建的报工ID',
+  `iqc_id` bigint DEFAULT NULL COMMENT '首条来料检验单ID',
+  `iqc_code` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '首条来料检验单号',
+  `issue_total_qty` decimal(14,4) DEFAULT '0.0000' COMMENT '发料总数量',
+  `recpt_total_qty` decimal(14,4) DEFAULT '0.0000' COMMENT '收货总数量',
+  `operator` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '发料操作人',
+  `issue_time` datetime DEFAULT NULL COMMENT '发料时间',
+  `vendor_receive_time` datetime DEFAULT NULL COMMENT '厂商签收时间',
+  `vendor_receiver` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '厂商签收人',
+  `finish_time` datetime DEFAULT NULL COMMENT '加工完成时间',
+  `finish_by` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '加工完成人',
+  `ship_time` datetime DEFAULT NULL COMMENT '厂商发货时间',
+  `ship_by` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '发货人',
+  `receive_time` datetime DEFAULT NULL COMMENT '收货时间',
+  `remark` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '备注',
+  `create_by` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '创建者',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '更新者',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`order_id`),
+  UNIQUE KEY `uk_order_code` (`order_code`),
+  UNIQUE KEY `uk_wo_process` (`workorder_id`,`process_id`),
+  KEY `idx_factory_id` (`factory_id`),
+  KEY `idx_outsource_factory_id` (`outsource_factory_id`),
+  KEY `idx_vendor` (`vendor_id`),
+  KEY `idx_workorder` (`workorder_id`),
+  KEY `idx_card` (`card_id`),
+  KEY `idx_status` (`status`),
+  KEY `idx_source` (`source_type`,`source_ref_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='通用外协订单头表';
 /*!40101 SET character_set_client = @saved_cs_client */;

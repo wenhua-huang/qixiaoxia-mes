@@ -487,4 +487,25 @@ class ProQcBlockServiceImplTest {
                 .hasMessageContaining("100");
         verifyNoInteractionsForGate();
     }
+
+    @Test
+    @DisplayName("11c. qcBlockState：同(工单,检验工序)返回多张判定单时取最新一张决定锁态")
+    void should_take_latest_ipqc_when_pair_returns_multiple() {
+        when(proTaskMapper.selectProTaskByTaskIds(anyCollection()))
+                .thenReturn(List.of(targetTask("PRODUCING")));
+        when(flow.nodes(ROUTE_ID)).thenReturn(List.of(checkNode()));
+        when(flow.prevCheckNode(anyList(), eq(TARGET_PROCESS_ID)))
+                .thenReturn(Optional.of(checkNode()));
+        // SQL 已按 ipqc_id 倒序：前面是更新的 PASS 单，应覆盖旧 FAIL
+        QcIpqc pass = ipqc("PASS");
+        pass.setIpqcId(IPQC_ID + 1);
+        when(qcIpqcMapper.selectLatestCompletedByProcessPairs(anyList()))
+                .thenReturn(List.of(pass, ipqc("FAIL")));
+
+        Map<String, Map<String, Object>> state = service.qcBlockState(List.of(TASK_ID));
+
+        assertThat(state.get(String.valueOf(TASK_ID)).get("blocked")).isEqualTo(false);
+        // PASS 单不查放行记录
+        verify(blockReleaseMapper, never()).selectByIpqcIds(anyCollection());
+    }
 }

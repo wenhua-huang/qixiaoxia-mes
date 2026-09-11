@@ -63,7 +63,11 @@ public class ProRouteFlowHelper {
         return prevNode(nodes(routeId), processId);
     }
 
-    /** 前驱节点（基于预载节点列表）：首道工序返回 empty */
+    /**
+     * 前驱节点（基于预载节点列表）：首道工序返回 empty。
+     * 一期限制：同 order_num 并行前驱只取一个（max 同序时随机一个），并行拓扑下
+     * 上机默认值只计单个前驱产出；待路线支持并行汇聚语义后改为前驱求和。
+     */
     public Optional<ProRouteProcess> prevNode(List<ProRouteProcess> nodes, Long processId) {
         Integer curOrder = currentOrder(nodes, processId);
         if (curOrder == null) {
@@ -83,7 +87,12 @@ public class ProRouteFlowHelper {
         return prevCheckNode(nodes(routeId), processId);
     }
 
-    /** 前驱中最近的检验节点（基于预载节点列表，批量富化场景按路线复用） */
+    /**
+     * 前驱中最近的检验节点（基于预载节点列表，批量富化场景按路线复用）。
+     * 一期限制：并行检验前驱只取 order_num 最大的一个，即跟单硬拦一期仅保证
+     * 串行/单检验前驱路线；存在同序并行检验工序时另一节点 FAIL 不会被发现，
+     * 待二期改为「任一检验前驱 FAIL 即拦」。
+     */
     public Optional<ProRouteProcess> prevCheckNode(List<ProRouteProcess> nodes, Long processId) {
         Integer curOrder = currentOrder(nodes, processId);
         if (curOrder == null) {

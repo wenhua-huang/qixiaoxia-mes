@@ -247,7 +247,9 @@ const statusColor: Record<string, string> = {
   PREPARE: '#E6A23C', NORMAL: '#409EFF', PRODUCING: '#67C23A', COMPLETED: '#909399', PAUSED: '#E6A23C', CANCEL: '#F56C6C'
 }
 
-// 跟单质检锁态：list 接口不富化，列表加载后对本页 PRODUCING 任务批量查询（≤100）
+// 跟单质检锁态：list 接口不富化，列表加载后对本页 PRODUCING 任务批量查询
+const QC_STATE_BATCH = 100  // 后端单次最多 100 个任务
+const RELEASE_REASON_MAX_LEN = 500
 const qcBlockMap = ref<Record<string, { blocked: boolean; reason: string | null }>>({})
 function isQcBlocked(row: any) {
   return !!qcBlockMap.value[String(row.taskId)]?.blocked
@@ -255,21 +257,31 @@ function isQcBlocked(row: any) {
 function loadQcBlockStates(rows: any[]) {
   const ids = rows.filter((r: any) => r.status === 'PRODUCING').map((r: any) => r.taskId)
   if (ids.length === 0) { qcBlockMap.value = {}; return }
-  getQcBlockState(ids).then((res: any) => {
-    qcBlockMap.value = res.data || {}
-  }).catch(() => { qcBlockMap.value = {} })
+  // 按 100 分批后合并，避免分页调大时超上限导致整页锁态静默丢失
+  const batches: number[][] = []
+  for (let i = 0; i < ids.length; i += QC_STATE_BATCH) batches.push(ids.slice(i, i + QC_STATE_BATCH))
+  Promise.all(batches.map(b => getQcBlockState(b)))
+    .then((results: any[]) => {
+      qcBlockMap.value = Object.assign({}, ...results.map(r => r.data || {}))
+    })
+    .catch(() => { qcBlockMap.value = {} })
 }
 function handleReleaseQcBlock(row: any) {
   const state = qcBlockMap.value[String(row.taskId)]
   ElMessageBox.prompt(state?.reason
-    ? `${state.reason}\n\n请填写放行理由（必填，至少2字）`
-    : '该工序被跟单质检不合格拦截，请填写放行理由（必填，至少2字）',
+    ? `${state.reason}\n\n请填写放行理由（必填，2~${RELEASE_REASON_MAX_LEN}字）`
+    : `该工序被跟单质检不合格拦截，请填写放行理由（必填，2~${RELEASE_REASON_MAX_LEN}字）`,
     `质检放行 · ${row.processName || row.taskCode}`, {
     confirmButtonText: '确认放行',
     cancelButtonText: '取消',
     type: 'warning',
     inputType: 'textarea',
-    inputValidator: (val: string) => (val || '').trim().length >= 2 || '放行理由至少2个字'
+    inputProps: { maxlength: RELEASE_REASON_MAX_LEN, showWordLimit: true, rows: 3 },
+    inputValidator: (val: string) => {
+      const len = (val || '').trim().length
+      return (len >= 2 && len <= RELEASE_REASON_MAX_LEN)
+        || `放行理由需 2~${RELEASE_REASON_MAX_LEN} 个字`
+    }
   }).then(({ value }: { value: string }) => {
     return releaseQcBlock(row.taskId, value.trim())
   }).then(() => {

@@ -46,12 +46,16 @@ export default {
       uni.showModal({
         title: '质检不合格放行',
         editable: true,
-        placeholderText: '请填写放行理由（必填，至少2字）',
+        placeholderText: '请填写放行理由（必填，2~500字）',
         success: (res) => {
           if (!res.confirm) return
           const reason = (res.content || '').trim()
           if (reason.length < 2) {
             uni.showToast({ title: '请填写放行理由（至少2字）', icon: 'none' })
+            return
+          }
+          if (reason.length > 500) {
+            uni.showToast({ title: '放行理由不能超过500字', icon: 'none' })
             return
           }
           this.doRelease(reason)

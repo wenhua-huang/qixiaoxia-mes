@@ -122,7 +122,7 @@ public class ProFeedbackController extends BaseController
         {
             return error("任务不存在");
         }
-        defaultsApplier.apply(task, null);
+        defaultsApplier.apply(task);
         return success(task.getDefaultQuantityInput());
     }
 

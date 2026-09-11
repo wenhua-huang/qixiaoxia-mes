@@ -359,8 +359,8 @@ public class ProWorkorderController extends BaseController
                 .filter(t -> ProConstants.WS_CODE_VENDOR.equals(t.getWorkstationCode()))
                 .collect(Collectors.toList());
         fillPendingFeedbackCount(allTasks);
-        // 工单维度报工入口：富化上机数量默认值（cardId 传 null）
-        defaultsApplier.apply(reportableTasks, null);
+        // 工单维度报工入口：富化上机数量默认值与质检锁态
+        defaultsApplier.apply(reportableTasks);
 
         Map<String, Object> result = new HashMap<>();
         result.put("workorder", wo);

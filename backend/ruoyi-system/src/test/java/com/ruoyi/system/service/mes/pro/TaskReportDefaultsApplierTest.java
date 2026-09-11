@@ -87,16 +87,16 @@ class TaskReportDefaultsApplierTest {
                 .thenReturn(List.of(node(FIRST_PROCESS_ID, 1), node(SECOND_PROCESS_ID, 2)));
         when(routeProcessMapper.selectProRouteProcessByRouteId(ROUTE_8))
                 .thenReturn(List.of(node(OTHER_PROCESS_ID, 1)));
-        when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, FIRST_PROCESS_ID, null))
+        when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, FIRST_PROCESS_ID))
                 .thenReturn(new BigDecimal("500"));
-        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, SECOND_PROCESS_ID, null))
+        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, SECOND_PROCESS_ID))
                 .thenReturn(new BigDecimal("120"));
 
         ProTask first = task(ROUTE_9, FIRST_PROCESS_ID, "1000");
         ProTask second = task(ROUTE_9, SECOND_PROCESS_ID, "1000");
         ProTask otherRoute = task(ROUTE_8, OTHER_PROCESS_ID, "300");
 
-        applier.apply(Arrays.asList(first, second, otherRoute, null), null);
+        applier.apply(Arrays.asList(first, second, otherRoute, null));
 
         // 路线 9 两个任务只查一次（旧实现每任务 2~3 次），路线 8 一次
         verify(routeProcessMapper, times(1)).selectProRouteProcessByRouteId(ROUTE_9);
@@ -112,13 +112,13 @@ class TaskReportDefaultsApplierTest {
     void should_match_batch_result_when_apply_one() {
         when(routeProcessMapper.selectProRouteProcessByRouteId(ROUTE_9))
                 .thenReturn(List.of(node(FIRST_PROCESS_ID, 1), node(SECOND_PROCESS_ID, 2)));
-        when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, FIRST_PROCESS_ID, null))
+        when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, FIRST_PROCESS_ID))
                 .thenReturn(new BigDecimal("500"));
-        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, SECOND_PROCESS_ID, null))
+        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, SECOND_PROCESS_ID))
                 .thenReturn(new BigDecimal("120"));
 
         ProTask second = task(ROUTE_9, SECOND_PROCESS_ID, "1000");
-        applier.apply(second, null);
+        applier.apply(second);
         assertThat(second.getDefaultQuantityInput()).isEqualByComparingTo("380");
     }
 }

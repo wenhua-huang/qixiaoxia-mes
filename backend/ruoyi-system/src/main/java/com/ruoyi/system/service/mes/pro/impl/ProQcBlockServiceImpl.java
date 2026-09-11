@@ -56,6 +56,7 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
     private static final String LOCK_RELEASE_PREFIX = "pro:qc:release:";
     private static final String FEEDBACK_TYPE_INTERNAL = "INTERNAL";
     private static final int RELEASE_REASON_MIN_LEN = 2;
+    private static final int RELEASE_REASON_MAX_LEN = 500;
     private static final int BATCH_STATE_MAX = 100;
 
     @Autowired
@@ -88,28 +89,28 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
     }
 
     @Override
-    public QcBlockInfo findBlock(Long workorderId, Long routeId, Long processId, Long cardId, Long taskId)
+    public QcBlockInfo findBlock(Long workorderId, Long routeId, Long processId, Long taskId)
     {
         if (workorderId == null || routeId == null || processId == null)
         {
             return null;
         }
-        return resolveBlock(workorderId, cardId, taskId, flow.prevCheckNode(routeId, processId));
+        return resolveBlock(workorderId, taskId, flow.prevCheckNode(routeId, processId));
     }
 
     @Override
-    public QcBlockInfo findBlock(Long workorderId, Long processId, Long cardId, Long taskId,
+    public QcBlockInfo findBlock(Long workorderId, Long processId, Long taskId,
                                  List<ProRouteProcess> routeNodes)
     {
         if (workorderId == null || processId == null || routeNodes == null)
         {
             return null;
         }
-        return resolveBlock(workorderId, cardId, taskId, flow.prevCheckNode(routeNodes, processId));
+        return resolveBlock(workorderId, taskId, flow.prevCheckNode(routeNodes, processId));
     }
 
-    /** 阻塞判定主干：检验前驱节点 → 最新判定单 → FAIL 且无放行记录则拦截 */
-    private QcBlockInfo resolveBlock(Long workorderId, Long cardId, Long taskId,
+    /** 阻塞判定主干：检验前驱节点 → 最新判定单 → FAIL 且无放行记录则拦截（工单+工序粒度，不区分流转卡） */
+    private QcBlockInfo resolveBlock(Long workorderId, Long taskId,
                                      Optional<ProRouteProcess> checkNodeOpt)
     {
         if (checkNodeOpt.isEmpty())
@@ -118,7 +119,7 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
         }
         ProRouteProcess checkNode = checkNodeOpt.get();
         QcIpqc latest = qcIpqcMapper.selectLatestCompletedByProcess(
-                workorderId, checkNode.getProcessId(), cardId);
+                workorderId, checkNode.getProcessId());
         if (latest == null || !QcConstants.RESULT_FAIL.equals(latest.getCheckResult()))
         {
             // 无已判定单 / PASS / CONCESSION 均放行：只硬拦已判不合格
@@ -162,7 +163,7 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
             return;
         }
         QcBlockInfo block = findBlock(feedback.getWorkorderId(), feedback.getRouteId(),
-                feedback.getProcessId(), feedback.getCardId(), feedback.getTaskId());
+                feedback.getProcessId(), feedback.getTaskId());
         if (block != null)
         {
             throw new ServiceException(block.getReason());
@@ -177,6 +178,10 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
         {
             throw new ServiceException("请填写放行理由");
         }
+        if (trimmed.length() > RELEASE_REASON_MAX_LEN)
+        {
+            throw new ServiceException("放行理由不能超过 " + RELEASE_REASON_MAX_LEN + " 字");
+        }
         // 先锁后事务：锁防同人/多人并发重复放行，事务保证 留痕+待办关闭 原子
         lockTemplate.execute(LOCK_RELEASE_PREFIX + taskId,
                 (Runnable) () -> txTemplate.execute(tx -> { doRelease(taskId, trimmed); return null; }));
@@ -189,9 +194,9 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
         {
             throw new ServiceException("任务不存在或已被删除");
         }
-        // 放行以任务维度定位（任务不挂具体流转卡；一条放行对该任务的各流转卡生效）
+        // 放行以任务维度定位（任务不挂具体流转卡；一条放行对该工单该工序各卡生效）
         QcBlockInfo block = findBlock(task.getWorkorderId(), task.getRouteId(),
-                task.getProcessId(), null, taskId);
+                task.getProcessId(), taskId);
         if (block == null)
         {
             throw new ServiceException("当前任务无需放行");
@@ -415,7 +420,7 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
         Map<String, Object> state = new HashMap<>(2);
         ProTask task = proTaskMapper.selectProTaskByTaskId(taskId);
         QcBlockInfo block = task == null ? null : findBlock(task.getWorkorderId(), task.getRouteId(),
-                task.getProcessId(), null, taskId);
+                task.getProcessId(), taskId);
         state.put("blocked", block != null);
         state.put("reason", block == null ? null : block.getReason());
         return state;

@@ -339,7 +339,7 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
     private BigDecimal applyQuantityInput(ProFeedback fb, ProTask task) {
         BigDecimal def = inputQuantityResolver.resolveDefaultInput(
                 fb.getWorkorderId(), fb.getRouteId(), fb.getProcessId(),
-                fb.getCardId(), task != null ? task.getQuantity() : null);
+                task != null ? task.getQuantity() : null);
         if (def == null) {
             return null;
         }

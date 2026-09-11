@@ -86,8 +86,8 @@ public class ProTaskServiceImpl implements IProTaskService
     public List<ProTask> selectReportableTaskList(ProTask proTask)
     {
         List<ProTask> list = proTaskMapper.selectReportableTaskList(proTask);
-        // 待报工列表为工单维度，cardId 传 null（不按流转卡限定上道产出差额）
-        defaultsApplier.apply(list, null);
+        // 一期默认值/锁态均按工单+工序粒度聚合
+        defaultsApplier.apply(list);
         return list;
     }
 

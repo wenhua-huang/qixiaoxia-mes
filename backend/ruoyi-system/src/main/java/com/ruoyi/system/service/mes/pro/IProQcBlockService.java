@@ -17,16 +17,17 @@ import com.ruoyi.system.domain.mes.qc.QcIpqc;
 public interface IProQcBlockService
 {
     /**
-     * 定位当前（工单+路线+工序+卡+任务）的质检阻塞。
+     * 定位当前（工单+工序+任务）的质检阻塞。一期按工单+工序粒度判定，不区分流转卡
+     * （放行同样按任务维度，一条放行对该工单该工序各卡生效）。
      *
      * @return 阻塞信息；null 表示可报工（无检验前驱 / 未判定 / PASS / CONCESSION / 已放行）
      */
-    QcBlockInfo findBlock(Long workorderId, Long routeId, Long processId, Long cardId, Long taskId);
+    QcBlockInfo findBlock(Long workorderId, Long routeId, Long processId, Long taskId);
 
     /**
      * 批量富化专用：基于预载路线节点定位阻塞（同一路线只查一次节点，避免 N+1）。
      */
-    QcBlockInfo findBlock(Long workorderId, Long processId, Long cardId, Long taskId,
+    QcBlockInfo findBlock(Long workorderId, Long processId, Long taskId,
                           List<ProRouteProcess> routeNodes);
 
     /** 报工提交硬门控：命中阻塞抛 {@link com.ruoyi.common.exception.ServiceException} */

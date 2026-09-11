@@ -285,13 +285,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where ipqc_id = #{ipqcId}
     </update>
 
-    <!-- 跟单质检门控：工单+检验工序最新已判定单；cardId 非空时严格按卡。factory_id 由拦截器注入。 -->
+    <!-- 跟单质检门控：工单+检验工序最新已判定单（一期不区分流转卡，与任务维度放行一致）。factory_id 由拦截器注入。 -->
     <select id="selectLatestCompletedByProcess" resultMap="QcIpqcResult">
         <include refid="selectQcIpqcVo"/>
         where workorder_id = #{workorderId}
           and process_id = #{processId}
           and status = 'COMPLETED'
-          <if test="cardId != null">and card_id = #{cardId}</if>
         order by ipqc_id desc
         limit 1
     </select>

@@ -33,7 +33,6 @@ class ProInputQuantityResolverTest {
 
     private static final Long WORKORDER_ID = 100L;
     private static final Long ROUTE_ID = 9L;
-    private static final Long CARD_ID = 7L;
     private static final Long FIRST_PROCESS_ID = 1L;
     private static final Long PREV_PROCESS_ID = 2L;
     private static final Long CURRENT_PROCESS_ID = 3L;
@@ -70,7 +69,7 @@ class ProInputQuantityResolverTest {
     void should_return_task_quantity_when_first_process() {
         stubCurrentAndPrev(true);
         BigDecimal result = resolver.resolveDefaultInput(
-                WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, CARD_ID, new BigDecimal("1000"));
+                WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, new BigDecimal("1000"));
         assertThat(result).isEqualByComparingTo("1000");
     }
 
@@ -78,12 +77,12 @@ class ProInputQuantityResolverTest {
     @DisplayName("非首道: 上工序已审产出500、本工序上机0 → 默认500")
     void should_return_produced_when_no_input_yet() {
         stubCurrentAndPrev(false);
-        when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, PREV_PROCESS_ID, CARD_ID))
+        when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, PREV_PROCESS_ID))
                 .thenReturn(new BigDecimal("500"));
-        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, CURRENT_PROCESS_ID, CARD_ID))
+        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, CURRENT_PROCESS_ID))
                 .thenReturn(BigDecimal.ZERO);
         BigDecimal result = resolver.resolveDefaultInput(
-                WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, CARD_ID, new BigDecimal("1000"));
+                WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, new BigDecimal("1000"));
         assertThat(result).isEqualByComparingTo("500");
     }
 
@@ -91,12 +90,12 @@ class ProInputQuantityResolverTest {
     @DisplayName("非首道: 上工序已审500、本工序已上机480 → 默认剩余20")
     void should_return_remaining_when_some_input() {
         stubCurrentAndPrev(false);
-        when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, PREV_PROCESS_ID, CARD_ID))
+        when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, PREV_PROCESS_ID))
                 .thenReturn(new BigDecimal("500"));
-        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, CURRENT_PROCESS_ID, CARD_ID))
+        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, CURRENT_PROCESS_ID))
                 .thenReturn(new BigDecimal("480"));
         BigDecimal result = resolver.resolveDefaultInput(
-                WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, CARD_ID, new BigDecimal("1000"));
+                WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, new BigDecimal("1000"));
         assertThat(result).isEqualByComparingTo("20");
     }
 
@@ -104,12 +103,12 @@ class ProInputQuantityResolverTest {
     @DisplayName("非首道: 上工序多批报工300+200由SQL聚合为500 → 默认500")
     void should_use_aggregated_produced_when_multiple_batches() {
         stubCurrentAndPrev(false);
-        when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, PREV_PROCESS_ID, CARD_ID))
+        when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, PREV_PROCESS_ID))
                 .thenReturn(new BigDecimal("300").add(new BigDecimal("200")));
-        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, CURRENT_PROCESS_ID, CARD_ID))
+        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, CURRENT_PROCESS_ID))
                 .thenReturn(BigDecimal.ZERO);
         BigDecimal result = resolver.resolveDefaultInput(
-                WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, CARD_ID, new BigDecimal("1000"));
+                WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, new BigDecimal("1000"));
         assertThat(result).isEqualByComparingTo("500");
     }
 
@@ -117,12 +116,12 @@ class ProInputQuantityResolverTest {
     @DisplayName("非首道: 本工序上机超过上工序产出(差额为负) → 钳为0")
     void should_clamp_to_zero_when_remaining_negative() {
         stubCurrentAndPrev(false);
-        when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, PREV_PROCESS_ID, CARD_ID))
+        when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, PREV_PROCESS_ID))
                 .thenReturn(new BigDecimal("300"));
-        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, CURRENT_PROCESS_ID, CARD_ID))
+        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, CURRENT_PROCESS_ID))
                 .thenReturn(new BigDecimal("500"));
         BigDecimal result = resolver.resolveDefaultInput(
-                WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, CARD_ID, new BigDecimal("1000"));
+                WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, new BigDecimal("1000"));
         assertThat(result).isEqualByComparingTo(BigDecimal.ZERO);
     }
 
@@ -131,7 +130,7 @@ class ProInputQuantityResolverTest {
     void should_return_null_when_current_node_missing() {
         when(flow.currentNode(ROUTE_ID, CURRENT_PROCESS_ID)).thenReturn(Optional.empty());
         BigDecimal result = resolver.resolveDefaultInput(
-                WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, CARD_ID, new BigDecimal("1000"));
+                WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, new BigDecimal("1000"));
         assertThat(result).isNull();
     }
 
@@ -139,24 +138,24 @@ class ProInputQuantityResolverTest {
     @DisplayName("无路线/工序信息 → 返回 null")
     void should_return_null_when_route_or_process_missing() {
         assertThat(resolver.resolveDefaultInput(
-                WORKORDER_ID, null, CURRENT_PROCESS_ID, CARD_ID, new BigDecimal("1000"))).isNull();
+                WORKORDER_ID, null, CURRENT_PROCESS_ID, new BigDecimal("1000"))).isNull();
         assertThat(resolver.resolveDefaultInput(
-                WORKORDER_ID, ROUTE_ID, null, CARD_ID, new BigDecimal("1000"))).isNull();
+                WORKORDER_ID, ROUTE_ID, null, new BigDecimal("1000"))).isNull();
     }
 
     @Test
-    @DisplayName("无流转卡(工单级生产): cardId 为 null 仍按工单+工序聚合")
+    @DisplayName("工单级生产: 不区分流转卡，按工单+工序聚合")
     void should_work_when_card_null() {
         when(flow.currentNode(ROUTE_ID, CURRENT_PROCESS_ID))
                 .thenReturn(Optional.of(node(CURRENT_PROCESS_ID, 2)));
         when(flow.prevNode(ROUTE_ID, CURRENT_PROCESS_ID))
                 .thenReturn(Optional.of(node(PREV_PROCESS_ID, 1)));
-        when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, PREV_PROCESS_ID, null))
+        when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, PREV_PROCESS_ID))
                 .thenReturn(new BigDecimal("120"));
-        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, CURRENT_PROCESS_ID, null))
+        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, CURRENT_PROCESS_ID))
                 .thenReturn(new BigDecimal("20"));
         BigDecimal result = resolver.resolveDefaultInput(
-                WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, null, new BigDecimal("1000"));
+                WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, new BigDecimal("1000"));
         assertThat(result).isEqualByComparingTo("100");
     }
 
@@ -174,12 +173,12 @@ class ProInputQuantityResolverTest {
                 .thenReturn(Optional.of(node(CURRENT_PROCESS_ID, 2)));
         when(flow.prevNode(nodes, CURRENT_PROCESS_ID))
                 .thenReturn(Optional.of(node(PREV_PROCESS_ID, 1)));
-        when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, PREV_PROCESS_ID, CARD_ID))
+        when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, PREV_PROCESS_ID))
                 .thenReturn(new BigDecimal("500"));
-        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, CURRENT_PROCESS_ID, CARD_ID))
+        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, CURRENT_PROCESS_ID))
                 .thenReturn(new BigDecimal("120"));
         BigDecimal result = resolver.resolveDefaultInput(
-                WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, CARD_ID,
+                WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID,
                 new BigDecimal("1000"), loader);
         assertThat(result).isEqualByComparingTo("380");
         assertThat(loaderCalls.get()).isEqualTo(1);
@@ -194,7 +193,7 @@ class ProInputQuantityResolverTest {
                 .thenReturn(Optional.of(node(CURRENT_PROCESS_ID, 1)));
         when(flow.prevNode(nodes, CURRENT_PROCESS_ID)).thenReturn(Optional.empty());
         BigDecimal result = resolver.resolveDefaultInput(
-                WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, CARD_ID,
+                WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID,
                 new BigDecimal("888"), loader);
         assertThat(result).isEqualByComparingTo("888");
         verifyNoInteractions(feedbackMapper);
@@ -207,7 +206,7 @@ class ProInputQuantityResolverTest {
         Function<Long, List<ProRouteProcess>> loader = rid -> nodes;
         when(flow.currentNode(nodes, CURRENT_PROCESS_ID)).thenReturn(Optional.empty());
         BigDecimal result = resolver.resolveDefaultInput(
-                WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, CARD_ID,
+                WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID,
                 new BigDecimal("1000"), loader);
         assertThat(result).isNull();
         verifyNoInteractions(feedbackMapper);
@@ -217,12 +216,12 @@ class ProInputQuantityResolverTest {
     @DisplayName("SQL 返回 null（无报工行）按 0 处理")
     void should_treat_null_sum_as_zero() {
         stubCurrentAndPrev(false);
-        when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, PREV_PROCESS_ID, CARD_ID))
+        when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, PREV_PROCESS_ID))
                 .thenReturn(null);
-        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, CURRENT_PROCESS_ID, CARD_ID))
+        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, CURRENT_PROCESS_ID))
                 .thenReturn(null);
         BigDecimal result = resolver.resolveDefaultInput(
-                WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, CARD_ID, new BigDecimal("1000"));
+                WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, new BigDecimal("1000"));
         assertThat(result).isEqualByComparingTo(BigDecimal.ZERO);
     }
 }

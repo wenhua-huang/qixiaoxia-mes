@@ -20,7 +20,8 @@ import com.ruoyi.system.mapper.mes.pro.ProFeedbackMapper;
  *   <li>其余工序 → 上一道工序累计已审核(AUDITED)报工产出 − 本工序累计上机数量，差额最小钳 0。</li>
  * </ul>
  *
- * <p>聚合按 workorderId + processId，cardId 非空时进一步限定同一张流转卡；
+ * <p>一期聚合按 workorderId + processId，不区分流转卡（与质检门控/放行口径一致，
+ * 保证预填默认值与提交时重算值同源、不会产生假的人工修改痕迹）；
  * factory_id 由 FactoryIdInterceptor 自动注入。
  *
  * @author qixiaoxia
@@ -39,7 +40,7 @@ public class ProInputQuantityResolver {
      * @return 系统默认上机数量；null 表示无默认值（调用方不留痕）
      */
     public BigDecimal resolveDefaultInput(Long workorderId, Long routeId, Long processId,
-                                          Long cardId, BigDecimal firstProcessDefault) {
+                                          BigDecimal firstProcessDefault) {
         if (routeId == null || processId == null) {
             return null;
         }
@@ -47,7 +48,7 @@ public class ProInputQuantityResolver {
         if (current.isEmpty()) {
             return null;
         }
-        return resolveAfterCurrent(workorderId, processId, cardId, firstProcessDefault,
+        return resolveAfterCurrent(workorderId, processId, firstProcessDefault,
                 flow.prevNode(routeId, processId));
     }
 
@@ -58,7 +59,7 @@ public class ProInputQuantityResolver {
      * @param nodesLoader 按 routeId 返回已排序节点列表（路线不存在返回空列表）
      */
     public BigDecimal resolveDefaultInput(Long workorderId, Long routeId, Long processId,
-                                          Long cardId, BigDecimal firstProcessDefault,
+                                          BigDecimal firstProcessDefault,
                                           Function<Long, List<ProRouteProcess>> nodesLoader) {
         if (routeId == null || processId == null) {
             return null;
@@ -68,12 +69,12 @@ public class ProInputQuantityResolver {
         if (current.isEmpty()) {
             return null;
         }
-        return resolveAfterCurrent(workorderId, processId, cardId, firstProcessDefault,
+        return resolveAfterCurrent(workorderId, processId, firstProcessDefault,
                 flow.prevNode(nodes, processId));
     }
 
     /** 当前节点已确认存在后的统一收尾：首道返回排产数，其余返回上道产出−本道上机（钳 0） */
-    private BigDecimal resolveAfterCurrent(Long workorderId, Long processId, Long cardId,
+    private BigDecimal resolveAfterCurrent(Long workorderId, Long processId,
                                            BigDecimal firstProcessDefault,
                                            Optional<ProRouteProcess> prev) {
         if (prev.isEmpty()) {
@@ -81,8 +82,8 @@ public class ProInputQuantityResolver {
             return firstProcessDefault;
         }
         BigDecimal produced = nz(feedbackMapper.sumAuditedQuantityFeedback(
-                workorderId, prev.get().getProcessId(), cardId));
-        BigDecimal used = nz(feedbackMapper.sumQuantityInput(workorderId, processId, cardId));
+                workorderId, prev.get().getProcessId()));
+        BigDecimal used = nz(feedbackMapper.sumQuantityInput(workorderId, processId));
         return produced.subtract(used).max(BigDecimal.ZERO);
     }
 

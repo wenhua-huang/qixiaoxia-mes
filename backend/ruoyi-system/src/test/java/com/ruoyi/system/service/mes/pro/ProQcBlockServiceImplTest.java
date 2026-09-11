@@ -144,20 +144,20 @@ class ProQcBlockServiceImplTest {
     void should_pass_when_no_prev_check_node() {
         when(flow.prevCheckNode(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(Optional.empty());
 
-        QcBlockInfo block = service.findBlock(WORKORDER_ID, ROUTE_ID, TARGET_PROCESS_ID, CARD_ID, TASK_ID);
+        QcBlockInfo block = service.findBlock(WORKORDER_ID, ROUTE_ID, TARGET_PROCESS_ID, TASK_ID);
 
         assertThat(block).isNull();
-        verify(qcIpqcMapper, never()).selectLatestCompletedByProcess(anyLong(), anyLong(), any());
+        verify(qcIpqcMapper, never()).selectLatestCompletedByProcess(anyLong(), anyLong());
     }
 
     @Test
     @DisplayName("2. 最新判定单 PASS → 放行")
     void should_pass_when_ipqc_pass() {
         when(flow.prevCheckNode(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(Optional.of(checkNode()));
-        when(qcIpqcMapper.selectLatestCompletedByProcess(WORKORDER_ID, CHECK_PROCESS_ID, CARD_ID))
+        when(qcIpqcMapper.selectLatestCompletedByProcess(WORKORDER_ID, CHECK_PROCESS_ID))
                 .thenReturn(ipqc("PASS"));
 
-        assertThat(service.findBlock(WORKORDER_ID, ROUTE_ID, TARGET_PROCESS_ID, CARD_ID, TASK_ID)).isNull();
+        assertThat(service.findBlock(WORKORDER_ID, ROUTE_ID, TARGET_PROCESS_ID, TASK_ID)).isNull();
         verify(blockReleaseMapper, never()).existsByIpqcAndTask(anyLong(), anyLong());
     }
 
@@ -165,21 +165,21 @@ class ProQcBlockServiceImplTest {
     @DisplayName("3. 最新判定单 CONCESSION 让步接收 → 放行")
     void should_pass_when_concession() {
         when(flow.prevCheckNode(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(Optional.of(checkNode()));
-        when(qcIpqcMapper.selectLatestCompletedByProcess(WORKORDER_ID, CHECK_PROCESS_ID, CARD_ID))
+        when(qcIpqcMapper.selectLatestCompletedByProcess(WORKORDER_ID, CHECK_PROCESS_ID))
                 .thenReturn(ipqc("CONCESSION"));
 
-        assertThat(service.findBlock(WORKORDER_ID, ROUTE_ID, TARGET_PROCESS_ID, CARD_ID, TASK_ID)).isNull();
+        assertThat(service.findBlock(WORKORDER_ID, ROUTE_ID, TARGET_PROCESS_ID, TASK_ID)).isNull();
     }
 
     @Test
     @DisplayName("4. FAIL 且无放行记录 → 返回阻塞信息")
     void should_block_when_fail_without_release() {
         when(flow.prevCheckNode(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(Optional.of(checkNode()));
-        when(qcIpqcMapper.selectLatestCompletedByProcess(WORKORDER_ID, CHECK_PROCESS_ID, CARD_ID))
+        when(qcIpqcMapper.selectLatestCompletedByProcess(WORKORDER_ID, CHECK_PROCESS_ID))
                 .thenReturn(ipqc("FAIL"));
         when(blockReleaseMapper.existsByIpqcAndTask(IPQC_ID, TASK_ID)).thenReturn(false);
 
-        QcBlockInfo block = service.findBlock(WORKORDER_ID, ROUTE_ID, TARGET_PROCESS_ID, CARD_ID, TASK_ID);
+        QcBlockInfo block = service.findBlock(WORKORDER_ID, ROUTE_ID, TARGET_PROCESS_ID, TASK_ID);
 
         assertThat(block).isNotNull();
         assertThat(block.getIpqcId()).isEqualTo(IPQC_ID);
@@ -192,21 +192,21 @@ class ProQcBlockServiceImplTest {
     @DisplayName("5. FAIL 但已有放行记录 → 放行")
     void should_pass_when_fail_but_released() {
         when(flow.prevCheckNode(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(Optional.of(checkNode()));
-        when(qcIpqcMapper.selectLatestCompletedByProcess(WORKORDER_ID, CHECK_PROCESS_ID, CARD_ID))
+        when(qcIpqcMapper.selectLatestCompletedByProcess(WORKORDER_ID, CHECK_PROCESS_ID))
                 .thenReturn(ipqc("FAIL"));
         when(blockReleaseMapper.existsByIpqcAndTask(IPQC_ID, TASK_ID)).thenReturn(true);
 
-        assertThat(service.findBlock(WORKORDER_ID, ROUTE_ID, TARGET_PROCESS_ID, CARD_ID, TASK_ID)).isNull();
+        assertThat(service.findBlock(WORKORDER_ID, ROUTE_ID, TARGET_PROCESS_ID, TASK_ID)).isNull();
     }
 
     @Test
     @DisplayName("6. 无已判定(COMPLETED)检验单 → 放行（只拦已判不合格）")
     void should_pass_when_no_completed_ipqc() {
         when(flow.prevCheckNode(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(Optional.of(checkNode()));
-        when(qcIpqcMapper.selectLatestCompletedByProcess(WORKORDER_ID, CHECK_PROCESS_ID, CARD_ID))
+        when(qcIpqcMapper.selectLatestCompletedByProcess(WORKORDER_ID, CHECK_PROCESS_ID))
                 .thenReturn(null);
 
-        assertThat(service.findBlock(WORKORDER_ID, ROUTE_ID, TARGET_PROCESS_ID, CARD_ID, TASK_ID)).isNull();
+        assertThat(service.findBlock(WORKORDER_ID, ROUTE_ID, TARGET_PROCESS_ID, TASK_ID)).isNull();
     }
 
     @Test
@@ -214,7 +214,7 @@ class ProQcBlockServiceImplTest {
     void should_release_when_blocked() {
         when(proTaskMapper.selectProTaskByTaskId(TASK_ID)).thenReturn(targetTask("PRODUCING"));
         when(flow.prevCheckNode(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(Optional.of(checkNode()));
-        when(qcIpqcMapper.selectLatestCompletedByProcess(eq(WORKORDER_ID), eq(CHECK_PROCESS_ID), any()))
+        when(qcIpqcMapper.selectLatestCompletedByProcess(eq(WORKORDER_ID), eq(CHECK_PROCESS_ID)))
                 .thenReturn(ipqc("FAIL"));
         when(blockReleaseMapper.existsByIpqcAndTask(IPQC_ID, TASK_ID)).thenReturn(false);
 
@@ -243,7 +243,7 @@ class ProQcBlockServiceImplTest {
     void should_throw_when_release_not_needed() {
         when(proTaskMapper.selectProTaskByTaskId(TASK_ID)).thenReturn(targetTask("PRODUCING"));
         when(flow.prevCheckNode(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(Optional.of(checkNode()));
-        when(qcIpqcMapper.selectLatestCompletedByProcess(eq(WORKORDER_ID), eq(CHECK_PROCESS_ID), any()))
+        when(qcIpqcMapper.selectLatestCompletedByProcess(eq(WORKORDER_ID), eq(CHECK_PROCESS_ID)))
                 .thenReturn(ipqc("PASS"));
 
         assertThatThrownBy(() -> service.release(TASK_ID, "理由"))
@@ -275,7 +275,7 @@ class ProQcBlockServiceImplTest {
         fb.setCardId(CARD_ID);
         fb.setTaskId(TASK_ID);
         when(flow.prevCheckNode(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(Optional.of(checkNode()));
-        when(qcIpqcMapper.selectLatestCompletedByProcess(WORKORDER_ID, CHECK_PROCESS_ID, CARD_ID))
+        when(qcIpqcMapper.selectLatestCompletedByProcess(WORKORDER_ID, CHECK_PROCESS_ID))
                 .thenReturn(ipqc("FAIL"));
         when(blockReleaseMapper.existsByIpqcAndTask(IPQC_ID, TASK_ID)).thenReturn(false);
 

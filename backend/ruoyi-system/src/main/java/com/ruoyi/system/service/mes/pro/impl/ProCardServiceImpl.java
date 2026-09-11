@@ -210,8 +210,8 @@ public class ProCardServiceImpl implements IProCardService
                 .filter(t -> !ProConstants.WS_CODE_VENDOR.equals(t.getWorkstationCode()))
                 .collect(Collectors.toList());
         fillPendingCount(reportable);
-        // 扫码入口按本卡限定上道产出差额，富化上机数量默认值
-        defaultsApplier.apply(reportable, card.getCardId());
+        // 一期默认值/锁态统一按工单+工序粒度，不按流转卡限定（与提交时重算同源）
+        defaultsApplier.apply(reportable);
         vo.setReportableTasks(reportable);
         // 外协任务不限状态：进行中/已完成均展示（供 App 呈现外协进度）
         List<ProTask> outsource = candidates.stream()

@@ -324,8 +324,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </select>
 
     <!-- 统计工单某工序已审核(AUDITED)报工的报工数量合计（上机数量默认值：上工序累计产出）。
-         cardId 为空时按工单+工序聚合（工单级生产无流转卡）；
-         factory_id 由 FactoryIdInterceptor 自动注入 SQL 文本。 -->
+         一期按工单+工序聚合，不区分流转卡；factory_id 由拦截器自动注入 SQL 文本。 -->
     <select id="sumAuditedQuantityFeedback" resultType="java.math.BigDecimal">
         select coalesce(sum(quantity_feedback), 0)
         from qxx_pro_feedback
@@ -333,18 +332,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           and process_id = #{processId}
           and status = 'AUDITED'
           and quantity_feedback is not null
-        <if test="cardId != null">and card_id = #{cardId}</if>
     </select>
 
     <!-- 统计工单某工序全部报工的本次上机数量合计（上机数量默认值：本工序累计已投入）。
-         cardId 为空时按工单+工序聚合；factory_id 由 FactoryIdInterceptor 自动注入 SQL 文本。 -->
+         一期按工单+工序聚合；factory_id 由拦截器自动注入 SQL 文本。 -->
     <select id="sumQuantityInput" resultType="java.math.BigDecimal">
         select coalesce(sum(quantity_input), 0)
         from qxx_pro_feedback
         where workorder_id = #{workorderId}
           and process_id = #{processId}
           and quantity_input is not null
-        <if test="cardId != null">and card_id = #{cardId}</if>
     </select>
 
     <!-- 查询有 PREPARE（待审核）报工的 taskId（不去重，Java 端按出现次数计数） -->

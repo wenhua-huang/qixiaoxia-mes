@@ -18,6 +18,7 @@ import com.ruoyi.system.domain.mes.qc.QcBlockInfo;
  *
  * <p>三个报工入口（待报工列表 / 工单报工入口 / 扫码反查）统一走本组件，
  * 默认值解析规则见 {@link ProInputQuantityResolver}，质检阻塞判定见 {@link IProQcBlockService}。
+ * 一期默认值与锁态均按工单+工序粒度，不区分流转卡，保证各入口与提交时重算同源。
  *
  * @author qixiaoxia
  */
@@ -34,30 +35,29 @@ public class TaskReportDefaultsApplier {
     private IProQcBlockService qcBlockService;
 
     /** 批量富化；tasks 为 null 时安全跳过。同一路线的工序节点只查一次库（消除 N+1） */
-    public void apply(Collection<ProTask> tasks, Long cardId) {
+    public void apply(Collection<ProTask> tasks) {
         if (tasks == null) {
             return;
         }
         Map<Long, List<ProRouteProcess>> nodesCache = new HashMap<>();
         Function<Long, List<ProRouteProcess>> nodesLoader =
                 routeId -> nodesCache.computeIfAbsent(routeId, flow::nodes);
-        tasks.forEach(t -> apply(t, cardId, nodesLoader));
+        tasks.forEach(t -> apply(t, nodesLoader));
     }
 
     /** 富化单个任务：首道工序默认排产数量，其余按上道已审产出差额；追加质检阻塞态 */
-    public void apply(ProTask task, Long cardId) {
+    public void apply(ProTask task) {
         if (task == null) {
             return;
         }
         task.setDefaultQuantityInput(inputResolver.resolveDefaultInput(
                 task.getWorkorderId(), task.getRouteId(), task.getProcessId(),
-                cardId, task.getQuantity()));
-        applyQcBlock(task, cardId);
+                task.getQuantity()));
+        applyQcBlock(task);
     }
 
     /** 批量内部入口：复用按 routeId 缓存的节点列表（上机数量与质检判定共用一次路线查询） */
-    private void apply(ProTask task, Long cardId,
-                       Function<Long, List<ProRouteProcess>> nodesLoader) {
+    private void apply(ProTask task, Function<Long, List<ProRouteProcess>> nodesLoader) {
         if (task == null) {
             return;
         }
@@ -65,17 +65,17 @@ public class TaskReportDefaultsApplier {
                 ? List.of() : nodesLoader.apply(task.getRouteId());
         task.setDefaultQuantityInput(inputResolver.resolveDefaultInput(
                 task.getWorkorderId(), task.getRouteId(), task.getProcessId(),
-                cardId, task.getQuantity(), nodesLoader));
+                task.getQuantity(), nodesLoader));
         QcBlockInfo block = qcBlockService.findBlock(task.getWorkorderId(), task.getProcessId(),
-                cardId, task.getTaskId(), nodes);
+                task.getTaskId(), nodes);
         task.setQcBlocked(block != null);
         task.setQcBlockReason(block == null ? null : block.getReason());
     }
 
     /** 单条富化的质检阻塞态（无预载节点，findBlock 内部按 routeId 查路线） */
-    private void applyQcBlock(ProTask task, Long cardId) {
+    private void applyQcBlock(ProTask task) {
         QcBlockInfo block = qcBlockService.findBlock(task.getWorkorderId(), task.getRouteId(),
-                task.getProcessId(), cardId, task.getTaskId());
+                task.getProcessId(), task.getTaskId());
         // 保证前端拿到布尔而非 null
         task.setQcBlocked(block != null);
         task.setQcBlockReason(block == null ? null : block.getReason());

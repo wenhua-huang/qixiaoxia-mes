@@ -31,10 +31,8 @@
     <el-row :gutter="10" class="mb8">
       <el-col :span="1.5"><el-button type="primary" plain size="small" @click="handleAdd" v-hasPermi="['mes:sal:order:add']">新增</el-button></el-col>
       <el-col :span="1.5"><el-button type="success" plain size="small" :disabled="single || !canEditSelected" @click="handleUpdate" v-hasPermi="['mes:sal:order:edit']">修改</el-button></el-col>
-      <el-col :span="1.5"><el-button type="danger" plain size="small" :disabled="multiple" @click="handleDelete" v-hasPermi="['mes:sal:order:remove']">删除</el-button></el-col>
+      <el-col :span="1.5"><el-button type="danger" plain size="small" :disabled="multiple || !canDeleteSelected" @click="handleDelete" v-hasPermi="['mes:sal:order:remove']">删除</el-button></el-col>
       <el-col :span="1.5"><el-button type="warning" plain size="small" @click="handleExport" v-hasPermi="['mes:sal:order:export']">导出</el-button></el-col>
-      <el-col :span="1.5"><el-button type="primary" plain size="small" :disabled="multiple" @click="handleBatchSubmit" v-hasPermi="['mes:sal:order:submit']">批量提交</el-button></el-col>
-      <el-col :span="1.5"><el-button type="success" plain size="small" :disabled="multiple" @click="handleBatchApprove" v-hasPermi="['mes:sal:order:approve']">批量审核</el-button></el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
@@ -51,18 +49,20 @@
       <el-table-column label="来源" align="center" prop="source" width="90"><template #default="s"><el-tag :type="sourceTag(s.row.source)">{{ sourceText(s.row.source) }}</el-tag></template></el-table-column>
       <el-table-column label="交期" align="center" prop="requestDate" width="110"><template #default="s">{{ parseTime(s.row.requestDate, '{y}-{m}-{d}') }}</template></el-table-column>
       <el-table-column label="总金额" align="center" prop="totalAmount" width="100" />
+      <el-table-column label="生产进度" align="center" width="150">
+        <template #default="s">
+          <el-progress :percentage="progressBar(s.row).percentage" :stroke-width="10" :status="progressBar(s.row).status" />
+        </template>
+      </el-table-column>
       <el-table-column label="状态" align="center" prop="status" width="90"><template #default="s"><el-tag :type="statusMeta(s.row.status).type">{{ statusMeta(s.row.status).text }}</el-tag></template></el-table-column>
       <el-table-column label="操作" align="center" width="360" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="View" @click="handleView(scope.row)">查看</el-button>
-          <el-button v-if="scope.row.status==='PREPARE'" link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:sal:order:edit']">改</el-button>
-          <el-button v-if="scope.row.status==='PREPARE'" link type="primary" size="small" @click="handleSubmit(scope.row)" v-hasPermi="['mes:sal:order:submit']">提交审核</el-button>
-          <el-button v-if="scope.row.status==='PENDING'" link type="success" size="small" @click="handleApprove(scope.row)" v-hasPermi="['mes:sal:order:approve']">审核通过</el-button>
-          <el-button v-if="scope.row.status==='PENDING'" link type="warning" size="small" @click="handleReject(scope.row)" v-hasPermi="['mes:sal:order:approve']">驳回</el-button>
-          <el-button v-if="scope.row.status==='CONFIRMED'" link type="warning" size="small" @click="handleToWorkorder(scope.row)" v-hasPermi="['mes:sal:order:workorder']">生成工单</el-button>
-          <el-button v-if="scope.row.status==='CONFIRMED'" link type="info" size="small" @click="handleClose(scope.row)" v-hasPermi="['mes:sal:order:edit']">关闭</el-button>
-          <el-button v-if="['PREPARE','PENDING','CONFIRMED'].includes(scope.row.status)" link type="danger" size="small" @click="handleCancel(scope.row)" v-hasPermi="['mes:sal:order:edit']">取消</el-button>
-          <el-button v-if="scope.row.status==='PREPARE'" link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:sal:order:remove']"></el-button>
+          <el-button v-if="scope.row.status==='CONFIRMED' && !hasWorkorder(scope.row)" link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:sal:order:edit']">改</el-button>
+          <el-button v-if="scope.row.status==='CONFIRMED' || scope.row.status==='PRODUCING'" link type="warning" size="small" @click="handleToWorkorder(scope.row)" v-hasPermi="['mes:sal:order:workorder']">生成工单</el-button>
+          <el-button v-if="scope.row.status==='SHIPPED'" link type="success" size="small" @click="handleClose(scope.row)" v-hasPermi="['mes:sal:order:edit']">结单</el-button>
+          <el-button v-if="scope.row.status==='CONFIRMED' || scope.row.status==='PRODUCING'" link type="danger" size="small" @click="handleCancel(scope.row)" v-hasPermi="['mes:sal:order:edit']">取消</el-button>
+          <el-button v-if="scope.row.status==='CONFIRMED' && !hasWorkorder(scope.row)" link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:sal:order:remove']"></el-button>
           <el-dropdown @command="(cmd) => handleRowExport(scope.row, cmd)" v-hasPermi="['mes:sal:order:exportDetail']">
             <el-button link type="primary" size="small">导出<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
             <template #dropdown>
@@ -253,26 +253,13 @@
     </el-dialog>
     <ItemSelect ref="twBomItemSelectRef" @onSelected="onTwBomItemSelected" />
 
-    <!-- 审核驳回弹窗 -->
-    <el-dialog title="审核驳回" v-model="rejectOpen" width="450px" append-to-body>
-      <el-alert type="warning" :closable="false" show-icon style="margin-bottom:12px"><template #title>驳回后退回「待提交」状态，提交人可根据意见修改后重新提交</template></el-alert>
-      <el-form label-width="80px">
-        <el-form-item label="订单号"><span>{{ rejectTargetCode }}</span></el-form-item>
-        <el-form-item label="驳回原因" required><el-input v-model="rejectRemark" type="textarea" :rows="3" placeholder="请填写驳回原因（必填）" /></el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button type="danger" @click="confirmReject" :disabled="!rejectRemark.trim()">确认驳回</el-button>
-        <el-button @click="rejectOpen=false">取 消</el-button>
-      </template>
-    </el-dialog>
-
     <ClientSelect ref="clientSelectRef" @onSelected="onClientSelected" />
     <LineEdit v-model="lineEditOpen" :line="editingLine" @confirm="onLineConfirm" />
   </div>
 </template>
 
 <script>
-import { listOrder, getOrderDetail, createOrderWithLines, updateOrderWithLines, submitOrder, approveOrder, rejectOrder, batchSubmitOrder, batchApproveOrder, closeOrder, cancelOrder, toWorkorder, delOrder } from '@/api/mes/sal/order'
+import { listOrder, getOrderDetail, createOrderWithLines, updateOrderWithLines, closeOrder, cancelOrder, toWorkorder, delOrder } from '@/api/mes/sal/order'
 import { getDicts } from '@/api/system/dict/data'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import { listRouteProduct } from '@/api/mes/pro/routeproduct'
@@ -286,6 +273,9 @@ import { listUser } from '@/api/system/user'
 import ClientSelect from '@/components/clientSelect/single.vue'
 import LineEdit from './LineEdit.vue'
 
+// 进度满格阈值（百分比）；CLOSED/CANCEL 由进度条 exception 态标识
+const PROGRESS_FULL = 100
+
 export default {
   name: 'SalOrder',
   components: { ClientSelect, LineEdit },
@@ -297,8 +287,6 @@ export default {
       salStatusOptions: [],
       // 销售订单类型字典(mes_sal_order_type)
       salOrderTypeOptions: [],
-      // 审核驳回弹窗
-      rejectOpen: false, rejectTargetId: null, rejectTargetCode: '', rejectRemark: '',
       // 业务员选项列表(SysUser,存展示用姓名 nickName,与客户/成品销售的 salesperson 口径一致)
       userOptions: [],
       queryParams: { pageNum: 1, pageSize: 10, orderCode: null, orderName: null, clientName: null, clientOrderCode: null, businessLine: null, orderType: null, status: null, source: null },
@@ -320,6 +308,14 @@ export default {
   },
   created() { this.loadUserOptions(); this.loadStatusDict(); this.loadOrderTypeDict(); this.getList() },
   methods: {
+    /** 进度条展示模型：百分比兜底 0；CLOSED/CANCEL 走 exception，满进度走 success */
+    progressBar(row) {
+      const percentage = Number(row.progressPercent || 0)
+      const terminated = row.status === 'CLOSED' || row.status === 'CANCEL'
+      return { percentage, status: terminated ? 'exception' : percentage >= PROGRESS_FULL ? 'success' : '' }
+    },
+    /** 已派生未取消工单（含未开工）：改/删必须隐藏，后端闸门同样拦截 */
+    hasWorkorder(row) { return Number(row.workorderCount || 0) > 0 },
     /** 业务员下拉数据源：按展示名去重(重复 value 会导致 el-select 的 filterable 过滤失效) */
     loadUserOptions() {
       listUser({ pageSize: 999 }).then(r => {
@@ -331,7 +327,7 @@ export default {
         })
       })
     },
-    getList() { this.loading = true; listOrder(this.queryParams).then(r => { this.orderList = r.rows; this.total = r.total; this.loading = false }).catch(() => { this.loading = false }) },
+    getList() { this.loading = true; listOrder({ ...this.queryParams, includeProgress: true }).then(r => { this.orderList = r.rows; this.total = r.total; this.loading = false }).catch(() => { this.loading = false }) },
     /** 加载销售订单状态字典 */
     loadStatusDict() { getDicts('mes_sal_order_status').then(r => { this.salStatusOptions = r.data || [] }) },
     /** 加载销售订单类型字典 */
@@ -351,7 +347,7 @@ export default {
     sourceTag(s) { return s === 2 ? 'warning' : 'info' },
     cancel() { this.open = false; this.reset() },
     reset() {
-      this.form = { orderId: null, orderCode: null, orderName: null, orderType: 'NEW', clientId: null, clientCode: null, clientName: null, clientOrderCode: null, salesperson: null, businessLine: null, sampleFlag: 'N', orderDate: null, requestDate: null, totalAmount: 0, paymentMethod: null, status: 'PREPARE', remark: null }
+      this.form = { orderId: null, orderCode: null, orderName: null, orderType: 'NEW', clientId: null, clientCode: null, clientName: null, clientOrderCode: null, salesperson: null, businessLine: null, sampleFlag: 'N', orderDate: null, requestDate: null, totalAmount: 0, paymentMethod: null, status: 'CONFIRMED', remark: null }
       this.optType = undefined; this.lineList = []; this.autoGenFlag = true; this.resetForm('form')
     },
     handleQuery() { this.queryParams.pageNum = 1; this.getList() },
@@ -361,7 +357,7 @@ export default {
     handleSelectClient() { this.$refs.clientSelectRef.open() },
     onClientSelected(row) { this.form.clientId = row.clientId; this.form.clientCode = row.clientCode; this.form.clientName = row.clientName; this.form.clientNick = row.clientNick; this.form.salesperson = row.salesperson || null; this.form.businessLine = row.clientType || null },
     handleAdd() { this.reset(); this.optType = 'add'; this.handleAutoGenChange(true); this.open = true; this.title = '新增销售订单' },
-    /** 跳转只读详情页（展示审核人/审核时间/明细） */
+    /** 跳转只读详情页（展示状态/生产进度/明细） */
     handleView(row) { this.$router.push({ path: '/mes/sal/order_detail', query: { orderId: row.orderId } }) },
     handleUpdate(row) {
       this.reset(); this.optType = 'edit'; const id = row.orderId || this.ids
@@ -385,33 +381,8 @@ export default {
         fn(payload).then(() => { this.$modal.msgSuccess(this.form.orderId ? '修改成功' : '新增成功'); this.open = false; this.getList() })
       })
     },
-    handleSubmit(row) { this.$modal.confirm('提交审核销售订单 "' + row.orderCode + '" ?').then(() => submitOrder(row.orderId)).then(() => { this.getList(); this.$modal.msgSuccess('已提交审核') }).catch(() => {}) },
-    handleApprove(row) { this.$modal.confirm('审核通过销售订单 "' + row.orderCode + '" ?').then(() => approveOrder(row.orderId)).then(() => { this.getList(); this.$modal.msgSuccess('审核通过') }).catch(() => {}) },
-    handleReject(row) { this.rejectTargetId = row.orderId; this.rejectTargetCode = row.orderCode; this.rejectRemark = ''; this.rejectOpen = true },
-    confirmReject() {
-      if (!this.rejectRemark.trim()) { this.$modal.msgWarning('请填写驳回原因'); return }
-      rejectOrder(this.rejectTargetId, this.rejectRemark.trim()).then(() => { this.rejectOpen = false; this.getList(); this.$modal.msgSuccess('已驳回') }).catch(() => {})
-    },
-    handleBatchSubmit() {
-      this.$modal.confirm('确认批量提交选中的 ' + this.ids.length + ' 张订单？').then(() =>
-        batchSubmitOrder(this.ids)
-      ).then(r => this.reportBatch(r.data, '提交')).catch(() => {})
-    },
-    handleBatchApprove() {
-      this.$modal.confirm('确认批量审核通过选中的 ' + this.ids.length + ' 张订单？').then(() =>
-        batchApproveOrder(this.ids)
-      ).then(r => this.reportBatch(r.data, '审核')).catch(() => {})
-    },
-    /** 批量结果汇总提示 */
-    reportBatch(res, action) {
-      this.getList()
-      const fail = res.failedCount || 0
-      if (fail === 0) { this.$modal.msgSuccess('批量' + action + '成功 ' + res.successCount + ' 张'); return }
-      const names = (res.failures || []).map(f => f.orderCode + '(' + f.reason + ')').join('，')
-      this.$modal.msgWarning('成功 ' + res.successCount + ' 张，失败 ' + fail + ' 张：' + names)
-    },
-    handleClose(row) { this.$modal.confirm('确认关闭 "' + row.orderCode + '" ?关闭后不可恢复。').then(() => closeOrder(row.orderId)).then(() => { this.getList(); this.$modal.msgSuccess('关闭成功') }).catch(() => {}) },
-    handleCancel(row) { this.$modal.confirm('确认取消 "' + row.orderCode + '" ?').then(() => cancelOrder(row.orderId)).then(() => { this.getList(); this.$modal.msgSuccess('取消成功') }).catch(() => {}) },
+    handleClose(row) { this.$modal.confirm('确认结单 "' + row.orderCode + '"？结单后不可恢复。').then(() => closeOrder(row.orderId)).then(() => { this.getList(); this.$modal.msgSuccess('结单成功') }).catch(() => {}) },
+    handleCancel(row) { this.$modal.confirm('确认取消 "' + row.orderCode + '" ?').then(() => cancelOrder(row.orderId)).then(() => { this.getList(); this.$modal.msgSuccess('取消成功，关联工单需另行处理') }).catch(() => {}) },
     handleDelete(row) { const ids = row.orderId || this.ids; this.$modal.confirm('是否确认删除销售订单 "' + ids + '" ?').then(() => delOrder(ids)).then(() => { this.getList(); this.$modal.msgSuccess('删除成功') }).catch(() => {}) },
     handleToWorkorder(row) {
       this.twOrderCode = row.orderCode; this.twOpen = true; this.twStep = 1; this.twAutoGenFlag = true
@@ -520,8 +491,10 @@ export default {
     }
   },
   computed: {
-    /** 顶部「修改」仅当选中行均为待提交(PREPARE)才可用 */
-    canEditSelected() { return this.selectedRows.length > 0 && this.selectedRows.every(r => r.status === 'PREPARE') },
+    /** 顶部「修改」：选中行均 CONFIRMED 且均未派生工单（含未开工）才可用 */
+    canEditSelected() { return this.selectedRows.length > 0 && this.selectedRows.every(r => r.status === 'CONFIRMED' && !this.hasWorkorder(r)) },
+    /** 顶部「删除」：同修改口径，CONFIRMED 且未派生工单 */
+    canDeleteSelected() { return this.selectedRows.length > 0 && this.selectedRows.every(r => r.status === 'CONFIRMED' && !this.hasWorkorder(r)) },
     twProcessGroupList() {
       const procs = this.twRouteProcesses
       return procs.map(p => ({

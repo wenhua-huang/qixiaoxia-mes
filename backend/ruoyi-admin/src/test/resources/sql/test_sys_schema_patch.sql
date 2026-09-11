@@ -195,3 +195,39 @@ SET @sql = IF(@col_exists = 0,
     'ALTER TABLE qxx_pro_doc_generation_log ADD COLUMN source_feedback_id bigint DEFAULT NULL COMMENT ''触发单据的报工record_id''',
     'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- V88 的 qxx_wm_product_sales_box：ry 旧基线/manual_tables 均无（Flyway baseline=136 不重放 V88）。
+-- V151 存量 SHIPPED 回填在 Flyway 阶段即引用本表，必须在 sql.init（先于 Flyway）补齐；
+-- DDL 与 SalOrderIT.ensureShipmentBoxTable 逐列一致，IF NOT EXISTS 幂等。
+CREATE TABLE IF NOT EXISTS qxx_wm_product_sales_box (
+  box_id bigint NOT NULL AUTO_INCREMENT COMMENT '装箱ID',
+  factory_id bigint NOT NULL COMMENT '工厂ID',
+  sales_id bigint NOT NULL COMMENT '销售出库单ID',
+  line_id bigint DEFAULT NULL COMMENT '出库行ID',
+  box_no varchar(32) NOT NULL COMMENT '箱号',
+  item_id bigint DEFAULT NULL COMMENT '物料ID',
+  item_code varchar(64) DEFAULT '' COMMENT '物料编码快照',
+  item_name varchar(200) DEFAULT '' COMMENT '物料名称快照',
+  specification varchar(200) DEFAULT '' COMMENT '规格快照',
+  quantity decimal(16,4) DEFAULT 0.0000 COMMENT '本箱数量',
+  unit_of_measure varchar(64) DEFAULT '' COMMENT '计量单位编码',
+  unit_name varchar(64) DEFAULT '' COMMENT '单位名称',
+  box_spec varchar(100) DEFAULT '' COMMENT '箱规描述',
+  box_length decimal(10,2) DEFAULT 0.00 COMMENT '箱长cm',
+  box_width decimal(10,2) DEFAULT 0.00 COMMENT '箱宽cm',
+  box_height decimal(10,2) DEFAULT 0.00 COMMENT '箱高cm',
+  volume decimal(12,4) DEFAULT 0.0000 COMMENT '体积m3',
+  weight decimal(12,4) DEFAULT 0.0000 COMMENT '重量kg',
+  shipment_id bigint DEFAULT NULL COMMENT '关联发运单ID',
+  status varchar(20) DEFAULT 'PACKED' COMMENT 'PACKED/SHIPPED',
+  remark varchar(500) DEFAULT '' COMMENT '备注',
+  create_by varchar(64) DEFAULT '' COMMENT '创建者',
+  create_time datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_by varchar(64) DEFAULT '' COMMENT '更新者',
+  update_time datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (box_id),
+  KEY idx_factory_id (factory_id),
+  KEY idx_sales_id (sales_id),
+  KEY idx_shipment_id (shipment_id),
+  KEY idx_line_id (line_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='销售出库-装箱明细';

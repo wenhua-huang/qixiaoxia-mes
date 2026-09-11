@@ -2,7 +2,6 @@ package com.ruoyi.web.controller.mes.sal;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -13,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.controller.BaseController;
@@ -49,12 +49,19 @@ public class SalOrderController extends BaseController
     @Autowired
     private SalOrderDetailExcelExporter excelExporter;
 
+    /**
+     * 查询销售订单列表
+     *
+     * @param includeProgress 为 true 时批量回填生产进度（任务数量口径），仅列表页需要时传入
+     */
     @PreAuthorize("@ss.hasPermi('mes:sal:order:list')")
     @GetMapping("/list")
-    public TableDataInfo list(SalOrder salOrder)
+    public TableDataInfo list(SalOrder salOrder,
+            @RequestParam(required = false, defaultValue = "false") boolean includeProgress)
     {
         startPage();
         List<SalOrder> list = salOrderService.selectSalOrderList(salOrder);
+        if (includeProgress) salOrderService.enrichOrderProgress(list);
         return getDataTable(list);
     }
 
@@ -147,49 +154,8 @@ public class SalOrderController extends BaseController
         return AjaxResult.success(salOrderService.updateWithLines(req));
     }
 
-    @PreAuthorize("@ss.hasPermi('mes:sal:order:submit')")
-    @Log(title = "销售订单提交审核", businessType = BusinessType.UPDATE)
-    @PutMapping("/submit/{orderId}")
-    public AjaxResult submit(@PathVariable("orderId") Long orderId)
-    {
-        return toAjax(salOrderService.submitOrder(orderId));
-    }
-
-    @PreAuthorize("@ss.hasPermi('mes:sal:order:submit')")
-    @Log(title = "销售订单批量提交审核", businessType = BusinessType.UPDATE)
-    @PutMapping("/batchSubmit")
-    public AjaxResult batchSubmit(@RequestBody(required = false) List<Long> orderIds)
-    {
-        return AjaxResult.success(salOrderService.batchSubmit(toIdArray(orderIds)));
-    }
-
-    @PreAuthorize("@ss.hasPermi('mes:sal:order:approve')")
-    @Log(title = "销售订单审核通过", businessType = BusinessType.UPDATE)
-    @PutMapping("/approve/{orderId}")
-    public AjaxResult approve(@PathVariable("orderId") Long orderId)
-    {
-        return toAjax(salOrderService.approveOrder(orderId));
-    }
-
-    @PreAuthorize("@ss.hasPermi('mes:sal:order:approve')")
-    @Log(title = "销售订单批量审核通过", businessType = BusinessType.UPDATE)
-    @PutMapping("/batchApprove")
-    public AjaxResult batchApprove(@RequestBody(required = false) List<Long> orderIds)
-    {
-        return AjaxResult.success(salOrderService.batchApprove(toIdArray(orderIds)));
-    }
-
-    @PreAuthorize("@ss.hasPermi('mes:sal:order:approve')")
-    @Log(title = "销售订单审核驳回", businessType = BusinessType.UPDATE)
-    @PutMapping("/reject/{orderId}")
-    public AjaxResult reject(@PathVariable("orderId") Long orderId, @RequestBody(required = false) Map<String, String> body)
-    {
-        String remark = body != null ? body.get("remark") : null;
-        return toAjax(salOrderService.rejectOrder(orderId, remark));
-    }
-
     @PreAuthorize("@ss.hasPermi('mes:sal:order:edit')")
-    @Log(title = "销售订单关闭", businessType = BusinessType.UPDATE)
+    @Log(title = "销售订单结单", businessType = BusinessType.UPDATE)
     @PutMapping("/close/{orderId}")
     public AjaxResult close(@PathVariable("orderId") Long orderId)
     {
@@ -219,11 +185,5 @@ public class SalOrderController extends BaseController
     public AjaxResult remove(@PathVariable Long[] orderIds)
     {
         return toAjax(salOrderService.deleteSalOrderByOrderIds(orderIds));
-    }
-
-    /** 空 body 兜底:转空数组交由 service 抛"未选择销售订单",避免 NPE 返回 500 */
-    private static Long[] toIdArray(List<Long> ids)
-    {
-        return ids == null ? new Long[0] : ids.toArray(Long[]::new);
     }
 }

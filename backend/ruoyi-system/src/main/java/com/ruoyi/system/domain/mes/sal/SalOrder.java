@@ -68,7 +68,7 @@ public class SalOrder extends BaseEntity
     @Excel(name = "付款方式")
     private String paymentMethod;
 
-    @Excel(name = "状态", readConverterExp = "PREPARE=待提交,PENDING=待审核,CONFIRMED=已确认,CLOSED=已关闭,CANCEL=已取消")
+    @Excel(name = "状态", readConverterExp = "CONFIRMED=已确认,PRODUCING=生产中,SHIPPED=已出货,CLOSED=已结单,CANCEL=已取消")
     private String status;
 
     @Excel(name = "审核人")
@@ -78,11 +78,20 @@ public class SalOrder extends BaseEntity
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date approveTime;
 
-    /** 审核意见/驳回原因（驳回时必填） */
+    /** 历史审核意见（审核流已废弃，保留列不写入） */
     private String approveRemark;
 
     /** 明细行列表(详情接口返回时填充,非DB字段) */
     private transient List<SalOrderLine> lines;
+
+    /** 生产进度百分比 0-100（任务口径实时聚合，非DB字段） */
+    private transient Integer progressPercent;
+
+    /** 已派生未取消工单数（改/删闸门与列表按钮依据，非DB字段） */
+    private transient Integer workorderCount;
+
+    /** 列表查询：多状态过滤（非DB字段） */
+    private transient java.util.List<String> statusList;
 
     public Long getOrderId() { return orderId; }
     public void setOrderId(Long v) { this.orderId = v; }
@@ -130,4 +139,10 @@ public class SalOrder extends BaseEntity
     public void setApproveRemark(String v) { this.approveRemark = v; }
     public List<SalOrderLine> getLines() { return lines; }
     public void setLines(List<SalOrderLine> lines) { this.lines = lines; }
+    public Integer getProgressPercent() { return progressPercent; }
+    public void setProgressPercent(Integer v) { this.progressPercent = v; }
+    public Integer getWorkorderCount() { return workorderCount; }
+    public void setWorkorderCount(Integer v) { this.workorderCount = v; }
+    public java.util.List<String> getStatusList() { return statusList; }
+    public void setStatusList(java.util.List<String> v) { this.statusList = v; }
 }

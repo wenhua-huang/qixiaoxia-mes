@@ -72,6 +72,7 @@ class ProWorkorderServiceUnitTest {
     @Mock private OutsourceIssueHelper outsourceIssueHelper;
     @Mock private RedisLockTemplate lockTemplate;
     @Mock private PlatformTransactionManager transactionManager;
+    @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
     @InjectMocks private ProWorkorderServiceImpl workorderService;
 
     private ProWorkorder testWorkorder;
@@ -362,6 +363,38 @@ class ProWorkorderServiceUnitTest {
         ArgumentCaptor<ProWorkorder> captor = ArgumentCaptor.forClass(ProWorkorder.class);
         verify(workorderMapper).updateProWorkorder(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo("PRODUCING");
+    }
+
+    @Test
+    @DisplayName("4b. 销售来源工单开工：发布 WorkorderStartedEvent")
+    void startProduction_salesOrderWo_publishesEvent() {
+        testWorkorder.setStatus("PREPARE");
+        testWorkorder.setSalesOrderLineId(7L);
+        testWorkorder.setFactoryId(1L);
+        when(workorderMapper.selectProWorkorderByWorkorderId(1L)).thenReturn(testWorkorder);
+        when(workorderMapper.updateProWorkorder(any(ProWorkorder.class))).thenReturn(1);
+
+        workorderService.startProduction(1L);
+
+        // (Object) 强转锁定 publishEvent(Object) 重载：事件为普通 POJO，不继承 ApplicationEvent
+        verify(eventPublisher).publishEvent((Object) argThat(e -> e instanceof com.ruoyi.system.event.mes.WorkorderStartedEvent
+                && ((com.ruoyi.system.event.mes.WorkorderStartedEvent) e).getWorkorderId().equals(1L)
+                && ((com.ruoyi.system.event.mes.WorkorderStartedEvent) e).getSalesOrderLineId().equals(7L)
+                && ((com.ruoyi.system.event.mes.WorkorderStartedEvent) e).getFactoryId().equals(1L)));
+    }
+
+    @Test
+    @DisplayName("4c. 非销售来源工单开工：不发事件")
+    void startProduction_manualWo_noEvent() {
+        testWorkorder.setStatus("PREPARE");
+        testWorkorder.setSalesOrderLineId(null);
+        when(workorderMapper.selectProWorkorderByWorkorderId(1L)).thenReturn(testWorkorder);
+        when(workorderMapper.updateProWorkorder(any(ProWorkorder.class))).thenReturn(1);
+
+        workorderService.startProduction(1L);
+
+        // 同样锁定 Object 重载，确保错误发布（走 Object 重载）也能被本断言捕获
+        verify(eventPublisher, never()).publishEvent((Object) any());
     }
 
     // ══════════════════════════════════════════════

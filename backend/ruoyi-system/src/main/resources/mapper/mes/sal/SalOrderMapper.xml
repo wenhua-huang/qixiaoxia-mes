@@ -48,14 +48,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="clientOrderCode != null  and clientOrderCode != ''"> and client_order_code like concat('%', #{clientOrderCode}, '%')</if>
             <if test="businessLine != null  and businessLine != ''"> and business_line = #{businessLine}</if>
             <if test="orderType != null  and orderType != ''"> and order_type = #{orderType}</if>
-            <if test="status != null  and status != ''"> and status = #{status}</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+            <if test="statusList != null and statusList.size() > 0">
+                and status in
+                <foreach collection="statusList" item="st" open="(" separator="," close=")">#{st}</foreach>
+            </if>
         </where>
         order by order_id desc
     </select>
 
     <select id="selectSalOrderAllConvertible" resultMap="SalOrderResult">
         <include refid="selectSalOrderVo"/>
-        where status = 'CONFIRMED'
+        where status in ('CONFIRMED', 'PRODUCING')
         order by order_id desc
     </select>
 
@@ -167,5 +171,99 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             #{orderId}
         </foreach>
     </delete>
+
+    <!-- 订单进度=Σ任务已报工数/Σ任务计划数（排已取消工单/任务）。主表 l.factory_id 由拦截器注入 -->
+    <select id="selectProgressByOrderIds"
+            resultType="com.ruoyi.system.domain.mes.sal.vo.SalOrderProgressRow">
+        SELECT l.order_id AS orderId,
+               LEAST(100, ROUND(COALESCE(SUM(t.quantity_produced), 0)
+                     / NULLIF(SUM(t.quantity), 0) * 100, 0)) AS progressPercent
+        FROM qxx_sal_order_line l
+        INNER JOIN qxx_pro_workorder w ON w.sales_order_line_id = l.line_id AND w.factory_id = l.factory_id
+                                      AND w.status != 'CANCEL'
+        INNER JOIN qxx_pro_task t ON t.workorder_id = w.workorder_id AND t.factory_id = w.factory_id
+                                 AND t.status != 'CANCEL'
+        WHERE l.order_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+        GROUP BY l.order_id
+    </select>
+
+    <!-- 各订单已派生未取消工单数（改/删闸门与列表按钮依据）。主表 l.factory_id 由拦截器注入 -->
+    <select id="selectWorkorderCountsByOrderIds"
+            resultType="com.ruoyi.system.domain.mes.sal.vo.SalOrderWorkorderCountRow">
+        SELECT l.order_id AS orderId, COUNT(DISTINCT w.workorder_id) AS workorderCount
+        FROM qxx_sal_order_line l
+        INNER JOIN qxx_pro_workorder w ON w.sales_order_line_id = l.line_id AND w.factory_id = l.factory_id
+                                      AND w.status != 'CANCEL'
+        WHERE l.order_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+        GROUP BY l.order_id
+    </select>
+
+    <!-- 开工推进：仅 CONFIRMED→PRODUCING，幂等；factory_id 显式（事件链路 @SkipFactoryId） -->
+    <update id="confirmProducing">
+        update qxx_sal_order
+        set status = 'PRODUCING', update_by = #{updateBy}, update_time = #{updateTime}
+        where order_id = #{orderId} and factory_id = #{factoryId} and status = 'CONFIRMED'
+    </update>
+
+    <!-- 发齐推进：不存在「订单行数量 > 该行在非作废出库单下 SHIPPED 箱量合计」的行 -->
+    <update id="markShippedIfFullyDelivered">
+        update qxx_sal_order o
+        set o.status = 'SHIPPED', o.update_by = #{updateBy}, o.update_time = #{updateTime}
+        where o.order_id = #{orderId}
+          and o.factory_id = #{factoryId}
+          and o.status in ('CONFIRMED', 'PRODUCING')
+          and not exists (
+              select 1 from qxx_sal_order_line l
+              left join (
+                  select sl.sales_order_line_id as sol_id, sum(b.quantity) as shipped_qty
+                  from qxx_wm_product_sales s
+                  inner join qxx_wm_product_sales_line sl on sl.sales_id = s.sales_id and sl.factory_id = s.factory_id
+                  inner join qxx_wm_product_sales_box b on b.line_id = sl.line_id and b.factory_id = sl.factory_id
+                                                       and b.status = 'SHIPPED'
+                  where s.sales_order_id = #{orderId}
+                    and s.factory_id = #{factoryId}
+                    and s.status &lt;&gt; 'CANCELED'
+                  group by sl.sales_order_line_id
+              ) x on x.sol_id = l.line_id
+              where l.order_id = #{orderId}
+                and l.factory_id = #{factoryId}
+                and l.quantity &gt; coalesce(x.shipped_qty, 0)
+          )
+    </update>
+
+    <!-- 冲销复核：仍为 SHIPPED 但已不发齐时降级；有未取消工单→PRODUCING，否则→CONFIRMED。与发齐推进同箱量口径 -->
+    <update id="demoteShippedIfNotFullyDelivered">
+        update qxx_sal_order o
+        set o.status = case
+                when exists (
+                    select 1 from qxx_sal_order_line l2
+                    inner join qxx_pro_workorder w2 on w2.sales_order_line_id = l2.line_id
+                        and w2.factory_id = l2.factory_id and w2.status != 'CANCEL'
+                    where l2.order_id = #{orderId} and l2.factory_id = #{factoryId}
+                ) then 'PRODUCING' else 'CONFIRMED' end,
+            o.update_by = #{updateBy}, o.update_time = #{updateTime}
+        where o.order_id = #{orderId}
+          and o.factory_id = #{factoryId}
+          and o.status = 'SHIPPED'
+          and exists (
+              select 1 from qxx_sal_order_line l
+              left join (
+                  select sl.sales_order_line_id as sol_id, sum(b.quantity) as shipped_qty
+                  from qxx_wm_product_sales s
+                  inner join qxx_wm_product_sales_line sl on sl.sales_id = s.sales_id and sl.factory_id = s.factory_id
+                  inner join qxx_wm_product_sales_box b on b.line_id = sl.line_id and b.factory_id = sl.factory_id
+                                                       and b.status = 'SHIPPED'
+                  where s.sales_order_id = #{orderId}
+                    and s.factory_id = #{factoryId}
+                    and s.status &lt;&gt; 'CANCELED'
+                  group by sl.sales_order_line_id
+              ) x on x.sol_id = l.line_id
+              where l.order_id = #{orderId}
+                and l.factory_id = #{factoryId}
+                and l.quantity &gt; coalesce(x.shipped_qty, 0)
+          )
+    </update>
 
 </mapper>

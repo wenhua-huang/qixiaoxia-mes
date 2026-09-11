@@ -140,4 +140,14 @@ class ProFeedbackServiceUnitTest {
         int result = feedbackService.deleteProFeedbackByRecordIds(ids);
         assertThat(result).isEqualTo(3);
     }
+
+    @Test
+    @DisplayName("架构防线：报工服务不得依赖任何 sal 域类型（D1 报工不动订单状态）")
+    void feedbackService_hasNoSalDependency() {
+        for (java.lang.reflect.Field f :
+                com.ruoyi.system.service.mes.pro.impl.ProFeedbackServiceImpl.class.getDeclaredFields()) {
+            String typeName = f.getType().getName();
+            org.assertj.core.api.Assertions.assertThat(typeName).doesNotContain(".mes.sal.");
+        }
+    }
 }

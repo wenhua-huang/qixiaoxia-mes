@@ -1,19 +1,16 @@
 package com.ruoyi.system.service.mes.sal.impl;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.ruoyi.common.core.redis.RedisLockTemplate;
 import com.ruoyi.common.enums.SalOrderStatus;
 import com.ruoyi.common.exception.ServiceException;
@@ -30,6 +27,8 @@ import com.ruoyi.system.domain.mes.sal.SalOrder;
 import com.ruoyi.system.domain.mes.sal.SalOrderCreateRequest;
 import com.ruoyi.system.domain.mes.sal.SalOrderLine;
 import com.ruoyi.system.domain.mes.sal.SalOrderToWorkorderRequest;
+import com.ruoyi.system.domain.mes.sal.vo.SalOrderProgressRow;
+import com.ruoyi.system.domain.mes.sal.vo.SalOrderWorkorderCountRow;
 import com.ruoyi.system.mapper.mes.md.MdItemMapper;
 import com.ruoyi.system.mapper.mes.sal.SalOrderLineMapper;
 import com.ruoyi.system.mapper.mes.sal.SalOrderMapper;
@@ -51,8 +50,6 @@ import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 @Service
 public class SalOrderServiceImpl implements ISalOrderService
 {
-    private static final Logger log = LoggerFactory.getLogger(SalOrderServiceImpl.class);
-
     @Autowired
     private SalOrderMapper salOrderMapper;
 
@@ -117,7 +114,8 @@ public class SalOrderServiceImpl implements ISalOrderService
     {
         SalOrder order = req.getOrder();
         validateOrderCode(order);
-        if (order.getStatus() == null) order.setStatus(SalOrderStatus.PREPARE.getCode());
+        // 建单即已确认（审核流已废弃），忽略前端可能传入的旧状态
+        order.setStatus(SalOrderStatus.CONFIRMED.getCode());
         if (order.getOrderType() == null) order.setOrderType("NEW");
         if (order.getSampleFlag() == null) order.setSampleFlag("N");
         if (order.getSource() == null) order.setSource(SalConstants.SOURCE_DIRECT);
@@ -146,8 +144,8 @@ public class SalOrderServiceImpl implements ISalOrderService
         order.setRemark(req.getRemark());
         order.setOrderType("NEW");
         order.setSampleFlag("N");
-        // CRM 推单无 MES 内"提交"动作，到 MES 即待审核
-        order.setStatus(SalOrderStatus.PENDING.getCode());
+        // CRM 推单无 MES 内"提交/审核"动作，到 MES 即已确认
+        order.setStatus(SalOrderStatus.CONFIRMED.getCode());
         order.setSource(SalConstants.SOURCE_CRM);
 
         if (req.getLines() == null || req.getLines().isEmpty())
@@ -198,14 +196,19 @@ public class SalOrderServiceImpl implements ISalOrderService
         validateOrderCode(order);
         SalOrder existing = salOrderMapper.selectSalOrderByOrderId(order.getOrderId());
         if (existing == null) throw new ServiceException("销售订单不存在");
-        if (!SalOrderStatus.PREPARE.is(existing.getStatus()))
-        {
-            throw new ServiceException("仅待提交(PREPARE)订单可修改,审核中/已确认订单不可改,如需调整请先驳回或取消");
+        if (!SalOrderStatus.CONFIRMED.is(existing.getStatus())) {
+            throw new ServiceException("仅已确认(CONFIRMED)订单可修改,生产中已派生工单不可改,如需调整请取消后重建");
         }
+        assertNoDerivedWorkorder(order.getOrderId(), "修改");
+        order.setStatus(existing.getStatus()); // 状态不允许经编辑接口篡改
+        // 审核历史列为留存字段,不允许经编辑接口覆写,强制以库中值为准
+        order.setApproveBy(existing.getApproveBy());
+        order.setApproveTime(existing.getApproveTime());
+        order.setApproveRemark(existing.getApproveRemark());
         order.setUpdateBy(SecurityUtils.getUsername());
         order.setUpdateTime(DateUtils.getNowDate());
         salOrderMapper.updateSalOrder(order);
-        // PREPARE 状态无转工单,可安全全量替换行(line_id 重置不影响 FK)
+        // CONFIRMED 且未派生工单才可整单改单,全量替换行（派生工单即使未开工也被上面闸门拦截，避免工单引用成孤儿）
         salOrderLineMapper.deleteSalOrderLineByOrderId(order.getOrderId());
         saveLines(order.getOrderId(), req.getLines(), true);
         return order;
@@ -224,86 +227,43 @@ public class SalOrderServiceImpl implements ISalOrderService
                 fillConvertible(line);
             }
         }
+        enrichOrderProgress(List.of(order));
         order.setLines(lines);
         return order;
     }
 
     @Override
-    public int submitOrder(Long orderId)
+    public void enrichOrderProgress(List<SalOrder> list)
     {
-        SalOrder order = mustExist(orderId);
-        if (!SalOrderStatus.PREPARE.is(order.getStatus()))
+        if (list == null || list.isEmpty()) return;
+        List<Long> ids = list.stream().map(SalOrder::getOrderId).collect(Collectors.toList());
+        Map<Long, Integer> pmap = new HashMap<>();
+        for (SalOrderProgressRow r : salOrderMapper.selectProgressByOrderIds(ids))
         {
-            throw new ServiceException("仅待提交(PREPARE)订单可提交审核,当前状态:" + order.getStatus());
+            pmap.put(r.getOrderId(), r.getProgressPercent());
         }
-        List<SalOrderLine> lines = salOrderLineMapper.selectSalOrderLineByOrderId(orderId);
-        if (lines == null || lines.isEmpty()) throw new ServiceException("订单无明细行,不可提交审核");
-        // 重新提交清空上次驳回原因
-        SalOrder update = new SalOrder();
-        update.setOrderId(orderId);
-        update.setStatus(SalOrderStatus.PENDING.getCode());
-        update.setApproveRemark("");
-        update.setUpdateBy(SecurityUtils.getUsername());
-        update.setUpdateTime(DateUtils.getNowDate());
-        return salOrderMapper.updateSalOrder(update);
-    }
-
-    @Override
-    public int approveOrder(Long orderId)
-    {
-        SalOrder order = mustExist(orderId);
-        if (!SalOrderStatus.PENDING.is(order.getStatus()))
+        Map<Long, Integer> wmap = new HashMap<>();
+        List<SalOrderWorkorderCountRow> crows = salOrderMapper.selectWorkorderCountsByOrderIds(ids);
+        if (crows != null)
         {
-            throw new ServiceException("仅待审核(PENDING)订单可审核,当前状态:" + order.getStatus());
+            for (SalOrderWorkorderCountRow r : crows)
+            {
+                wmap.put(r.getOrderId(), r.getWorkorderCount() == null ? 0 : r.getWorkorderCount());
+            }
         }
-        List<SalOrderLine> lines = salOrderLineMapper.selectSalOrderLineByOrderId(orderId);
-        if (lines == null || lines.isEmpty()) throw new ServiceException("订单无明细行,不可审核通过");
-        SalOrder update = new SalOrder();
-        update.setOrderId(orderId);
-        update.setStatus(SalOrderStatus.CONFIRMED.getCode());
-        update.setApproveBy(SecurityUtils.getUsername());
-        update.setApproveTime(DateUtils.getNowDate());
-        update.setUpdateBy(SecurityUtils.getUsername());
-        update.setUpdateTime(DateUtils.getNowDate());
-        return salOrderMapper.updateSalOrder(update);
-    }
-
-    @Override
-    public int rejectOrder(Long orderId, String remark)
-    {
-        if (StringUtils.isEmpty(remark)) throw new ServiceException("驳回必须填写审核意见");
-        SalOrder order = mustExist(orderId);
-        if (!SalOrderStatus.PENDING.is(order.getStatus()))
+        // 无聚合行（无未取消任务/工单）的订单在 SQL 结果中缺席，回填 0
+        for (SalOrder o : list)
         {
-            throw new ServiceException("仅待审核(PENDING)订单可驳回,当前状态:" + order.getStatus());
+            o.setProgressPercent(pmap.getOrDefault(o.getOrderId(), 0));
+            o.setWorkorderCount(wmap.getOrDefault(o.getOrderId(), 0));
         }
-        SalOrder update = new SalOrder();
-        update.setOrderId(orderId);
-        update.setStatus(SalOrderStatus.PREPARE.getCode());
-        update.setApproveRemark(remark);
-        // PENDING 态尚未审核通过,approveBy/approveTime 仍为 null,无需清空;保留驳回意见供提交人查看
-        update.setUpdateBy(SecurityUtils.getUsername());
-        update.setUpdateTime(DateUtils.getNowDate());
-        return salOrderMapper.updateSalOrder(update);
-    }
-
-    @Override
-    public Map<String, Object> batchSubmit(Long[] orderIds)
-    {
-        return executeBatch(orderIds, this::submitOrder);
-    }
-
-    @Override
-    public Map<String, Object> batchApprove(Long[] orderIds)
-    {
-        return executeBatch(orderIds, this::approveOrder);
     }
 
     @Override
     public int closeOrder(Long orderId)
     {
         SalOrder order = mustExist(orderId);
-        if (!SalOrderStatus.CONFIRMED.is(order.getStatus())) throw new ServiceException("仅已确认订单可关闭");
+        if (!SalOrderStatus.SHIPPED.is(order.getStatus())) throw new ServiceException("仅已出货订单可结单");
         return updateStatus(orderId, SalOrderStatus.CLOSED.getCode());
     }
 
@@ -311,8 +271,11 @@ public class SalOrderServiceImpl implements ISalOrderService
     public int cancelOrder(Long orderId)
     {
         SalOrder order = mustExist(orderId);
-        if (SalOrderStatus.CLOSED.is(order.getStatus())) throw new ServiceException("已关闭订单不可取消");
-        if (SalOrderStatus.CANCEL.is(order.getStatus())) throw new ServiceException("订单已取消");
+        if (SalOrderStatus.SHIPPED.is(order.getStatus())
+                || SalOrderStatus.CLOSED.is(order.getStatus())
+                || SalOrderStatus.CANCEL.is(order.getStatus())) {
+            throw new ServiceException("已出货/已结单/已取消订单不可取消，关联工单需另行处理");
+        }
         return updateStatus(orderId, SalOrderStatus.CANCEL.getCode());
     }
 
@@ -324,11 +287,12 @@ public class SalOrderServiceImpl implements ISalOrderService
         {
             SalOrder order = salOrderMapper.selectSalOrderByOrderId(orderId);
             if (order == null) continue;
-            // 仅待提交(PREPARE)可删:CONFIRMED 可能已转工单,删除会使工单 sales_order_line_id 成孤儿
-            if (!SalOrderStatus.PREPARE.is(order.getStatus()))
+            // 仅已确认(CONFIRMED)可删:转工单后(PRODUCING 起)删除会使工单 sales_order_line_id 成孤儿
+            if (!SalOrderStatus.CONFIRMED.is(order.getStatus()))
             {
-                throw new ServiceException("订单 " + order.getOrderCode() + " 非待提交状态,不可删除");
+                throw new ServiceException("订单 " + order.getOrderCode() + " 非已确认状态,不可删除");
             }
+            assertNoDerivedWorkorder(orderId, "删除");
             salOrderLineMapper.deleteSalOrderLineByOrderId(orderId);
         }
         return salOrderMapper.deleteSalOrderByOrderIds(orderIds);
@@ -352,7 +316,10 @@ public class SalOrderServiceImpl implements ISalOrderService
         if (line == null) throw new ServiceException("销售订单明细行不存在");
         SalOrder order = salOrderMapper.selectSalOrderByOrderId(line.getOrderId());
         if (order == null) throw new ServiceException("销售订单不存在");
-        if (!SalOrderStatus.CONFIRMED.is(order.getStatus())) throw new ServiceException("仅已确认订单可转工单");
+        if (!SalOrderStatus.CONFIRMED.is(order.getStatus())
+                && !SalOrderStatus.PRODUCING.is(order.getStatus())) {
+            throw new ServiceException("仅已确认/生产中订单可转工单");
+        }
 
         BigDecimal produced = salOrderLineMapper.sumProducedQtyByLineId(req.getLineId());
         if (produced == null) produced = BigDecimal.ZERO;
@@ -414,7 +381,7 @@ public class SalOrderServiceImpl implements ISalOrderService
         wo.setCreateSkuVariant(req.getCreateSkuVariant());
         wo.setSkuCode(req.getSkuCode());
         wo.setSkuName(req.getSkuName());
-        wo.setStatus("PREPARE");
+        wo.setStatus("PREPARE"); // ProConstants 工单初态
         wo.setRemark(req.getRemark());
         return wo;
     }
@@ -469,6 +436,17 @@ public class SalOrderServiceImpl implements ISalOrderService
         return order;
     }
 
+    /** 改/删闸门：订单 CONFIRMED 但已派生工单（含未开工 PREPARE）时拒绝，避免行硬删使工单引用成孤儿+可转量重复占用 */
+    private void assertNoDerivedWorkorder(Long orderId, String action)
+    {
+        List<SalOrderWorkorderCountRow> rows =
+                salOrderMapper.selectWorkorderCountsByOrderIds(List.of(orderId));
+        if (rows != null && rows.stream().anyMatch(r -> r.getWorkorderCount() != null && r.getWorkorderCount() > 0))
+        {
+            throw new ServiceException("订单已派生工单，不可" + action + "，如需调整请取消后重建");
+        }
+    }
+
     private int updateStatus(Long orderId, String status)
     {
         SalOrder update = new SalOrder();
@@ -477,46 +455,5 @@ public class SalOrderServiceImpl implements ISalOrderService
         update.setUpdateBy(SecurityUtils.getUsername());
         update.setUpdateTime(DateUtils.getNowDate());
         return salOrderMapper.updateSalOrder(update);
-    }
-
-    /** 批量流转骨架:逐张调用单条动作,失败不中断,收集到 failures(仿 WmIssueHeaderServiceImpl) */
-    private Map<String, Object> executeBatch(Long[] orderIds, Consumer<Long> action)
-    {
-        if (orderIds == null || orderIds.length == 0)
-        {
-            throw new ServiceException("未选择销售订单");
-        }
-        int success = 0;
-        List<Map<String, Object>> failures = new ArrayList<>();
-        for (Long id : orderIds)
-        {
-            try
-            {
-                action.accept(id);
-                success++;
-            }
-            catch (Exception e)
-            {
-                // ServiceException 是预期业务失败,仅收集;非 ServiceException 留 warn 日志
-                if (!(e instanceof ServiceException))
-                {
-                    log.warn("批量流转失败(非业务异常), orderId={}", id, e);
-                }
-                SalOrder o = salOrderMapper.selectSalOrderByOrderId(id);
-                Map<String, Object> f = new HashMap<>();
-                f.put("orderId", id);
-                f.put("orderCode", o != null ? o.getOrderCode() : null);
-                f.put("orderName", o != null ? o.getOrderName() : null);
-                String msg = e.getMessage();
-                f.put("reason", (msg != null && !msg.isEmpty()) ? msg : e.getClass().getSimpleName());
-                failures.add(f);
-            }
-        }
-        Map<String, Object> r = new HashMap<>();
-        r.put("total", orderIds.length);
-        r.put("successCount", success);
-        r.put("failedCount", failures.size());
-        r.put("failures", failures);
-        return r;
     }
 }

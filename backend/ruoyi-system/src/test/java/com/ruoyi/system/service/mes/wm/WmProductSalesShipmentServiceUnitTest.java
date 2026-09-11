@@ -23,6 +23,7 @@ import com.ruoyi.common.enums.WmProductSalesConstants;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.system.event.mes.SalesShipmentCompletedEvent;
+import com.ruoyi.system.event.mes.SalesShipmentRevokedEvent;
 import com.ruoyi.system.domain.mes.wm.WmProductSales;
 import com.ruoyi.system.domain.mes.wm.WmProductSalesBox;
 import com.ruoyi.system.domain.mes.wm.WmProductSalesShipment;
@@ -98,6 +99,53 @@ class WmProductSalesShipmentServiceUnitTest {
         verify(salesMapper).updateWmProductSales(argThat(h ->
                 WmProductSalesConstants.SHIP_STATUS_PARTIAL_SHIPPED.equals(h.getShipStatus())
                         && !WmProductSalesConstants.STATUS_SHIPPED.equals(h.getStatus())));
+    }
+
+    @Test
+    @DisplayName("删除全量发运单：头表 SHIPPED→POSTED 且发布 SalesShipmentRevokedEvent")
+    void deleteFullShipment_publishesRevokeEvent() {
+        when(shipmentMapper.selectWmProductSalesShipmentByShipmentId(50L)).thenReturn(
+                buildInTransitShipment(50L, new BigDecimal("100")));
+        when(boxMapper.selectBoxesByShipmentId(50L)).thenReturn(List.of());
+        when(salesMapper.selectWmProductSalesBySalesId(1L)).thenReturn(
+                buildHeader(new BigDecimal("100"), new BigDecimal("100")));
+        when(shipmentMapper.selectShipmentsBySalesId(1L)).thenReturn(List.of());
+
+        shipmentService.deleteWmProductSalesShipmentByShipmentId(50L);
+
+        verify(eventPublisher).publishEvent(argThat((Object e) -> e instanceof SalesShipmentRevokedEvent
+                && ((SalesShipmentRevokedEvent) e).getSalesOrderId().equals(5L)
+                && ((SalesShipmentRevokedEvent) e).getSalesId().equals(1L)
+                && ((SalesShipmentRevokedEvent) e).getFactoryId().equals(1L)));
+        verify(salesMapper).updateWmProductSales(argThat(h ->
+                WmProductSalesConstants.STATUS_POSTED.equals(h.getStatus())
+                        && WmProductSalesConstants.SHIP_STATUS_UN_SHIPPED.equals(h.getShipStatus())));
+        verify(shipmentMapper).deleteWmProductSalesShipmentByShipmentId(50L);
+    }
+
+    @Test
+    @DisplayName("删除发运单但出库单未挂销售订单：不发冲销事件")
+    void deleteShipment_noOrder_noEvent() {
+        when(shipmentMapper.selectWmProductSalesShipmentByShipmentId(51L)).thenReturn(
+                buildInTransitShipment(51L, new BigDecimal("30")));
+        when(boxMapper.selectBoxesByShipmentId(51L)).thenReturn(List.of());
+        WmProductSales standalone = buildHeader(new BigDecimal("100"), new BigDecimal("30"));
+        standalone.setSalesOrderId(null);
+        when(salesMapper.selectWmProductSalesBySalesId(1L)).thenReturn(standalone);
+        when(shipmentMapper.selectShipmentsBySalesId(1L)).thenReturn(List.of());
+
+        shipmentService.deleteWmProductSalesShipmentByShipmentId(51L);
+
+        verify(eventPublisher, never()).publishEvent(argThat((Object e) -> e instanceof SalesShipmentRevokedEvent));
+        verify(shipmentMapper).deleteWmProductSalesShipmentByShipmentId(51L);
+    }
+
+    private WmProductSalesShipment buildInTransitShipment(Long id, BigDecimal shippedQty) {
+        WmProductSalesShipment s = new WmProductSalesShipment();
+        s.setShipmentId(id); s.setSalesId(1L);
+        s.setStatus(WmProductSalesConstants.SHIPMENT_STATUS_IN_TRANSIT);
+        s.setShippedQuantity(shippedQty);
+        return s;
     }
 
     /** POSTED+UN_SHIPPED 可发运；total=100，已发 alreadyShipped，挂销售订单 5 */

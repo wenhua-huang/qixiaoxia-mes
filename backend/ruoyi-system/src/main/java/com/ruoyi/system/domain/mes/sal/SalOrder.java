@@ -87,6 +87,9 @@ public class SalOrder extends BaseEntity
     /** 生产进度百分比 0-100（任务口径实时聚合，非DB字段） */
     private transient Integer progressPercent;
 
+    /** 已派生未取消工单数（改/删闸门与列表按钮依据，非DB字段） */
+    private transient Integer workorderCount;
+
     /** 列表查询：多状态过滤（非DB字段） */
     private transient java.util.List<String> statusList;
 
@@ -138,6 +141,8 @@ public class SalOrder extends BaseEntity
     public void setLines(List<SalOrderLine> lines) { this.lines = lines; }
     public Integer getProgressPercent() { return progressPercent; }
     public void setProgressPercent(Integer v) { this.progressPercent = v; }
+    public Integer getWorkorderCount() { return workorderCount; }
+    public void setWorkorderCount(Integer v) { this.workorderCount = v; }
     public java.util.List<String> getStatusList() { return statusList; }
     public void setStatusList(java.util.List<String> v) { this.statusList = v; }
 }

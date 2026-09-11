@@ -28,6 +28,7 @@ import com.ruoyi.system.domain.mes.sal.SalOrderCreateRequest;
 import com.ruoyi.system.domain.mes.sal.SalOrderLine;
 import com.ruoyi.system.domain.mes.sal.SalOrderToWorkorderRequest;
 import com.ruoyi.system.domain.mes.sal.vo.SalOrderProgressRow;
+import com.ruoyi.system.domain.mes.sal.vo.SalOrderWorkorderCountRow;
 import com.ruoyi.system.mapper.mes.md.MdItemMapper;
 import com.ruoyi.system.mapper.mes.sal.SalOrderLineMapper;
 import com.ruoyi.system.mapper.mes.sal.SalOrderMapper;
@@ -198,6 +199,7 @@ public class SalOrderServiceImpl implements ISalOrderService
         if (!SalOrderStatus.CONFIRMED.is(existing.getStatus())) {
             throw new ServiceException("仅已确认(CONFIRMED)订单可修改,生产中已派生工单不可改,如需调整请取消后重建");
         }
+        assertNoDerivedWorkorder(order.getOrderId(), "修改");
         order.setStatus(existing.getStatus()); // 状态不允许经编辑接口篡改
         // 审核历史列为留存字段,不允许经编辑接口覆写,强制以库中值为准
         order.setApproveBy(existing.getApproveBy());
@@ -206,7 +208,7 @@ public class SalOrderServiceImpl implements ISalOrderService
         order.setUpdateBy(SecurityUtils.getUsername());
         order.setUpdateTime(DateUtils.getNowDate());
         salOrderMapper.updateSalOrder(order);
-        // 仅 CONFIRMED 可整单改单（PRODUCING 起已派生工单，被上面门控拦截）,全量替换行
+        // CONFIRMED 且未派生工单才可整单改单,全量替换行（派生工单即使未开工也被上面闸门拦截，避免工单引用成孤儿）
         salOrderLineMapper.deleteSalOrderLineByOrderId(order.getOrderId());
         saveLines(order.getOrderId(), req.getLines(), true);
         return order;
@@ -240,10 +242,20 @@ public class SalOrderServiceImpl implements ISalOrderService
         {
             pmap.put(r.getOrderId(), r.getProgressPercent());
         }
-        // 无聚合行（无未取消任务）的订单在 SQL 结果中缺席，回填 0
+        Map<Long, Integer> wmap = new HashMap<>();
+        List<SalOrderWorkorderCountRow> crows = salOrderMapper.selectWorkorderCountsByOrderIds(ids);
+        if (crows != null)
+        {
+            for (SalOrderWorkorderCountRow r : crows)
+            {
+                wmap.put(r.getOrderId(), r.getWorkorderCount() == null ? 0 : r.getWorkorderCount());
+            }
+        }
+        // 无聚合行（无未取消任务/工单）的订单在 SQL 结果中缺席，回填 0
         for (SalOrder o : list)
         {
             o.setProgressPercent(pmap.getOrDefault(o.getOrderId(), 0));
+            o.setWorkorderCount(wmap.getOrDefault(o.getOrderId(), 0));
         }
     }
 
@@ -280,6 +292,7 @@ public class SalOrderServiceImpl implements ISalOrderService
             {
                 throw new ServiceException("订单 " + order.getOrderCode() + " 非已确认状态,不可删除");
             }
+            assertNoDerivedWorkorder(orderId, "删除");
             salOrderLineMapper.deleteSalOrderLineByOrderId(orderId);
         }
         return salOrderMapper.deleteSalOrderByOrderIds(orderIds);
@@ -421,6 +434,17 @@ public class SalOrderServiceImpl implements ISalOrderService
         SalOrder order = salOrderMapper.selectSalOrderByOrderId(orderId);
         if (order == null) throw new ServiceException("销售订单不存在");
         return order;
+    }
+
+    /** 改/删闸门：订单 CONFIRMED 但已派生工单（含未开工 PREPARE）时拒绝，避免行硬删使工单引用成孤儿+可转量重复占用 */
+    private void assertNoDerivedWorkorder(Long orderId, String action)
+    {
+        List<SalOrderWorkorderCountRow> rows =
+                salOrderMapper.selectWorkorderCountsByOrderIds(List.of(orderId));
+        if (rows != null && rows.stream().anyMatch(r -> r.getWorkorderCount() != null && r.getWorkorderCount() > 0))
+        {
+            throw new ServiceException("订单已派生工单，不可" + action + "，如需调整请取消后重建");
+        }
     }
 
     private int updateStatus(Long orderId, String status)

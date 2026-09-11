@@ -177,6 +177,62 @@ class SalOrderServiceImplTest
     }
 
     @Test
+    @DisplayName("updateWithLines - CONFIRMED 但已派生工单（含未开工）拒绝修改，不动头行")
+    void update_gate_derivedWorkorder() {
+        when(salOrderMapper.selectSalOrderByOrderId(1L)).thenReturn(buildOrder(1L, "SO1", "CONFIRMED"));
+        when(salOrderMapper.selectWorkorderCountsByOrderIds(anyList()))
+                .thenReturn(java.util.List.of(buildCountRow(1L, 1)));
+        SalOrderCreateRequest req = new SalOrderCreateRequest();
+        req.setOrder(buildOrder(1L, "SO1", "CONFIRMED"));
+
+        assertThatThrownBy(() -> salOrderService.updateWithLines(req))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("已派生工单");
+        verify(salOrderMapper, never()).updateSalOrder(any());
+        verify(salOrderLineMapper, never()).deleteSalOrderLineByOrderId(anyLong());
+    }
+
+    @Test
+    @DisplayName("updateWithLines - CONFIRMED 且无派生工单时正常整单改单")
+    void update_ok_noDerivedWorkorder() {
+        when(salOrderMapper.selectSalOrderByOrderId(1L)).thenReturn(buildOrder(1L, "SO1", "CONFIRMED"));
+        when(salOrderMapper.selectWorkorderCountsByOrderIds(anyList())).thenReturn(java.util.Collections.emptyList());
+        SalOrderCreateRequest req = new SalOrderCreateRequest();
+        req.setOrder(buildOrder(1L, "SO1", "CONFIRMED"));
+        req.setLines(Collections.emptyList());
+
+        salOrderService.updateWithLines(req);
+
+        verify(salOrderMapper).updateSalOrder(any());
+        verify(salOrderLineMapper).deleteSalOrderLineByOrderId(1L);
+    }
+
+    @Test
+    @DisplayName("delete - CONFIRMED 但已派生工单（含未开工）拒绝删除")
+    void delete_gate_derivedWorkorder() {
+        when(salOrderMapper.selectSalOrderByOrderId(1L)).thenReturn(buildOrder(1L, "SO1", "CONFIRMED"));
+        when(salOrderMapper.selectWorkorderCountsByOrderIds(anyList()))
+                .thenReturn(java.util.List.of(buildCountRow(1L, 2)));
+
+        assertThatThrownBy(() -> salOrderService.deleteSalOrderByOrderIds(new Long[]{1L}))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("已派生工单");
+        verify(salOrderLineMapper, never()).deleteSalOrderLineByOrderId(anyLong());
+        verify(salOrderMapper, never()).deleteSalOrderByOrderIds(any());
+    }
+
+    @Test
+    @DisplayName("delete - CONFIRMED 且无派生工单时正常删除")
+    void delete_ok_noDerivedWorkorder() {
+        when(salOrderMapper.selectSalOrderByOrderId(1L)).thenReturn(buildOrder(1L, "SO1", "CONFIRMED"));
+        when(salOrderMapper.selectWorkorderCountsByOrderIds(anyList())).thenReturn(java.util.Collections.emptyList());
+        when(salOrderMapper.deleteSalOrderByOrderIds(any())).thenReturn(1);
+
+        salOrderService.deleteSalOrderByOrderIds(new Long[]{1L});
+
+        verify(salOrderLineMapper).deleteSalOrderLineByOrderId(1L);
+        verify(salOrderMapper).deleteSalOrderByOrderIds(any());
+    }
+
+    @Test
     @DisplayName("toWorkorder - CONFIRMED 与 PRODUCING 均可转；SHIPPED 拒绝")
     void toWorkorder_statusGate() {
         // PRODUCING 正向：保留现有 toWorkorder_ok_backfill 用例，把前置 mock 单状态保持 CONFIRMED 即可
@@ -348,5 +404,14 @@ class SalOrderServiceImplTest
         l.setOrderId(orderId);
         l.setQuantity(qty);
         return l;
+    }
+
+    private com.ruoyi.system.domain.mes.sal.vo.SalOrderWorkorderCountRow buildCountRow(Long orderId, int count)
+    {
+        com.ruoyi.system.domain.mes.sal.vo.SalOrderWorkorderCountRow r =
+                new com.ruoyi.system.domain.mes.sal.vo.SalOrderWorkorderCountRow();
+        r.setOrderId(orderId);
+        r.setWorkorderCount(count);
+        return r;
     }
 }

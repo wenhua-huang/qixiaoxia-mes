@@ -62,6 +62,28 @@ class SalOrderLifecycleListenerTest {
     }
 
     @Test
+    void revoked_event_calls_conditional_demotion() {
+        listener.onSalesShipmentRevoked(new com.ruoyi.system.event.mes.SalesShipmentRevokedEvent(5L, 1L, 1L));
+        verify(salOrderMapper).demoteShippedIfNotFullyDelivered(eq(1L), eq(1L), anyString(), any());
+    }
+
+    @Test
+    void revoked_event_null_order_ignored() {
+        listener.onSalesShipmentRevoked(new com.ruoyi.system.event.mes.SalesShipmentRevokedEvent(5L, null, 1L));
+        verify(salOrderMapper, never()).demoteShippedIfNotFullyDelivered(anyLong(), anyLong(), anyString(), any());
+    }
+
+    @Test
+    void revoked_listener_annotation_is_after_commit_requires_new() throws Exception {
+        Method m = SalOrderLifecycleListener.class.getMethod(
+                "onSalesShipmentRevoked", com.ruoyi.system.event.mes.SalesShipmentRevokedEvent.class);
+        org.assertj.core.api.Assertions.assertThat(m.getAnnotation(TransactionalEventListener.class).phase())
+                .isEqualTo(TransactionPhase.AFTER_COMMIT);
+        org.assertj.core.api.Assertions.assertThat(m.getAnnotation(Transactional.class).propagation())
+                .isEqualTo(org.springframework.transaction.annotation.Propagation.REQUIRES_NEW);
+    }
+
+    @Test
     void listener_annotation_is_after_commit_requires_new() throws Exception {
         Method m = SalOrderLifecycleListener.class.getMethod("onWorkorderStarted", WorkorderStartedEvent.class);
         TransactionalEventListener a = m.getAnnotation(TransactionalEventListener.class);

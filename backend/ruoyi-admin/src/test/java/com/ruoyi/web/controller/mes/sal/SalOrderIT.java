@@ -9,6 +9,7 @@ import com.ruoyi.BaseIntegrationTest;
 import com.ruoyi.common.core.domain.entity.SysUser;
 import com.ruoyi.common.core.domain.model.LoginUser;
 import com.ruoyi.system.event.mes.SalesShipmentCompletedEvent;
+import com.ruoyi.system.event.mes.SalesShipmentRevokedEvent;
 import com.ruoyi.system.event.mes.WorkorderStartedEvent;
 import com.ruoyi.system.service.mes.pro.IProWorkorderService;
 import com.ruoyi.system.service.mes.sal.impl.SalOrderLifecycleListener;
@@ -209,7 +210,84 @@ class SalOrderIT extends BaseIntegrationTest
         assertThat(del.getBody().get("code")).isEqualTo(500);
     }
 
+    @Test
+    @DisplayName("冲销对称降级：SHIPPED 删发运单（箱回 PACKED）→PRODUCING；仍发齐时冲销事件不动 SHIPPED；重发后回到 SHIPPED")
+    void shipment_revoke_demotion_roundtrip()
+    {
+        Long orderId = createOrderAndWorkorder("SO-IT-M4", "WO-IT-M4", new BigDecimal("100"));
+        Long lineId = getFirstLineId(orderId);
+        Long woId = jdbcTemplate.queryForObject(
+                "select workorder_id from qxx_pro_workorder where workorder_code='WO-IT-M4'", Long.class);
+        startWorkorderAndPublish(woId);
+        assertThat(queryStatus(orderId)).isEqualTo("PRODUCING");
+
+        // 60+40 两张出库单累计发齐 → SHIPPED
+        seedShippedBoxes(orderId, lineId, "WS-IT-3", new BigDecimal("60"));
+        Long sales3 = jdbcTemplate.queryForObject(
+                "select sales_id from qxx_wm_product_sales where sales_code='WS-IT-3'", Long.class);
+        publishShipmentEventInTx(sales3);
+        assertThat(queryStatus(orderId)).isEqualTo("PRODUCING");
+        seedShippedBoxes(orderId, lineId, "WS-IT-4", new BigDecimal("40"));
+        Long sales4 = jdbcTemplate.queryForObject(
+                "select sales_id from qxx_wm_product_sales where sales_code='WS-IT-4'", Long.class);
+        publishShipmentEventInTx(sales4);
+        assertThat(queryStatus(orderId)).isEqualTo("SHIPPED");
+
+        // 删除已发齐的发运单前，箱仍 SHIPPED：冲销事件幂等不动 SHIPPED
+        publishRevokeEventInTx(sales4);
+        assertThat(queryStatus(orderId)).isEqualTo("SHIPPED");
+
+        // 模拟 doDeleteShipment：WS-IT-4 的箱回滚为 PACKED → 已不发齐 → SHIPPED 降级 PRODUCING（有未取消工单）
+        jdbcTemplate.update(
+                "update qxx_wm_product_sales_box set status='PACKED' where sales_id=?", sales4);
+        publishRevokeEventInTx(sales4);
+        assertThat(queryStatus(orderId)).isEqualTo("PRODUCING");
+
+        // 重发（箱重新 SHIPPED）→ 条件推进再次生效，回到 SHIPPED
+        jdbcTemplate.update(
+                "update qxx_wm_product_sales_box set status='SHIPPED' where sales_id=?", sales4);
+        publishShipmentEventInTx(sales4);
+        assertThat(queryStatus(orderId)).isEqualTo("SHIPPED");
+    }
+
+    @Test
+    @DisplayName("冲销降级：未派生工单的订单 SHIPPED→CONFIRMED；改/删闸门对已派生工单返回 500")
+    void shipment_revoke_demotes_to_confirmed_and_editdelete_gate()
+    {
+        // 仅建单不转工单，直接造出发齐事实
+        Long orderId = createOrderOnly("SO-IT-M5");
+        Long lineId = getFirstLineId(orderId);
+        seedShippedBoxes(orderId, lineId, "WS-IT-5", new BigDecimal("100"));
+        Long sales5 = jdbcTemplate.queryForObject(
+                "select sales_id from qxx_wm_product_sales where sales_code='WS-IT-5'", Long.class);
+        publishShipmentEventInTx(sales5);
+        assertThat(queryStatus(orderId)).isEqualTo("SHIPPED");
+
+        // 无未取消工单 → 降级 CONFIRMED
+        jdbcTemplate.update(
+                "update qxx_wm_product_sales_box set status='PACKED' where sales_id=?", sales5);
+        publishRevokeEventInTx(sales5);
+        assertThat(queryStatus(orderId)).isEqualTo("CONFIRMED");
+
+        // CONFIRMED + 已派生未开工工单：改/删闸门（工单由主链路另单派生，这里给本单补一张 PREPARE 工单）
+        Long orderId2 = createOrderAndWorkorder("SO-IT-M6", "WO-IT-M6", new BigDecimal("100"));
+        assertThat(queryStatus(orderId2)).isEqualTo("CONFIRMED");
+        ResponseEntity<Map> del = restTemplate.exchange(baseUrl() + "/" + orderId2,
+                HttpMethod.DELETE, authRequest(), Map.class);
+        assertThat(del.getBody().get("code")).isEqualTo(500);
+        assertThat(del.getBody().get("msg").toString()).contains("已派生工单");
+    }
+
     // ==================== 辅助：状态 / 进度 / 事务事件 ====================
+
+    /** 冲销事件同样要在事务内发布，AFTER_COMMIT 才会投递到 REQUIRES_NEW 监听器 */
+    private void publishRevokeEventInTx(Long salesId)
+    {
+        Long orderId = jdbcTemplate.queryForObject(
+                "select sales_order_id from qxx_wm_product_sales where sales_id=?", Long.class, salesId);
+        new TransactionTemplate(txManager).executeWithoutResult(status ->
+                publisher.publishEvent(new SalesShipmentRevokedEvent(salesId, orderId, FACTORY)));
+    }
 
     private String queryStatus(Long orderId)
     {
@@ -319,6 +397,35 @@ class SalOrderIT extends BaseIntegrationTest
         assertThat(new BigDecimal(lineAfter.get("quantityConvertible").toString())).isEqualByComparingTo(convertible);
 
         return orderId;
+    }
+
+    /** 仅建单（建单即 CONFIRMED），不转工单——用于无工单降级 CONFIRMED 分支 */
+    @SuppressWarnings("unchecked")
+    private Long createOrderOnly(String orderCode)
+    {
+        Map<String, Object> line = new HashMap<>();
+        line.put("productId", 1);
+        line.put("productCode", "P001");
+        line.put("productName", "产品");
+        line.put("unitOfMeasure", "PCS");
+        line.put("unitName", "个");
+        line.put("quantity", LINE_QTY);
+
+        Map<String, Object> order = new HashMap<>();
+        order.put("orderCode", orderCode);
+        order.put("orderName", "订单-" + orderCode);
+        order.put("clientCode", "C001");
+        order.put("clientName", "测试客户");
+        order.put("businessLine", "DOMESTIC");
+
+        Map<String, Object> createReq = new HashMap<>();
+        createReq.put("order", order);
+        createReq.put("lines", List.of(line));
+
+        ResponseEntity<Map> createResp = restTemplate.postForEntity(
+                baseUrl() + "/createWithLines", authRequest(createReq), Map.class);
+        assertThat(createResp.getBody().get("code")).isEqualTo(200);
+        return ((Number) ((Map<?, ?>) createResp.getBody().get("data")).get("orderId")).longValue();
     }
 
     @SuppressWarnings("unchecked")

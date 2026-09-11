@@ -22,6 +22,7 @@ import com.ruoyi.system.mapper.mes.wm.WmProductSalesBoxMapper;
 import com.ruoyi.system.mapper.mes.wm.WmProductSalesMapper;
 import com.ruoyi.system.mapper.mes.wm.WmProductSalesShipmentMapper;
 import com.ruoyi.system.event.mes.SalesShipmentCompletedEvent;
+import com.ruoyi.system.event.mes.SalesShipmentRevokedEvent;
 import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 import com.ruoyi.system.service.mes.wm.IWmProductSalesShipmentService;
 
@@ -282,6 +283,11 @@ public class WmProductSalesShipmentServiceImpl implements IWmProductSalesShipmen
             header.setUpdateTime(now);
             header.setUpdateBy(user);
             salesMapper.updateWmProductSales(header);
+            // 对称发齐事件：箱已回滚 PACKED，订单维度复核箱量，不再发齐则 SHIPPED 降级（幂等条件 UPDATE）
+            if (header.getSalesOrderId() != null) {
+                eventPublisher.publishEvent(new SalesShipmentRevokedEvent(
+                        header.getSalesId(), header.getSalesOrderId(), header.getFactoryId()));
+            }
         }
         shipmentMapper.deleteWmProductSalesShipmentByShipmentId(ship.getShipmentId());
         return ship.getShipmentId();

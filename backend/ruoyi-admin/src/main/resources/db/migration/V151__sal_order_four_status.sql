@@ -39,6 +39,40 @@ UPDATE sys_dict_data SET is_default = 'N', dict_sort = 9 WHERE dict_type = 'mes_
 -- ③ 存量刷态（跨工厂全量，有意）
 UPDATE qxx_sal_order SET status = 'CONFIRMED' WHERE status IN ('PREPARE', 'PENDING');
 
+-- ③-b 存量推导 PRODUCING：已派生且已开工（PRODUCING/COMPLETED）的未取消工单。
+-- 事件链只覆盖迁移后的新开工，历史已开工单不会再发事件，必须一次性补齐。显式 factory_id（Flyway 不走拦截器）。
+UPDATE qxx_sal_order o
+SET o.status = 'PRODUCING', o.update_by = 'flyway', o.update_time = sysdate()
+WHERE o.status = 'CONFIRMED'
+  AND EXISTS (
+      SELECT 1 FROM qxx_sal_order_line l
+      INNER JOIN qxx_pro_workorder w ON w.sales_order_line_id = l.line_id
+          AND w.factory_id = l.factory_id AND w.status IN ('PRODUCING', 'COMPLETED')
+      WHERE l.order_id = o.order_id AND l.factory_id = o.factory_id
+  );
+
+-- ③-c 存量推导 SHIPPED：全部订单行在非作废出库单上的 SHIPPED 箱量已发齐。
+-- 与 SalOrderMapper.markShippedIfFullyDelivered 同箱量口径；发运事件已是历史，不会再触发。
+-- MySQL 派生表(FROM 子查询)不允许引用外层 o/l，行已发箱量改用「关联标量子查询」表达（WHERE 中的子查询可关联）。
+UPDATE qxx_sal_order o
+SET o.status = 'SHIPPED', o.update_by = 'flyway', o.update_time = sysdate()
+WHERE o.status IN ('CONFIRMED', 'PRODUCING')
+  AND EXISTS (SELECT 1 FROM qxx_sal_order_line l WHERE l.order_id = o.order_id AND l.factory_id = o.factory_id)
+  AND NOT EXISTS (
+      SELECT 1
+      FROM qxx_sal_order_line l
+      WHERE l.order_id = o.order_id AND l.factory_id = o.factory_id
+        AND l.quantity > COALESCE((
+            SELECT SUM(b.quantity)
+            FROM qxx_wm_product_sales s
+            INNER JOIN qxx_wm_product_sales_line sl ON sl.sales_id = s.sales_id AND sl.factory_id = s.factory_id
+            INNER JOIN qxx_wm_product_sales_box b ON b.line_id = sl.line_id AND b.factory_id = sl.factory_id
+                 AND b.status = 'SHIPPED'
+            WHERE s.sales_order_id = o.order_id AND s.factory_id = o.factory_id AND s.status <> 'CANCELED'
+              AND sl.sales_order_line_id = l.line_id
+        ), 0)
+  );
+
 -- ④ 列默认值 + 注释（保持原 varchar(64) 可空定义）
 ALTER TABLE qxx_sal_order
   MODIFY COLUMN status varchar(64) DEFAULT 'CONFIRMED' COMMENT '订单状态：CONFIRMED已确认/PRODUCING生产中/SHIPPED已出货/CLOSED已结单/CANCEL已取消';

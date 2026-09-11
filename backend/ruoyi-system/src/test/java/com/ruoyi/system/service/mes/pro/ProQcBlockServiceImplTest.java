@@ -336,6 +336,35 @@ class ProQcBlockServiceImplTest {
     }
 
     @Test
+    @DisplayName("9b. onIpqcFailed：任务无负责人时待办按 派工人→判定人 兜底，user_id 永不为 null")
+    void should_fallback_todo_assignee_when_leader_missing() {
+        QcIpqc failed = ipqc("FAIL");
+        failed.setRouteId(ROUTE_ID);
+        ProRouteProcess targetNode = new ProRouteProcess();
+        targetNode.setProcessId(TARGET_PROCESS_ID);
+        targetNode.setProcessName(TARGET_PROCESS_NAME);
+        targetNode.setOrderNum(2);
+        when(flow.nextWave(ROUTE_ID, CHECK_PROCESS_ID)).thenReturn(List.of(targetNode));
+        ProTask workerTask = targetTask("PRODUCING");
+        workerTask.setLeaderId(null);
+        workerTask.setWorkerId(9L);
+        ProTask nakedTask = targetTask("NORMAL");
+        nakedTask.setTaskId(TASK_ID + 1);
+        nakedTask.setLeaderId(null);
+        nakedTask.setWorkerId(null);
+        when(proTaskMapper.selectProTaskList(any(ProTask.class)))
+                .thenReturn(List.of(workerTask, nakedTask));
+        when(sysTodoListMapper.selectPendingByDocAndCode(eq("IPQC"), eq(IPQC_ID), anyString()))
+                .thenReturn(null);
+
+        service.onIpqcFailed(failed);
+
+        ArgumentCaptor<SysTodoList> tc = ArgumentCaptor.forClass(SysTodoList.class);
+        verify(sysTodoListMapper, times(2)).insertSysTodoList(tc.capture());
+        assertThat(tc.getAllValues()).extracting(SysTodoList::getUserId).containsExactly(9L, 1L);
+    }
+
+    @Test
     @DisplayName("10. onIpqcFailed：下一波无任务时仍返回工序名（供检验页提示）")
     void should_return_process_names_even_without_tasks() {
         QcIpqc failed = ipqc("FAIL");

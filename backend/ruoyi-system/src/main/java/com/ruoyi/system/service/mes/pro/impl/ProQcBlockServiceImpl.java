@@ -354,7 +354,12 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
             return;  // 幂等：同 IPQC + 同任务已有 PENDING 待办
         }
         SysTodoList todo = new SysTodoList();
-        todo.setUserId(task.getLeaderId());  // 可空 = 全员可见
+        // sys_todo_list.user_id 为 NOT NULL 且无「全员待办」语义：负责人 → 派工报工人
+        // → 当前判定人兜底，保证待办总有行动责任人（硬拦不依赖待办，放行入口在报工/任务页）
+        Long assignee = task.getLeaderId() != null ? task.getLeaderId()
+                : task.getWorkerId() != null ? task.getWorkerId()
+                : SecurityUtils.getUserId();
+        todo.setUserId(assignee);
         todo.setTodoType(TodoTypeEnum.PRO_QC_BLOCK.getCode());
         todo.setTodoTitle(buildBlockTodoTitle(ipqc, task, node));
         todo.setSourceDocId(ipqc.getIpqcId());

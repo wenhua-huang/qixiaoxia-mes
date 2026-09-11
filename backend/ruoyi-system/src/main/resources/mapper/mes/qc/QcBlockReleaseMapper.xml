@@ -98,4 +98,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where ipqc_id = #{ipqcId}
         order by release_id desc
     </select>
+
+    <!-- 批量锁态：多 IPQC 放行记录一次查回；非空由调用方保证。factory_id 由拦截器注入 -->
+    <select id="selectByIpqcIds" resultMap="QcBlockReleaseResult">
+        <include refid="selectQcBlockReleaseVo"/>
+        where ipqc_id in
+        <foreach collection="ipqcIds" item="iid" open="(" separator="," close=")">
+            #{iid}
+        </foreach>
+    </select>
 </mapper>

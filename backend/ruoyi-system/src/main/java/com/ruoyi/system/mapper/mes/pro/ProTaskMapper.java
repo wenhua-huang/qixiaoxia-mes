@@ -1,5 +1,6 @@
 package com.ruoyi.system.mapper.mes.pro;
 
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.math.BigDecimal;
@@ -8,6 +9,10 @@ import com.ruoyi.system.domain.mes.pro.ProTask;
 
 public interface ProTaskMapper {
     ProTask selectProTaskByTaskId(Long taskId);
+
+    /** 按任务ID批量查（质检锁态批量查询消除 N+1）。factory_id 由拦截器注入 */
+    List<ProTask> selectProTaskByTaskIds(@Param("taskIds") Collection<Long> taskIds);
+
     List<ProTask> selectProTaskList(ProTask task);
 
     /**

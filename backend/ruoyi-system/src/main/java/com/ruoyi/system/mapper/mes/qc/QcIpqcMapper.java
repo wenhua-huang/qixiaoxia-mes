@@ -5,6 +5,7 @@ import java.util.Date;
 import java.util.List;
 import org.apache.ibatis.annotations.Param;
 import com.ruoyi.system.domain.mes.qc.QcIpqc;
+import com.ruoyi.system.domain.mes.qc.WorkorderProcessPair;
 
 /**
  * 过程检验单Mapper接口（factory_id 由 FactoryIdInterceptor 自动注入）
@@ -69,4 +70,14 @@ public interface QcIpqcMapper
      */
     public QcIpqc selectLatestCompletedByProcess(@Param("workorderId") Long workorderId,
                                                  @Param("processId") Long processId);
+
+    /**
+     * 批量取多组（工单ID, 检验工序ID）下的全部已完成(COMPLETED)检验单，按 ipqc_id 倒序。
+     * 调用方按 pair 分组取第一条即「该组最新一张」（qcBlockState 批量锁态消除 N+1）。
+     * 单层平铺 SQL，factory_id 由拦截器在末尾 WHERE 注入。
+     *
+     * @param pairs （工单,工序）组合，非空由调用方保证
+     */
+    public List<QcIpqc> selectLatestCompletedByProcessPairs(
+            @Param("pairs") List<WorkorderProcessPair> pairs);
 }

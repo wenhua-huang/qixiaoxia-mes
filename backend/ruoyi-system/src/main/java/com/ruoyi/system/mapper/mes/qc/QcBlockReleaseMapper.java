@@ -1,5 +1,6 @@
 package com.ruoyi.system.mapper.mes.qc;
 
+import java.util.Collection;
 import java.util.List;
 import org.apache.ibatis.annotations.Param;
 import com.ruoyi.system.domain.mes.qc.QcBlockRelease;
@@ -29,4 +30,9 @@ public interface QcBlockReleaseMapper
      * 查某 IPQC 的全部放行记录（追溯/排查用）
      */
     public List<QcBlockRelease> selectByIpqc(@Param("ipqcId") Long ipqcId);
+
+    /**
+     * 批量查多个 IPQC 的放行记录（qcBlockState 批量锁态消除 N+1）。factory_id 由拦截器注入
+     */
+    public List<QcBlockRelease> selectByIpqcIds(@Param("ipqcIds") Collection<Long> ipqcIds);
 }

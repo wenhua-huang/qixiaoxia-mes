@@ -123,6 +123,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where task_id = #{taskId}
     </select>
 
+    <!-- 按任务ID批量查（qcBlockState 消除 N+1）；foreach 非空由调用方保证，factory_id 由拦截器注入 -->
+    <select id="selectProTaskByTaskIds" resultMap="ProTaskResult">
+        <include refid="selectProTaskVo"/>
+        where task_id in
+        <foreach collection="taskIds" item="tid" open="(" separator="," close=")">
+            #{tid}
+        </foreach>
+    </select>
+
     <insert id="insertProTask" parameterType="ProTask" useGeneratedKeys="true" keyProperty="taskId">
         insert into qxx_pro_task
         <trim prefix="(" suffix=")" suffixOverrides=",">

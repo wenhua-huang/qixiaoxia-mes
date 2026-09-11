@@ -2,6 +2,7 @@ package com.ruoyi.system.service.mes.pro;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import com.ruoyi.common.core.redis.RedisLockTemplate;
@@ -37,6 +38,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -402,5 +405,86 @@ class ProQcBlockServiceImplTest {
 
         assertThat(names).containsExactly(TARGET_PROCESS_NAME);
         verify(sysTodoListMapper, never()).insertSysTodoList(any());
+    }
+
+    @Test
+    @DisplayName("7d. release 理由超 500 字拒绝；恰 500 字放行，待办结果截断到 500 不超长")
+    void should_reject_overlong_reason_and_truncate_todo_result() {
+        assertThatThrownBy(() -> service.release(TASK_ID, "x".repeat(501)))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("不能超过 500");
+        verify(proTaskMapper, never()).selectProTaskByTaskId(anyLong());
+
+        when(proTaskMapper.selectProTaskByTaskId(TASK_ID)).thenReturn(targetTask("PRODUCING"));
+        when(flow.prevCheckNode(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(Optional.of(checkNode()));
+        when(qcIpqcMapper.selectLatestCompletedByProcess(eq(WORKORDER_ID), eq(CHECK_PROCESS_ID)))
+                .thenReturn(ipqc("FAIL"));
+        when(blockReleaseMapper.existsByIpqcAndTask(IPQC_ID, TASK_ID)).thenReturn(false);
+
+        service.release(TASK_ID, "x".repeat(500));
+
+        ArgumentCaptor<String> resultCaptor = ArgumentCaptor.forClass(String.class);
+        verify(sysTodoListMapper).completePendingByDocAndCode(
+                eq("IPQC"), eq(IPQC_ID), anyString(), any(), resultCaptor.capture(), eq("admin"));
+        assertThat(resultCaptor.getValue()).hasSize(500).startsWith("人工放行：");
+    }
+
+    @Test
+    @DisplayName("11a. qcBlockState 批量：同路线一未放行(拦)一已放行(通)，仅 4 次批量查询不走逐条 N+1")
+    void should_resolve_block_state_in_batch_without_n_plus_1() {
+        ProTask blocked = targetTask("PRODUCING");                       // 777 / 工序22
+        ProTask released = targetTask("PRODUCING");
+        released.setTaskId(TASK_ID + 1);                                 // 778
+        released.setProcessId(33L);
+        released.setProcessName("钻孔");
+        ProRouteProcess targetNode = new ProRouteProcess();
+        targetNode.setProcessId(TARGET_PROCESS_ID);
+        targetNode.setOrderNum(2);
+        ProRouteProcess otherNode = new ProRouteProcess();
+        otherNode.setProcessId(33L);
+        otherNode.setOrderNum(3);
+        List<ProRouteProcess> nodes = List.of(checkNode(), targetNode, otherNode);
+
+        when(proTaskMapper.selectProTaskByTaskIds(anyCollection())).thenReturn(List.of(blocked, released));
+        when(flow.nodes(ROUTE_ID)).thenReturn(nodes);
+        when(flow.prevCheckNode(anyList(), anyLong())).thenAnswer(inv -> {
+            Long pid = inv.getArgument(1);
+            return pid.equals(TARGET_PROCESS_ID) || pid.equals(33L)
+                    ? Optional.of(checkNode()) : Optional.empty();
+        });
+        when(qcIpqcMapper.selectLatestCompletedByProcessPairs(anyList()))
+                .thenReturn(List.of(ipqc("FAIL")));
+        QcBlockRelease releaseRow = new QcBlockRelease();
+        releaseRow.setIpqcId(IPQC_ID);
+        releaseRow.setTargetTaskId(TASK_ID + 1);
+        when(blockReleaseMapper.selectByIpqcIds(anyCollection())).thenReturn(List.of(releaseRow));
+
+        Map<String, Map<String, Object>> state =
+                service.qcBlockState(List.of(TASK_ID, TASK_ID + 1));
+
+        assertThat(state.get(String.valueOf(TASK_ID)).get("blocked")).isEqualTo(true);
+        assertThat((String) state.get(String.valueOf(TASK_ID)).get("reason")).contains(IPQC_CODE);
+        assertThat(state.get(String.valueOf(TASK_ID + 1)).get("blocked")).isEqualTo(false);
+        assertThat(state.get(String.valueOf(TASK_ID + 1)).get("reason")).isNull();
+
+        // 批量接口各一次；逐条接口零次
+        verify(proTaskMapper, times(1)).selectProTaskByTaskIds(anyCollection());
+        verify(flow, times(1)).nodes(ROUTE_ID);
+        verify(qcIpqcMapper, times(1)).selectLatestCompletedByProcessPairs(anyList());
+        verify(blockReleaseMapper, times(1)).selectByIpqcIds(anyCollection());
+        verify(proTaskMapper, never()).selectProTaskByTaskId(anyLong());
+        verify(qcIpqcMapper, never()).selectLatestCompletedByProcess(anyLong(), anyLong());
+        verify(blockReleaseMapper, never()).existsByIpqcAndTask(anyLong(), anyLong());
+    }
+
+    @Test
+    @DisplayName("11b. qcBlockState：空列表返回空 Map；超 100 个拒绝")
+    void should_handle_empty_and_oversized_batch() {
+        assertThat(service.qcBlockState(List.of())).isEmpty();
+        List<Long> tooMany = Collections.nCopies(101, 1L);
+        assertThatThrownBy(() -> service.qcBlockState(tooMany))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("100");
+        verifyNoInteractionsForGate();
     }
 }

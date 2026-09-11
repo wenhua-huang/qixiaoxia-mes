@@ -8,6 +8,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +29,7 @@ import com.ruoyi.system.domain.mes.pro.ProTask;
 import com.ruoyi.system.domain.mes.qc.QcBlockInfo;
 import com.ruoyi.system.domain.mes.qc.QcBlockRelease;
 import com.ruoyi.system.domain.mes.qc.QcIpqc;
+import com.ruoyi.system.domain.mes.qc.WorkorderProcessPair;
 import com.ruoyi.system.domain.mes.sys.SysTodoList;
 import com.ruoyi.system.mapper.mes.pro.ProTaskMapper;
 import com.ruoyi.system.mapper.mes.qc.QcBlockReleaseMapper;
@@ -57,6 +59,8 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
     private static final String FEEDBACK_TYPE_INTERNAL = "INTERNAL";
     private static final int RELEASE_REASON_MIN_LEN = 2;
     private static final int RELEASE_REASON_MAX_LEN = 500;
+    /** sys_todo_list.handle_result 为 varchar(500)：前缀拼接后超长会导致放行事务整体回滚 */
+    private static final int TODO_HANDLE_RESULT_MAX_LEN = 500;
     private static final int BATCH_STATE_MAX = 100;
 
     @Autowired
@@ -256,10 +260,14 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
 
     private void closeBlockTodo(QcBlockInfo block, Long taskId, String reason)
     {
+        String handleResult = QcConstants.TODO_RESULT_BLOCK_RELEASED_PREFIX + reason;
+        if (handleResult.length() > TODO_HANDLE_RESULT_MAX_LEN)
+        {
+            handleResult = handleResult.substring(0, TODO_HANDLE_RESULT_MAX_LEN);
+        }
         String docCode = QcConstants.buildBlockTodoCode(block.getIpqcCode(), taskId);
         sysTodoListMapper.completePendingByDocAndCode(QcConstants.BLOCK_TODO_SOURCE_TYPE,
-                block.getIpqcId(), docCode, new Date(),
-                QcConstants.TODO_RESULT_BLOCK_RELEASED_PREFIX + reason,
+                block.getIpqcId(), docCode, new Date(), handleResult,
                 SecurityUtils.getUsername());
     }
 
@@ -407,22 +415,111 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
         {
             throw new ServiceException("单次最多查询 " + BATCH_STATE_MAX + " 个任务的锁态");
         }
+        // 批量路径：任务 1 次 + 每路线节点 1 次 + 判定单 1 次 + 放行记录 1 次，杜绝逐任务 N+1
+        List<Long> distinctIds = taskIds.stream().distinct().collect(java.util.stream.Collectors.toList());
+        Map<Long, ProTask> taskMap = proTaskMapper.selectProTaskByTaskIds(distinctIds).stream()
+                .collect(java.util.stream.Collectors.toMap(ProTask::getTaskId, t -> t, (a, b) -> a));
+        Map<Long, ProRouteProcess> checkNodeByTask = mapCheckNodes(taskMap);
+        Map<String, QcIpqc> latestIpqcByPair = loadLatestIpqcs(taskMap.values(), checkNodeByTask);
+        Set<String> releaseKeys = loadReleaseKeys(latestIpqcByPair.values());
+
         Map<String, Map<String, Object>> result = new LinkedHashMap<>();
         for (Long taskId : taskIds)
         {
-            result.put(String.valueOf(taskId), resolveOneState(taskId));
+            result.put(String.valueOf(taskId),
+                    stateOf(taskId, taskMap.get(taskId), checkNodeByTask, latestIpqcByPair, releaseKeys));
         }
         return result;
     }
 
-    private Map<String, Object> resolveOneState(Long taskId)
+    /** 批量解析每个任务的前驱检验节点（路线节点按 routeId 缓存复用） */
+    private Map<Long, ProRouteProcess> mapCheckNodes(Map<Long, ProTask> taskMap)
+    {
+        Map<Long, List<ProRouteProcess>> nodesCache = new HashMap<>();
+        Map<Long, ProRouteProcess> checkNodeByTask = new HashMap<>();
+        for (ProTask task : taskMap.values())
+        {
+            if (task.getRouteId() == null || task.getProcessId() == null)
+            {
+                continue;
+            }
+            List<ProRouteProcess> nodes = nodesCache.computeIfAbsent(task.getRouteId(), flow::nodes);
+            flow.prevCheckNode(nodes, task.getProcessId())
+                    .ifPresent(node -> checkNodeByTask.put(task.getTaskId(), node));
+        }
+        return checkNodeByTask;
+    }
+
+    /** 按全部（工单,检验工序）组批量取已判定单，每组保留 ipqc_id 最大的一张（SQL 已按 id 倒序） */
+    private Map<String, QcIpqc> loadLatestIpqcs(java.util.Collection<ProTask> tasks,
+                                                Map<Long, ProRouteProcess> checkNodeByTask)
+    {
+        // 按 "工单:工序" 键去重后再构造批量查询入参
+        Map<String, WorkorderProcessPair> pairDedup = new LinkedHashMap<>();
+        for (ProTask t : tasks)
+        {
+            if (t.getWorkorderId() == null || !checkNodeByTask.containsKey(t.getTaskId()))
+            {
+                continue;
+            }
+            Long checkProcessId = checkNodeByTask.get(t.getTaskId()).getProcessId();
+            pairDedup.putIfAbsent(pairKey(t.getWorkorderId(), checkProcessId),
+                    new WorkorderProcessPair(t.getWorkorderId(), checkProcessId));
+        }
+        List<WorkorderProcessPair> pairs = new ArrayList<>(pairDedup.values());
+        if (pairs.isEmpty())
+        {
+            return Map.of();
+        }
+        Map<String, QcIpqc> latest = new HashMap<>();
+        for (QcIpqc ipqc : qcIpqcMapper.selectLatestCompletedByProcessPairs(pairs))
+        {
+            latest.putIfAbsent(pairKey(ipqc.getWorkorderId(), ipqc.getProcessId()), ipqc);
+        }
+        return latest;
+    }
+
+    /** 批量取 FAIL 单的放行记录，返回 ipqcId:targetTaskId 键集合 */
+    private Set<String> loadReleaseKeys(java.util.Collection<QcIpqc> ipqcs)
+    {
+        List<Long> failIpqcIds = ipqcs.stream()
+                .filter(i -> QcConstants.RESULT_FAIL.equals(i.getCheckResult()))
+                .map(QcIpqc::getIpqcId).distinct().collect(java.util.stream.Collectors.toList());
+        if (failIpqcIds.isEmpty())
+        {
+            return Set.of();
+        }
+        return blockReleaseMapper.selectByIpqcIds(failIpqcIds).stream()
+                .map(r -> r.getIpqcId() + ":" + r.getTargetTaskId())
+                .collect(java.util.stream.Collectors.toSet());
+    }
+
+    private Map<String, Object> stateOf(Long taskId, ProTask task,
+                                        Map<Long, ProRouteProcess> checkNodeByTask,
+                                        Map<String, QcIpqc> latestIpqcByPair,
+                                        Set<String> releaseKeys)
     {
         Map<String, Object> state = new HashMap<>(2);
-        ProTask task = proTaskMapper.selectProTaskByTaskId(taskId);
-        QcBlockInfo block = task == null ? null : findBlock(task.getWorkorderId(), task.getRouteId(),
-                task.getProcessId(), taskId);
+        QcBlockInfo block = null;
+        ProRouteProcess checkNode = task == null ? null : checkNodeByTask.get(taskId);
+        if (task != null && checkNode != null)
+        {
+            QcIpqc latest = latestIpqcByPair.get(
+                    pairKey(task.getWorkorderId(), checkNode.getProcessId()));
+            boolean released = releaseKeys.contains(latest == null ? null
+                    : latest.getIpqcId() + ":" + taskId);
+            if (latest != null && QcConstants.RESULT_FAIL.equals(latest.getCheckResult()) && !released)
+            {
+                block = buildBlockInfo(latest, checkNode);
+            }
+        }
         state.put("blocked", block != null);
         state.put("reason", block == null ? null : block.getReason());
         return state;
+    }
+
+    private static String pairKey(Long workorderId, Long processId)
+    {
+        return workorderId + ":" + processId;
     }
 }

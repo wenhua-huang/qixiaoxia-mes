@@ -59,6 +59,7 @@
         <view class="task-top">
           <text class="task-name">{{ task.processName || '工序' }}</text>
           <view class="task-tags">
+            <uni-tag v-if="task.qcBlocked" type="error" text="不可开工" size="small" />
             <uni-tag v-if="(task.pendingFeedbackCount || 0) > 0" type="warning" :text="'待审核' + task.pendingFeedbackCount" size="small" />
             <uni-tag v-if="selectedTaskId === task.taskId" type="primary" text="已选" size="small" />
           </view>
@@ -89,11 +90,14 @@
     <!-- 步骤 3：填报工数量 -->
     <view v-if="selectedTask" class="section">
       <uni-section title="报工数量" type="line"></uni-section>
+      <!-- 跟单质检不合格硬拦：展示原因，授权角色可在此一键放行 -->
+      <qc-block-bar v-if="isBlocked" :task="selectedTask" @released="onBlockReleased" />
       <view class="form-box">
         <view class="worker-row">
           <text class="qty-label">报工人</text>
           <text class="worker-val">{{ workerDisplay }}</text>
         </view>
+        <view v-show="!isBlocked">
         <input-qty-row v-model="form.quantityInput" :default-val="selectedTask.defaultQuantityInput"
           :unit="workorder.unitName || 'PCS'" />
         <view class="qty-row">
@@ -128,11 +132,12 @@
           <text class="qty-label">本次报工</text>
           <text class="total-val">{{ totalQuantity }} {{ workorder.unitName || 'PCS' }}</text>
         </view>
+        </view>
       </view>
     </view>
 
     <!-- 步骤 3.5：工序参数填报 -->
-    <view v-if="selectedTask && paramList.length > 0" class="section">
+    <view v-if="selectedTask && !isBlocked && paramList.length > 0" class="section">
       <uni-section title="工序参数" type="line"></uni-section>
       <view class="form-box">
         <view v-for="(p, idx) in paramList" :key="idx" class="param-row">
@@ -157,7 +162,7 @@
     </view>
 
     <!-- 步骤 4：备注 -->
-    <view v-if="selectedTask" class="section">
+    <view v-if="selectedTask && !isBlocked" class="section">
       <uni-section title="备注（选填）" type="line"></uni-section>
       <view class="form-box">
         <uni-easyinput
@@ -169,8 +174,8 @@
       </view>
     </view>
 
-    <!-- 底部提交 -->
-    <view v-if="selectedTask" class="footer-bar">
+    <!-- 底部提交（质检不合格未放行时隐藏，硬拦以服务端断言为准） -->
+    <view v-if="selectedTask && !isBlocked" class="footer-bar">
       <button type="primary" class="confirm-btn" @click="submitReport" :disabled="submitting">
         {{ submitting ? '提交中...' : '提交报工' }}
       </button>
@@ -186,6 +191,7 @@ import { getCardScanResult } from '@/api/mes/pro/procard'
 import { parseQrPayload } from '@/utils/qrPayload'
 import { listParamTemplateByProcessId } from '@/api/mes/pro/paramtemplate'
 import InputQtyRow from './components/input-qty-row.vue'
+import QcBlockBar from './components/qc-block-bar.vue'
 import { useUserStore } from '@/store/modules/user'
 import config from '@/config.js'
 
@@ -224,6 +230,20 @@ const totalQuantity = computed(() => {
 const workerDisplay = computed(() => {
   return selectedTask.value?.workerNick || userStore.name || '当前登录人'
 })
+
+// 跟单质检不合格硬拦：锁态由后端入口接口富化，放行后需重拉入口数据解除
+const isBlocked = computed(() => selectedTask.value?.qcBlocked === true)
+
+// 放行成功后按当前入口（流转卡 / 工单编码）重拉任务列表并重新选中该任务
+function onBlockReleased(releasedTaskId) {
+  if (card.value?.cardCode) {
+    pendingTaskId.value = releasedTaskId
+    scanByCard(card.value.cardCode)
+  } else if (workorderCode.value) {
+    pendingTaskId.value = releasedTaskId
+    searchWorkorder()
+  }
+}
 
 const WO_STATUS_MAP = {
   PREPARE: '待生产', PRODUCING: '生产中', COMPLETED: '已完成', CANCEL: '已取消', CLOSED: '已关闭'
@@ -325,8 +345,13 @@ function scanByCard(cardCode) {
       proxy.$modal.alert(msg, '无法报工')
       return
     }
-    // 单任务自动选中 → 直接进填数量步
-    if (taskList.value.length === 1) {
+    // 单任务自动选中 → 直接进填数量步；放行后重拉携带 taskId 时选中指定任务
+    const targetTaskId = pendingTaskId.value
+    pendingTaskId.value = null
+    if (targetTaskId) {
+      const target = taskList.value.find(t => t.taskId === targetTaskId)
+      if (target) selectTask(target)
+    } else if (taskList.value.length === 1) {
       selectTask(taskList.value[0])
     }
   }).catch(() => {
@@ -480,6 +505,10 @@ watch(() => paramList.value.map(p => p.actualValue).join(','), () => {
 
 // 提交报工
 async function submitReport() {
+  if (isBlocked.value) {
+    proxy.$modal.msgError('该工序因质检不合格被拦截，请先放行')
+    return
+  }
   if (totalQuantity.value <= 0) {
     proxy.$modal.msgError('请至少填写一项报工数量')
     return

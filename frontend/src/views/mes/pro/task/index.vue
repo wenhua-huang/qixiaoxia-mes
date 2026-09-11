@@ -80,15 +80,17 @@
         </template>
       </el-table-column>
       <el-table-column label="总时长(h)" align="center" prop="duration" width="90" />
-      <el-table-column label="状态" align="center" prop="status" width="85">
+      <el-table-column label="状态" align="center" prop="status" width="110">
         <template #default="scope">
-          <span :style="{ color: statusColor[scope.row.status] }">{{ statusMap[scope.row.status] || scope.row.status }}</span>
+          <el-tag v-if="isQcBlocked(scope.row)" type="danger" size="small" effect="dark">不可开工</el-tag>
+          <span v-else :style="{ color: statusColor[scope.row.status] }">{{ statusMap[scope.row.status] || scope.row.status }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="280">
+      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="340">
         <template #default="scope">
+          <el-button link type="danger" icon="Unlock" @click="handleReleaseQcBlock(scope.row)" v-if="isQcBlocked(scope.row)" v-hasPermi="['mes:pro:task:release']">质检放行</el-button>
           <el-button link type="success" icon="Position" @click="handleDispatch(scope.row)" v-if="scope.row.status==='NORMAL'||scope.row.status==='PREPARE'" v-hasPermi="['mes:pro:task:edit']">下发</el-button>
-          <el-button link type="primary" icon="CircleCheck" @click="handleComplete(scope.row)" v-if="scope.row.status==='PRODUCING'" v-hasPermi="['mes:pro:task:edit']">完成</el-button>
+          <el-button link type="primary" icon="CircleCheck" @click="handleComplete(scope.row)" v-if="scope.row.status==='PRODUCING' && !isQcBlocked(scope.row)" v-hasPermi="['mes:pro:task:edit']">完成</el-button>
           <el-button link type="warning" icon="CircleClose" @click="handleCancelTask(scope.row)" v-if="scope.row.status!=='COMPLETED'&&scope.row.status!=='CANCEL'" v-hasPermi="['mes:pro:task:edit']">取消</el-button>
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:pro:task:edit']">修改</el-button>
           <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:pro:task:remove']">删除</el-button>
@@ -209,7 +211,8 @@
 
 <script setup lang="ts" name="ProSchedule">
 import { ref, reactive, toRefs, getCurrentInstance } from 'vue'
-import { listTask, getTask, delTask, addTask, updateTask, dispatchTask, completeTask, cancelTask } from '@/api/mes/pro/task'
+import { ElMessageBox } from 'element-plus'
+import { listTask, getTask, delTask, addTask, updateTask, dispatchTask, completeTask, cancelTask, releaseQcBlock, getQcBlockState } from '@/api/mes/pro/task'
 import { listWorkorder, getWorkorder } from '@/api/mes/pro/workorder'
 import { listAllProcess } from '@/api/mes/pro/process'
 import { listRouteProcessByRouteId } from '@/api/mes/pro/routeprocess'
@@ -244,6 +247,37 @@ const statusColor: Record<string, string> = {
   PREPARE: '#E6A23C', NORMAL: '#409EFF', PRODUCING: '#67C23A', COMPLETED: '#909399', PAUSED: '#E6A23C', CANCEL: '#F56C6C'
 }
 
+// 跟单质检锁态：list 接口不富化，列表加载后对本页 PRODUCING 任务批量查询（≤100）
+const qcBlockMap = ref<Record<string, { blocked: boolean; reason: string | null }>>({})
+function isQcBlocked(row: any) {
+  return !!qcBlockMap.value[String(row.taskId)]?.blocked
+}
+function loadQcBlockStates(rows: any[]) {
+  const ids = rows.filter((r: any) => r.status === 'PRODUCING').map((r: any) => r.taskId)
+  if (ids.length === 0) { qcBlockMap.value = {}; return }
+  getQcBlockState(ids).then((res: any) => {
+    qcBlockMap.value = res.data || {}
+  }).catch(() => { qcBlockMap.value = {} })
+}
+function handleReleaseQcBlock(row: any) {
+  const state = qcBlockMap.value[String(row.taskId)]
+  ElMessageBox.prompt(state?.reason
+    ? `${state.reason}\n\n请填写放行理由（必填，至少2字）`
+    : '该工序被跟单质检不合格拦截，请填写放行理由（必填，至少2字）',
+    `质检放行 · ${row.processName || row.taskCode}`, {
+    confirmButtonText: '确认放行',
+    cancelButtonText: '取消',
+    type: 'warning',
+    inputType: 'textarea',
+    inputValidator: (val: string) => (val || '').trim().length >= 2 || '放行理由至少2个字'
+  }).then(({ value }: { value: string }) => {
+    return releaseQcBlock(row.taskId, value.trim())
+  }).then(() => {
+    proxy.$modal.msgSuccess('已放行')
+    getList()
+  }).catch(() => {})
+}
+
 const data = reactive({
   form: {} as any,
   queryParams: { pageNum: 1, pageSize: 10 } as any,
@@ -268,6 +302,7 @@ function getList() {
     taskList.value = r.rows || []
     total.value = r.total || 0
     loading.value = false
+    loadQcBlockStates(taskList.value)
   }).catch(() => { loading.value = false })
 }
 

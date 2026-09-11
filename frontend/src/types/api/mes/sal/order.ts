@@ -1,5 +1,8 @@
 import type { PageDomain, BaseEntity } from "../../common";
 
+/** 销售订单状态（四态主线 + CANCEL 链外） */
+export type SalOrderStatus = 'CONFIRMED' | 'PRODUCING' | 'SHIPPED' | 'CLOSED' | 'CANCEL'
+
 export interface SalOrderQueryParams extends PageDomain {
   orderCode?: string;
   orderName?: string;
@@ -10,6 +13,10 @@ export interface SalOrderQueryParams extends PageDomain {
   /** 订单类型：NEW=新单 REPEAT=返单 STOCK=备货订单（字典 mes_sal_order_type） */
   orderType?: string;
   status?: string;
+  /** 多状态筛选（后端 List<String> 绑定，重复 statusList 参数） */
+  statusList?: SalOrderStatus[];
+  /** 是否在列表行内返回生产进度 progressPercent */
+  includeProgress?: boolean;
   /** 订单来源：1=直接新增 2=CRM系统 */
   source?: number;
 }
@@ -34,12 +41,14 @@ export interface SalOrder extends BaseEntity {
   requestDate?: string;
   totalAmount?: number;
   paymentMethod?: string;
-  status?: string;
-  /** 审核人 */
+  status?: SalOrderStatus;
+  /** 生产进度百分比（includeProgress=true 时后端返回，0-100） */
+  progressPercent?: number;
+  /** @deprecated 审核流已废弃，历史数据 */
   approveBy?: string;
-  /** 审核时间 */
+  /** @deprecated 审核流已废弃，历史数据 */
   approveTime?: string;
-  /** 审核意见/驳回原因 */
+  /** @deprecated 审核流已废弃，历史数据 */
   approveRemark?: string;
   lines?: SalOrderLine[];
 }

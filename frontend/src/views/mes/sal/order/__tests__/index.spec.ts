@@ -12,11 +12,16 @@ vi.mock('@/api/mes/sal/order', () => ({
   getOrderDetail: vi.fn().mockResolvedValue({ code: 200, data: { lines: [] } }),
   createOrderWithLines: vi.fn().mockResolvedValue({ code: 200 }),
   updateOrderWithLines: vi.fn().mockResolvedValue({ code: 200 }),
-  confirmOrder: vi.fn().mockResolvedValue({ code: 200 }),
   closeOrder: vi.fn().mockResolvedValue({ code: 200 }),
   cancelOrder: vi.fn().mockResolvedValue({ code: 200 }),
   toWorkorder: vi.fn().mockResolvedValue({ code: 200, data: { workorderCode: 'WO001' } }),
   delOrder: vi.fn().mockResolvedValue({ code: 200 }),
+}))
+vi.mock('@/api/system/dict/data', () => ({
+  getDicts: vi.fn().mockResolvedValue({ data: [] }),
+}))
+vi.mock('@/api/system/user', () => ({
+  listUser: vi.fn().mockResolvedValue({ rows: [] }),
 }))
 vi.mock('@/api/mes/sys/autocoderule', () => ({
   genSerialCode: vi.fn().mockResolvedValue({ data: 'SO20260715001' }),
@@ -29,6 +34,9 @@ vi.mock('@/components/itemSelect/single.vue', () => ({
 vi.mock('@/api/mes/md/client', () => ({
   listClient: vi.fn().mockResolvedValue({ rows: [], total: 0 }),
 }))
+// LineEdit 真实加载(组件虽 stub,模块仍被 import 解析)，切断 md/item、md/attr -> request->Navbar 链
+vi.mock('@/api/mes/md/item', () => ({ getItem: vi.fn().mockResolvedValue({ data: {} }) }))
+vi.mock('@/api/mes/md/attr', () => ({ getEffAttrSchema: vi.fn().mockResolvedValue({ data: [] }) }))
 // 断开 index.vue 新增的 pro 域 API 导入->request->Navbar 链
 vi.mock('@/api/mes/pro/routeproduct', () => ({ listRouteProduct: vi.fn().mockResolvedValue({ rows: [], total: 0 }) }))
 vi.mock('@/api/mes/pro/proroute', () => ({ listRoute: vi.fn().mockResolvedValue({ rows: [] }) }))
@@ -75,18 +83,34 @@ describe('SalOrder index.vue', () => {
     expect(html).toContain('圣享')
   })
 
-  it('状态文本/标签/业务线 纯函数映射正确', async () => {
-    mockListOrder.mockResolvedValue({ rows: [], total: 0 })
+  it('生产中订单显示进度百分比且不渲染审核按钮', async () => {
+    mockListOrder.mockResolvedValue({ rows: [
+      { orderId: 1, orderCode: 'SO001', orderName: 'x', clientName: 'c', status: 'PRODUCING', progressPercent: 40 }
+    ], total: 1 })
     const wrapper = mount(SalOrder, { global: globalStubs })
+    await nextTick(); await nextTick()
+    const html = wrapper.html()
+    expect(html).toContain('40')              // 进度
+    expect(html).not.toContain('提交审核')
+    expect(html).not.toContain('审核通过')
+    expect(html).toContain('生成工单')        // PRODUCING 可追加转单
+  })
+
+  it('已出货订单显示结单按钮，不显示取消', async () => {
+    mockListOrder.mockResolvedValue({ rows: [
+      { orderId: 2, orderCode: 'SO002', orderName: 'x', clientName: 'c', status: 'SHIPPED', progressPercent: 100 }
+    ], total: 1 })
+    const wrapper = mount(SalOrder, { global: globalStubs })
+    await nextTick(); await nextTick()
+    expect(wrapper.html()).toContain('结单')
+    expect(wrapper.html()).not.toContain('取消')
+  })
+
+  it('getList 请求带 includeProgress=true', async () => {
+    mockListOrder.mockResolvedValue({ rows: [], total: 0 })
+    mount(SalOrder, { global: globalStubs })
     await nextTick()
-    const vm: any = wrapper.vm
-    expect(vm.statusText('PREPARE')).toBe('待确认')
-    expect(vm.statusText('CONFIRMED')).toBe('已确认')
-    expect(vm.statusText('CANCEL')).toBe('已取消')
-    expect(vm.statusTag('CONFIRMED')).toBe('success')
-    expect(vm.statusTag('CANCEL')).toBe('danger')
-    expect(vm.businessLineText('FOREIGN')).toBe('外贸')
-    expect(vm.businessLineText('SPOT')).toBe('现货')
+    expect(mockListOrder.mock.calls[0][0]).toMatchObject({ includeProgress: true })
   })
 
   it('空列表不崩溃', async () => {

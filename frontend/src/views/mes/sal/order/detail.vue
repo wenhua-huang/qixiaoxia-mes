@@ -6,6 +6,7 @@
         <span class="header-title">销售订单详情</span>
         <el-tag v-if="order.orderCode" type="info" class="ml8">{{ order.orderCode }}</el-tag>
         <el-tag v-if="order.status" :type="statusTagType" class="ml8">{{ statusLabel }}</el-tag>
+        <el-progress v-if="order.orderCode" :percentage="Number(order.progressPercent || 0)" :stroke-width="12" style="width:220px;display:inline-flex;vertical-align:middle;margin-left:12px" />
       </template>
       <template #extra>
         <el-button type="primary" plain icon="Printer" @click="exportPdf" v-hasPermi="['mes:sal:order:exportDetail']">导出 PDF</el-button>
@@ -14,10 +15,6 @@
     </el-page-header>
 
     <div v-loading="loading">
-      <!-- 驳回原因提醒（退回待提交时展示最近一次驳回意见） -->
-      <el-alert v-if="order.status === 'PREPARE' && order.approveRemark" :title="'驳回原因：' + order.approveRemark"
-        type="warning" :closable="false" show-icon class="mb16" />
-
       <el-card shadow="never" class="mb16">
         <template #header><span>订单信息</span></template>
         <el-descriptions :column="3" size="small" border>
@@ -37,22 +34,6 @@
           </el-descriptions-item>
           <el-descriptions-item label="付款方式">{{ order.paymentMethod || '-' }}</el-descriptions-item>
           <el-descriptions-item label="备注" :span="2">{{ order.remark || '-' }}</el-descriptions-item>
-        </el-descriptions>
-      </el-card>
-
-      <!-- 审核信息：审批人/审批时间/审批意见 -->
-      <el-card shadow="never" class="mb16">
-        <template #header><span>审核信息</span></template>
-        <el-descriptions :column="3" size="small" border>
-          <el-descriptions-item label="审核人">
-            <span v-if="order.approveBy">{{ order.approveBy }}</span>
-            <span v-else style="color:#909399">{{ approveHint }}</span>
-          </el-descriptions-item>
-          <el-descriptions-item label="审核时间">
-            <span v-if="order.approveTime">{{ fmtDateTime(order.approveTime) }}</span>
-            <span v-else style="color:#909399">{{ approveHint }}</span>
-          </el-descriptions-item>
-          <el-descriptions-item label="审核意见">{{ order.approveRemark || '-' }}</el-descriptions-item>
         </el-descriptions>
       </el-card>
 
@@ -112,15 +93,8 @@ const statusLabel = computed(() => {
   return d ? (d.label || d.dictLabel) : (v || '')
 })
 const statusTagType = computed(() => {
-  const map: Record<string, string> = { PREPARE: 'info', PENDING: 'warning', CONFIRMED: 'success', CLOSED: 'primary', CANCEL: 'danger' }
+  const map: Record<string, string> = { CONFIRMED: 'success', PRODUCING: 'warning', SHIPPED: 'primary', CLOSED: 'info', CANCEL: 'danger' }
   return map[order.value.status || ''] || 'info'
-})
-/** 审核人/时间为空时的占位提示 */
-const approveHint = computed(() => {
-  const s = order.value.status
-  if (s === 'PENDING') return '待审核'
-  if (s === 'PREPARE') return '未提交'
-  return '-'
 })
 const orderTypeText = computed(() => {
   const v = order.value.orderType

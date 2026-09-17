@@ -911,9 +911,14 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
     public List<Map<String, Object>> checkMaterialReadiness(Long workorderId)
     {
         // 1. 获取工单 BOM 物料清单
+        ProWorkorder wo = selectProWorkorderByWorkorderId(workorderId);
+        if (wo == null) throw new ServiceException("工单不存在");
         List<ProWorkorderBom> bomList = proWorkorderBomService.selectProWorkorderBomByWorkorderId(workorderId);
         if (bomList == null || bomList.isEmpty()) {
-            throw new ServiceException("工单无 BOM 数据，请先维护物料清单");
+            if (hasRouteBomForProduct(wo)) {
+                throw new ServiceException("工单 BOM 未同步，请编辑工单并保存后再开工");
+            }
+            throw new ServiceException("工单无 BOM 数据，请先在工艺路线维护该产品的物料清单");
         }
 
         // 2. 本工单已备料量（领料单 ALLOCATED/PARTIAL_ISSUED/ISSUED）—— 预占/出库时已扣
@@ -964,6 +969,22 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         }
 
         return result;
+    }
+
+    /**
+     * 判断工艺路线模板下是否已维护该工单产品的 BOM（快照为空时用于区分"未维护"与"未同步"）
+     */
+    private boolean hasRouteBomForProduct(ProWorkorder wo)
+    {
+        if (wo.getRouteProductId() == null) return false;
+        ProRouteProduct routeProduct = proRouteProductService
+                .selectProRouteProductByRecordId(wo.getRouteProductId());
+        if (routeProduct == null) return false;
+        List<ProRouteProductBom> routeBoms = proRouteProductBomService
+                .selectProRouteProductBomByRouteId(routeProduct.getRouteId());
+        if (routeBoms == null) return false;
+        return routeBoms.stream().anyMatch(rb -> routeProduct.getItemId() != null
+                && routeProduct.getItemId().equals(rb.getProductId()));
     }
 
     /**

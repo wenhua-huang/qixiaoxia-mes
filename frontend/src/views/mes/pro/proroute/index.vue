@@ -358,7 +358,12 @@
 
     <!-- 工序BOM弹窗 -->
     <el-dialog :title="'BOM物料 — ' + _procBomTitle" v-model="_procBomOpen" width="700px" append-to-body>
-      <el-row :gutter="10" class="mb8">
+      <el-row :gutter="10" class="mb8" align="middle">
+        <el-col :span="9">
+          <el-select v-model="_procProductRecordId" placeholder="选择产品" size="small" style="width:100%" @change="handleProcProductChange">
+            <el-option v-for="p in productList" :key="p.recordId" :label="p.itemName + ' (' + p.itemCode + ')'" :value="p.recordId" />
+          </el-select>
+        </el-col>
         <el-col :span="1.5">
           <el-button type="primary" plain size="small" @click="handleAddProcBomItem" v-if="optType!=='view'">新增物料</el-button>
         </el-col>
@@ -376,7 +381,12 @@
 
     <!-- 工序参数弹窗 -->
     <el-dialog :title="'工序参数 — ' + _procParamTitle" v-model="_procParamOpen" width="600px" append-to-body>
-      <el-row :gutter="10" class="mb8">
+      <el-row :gutter="10" class="mb8" align="middle">
+        <el-col :span="11">
+          <el-select v-model="_procProductRecordId" placeholder="选择产品" size="small" style="width:100%" @change="handleProcProductChange">
+            <el-option v-for="p in productList" :key="p.recordId" :label="p.itemName + ' (' + p.itemCode + ')'" :value="p.recordId" />
+          </el-select>
+        </el-col>
         <el-col :span="1.5">
           <el-button type="warning" plain size="small" @click="handleInitParamFromTemplate" v-if="optType!=='view'">从模版初始化</el-button>
         </el-col>
@@ -423,10 +433,12 @@ export default {
       // 关联产品弹窗
       prodOpen: false, prodTitle: '', prodForm: {},
       // BOM弹窗
-      bomOpen: false, bomTitle: '', bomTab: 'bom', bomSearchKey: '', currentRouteProductId: null,
-      _bomAddOpen: false, _bomItemForm: { processId: null, itemId: null, itemCode: null, itemName: null, specification: null, unitOfMeasure: null, unitName: null, quantity: 1 },
+      bomOpen: false, bomTitle: '', bomTab: 'bom', bomSearchKey: '', currentRouteProductId: null, currentBomProductId: null,
+      _bomAddOpen: false, _bomAddFrom: 'product', _bomItemForm: { processId: null, itemId: null, itemCode: null, itemName: null, specification: null, unitOfMeasure: null, unitName: null, quantity: 1 },
       // 工序BOM弹窗
       _procBomOpen: false, _procBomTitle: '', _procBomLoading: false, _procBomList: [],
+      // 工序BOM/参数弹窗当前选中的路线产品（qxx_pro_route_product.record_id）
+      _procProductRecordId: null,
       // 工序参数弹窗
       _procParamOpen: false, _procParamTitle: '', _procParamLoading: false, _procParamList: [],
       _currentProcProcessId: null, _templateMap: {},
@@ -466,6 +478,9 @@ export default {
         (b.itemName && b.itemName.toLowerCase().includes(key))
       )
     },
+  },
+  watch: {
+    bomOpen(open) { if (!open) this.currentBomProductId = null },
   },
   methods: {
     getList() { this.loading = true; listRoute(this.queryParams).then(r => { this.routeList = r.rows; this.total = r.total; }).catch(()=>{}).finally(()=>{ this.loading = false }) },
@@ -574,6 +589,7 @@ export default {
     handleViewProductBom(row) {
       this.bomTitle = '产品工艺详情 - ' + (row.itemName || row.itemCode)
       this.currentRouteProductId = row.recordId
+      this.currentBomProductId = row.itemId
       this.bomOpen = true; this.bomTab = 'bom'
       this.loadBomData(); this.loadParamData()
     },
@@ -608,6 +624,7 @@ export default {
     },
     // BOM 操作
     handleAddBomItem() {
+      this._bomAddFrom = 'product'
       this._bomProcessId = this.processList.length > 0 ? this.processList[0].processId : null
       this._bomItemForm = { processId: this._bomProcessId, itemId: null, itemCode: null, itemName: null, specification: null, unitOfMeasure: null, unitName: null, quantity: 1 }
       this._bomAddOpen = true
@@ -633,7 +650,8 @@ export default {
       if (this.productList.length === 0) { this.$modal.msgWarning('请先在「关联产品」Tab 关联至少一个产品'); return }
       this._currentProcProcessId = row.processId
       this._procBomTitle = row.processName || row.processCode
-      this.currentRouteProductId = this.productList[0].recordId
+      this._procProductRecordId = this.productList[0].recordId
+      this.currentRouteProductId = this._procProductRecordId
       this._procBomOpen = true
       this._loadProcBomData()
     },
@@ -641,14 +659,24 @@ export default {
       if (this.productList.length === 0) { this.$modal.msgWarning('请先在「关联产品」Tab 关联至少一个产品'); return }
       this._currentProcProcessId = row.processId
       this._procParamTitle = row.processName || row.processCode
-      this.currentRouteProductId = this.productList[0].recordId
+      this._procProductRecordId = this.productList[0].recordId
+      this.currentRouteProductId = this._procProductRecordId
       this._procParamOpen = true
       this._loadProcParamData()
     },
+    // 工序BOM/参数弹窗切换产品：同步参数归属并按当前弹窗重新加载
+    handleProcProductChange(recordId) {
+      this.currentRouteProductId = recordId
+      if (this._procBomOpen) this._loadProcBomData()
+      if (this._procParamOpen) this._loadProcParamData()
+    },
     _loadProcBomData() {
       this._procBomLoading = true
+      const prod = this.productList.find(p => p.recordId === this._procProductRecordId)
+      const productId = prod ? prod.itemId : null
       listRouteProductBomByRouteId(this.form.routeId).then(r => {
-        this._procBomList = (r.data || []).filter(b => b.processId === this._currentProcProcessId)
+        this._procBomList = (r.data || []).filter(b => b.processId === this._currentProcProcessId
+          && (productId == null || b.productId === productId))
         this._procBomLoading = false
       }).catch(() => { this._procBomLoading = false })
     },
@@ -680,6 +708,7 @@ export default {
       return t ? t.imageUrl : ''
     },
     handleAddProcBomItem() {
+      this._bomAddFrom = 'process'
       this._bomItemForm.processId = this._currentProcProcessId
       this._bomItemForm.itemId = null; this._bomItemForm.itemCode = null; this._bomItemForm.itemName = null
       this._bomItemForm.specification = null; this._bomItemForm.unitOfMeasure = null; this._bomItemForm.unitName = null; this._bomItemForm.quantity = 1
@@ -687,15 +716,20 @@ export default {
     },
     confirmAddBomItem() {
       if (!this._bomItemForm.itemId) { this.$modal.msgWarning('请选择物料'); return }
-      // productId：关联产品 Tab 打开时传 actual productId，工序 BOM 弹窗打开时传 null（不限产品）
-      const prod = this.productList.find(p => p.recordId === this.currentRouteProductId)
+      // 产品归属：产品详情弹窗用 currentRouteProductId，工序BOM弹窗用下拉选中的 _procProductRecordId
+      const refRecordId = this._bomAddFrom === 'process' ? this._procProductRecordId : this.currentRouteProductId
+      const prod = this.productList.find(p => p.recordId === refRecordId)
       addRouteProductBom({
         routeId: this.form.routeId, processId: this._bomItemForm.processId,
         productId: prod ? prod.itemId : null,
         itemId: this._bomItemForm.itemId, itemCode: this._bomItemForm.itemCode, itemName: this._bomItemForm.itemName,
         specification: this._bomItemForm.specification, unitOfMeasure: this._bomItemForm.unitOfMeasure, unitName: this._bomItemForm.unitName,
         quantity: this._bomItemForm.quantity
-      }).then(() => { this._bomAddOpen = false; this._loadProcBomData(); this.$modal.msgSuccess('新增成功') }).catch(() => { this._bomAddOpen = false })
+      }).then(() => {
+        this._bomAddOpen = false
+        if (this._bomAddFrom === 'process') this._loadProcBomData(); else this.loadBomData()
+        this.$modal.msgSuccess('新增成功')
+      }).catch(() => { this._bomAddOpen = false })
     },
     handleProcBomQtyChange(row, val) { if (row.recordId) updateRouteProductBom({ ...row, quantity: val }).then(() => {}) },
     handleDelProcBomItem(row) {

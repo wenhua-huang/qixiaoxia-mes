@@ -354,7 +354,8 @@ public class ProTaskServiceImpl implements IProTaskService
             throw new ServiceException("只有待排产/正常状态的任务才能下发，当前状态：" + task.getStatus());
         // 机台闸门：厂内工序必须指派真实且启用的机台才能下发（外协 VENDOR 不占厂内机台，放行）
         assertWorkstationAssigned(task);
-        // 负责人闸门：下发即推进到生产中，负责人是质检拦截等待办的第一责任人，厂内/外协均必填
+        // 负责人闸门：下发即推进到生产中，负责人是质检拦截等待办的第一责任人（厂内必填；
+        // 外协 VENDOR 任务在甘特上没有指派内部负责人的入口，放行，质检待办按报工人/判定人兜底）
         assertLeaderAssigned(task);
         task.setStatus(ProConstants.TASK_STATUS_PRODUCING);
         task.setUpdateTime(DateUtils.getNowDate());
@@ -471,15 +472,15 @@ public class ProTaskServiceImpl implements IProTaskService
         List<String> pendingNames = collectPendingInHouseNames(workorderId);
         if (!pendingNames.isEmpty())
             throw new ServiceException("以下工序尚未指派有效机台，请先在甘特排产中指派后再下发：" + String.join("、", pendingNames));
-        // 负责人闸门：与单任务下发同口径，厂内/外协均必填，缺一个整体拒绝（工单开工走此入口）
+        // 负责人闸门：与单任务下发同口径，仅厂内任务必填，缺一个整体拒绝（工单开工走此入口）
         List<String> noLeaderNames = collectMissingLeaderNames(workorderId);
         if (!noLeaderNames.isEmpty())
             throw new ServiceException("以下工序任务尚未指定负责人，请先在甘特排产任务弹窗指派负责人后再开工："
-                    + String.join("、", noLeaderNames) + "（外协工序同样要求）");
+                    + String.join("、", noLeaderNames));
         proTaskMapper.updateStatusByWorkorder(workorderId, TASK_DISPATCHABLE, ProConstants.TASK_STATUS_PRODUCING);
     }
 
-    /** 收集工单下"未指定负责人"的可下发任务工序名（厂内/外协均检查，不豁免外协） */
+    /** 收集工单下"未指定负责人"的可下发任务工序名（仅厂内；外协 VENDOR 无内部负责人指派入口，豁免） */
     private List<String> collectMissingLeaderNames(Long workorderId)
     {
         ProTask q = new ProTask();
@@ -488,6 +489,7 @@ public class ProTaskServiceImpl implements IProTaskService
         for (ProTask t : proTaskMapper.selectProTaskList(q))
         {
             if (!TASK_DISPATCHABLE.contains(t.getStatus())) continue;
+            if (ProConstants.WS_CODE_VENDOR.equals(t.getWorkstationCode())) continue;
             if (t.getLeaderId() != null) continue;
             String name = t.getProcessName() != null ? t.getProcessName() : ("任务#" + t.getTaskId());
             if (!names.contains(name)) names.add(name);
@@ -534,9 +536,10 @@ public class ProTaskServiceImpl implements IProTaskService
             throw new ServiceException("该任务指派的机台不存在或已停用，请在甘特排产中重新指派机台后再下发");
     }
 
-    /** 下发前负责人闸门：未指定负责人则拒绝（外协不豁免，外协异常同样需要内部跟进责任人） */
+    /** 下发前负责人闸门：厂内任务未指定负责人则拒绝（外协 VENDOR 豁免，无内部负责人指派入口） */
     private void assertLeaderAssigned(ProTask task)
     {
+        if (ProConstants.WS_CODE_VENDOR.equals(task.getWorkstationCode())) return;
         if (task.getLeaderId() == null)
             throw new ServiceException("该任务尚未指定负责人，请先在甘特排产任务弹窗指派负责人后再下发");
     }

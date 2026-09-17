@@ -423,6 +423,32 @@ describe('甘特图任务CRUD — 单元测试', () => {
       const { updateTask } = await import('@/api/mes/pro/task')
       expect(updateTask).not.toHaveBeenCalled()
     })
+
+    it('外协 VENDOR 任务(id=0)无厂内机台也可保存，且保留 VENDOR 快照不被冲成厂内任务', async () => {
+      const wrapper = mountGantt()
+      const vm = wrapper.vm as any
+      vm.queryParams.workorderId = 1
+      vm.taskForm.taskId = 77
+      vm.taskForm.processId = 20
+      vm.taskForm.processName = '分切'
+      vm.taskForm.workstationId = 0          // 外协占位 id
+      vm.taskForm.workstationCode = 'VENDOR'
+      vm.taskForm.workstationName = '万隆'
+      vm.taskForm.leaderId = null            // 外协无内部负责人
+
+      const warnSpy = vi.spyOn(ElMessage, 'warning')
+      await vm.submitTaskEdit()
+      await nextTick()
+
+      expect(warnSpy).not.toHaveBeenCalled()
+      const { updateTask } = await import('@/api/mes/pro/task')
+      expect(updateTask).toHaveBeenCalledWith(expect.objectContaining({
+        taskId: 77,
+        workstationId: 0,
+        workstationCode: 'VENDOR',
+        workstationName: '万隆'
+      }))
+    })
   })
 
   // ═══ onDialogClose ═══

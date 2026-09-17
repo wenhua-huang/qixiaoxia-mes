@@ -324,6 +324,8 @@
               <el-table-column label="负责人" align="center" width="90">
                 <template #default="scope">
                   <el-tag v-if="scope.row.leaderAssigned" type="success" size="small">已指定</el-tag>
+                  <!-- 外协 VENDOR 任务无内部负责人指派入口，不标红 -->
+                  <span v-else-if="scope.row.execType === 'OUTSOURCE'" style="color:#909399">—</span>
                   <el-tag v-else type="danger" size="small">待指派</el-tag>
                 </template>
               </el-table-column>
@@ -817,7 +819,8 @@ export default {
         && this.startCheckSteps[1].status === 'error'
         && this.startCheckSteps[1].overridable === true
     },
-    // 排产检查硬性拦截（厂内未派机台 / 任一工序缺负责人；外协也要求负责人）：不提供豁免，跳甘特处理
+    // 排产检查硬性拦截（厂内未派机台 / 厂内工序缺负责人）：不提供豁免，跳甘特处理。
+    // 外协 VENDOR 任务无内部负责人指派入口，不参与负责人拦截
     isScheduleHardBlock() {
       const s = this.startCheckSteps[1]
       if (this.startCheckRunning || this.startCheckAllPassed || !s || s.status !== 'error' || s.overridable !== false) {
@@ -825,12 +828,12 @@ export default {
       }
       const details = s.details || []
       return details.some(d => d.execType === 'INHOUSE' && !d.assigned)
-        || details.some(d => d.execType !== 'UNSCHEDULED' && !d.leaderAssigned)
+        || details.some(d => d.execType === 'INHOUSE' && !d.leaderAssigned)
     },
     // 缺负责人优先提示补负责人，否则提示派机台
     hardBlockButtonText() {
       const details = (this.startCheckSteps[1] && this.startCheckSteps[1].details) || []
-      return details.some(d => d.execType !== 'UNSCHEDULED' && !d.leaderAssigned)
+      return details.some(d => d.execType === 'INHOUSE' && !d.leaderAssigned)
         ? '去甘特指派负责人' : '去甘特指派机台'
     },
     // 硬性拦截时跳转甘特排产处理

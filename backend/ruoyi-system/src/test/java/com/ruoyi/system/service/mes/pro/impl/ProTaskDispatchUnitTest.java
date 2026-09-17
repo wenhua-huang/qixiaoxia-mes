@@ -20,11 +20,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
- * 任务下发闸门单测：机台（厂内）+ 负责人（厂内/外协均必填）。
+ * 任务下发闸门单测：机台（厂内必填，外协 VENDOR 豁免）+ 负责人（厂内必填，外协 VENDOR 豁免）。
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("任务下发闸门")
@@ -73,17 +74,19 @@ class ProTaskDispatchUnitTest {
     }
 
     @Test
-    @DisplayName("外协任务无负责人同样拒绝（外协不豁免）")
-    void rejectsOutsourceTaskWithoutLeader() {
+    @DisplayName("外协任务无负责人也可下发（VENDOR 无内部负责人指派入口，豁免）")
+    void dispatchesOutsourceTaskWithoutLeader() {
         ProTask t = internalTask();
         t.setWorkstationId(0L);
         t.setWorkstationCode(ProConstants.WS_CODE_VENDOR);
         when(proTaskMapper.selectProTaskByTaskId(100L)).thenReturn(t);
 
-        assertThatThrownBy(() -> taskService.dispatchTask(100L))
-                .isInstanceOf(ServiceException.class)
-                .hasMessageContaining("负责人");
-        verify(proTaskMapper, never()).updateProTask(any());
+        taskService.dispatchTask(100L);
+
+        assertThat(t.getStatus()).isEqualTo(ProConstants.TASK_STATUS_PRODUCING);
+        verify(proTaskMapper).updateProTask(t);
+        // 外协不查厂内机台表
+        verifyNoInteractions(mdWorkstationMapper);
     }
 
     @Test
@@ -136,15 +139,31 @@ class ProTaskDispatchUnitTest {
     }
 
     @Test
-    @DisplayName("工单开工批量下发：外协任务无负责人同样拒绝（外协不豁免）")
-    void rejectsWorkorderDispatchOutsourceWithoutLeader() {
+    @DisplayName("工单开工批量下发：仅外协任务且无负责人时放行（外协 VENDOR 豁免负责人）")
+    void dispatchesWorkorderWhenOnlyOutsourceWithoutLeader() {
         mockWorkorderTasks(java.util.List.of(
                 workorderTask(1L, "覆膜", ProConstants.WS_CODE_VENDOR, null)));
 
-        assertThatThrownBy(() -> taskService.dispatchByWorkorder(900L))
-                .isInstanceOf(ServiceException.class)
-                .hasMessageContaining("覆膜")
-                .hasMessageContaining("外协工序同样要求");
+        taskService.dispatchByWorkorder(900L);
+
+        verify(proTaskMapper).updateStatusByWorkorder(
+                eq(900L), anyList(), eq(ProConstants.TASK_STATUS_PRODUCING));
+        verifyNoInteractions(mdWorkstationMapper);
+    }
+
+    @Test
+    @DisplayName("工单开工批量下发：厂内缺负责人+外协无负责人时只报错厂内工序，外协放行")
+    void rejectsWorkorderDispatchListingOnlyInternalMissingLeader() {
+        MdWorkstation ws = new MdWorkstation();
+        ws.setEnableFlag("1");
+        when(mdWorkstationMapper.selectMdWorkstationByWorkstationId(216L)).thenReturn(ws);
+        mockWorkorderTasks(java.util.List.of(
+                workorderTask(1L, "印刷", "WST-01", null),
+                workorderTask(2L, "覆膜", ProConstants.WS_CODE_VENDOR, null)));
+
+        ServiceException ex = catchThrowableOfType(
+                () -> taskService.dispatchByWorkorder(900L), ServiceException.class);
+        assertThat(ex.getMessage()).contains("印刷").doesNotContain("覆膜");
         verify(proTaskMapper, never())
                 .updateStatusByWorkorder(anyLong(), anyList(), anyString());
     }

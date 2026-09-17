@@ -73,7 +73,9 @@
           </el-select>
         </el-form-item>
         <el-form-item label="工作站" prop="workstationId">
-          <el-select v-model="taskForm.workstationId" style="width:100%" filterable
+          <!-- 外协任务锁定为外协占位（VENDOR），禁止改成厂内机台：否则会漏进厂内报工列表 -->
+          <el-input v-if="isVendorTask" model-value="外协（厂商加工）" disabled />
+          <el-select v-else v-model="taskForm.workstationId" style="width:100%" filterable
             :disabled="taskDialogMode==='view'"
             placeholder="请选择机台（必选）"
             @focus="onWorkstationFocus" @change="onWorkstationChange">
@@ -100,8 +102,9 @@
             <el-option v-for="u in leaderOptions" :key="u.userId"
               :label="`${u.nickName}（${u.userName}）`" :value="u.userId" />
           </el-select>
-          <div class="form-tip" :class="{ 'tip-warn': !taskForm.leaderId }">
-            {{ taskForm.leaderId ? '已指定，任务可下发' : '未指定：任务可保存，但下发时会被拦截（外协工序同样要求）' }}
+          <div class="form-tip" :class="{ 'tip-warn': !taskForm.leaderId && !isVendorTask }">
+            <template v-if="isVendorTask">外协任务不要求内部负责人；质检拦截等待办按实际报工人/判定人兜底</template>
+            <template v-else>{{ taskForm.leaderId ? '已指定，任务可下发' : '未指定：任务可保存，但下发时会被拦截' }}</template>
           </div>
         </el-form-item>
         <el-form-item label="排产数量">
@@ -185,6 +188,11 @@ const queryParams = reactive({
 const detailOpen = ref(false)
 const selectedTask = ref<any>({})
 
+// 外协占位机台编码（与后端 ProConstants.WS_CODE_VENDOR 对齐）：id=0，弹窗内锁定机台选择
+const WS_CODE_VENDOR = 'VENDOR'
+// 当前编辑的是否外协任务：机台锁定为外协占位，禁止改成厂内机台（否则 VENDOR 任务会漏进厂内报工列表）
+const isVendorTask = computed(() => taskForm.workstationCode === WS_CODE_VENDOR)
+
 // 任务状态改用 useDict('mes_pro_task_status') + dict-tag 渲染，不再硬编码 statusMap
 
 // 任务编辑弹窗状态
@@ -196,6 +204,7 @@ const taskForm = reactive({
   processId: null as number | null,
   processName: '',
   workstationId: null as number | null,
+  workstationCode: '',
   workstationName: '',
   quantity: 1,
   startTime: '' as string | null,
@@ -321,6 +330,7 @@ function onProcessChange(processId: number | null) {
   }
   // 切换工序后重置工作站选择，按新工序加载可用工作站
   taskForm.workstationId = null
+  taskForm.workstationCode = ''
   loadAvailableWorkstations()
 }
 
@@ -336,6 +346,7 @@ function resetTaskForm() {
   taskForm.processId = null
   taskForm.processName = ''
   taskForm.workstationId = null
+  taskForm.workstationCode = ''
   taskForm.workstationName = ''
   taskForm.quantity = 1
   taskForm.startTime = null
@@ -549,7 +560,8 @@ async function onTaskSelect(task: GanttTask) {
   taskForm.taskId = Number(task.id) || null
   taskForm.processId = (task as any).processId || null         // #5 填充工序
   taskForm.processName = task.processName || (task as any).processName || ''
-  taskForm.workstationId = (task as any).workstationId || null
+  taskForm.workstationId = (task as any).workstationId ?? null
+  taskForm.workstationCode = (task as any).workstationCode || ''
   taskForm.workstationName = (task as any).workstationName || ''
   taskForm.quantity = task.quantity || 1
   taskForm.startTime = normalizeTime(task.start)               // #6 ISO→空格格式
@@ -570,8 +582,8 @@ async function onTaskSelect(task: GanttTask) {
     await loadWorkstations()
   }
   detailOpen.value = true
-  // 编辑时按当前工序+时段加载可用工作站
-  loadAvailableWorkstations()
+  // 外协任务机台锁定，不需要加载厂内可用机台
+  if (!isVendorTask.value) loadAvailableWorkstations()
 }
 
 // 工作站下拉框聚焦时加载列表
@@ -642,8 +654,8 @@ async function submitTaskEdit() {
     ? await taskFormRef.value.validate().catch(() => false)
     : true
   if (!valid) return
-  // 兜底：表单规则未生效（如测试桩/程序化调用）时也绝不放行无机器台任务
-  if (!taskForm.workstationId) {
+  // 兜底：表单规则未生效（如测试桩/程序化调用）时也绝不放行无机器台任务（外协占位 id=0 合法）
+  if (!isVendorTask.value && !taskForm.workstationId) {
     ElMessage.warning('请选择机台')
     return
   }
@@ -664,9 +676,12 @@ async function submitTaskEdit() {
       workerId: taskForm.workerId,
       leaderId: taskForm.leaderId,
       workstationId: taskForm.workstationId,
-      // code/name 优先用所选机台（availableWorkstations 也可能含），避免全量列表未覆盖时丢名
-      workstationCode: ws?.workstationCode || (filteredWorkstationList.value.find((x: any) => x.workstationId === taskForm.workstationId)?.workstationCode) || '',
-      workstationName: ws?.workstationName || (filteredWorkstationList.value.find((x: any) => x.workstationId === taskForm.workstationId)?.workstationName) || ''
+      // 外协任务保留 VENDOR 占位快照（机台锁定不可改）；厂内任务 code/name 优先用所选机台
+      // （availableWorkstations 也可能含），避免全量列表未覆盖时丢名
+      workstationCode: isVendorTask.value ? WS_CODE_VENDOR
+        : (ws?.workstationCode || (filteredWorkstationList.value.find((x: any) => x.workstationId === taskForm.workstationId)?.workstationCode) || ''),
+      workstationName: isVendorTask.value ? (taskForm.workstationName || '外协')
+        : (ws?.workstationName || (filteredWorkstationList.value.find((x: any) => x.workstationId === taskForm.workstationId)?.workstationName) || '')
     }
     if (taskForm.taskId) {
       payload.taskId = taskForm.taskId

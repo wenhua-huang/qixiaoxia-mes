@@ -150,6 +150,9 @@ public class GanttDataServiceImpl implements IGanttDataService
                 item.put("processId", pt.getProcessId());
                 item.put("processName", rp.getProcessName());
                 item.put("workstationId", pt.getWorkstationId());
+                // 外协 VENDOR 任务 workstationId=0，前端需靠 code 识别并锁定机台选择（防止被改成厂内任务漏进报工列表）
+                item.put("workstationCode", pt.getWorkstationCode());
+                item.put("workstationName", pt.getWorkstationName());
                 item.put("colorCode", rp.getColorCode() != null ? rp.getColorCode() : com.ruoyi.system.domain.mes.pro.ProConstants.DEFAULT_COLOR_CODE);
                 item.put("predecessorId", pt.getPredecessorId());
                 item.put("status", pt.getStatus());
@@ -312,6 +315,7 @@ public class GanttDataServiceImpl implements IGanttDataService
             item.put("processId", pt.getProcessId());
             item.put("processName", pt.getProcessName());
             item.put("workstationId", pt.getWorkstationId());
+            item.put("workstationCode", pt.getWorkstationCode());
             item.put("workstationName", pt.getWorkstationName());
             item.put("workorderId", pt.getWorkorderId());
             item.put("workorderName", pt.getWorkorderName());

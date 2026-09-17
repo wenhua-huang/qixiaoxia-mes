@@ -1227,11 +1227,12 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         }
         if (!unscheduled.isEmpty())
             return schedulingFail(step, "以下工序尚未排产，请先进行排产操作：" + String.join("、", unscheduled), true);
-        // 负责人是硬约束（与甘特单任务下发、批量下发同口径，外协不豁免）：无负责人豁免后开工仍会被拦
+        // 负责人是硬约束（与甘特单任务下发、批量下发同口径，仅厂内任务）：无负责人豁免后开工仍会被拦
+        // 外协 VENDOR 任务没有内部负责人指派入口，不在此列（质检待办按报工人/判定人兜底）
         List<String> missingLeader = execNamesByLeader(rows, false);
         if (!missingLeader.isEmpty())
             return schedulingFail(step, "以下工序任务尚未指定负责人，请先在甘特排产任务弹窗指派负责人后再开工："
-                    + String.join("、", missingLeader) + "（外协工序同样要求）", false);
+                    + String.join("、", missingLeader), false);
 
         long outsourceCount = rows.stream().filter(r -> ProConstants.EXEC_TYPE_OUTSOURCE.equals(r.get("execType"))).count();
         step.put("status", "PASS");
@@ -1260,13 +1261,16 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         return names;
     }
 
-    /** 按负责人落实标志取工序名（未排产行 leaderAssigned 为 null，按未落实处理） */
+    /** 按负责人落实标志取工序名（仅厂内行；外协 VENDOR 豁免，未排产行到达此方法前已提前返回） */
     private List<String> execNamesByLeader(List<Map<String, Object>> rows, boolean leaderAssigned)
     {
         List<String> names = new ArrayList<>();
         for (Map<String, Object> r : rows)
+        {
+            if (ProConstants.EXEC_TYPE_OUTSOURCE.equals(r.get("execType"))) continue;
             if (Boolean.TRUE.equals(r.get("leaderAssigned")) == leaderAssigned)
                 names.add(String.valueOf(r.get("processName")));
+        }
         return names;
     }
 

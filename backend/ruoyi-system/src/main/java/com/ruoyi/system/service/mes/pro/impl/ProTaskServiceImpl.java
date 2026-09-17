@@ -354,6 +354,8 @@ public class ProTaskServiceImpl implements IProTaskService
             throw new ServiceException("只有待排产/正常状态的任务才能下发，当前状态：" + task.getStatus());
         // 机台闸门：厂内工序必须指派真实且启用的机台才能下发（外协 VENDOR 不占厂内机台，放行）
         assertWorkstationAssigned(task);
+        // 负责人闸门：下发即推进到生产中，负责人是质检拦截等待办的第一责任人，厂内/外协均必填
+        assertLeaderAssigned(task);
         task.setStatus(ProConstants.TASK_STATUS_PRODUCING);
         task.setUpdateTime(DateUtils.getNowDate());
         task.setUpdateBy(SecurityUtils.getUsername());
@@ -421,6 +423,7 @@ public class ProTaskServiceImpl implements IProTaskService
             row.put("execTypeName", "未排产");
             row.put("resourceName", "");
             row.put("assigned", false);
+            row.put("leaderAssigned", false);
             return row;
         }
         // 外协工序：任一任务挂厂商即按外协（外厂机器，不校验厂内机台）
@@ -432,6 +435,7 @@ public class ProTaskServiceImpl implements IProTaskService
             row.put("execTypeName", "外协");
             row.put("resourceName", vendor.getWorkstationName() != null ? vendor.getWorkstationName() : "外协");
             row.put("assigned", true);
+            row.put("leaderAssigned", isLeaderAssigned(tasks));
             return row;
         }
         // 厂内工序：任一"可下发"任务未指派有效机台即待指派（与 dispatchByWorkorder 闸门口径一致）
@@ -443,13 +447,21 @@ public class ProTaskServiceImpl implements IProTaskService
         {
             row.put("resourceName", ProConstants.WS_NAME_PENDING);
             row.put("assigned", false);
+            row.put("leaderAssigned", isLeaderAssigned(tasks));
             return row;
         }
         // 机台名取自已指派真实机台的任务（避免取到终态/占位任务导致名称为空）
         ProTask assignedTask = tasks.stream().filter(this::isWorkstationAssigned).findFirst().orElse(tasks.get(0));
         row.put("resourceName", assignedTask.getWorkstationName() != null ? assignedTask.getWorkstationName() : "已指派机台");
         row.put("assigned", true);
+        row.put("leaderAssigned", isLeaderAssigned(tasks));
         return row;
+    }
+
+    /** 工序级负责人落实判定：该工序下任一可下发任务无负责人即视为未落实（厂内/外协同口径） */
+    private boolean isLeaderAssigned(List<ProTask> tasks)
+    {
+        return tasks.stream().noneMatch(t -> TASK_DISPATCHABLE.contains(t.getStatus()) && t.getLeaderId() == null);
     }
 
     @Override
@@ -459,7 +471,28 @@ public class ProTaskServiceImpl implements IProTaskService
         List<String> pendingNames = collectPendingInHouseNames(workorderId);
         if (!pendingNames.isEmpty())
             throw new ServiceException("以下工序尚未指派有效机台，请先在甘特排产中指派后再下发：" + String.join("、", pendingNames));
+        // 负责人闸门：与单任务下发同口径，厂内/外协均必填，缺一个整体拒绝（工单开工走此入口）
+        List<String> noLeaderNames = collectMissingLeaderNames(workorderId);
+        if (!noLeaderNames.isEmpty())
+            throw new ServiceException("以下工序任务尚未指定负责人，请先在甘特排产任务弹窗指派负责人后再开工："
+                    + String.join("、", noLeaderNames) + "（外协工序同样要求）");
         proTaskMapper.updateStatusByWorkorder(workorderId, TASK_DISPATCHABLE, ProConstants.TASK_STATUS_PRODUCING);
+    }
+
+    /** 收集工单下"未指定负责人"的可下发任务工序名（厂内/外协均检查，不豁免外协） */
+    private List<String> collectMissingLeaderNames(Long workorderId)
+    {
+        ProTask q = new ProTask();
+        q.setWorkorderId(workorderId);
+        List<String> names = new ArrayList<>();
+        for (ProTask t : proTaskMapper.selectProTaskList(q))
+        {
+            if (!TASK_DISPATCHABLE.contains(t.getStatus())) continue;
+            if (t.getLeaderId() != null) continue;
+            String name = t.getProcessName() != null ? t.getProcessName() : ("任务#" + t.getTaskId());
+            if (!names.contains(name)) names.add(name);
+        }
+        return names;
     }
 
     /** 收集工单下"待指派机台"的厂内可下发任务工序名（外协 VENDOR 放行，不占厂内机台） */
@@ -499,6 +532,13 @@ public class ProTaskServiceImpl implements IProTaskService
         MdWorkstation ws = mdWorkstationMapper.selectMdWorkstationByWorkstationId(wsId);
         if (ws == null || !"1".equals(ws.getEnableFlag()))
             throw new ServiceException("该任务指派的机台不存在或已停用，请在甘特排产中重新指派机台后再下发");
+    }
+
+    /** 下发前负责人闸门：未指定负责人则拒绝（外协不豁免，外协异常同样需要内部跟进责任人） */
+    private void assertLeaderAssigned(ProTask task)
+    {
+        if (task.getLeaderId() == null)
+            throw new ServiceException("该任务尚未指定负责人，请先在甘特排产任务弹窗指派负责人后再下发");
     }
 
     @Override

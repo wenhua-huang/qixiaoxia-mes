@@ -9,7 +9,9 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.system.domain.mes.pro.ProFeedback;
 import com.ruoyi.system.domain.mes.pro.ProFeedbackParam;
+import com.ruoyi.system.domain.mes.pro.ProTask;
 import com.ruoyi.system.mapper.mes.pro.ProFeedbackMapper;
+import com.ruoyi.system.mapper.mes.pro.ProTaskMapper;
 import com.ruoyi.system.service.mes.pro.impl.ProFeedbackServiceImpl;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,6 +50,7 @@ class ProFeedbackServiceUnitTest {
     @Mock private ProInputQuantityResolver inputQuantityResolver;
     @Mock private IProFeedbackChangeService feedbackChangeService;
     @Mock private IProQcBlockService qcBlockService;
+    @Mock private ProTaskMapper proTaskMapper;
     @InjectMocks private ProFeedbackServiceImpl feedbackService;
 
     private ProFeedback testFeedback;
@@ -94,6 +97,38 @@ class ProFeedbackServiceUnitTest {
         fb.setFeedbackCode("FB-NEW");
         feedbackService.insertProFeedback(fb);
         assertThat(fb.getStatus()).isEqualTo("PREPARE");
+    }
+
+    @Test @DisplayName("下发闸门：任务未下发（NORMAL）禁止厂内报工")
+    void testInsertRejectsUndispatchedTask() {
+        ProFeedback fb = new ProFeedback();
+        fb.setFeedbackType("INTERNAL");
+        fb.setWorkorderId(10L);
+        fb.setWorkorderCode("WO-1");
+        fb.setTaskId(20L);
+        fb.setProcessId(30L);
+        fb.setProcessCode("P30");
+        ProTask task = new ProTask();
+        task.setTaskId(20L);
+        task.setTaskCode("WO-1-002");
+        task.setStatus("NORMAL");
+        when(proTaskMapper.selectProTaskByTaskId(20L)).thenReturn(task);
+
+        assertThatThrownBy(() -> feedbackService.insertProFeedback(fb))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("不能报工");
+        verify(feedbackMapper, never()).insertProFeedback(any());
+    }
+
+    @Test @DisplayName("下发闸门：厂内报工必须挂任务，缺任务直接拒绝")
+    void testInsertRejectsMissingTask() {
+        ProFeedback fb = new ProFeedback();
+        fb.setFeedbackType("INTERNAL");
+
+        assertThatThrownBy(() -> feedbackService.insertProFeedback(fb))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("必须指定生产任务");
+        verify(feedbackMapper, never()).insertProFeedback(any());
     }
 
     @Test @DisplayName("参数偏差判定：实际值超出最大值")

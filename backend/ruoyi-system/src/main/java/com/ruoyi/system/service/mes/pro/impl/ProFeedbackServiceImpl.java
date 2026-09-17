@@ -303,6 +303,8 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
                 && isOutsourceRouteProcess(proFeedback.getRouteId(), proFeedback.getProcessId())) {
             throw new ServiceException("该工序为外发工序，不可内部报工，请走外协收货回写");
         }
+        // 下发闸门：厂内报工仅允许「生产中」任务，未下发/暂停/终态不可报（外协收货走独立回写入口）
+        assertTaskProducing(proFeedback, task);
         // 自动关联流转卡：用户没传 cardId 时，按工单查活跃卡取第一张
         if (proFeedback.getCardId() == null && proFeedback.getWorkorderId() != null) {
             proFeedback.setCardId(resolveActiveCardId(proFeedback.getWorkorderId()));
@@ -325,6 +327,39 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
         persistFeedbackChildren(proFeedback);
         writeMaterialTrace(proFeedback);
         return rows;
+    }
+
+    /**
+     * 下发闸门：厂内报工必须挂在「生产中」任务上。App/PC 查询入口虽已只给 PRODUCING 任务，
+     * 提交唯一入口仍需服务端断言，防止绕过界面对未下发/暂停/已完成任务报工。
+     * 外协收货/分切回写走 mapper 直写，不经过本入口；taskId 缺失（理论上前端必填）同样拒绝。
+     */
+    private void assertTaskProducing(ProFeedback fb, ProTask task) {
+        if (!"INTERNAL".equals(fb.getFeedbackType())) {
+            return;
+        }
+        if (task == null) {
+            throw new ServiceException("报工必须指定生产任务，请从待报工列表进入");
+        }
+        if (!ProConstants.TASK_STATUS_PRODUCING.equals(task.getStatus())) {
+            throw new ServiceException("任务「" + task.getTaskCode() + "」未下发或不处于生产中（当前状态："
+                    + taskStatusLabel(task.getStatus()) + "），不能报工");
+        }
+    }
+
+    private String taskStatusLabel(String status) {
+        if (status == null) {
+            return "未知";
+        }
+        switch (status) {
+            case ProConstants.TASK_STATUS_NORMAL: return "待排产";
+            case ProConstants.TASK_STATUS_PREPARE: return "待下发";
+            case ProConstants.TASK_STATUS_PRODUCING: return "生产中";
+            case ProConstants.TASK_STATUS_PAUSED: return "已暂停";
+            case ProConstants.TASK_STATUS_COMPLETED: return "已完成";
+            case ProConstants.TASK_STATUS_CANCEL: return "已取消";
+            default: return status;
+        }
     }
 
     /**

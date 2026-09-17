@@ -76,7 +76,7 @@
           <el-select v-model="taskForm.workstationId" style="width:100%" filterable
             :disabled="taskDialogMode==='view'"
             placeholder="请选择机台（必选）"
-            @focus="onWorkstationFocus">
+            @focus="onWorkstationFocus" @change="onWorkstationChange">
             <el-option v-for="ws in filteredWorkstationList" :key="ws.workstationId"
               :label="ws.workstationName + (ws.idle === false ? '（占用）' : (ws.idle === true ? '（空闲）' : ''))"
               :value="ws.workstationId" />
@@ -90,15 +90,19 @@
             <el-option v-for="u in workerOptions" :key="u.userId"
               :label="`${u.nickName}（${u.userName}）`" :value="u.userId" />
           </el-select>
+          <div class="form-tip">选机台后按「用户工作站」绑定自动推荐，可改派；不派则报工人取实际登录人</div>
         </el-form-item>
         <el-form-item label="负责人">
           <el-select v-model="taskForm.leaderId" style="width:100%" filterable remote clearable
             :remote-method="searchLeaders" :loading="leaderLoading"
-            placeholder="不派则报工时默认当前登录人"
+            placeholder="下发必填：质检拦截等待办的处理责任人"
             :disabled="taskDialogMode==='view'">
             <el-option v-for="u in leaderOptions" :key="u.userId"
               :label="`${u.nickName}（${u.userName}）`" :value="u.userId" />
           </el-select>
+          <div class="form-tip" :class="{ 'tip-warn': !taskForm.leaderId }">
+            {{ taskForm.leaderId ? '已指定，任务可下发' : '未指定：任务可保存，但下发时会被拦截（外协工序同样要求）' }}
+          </div>
         </el-form-item>
         <el-form-item label="排产数量">
           <el-input-number v-model="taskForm.quantity" :min="1" style="width:100%" :disabled="taskDialogMode==='view'" />
@@ -143,6 +147,7 @@ import { getWorkOrderGantt, getAvailableWorkstations, getWorkstationView } from 
 import { listWorkorder, getWorkorderDetail } from '@/api/mes/pro/workorder'
 import { listWorkstation } from '@/api/mes/md/workstation'
 import { addTask, updateTask, delTask } from '@/api/mes/pro/task'
+import { listUserWorkstation } from '@/api/mes/pro/userworkstation'
 import { listUser } from '@/api/system/user'
 import GanttChart from '@/components/GanttChart/index.vue'
 // import SnapShotPanel from './SnapShotPanel.vue'  // 排产快照面板暂时下线，恢复时取消注释
@@ -576,6 +581,22 @@ function onWorkstationFocus() {
   }
 }
 
+// 换机台时按「用户工作站」绑定软推荐报工人：仅当未派人时预填，不覆盖人工选择
+async function onWorkstationChange(wsId: number | null) {
+  if (!wsId || taskForm.workerId) return
+  try {
+    const res: any = await listUserWorkstation({ workstationId: wsId, enableFlag: '1', pageNum: 1, pageSize: 10 })
+    const bound: any[] = res?.rows || []
+    if (!bound.length) return
+    const u = bound[0]
+    taskForm.workerId = u.userId
+    if (!workerOptions.value.some(o => o.userId === u.userId)) {
+      workerOptions.value = [{ userId: u.userId, userName: u.userName, nickName: u.nickName, __echo: true }]
+    }
+    ElMessage.info(`已按该机台绑定推荐报工人：${u.nickName || u.userName}，可改派`)
+  } catch { /* 推荐失败静默：报工人本就可空，报工时登录人兜底 */ }
+}
+
 // 新增任务
 function handleAddTask() {
   if (!queryParams.workorderId) return
@@ -719,4 +740,6 @@ function findTask(id: string): GanttTask|undefined {
 .mb8 { margin-bottom: 8px; }
 .gantt-layout { display: flex; gap: 0; }
 .gantt-main { flex: 1; overflow: hidden; }
+.form-tip { font-size: 12px; line-height: 1.4; color: #909399; margin-top: 4px; }
+.form-tip.tip-warn { color: #e6a23c; }
 </style>

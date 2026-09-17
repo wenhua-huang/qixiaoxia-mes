@@ -64,6 +64,30 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by todo_id desc
     </select>
 
+    <!-- PRO_QC_BLOCK 幂等查询：同一 IPQC 对同一任务(source_doc_code 携带任务ID)的 PENDING 待办只允许一条 -->
+    <select id="selectPendingByDocAndCode" resultMap="SysTodoListResult">
+        <include refid="selectSysTodoListVo"/>
+        where source_doc_type = #{sourceDocType}
+          and source_doc_id = #{sourceDocId}
+          and source_doc_code = #{sourceDocCode}
+          and status = 'PENDING'
+        limit 1
+    </select>
+
+    <!-- PRO_QC_BLOCK 放行关闭：按四元组把 PENDING 待办置 COMPLETED -->
+    <update id="completePendingByDocAndCode">
+        update sys_todo_list
+        set status = 'COMPLETED',
+            handle_time = #{handleTime},
+            handle_result = #{handleResult},
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            update_time = #{handleTime}
+        where source_doc_type = #{sourceDocType}
+          and source_doc_id = #{sourceDocId}
+          and source_doc_code = #{sourceDocCode}
+          and status = 'PENDING'
+    </update>
+
     <insert id="insertSysTodoList" parameterType="com.ruoyi.system.domain.mes.sys.SysTodoList" useGeneratedKeys="true" keyProperty="todoId">
         insert into sys_todo_list
         <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="userId != null">user_id,</if>

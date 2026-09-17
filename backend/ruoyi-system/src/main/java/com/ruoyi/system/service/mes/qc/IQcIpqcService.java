@@ -42,7 +42,9 @@ public interface IQcIpqcService
 
     /**
      * 执行判定（FAIL+让步理由→CONCESSION；行结果/缺陷统计/合格数回写，状态置 COMPLETED；
-     * 判定通过后不自动流转流转卡，只完成检验单本身）
+     * 判定通过后不自动流转流转卡，只完成检验单本身）。
+     *
+     * @return 被质检不合格拦截的下波工序名列表（FAIL 时非空；PASS/CONCESSION 返回空列表）
      */
-    public void judgeIpqc(Long ipqcId, String concessionReason);
+    public List<String> judgeIpqc(Long ipqcId, String concessionReason);
 }

@@ -49,6 +49,7 @@ import com.ruoyi.system.domain.mes.pro.ProCard;
 import com.ruoyi.system.domain.mes.pro.ProMaterialTrace;
 import com.ruoyi.system.domain.mes.md.MdItem;
 import com.ruoyi.system.service.mes.pro.IProFeedbackService;
+import com.ruoyi.system.service.mes.pro.ProInputQuantityResolver;
 import com.ruoyi.system.service.mes.pro.IProWorkorderDocService;
 import com.ruoyi.system.service.mes.pro.TeamResolver;
 import com.ruoyi.system.service.mes.qc.IQcFactoryService;
@@ -89,6 +90,9 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
     @Autowired private com.ruoyi.system.mapper.mes.wm.WmIssueHeaderMapper wmIssueHeaderMapper;
     @Autowired private com.ruoyi.system.mapper.mes.wm.WmIssueDetailMapper wmIssueDetailMapper;
     @Autowired private com.ruoyi.system.mapper.mes.wm.WmIssueLineMapper wmIssueLineMapper;
+    @Autowired private ProInputQuantityResolver inputQuantityResolver;
+    @Autowired private com.ruoyi.system.service.mes.pro.IProFeedbackChangeService feedbackChangeService;
+    @Autowired private com.ruoyi.system.service.mes.pro.IProQcBlockService qcBlockService;
 
     @Override
     public ProFeedback selectProFeedbackByRecordId(Long recordId) {
@@ -118,7 +122,13 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
         throw new ServiceException("报工编码[" + proFeedback.getFeedbackCode() + "]已存在");
     }
 
-    private void autoFillCodes(ProFeedback fb) {
+    /**
+     * 自动填充工单/任务/工序/物料等身份快照。
+     *
+     * @return fb.taskId 对应的任务（用于以上任务排产数为基准的默认值解析）；无 taskId 返回 null
+     */
+    private ProTask autoFillCodes(ProFeedback fb) {
+        ProTask task = null;
         if (fb.getWorkorderId() != null && fb.getWorkorderCode() == null) {
             try {
                 ProWorkorder wo = proWorkorderMapper.selectProWorkorderByWorkorderId(fb.getWorkorderId());
@@ -141,33 +151,7 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
             }
         }
         if (fb.getTaskId() != null) {
-            try {
-                ProTask task = proTaskMapper.selectProTaskByTaskId(fb.getTaskId());
-                if (task != null) {
-                    // 工单/工序/路线是任务的身份字段，外协拦截、工序顺序、领料校验都以它们为键，
-                    // 必须以任务为准，不能采信客户端传入值——否则伪造 routeId 即可把外协工序报成自制。
-                    fb.setWorkorderId(task.getWorkorderId());
-                    fb.setProcessId(task.getProcessId());
-                    fb.setRouteId(task.getRouteId());
-                    // 身份快照（编码/名称）同步以任务为准，避免与上面纠正后的 ID 不一致
-                    fb.setWorkorderCode(task.getWorkorderCode());
-                    fb.setWorkorderName(task.getWorkorderName());
-                    fb.setTaskCode(task.getTaskCode());
-                    fb.setProcessCode(task.getProcessCode());
-                    fb.setProcessName(task.getProcessName());
-                    if (fb.getWorkstationId() == null) fb.setWorkstationId(task.getWorkstationId());
-                    if (fb.getWorkstationCode() == null) fb.setWorkstationCode(task.getWorkstationCode());
-                    if (fb.getWorkstationName() == null) fb.setWorkstationName(task.getWorkstationName());
-                    // 产出物即任务产品（排产时 task.item_id = 工单产品），同样以任务为准
-                    fb.setItemId(task.getItemId());
-                    fb.setItemCode(task.getItemCode());
-                    fb.setItemName(task.getItemName());
-                    if (fb.getUnitOfMeasure() == null) fb.setUnitOfMeasure(task.getUnitOfMeasure());
-                    if (fb.getUnitName() == null) fb.setUnitName(task.getUnitName());
-                }
-            } catch (Exception e) {
-                throw new ServiceException("加载任务信息失败: " + e.getMessage());
-            }
+            task = applyTaskSnapshot(fb);
         }
         if (fb.getItemId() != null && fb.getItemCode() == null) {
             try {
@@ -187,6 +171,45 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
         if (fb.getUnitOfMeasure() == null || fb.getUnitOfMeasure().isEmpty()) {
             fb.setUnitOfMeasure(ProConstants.DEFAULT_UNIT);
         }
+        applyZeroDefaults(fb);
+        return task;
+    }
+
+    /** 以任务为准覆盖报工身份字段（工单/工序/路线/工位/产品快照），返回任务实体 */
+    private ProTask applyTaskSnapshot(ProFeedback fb) {
+        try {
+            ProTask task = proTaskMapper.selectProTaskByTaskId(fb.getTaskId());
+            if (task == null) {
+                return null;
+            }
+            // 工单/工序/路线是任务的身份字段，外协拦截、工序顺序、领料校验都以它们为键，
+            // 必须以任务为准，不能采信客户端传入值——否则伪造 routeId 即可把外协工序报成自制。
+            fb.setWorkorderId(task.getWorkorderId());
+            fb.setProcessId(task.getProcessId());
+            fb.setRouteId(task.getRouteId());
+            // 身份快照（编码/名称）同步以任务为准，避免与上面纠正后的 ID 不一致
+            fb.setWorkorderCode(task.getWorkorderCode());
+            fb.setWorkorderName(task.getWorkorderName());
+            fb.setTaskCode(task.getTaskCode());
+            fb.setProcessCode(task.getProcessCode());
+            fb.setProcessName(task.getProcessName());
+            if (fb.getWorkstationId() == null) fb.setWorkstationId(task.getWorkstationId());
+            if (fb.getWorkstationCode() == null) fb.setWorkstationCode(task.getWorkstationCode());
+            if (fb.getWorkstationName() == null) fb.setWorkstationName(task.getWorkstationName());
+            // 产出物即任务产品（排产时 task.item_id = 工单产品），同样以任务为准
+            fb.setItemId(task.getItemId());
+            fb.setItemCode(task.getItemCode());
+            fb.setItemName(task.getItemName());
+            if (fb.getUnitOfMeasure() == null) fb.setUnitOfMeasure(task.getUnitOfMeasure());
+            if (fb.getUnitName() == null) fb.setUnitName(task.getUnitName());
+            return task;
+        } catch (Exception e) {
+            throw new ServiceException("加载任务信息失败: " + e.getMessage());
+        }
+    }
+
+    /** 数量类字段空值兜底为 0（单位不兜底为 "-"，避免破坏追溯） */
+    private void applyZeroDefaults(ProFeedback fb) {
         if (fb.getQuantity() == null) fb.setQuantity(BigDecimal.ZERO);
         if (fb.getQuantityFeedback() == null) fb.setQuantityFeedback(BigDecimal.ZERO);
         if (fb.getQuantityQualified() == null) fb.setQuantityQualified(BigDecimal.ZERO);
@@ -274,18 +297,22 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
         }
         // 班组快照：按 userId 反查归属班组并固化（无班组不报错）
         fillTeamSnapshot(proFeedback);
-        autoFillCodes(proFeedback);
+        ProTask task = autoFillCodes(proFeedback);
         // 外协工序(is_outsource=1)禁止内部报工：走外协收货回写，避免厂内重复报工
         if ("INTERNAL".equals(proFeedback.getFeedbackType())
                 && isOutsourceRouteProcess(proFeedback.getRouteId(), proFeedback.getProcessId())) {
             throw new ServiceException("该工序为外发工序，不可内部报工，请走外协收货回写");
         }
+        // 下发闸门：厂内报工仅允许「生产中」任务，未下发/暂停/终态不可报（外协收货走独立回写入口）
+        assertTaskProducing(proFeedback, task);
         // 自动关联流转卡：用户没传 cardId 时，按工单查活跃卡取第一张
         if (proFeedback.getCardId() == null && proFeedback.getWorkorderId() != null) {
             proFeedback.setCardId(resolveActiveCardId(proFeedback.getWorkorderId()));
         }
         // 工序顺序校验：严格串行推进，拦跳序+拦倒序（仅纯串行 SS 路线生效）
         validateProcessSequence(proFeedback.getCardId(), proFeedback.getRouteId(), proFeedback.getProcessId());
+        // 跟单质检门控：上道检验工序判不合格且未授权放行时，硬拦本工序报工（外协报工不拦）
+        qcBlockService.assertReportable(proFeedback);
         // 领料校验（缺料不生产）：该工序有物料消耗时，必须已发料出库才能报工
         validateIssueBeforeFeedback(proFeedback);
         // 物料消耗默认值：若未传 consumeList 但有工单ID，从工单BOM自动填充
@@ -293,25 +320,98 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
                 && proFeedback.getWorkorderId() != null) {
             proFeedback.setConsumeList(getDefaultConsume(proFeedback.getWorkorderId()));
         }
+        // 本次上机数量默认值：未填=系统填充不留痕；显式传了不同值→insert 后写 MANUAL 痕迹
+        BigDecimal inputDefault = applyQuantityInput(proFeedback, task);
         int rows = qxxProFeedbackMapper.insertProFeedback(proFeedback);
-        // 持久化物料消耗
-        if (proFeedback.getConsumeList() != null && !proFeedback.getConsumeList().isEmpty()) {
-            for (ProFeedbackConsume c : proFeedback.getConsumeList()) {
-                c.setFeedbackId(proFeedback.getRecordId());
-                if (c.getWorkorderId() == null) c.setWorkorderId(proFeedback.getWorkorderId());
-            }
-            consumeMapper.insertBatch(proFeedback.getConsumeList());
+        recordManualInputOverride(proFeedback, inputDefault);
+        persistFeedbackChildren(proFeedback);
+        writeMaterialTrace(proFeedback);
+        return rows;
+    }
+
+    /**
+     * 下发闸门：厂内报工必须挂在「生产中」任务上。App/PC 查询入口虽已只给 PRODUCING 任务，
+     * 提交唯一入口仍需服务端断言，防止绕过界面对未下发/暂停/已完成任务报工。
+     * 外协收货/分切回写走 mapper 直写，不经过本入口；taskId 缺失（理论上前端必填）同样拒绝。
+     */
+    private void assertTaskProducing(ProFeedback fb, ProTask task) {
+        if (!"INTERNAL".equals(fb.getFeedbackType())) {
+            return;
         }
-        // 持久化报工参数（自动判定偏差）
-        if (proFeedback.getParamList() != null && !proFeedback.getParamList().isEmpty()) {
-            for (ProFeedbackParam p : proFeedback.getParamList()) {
-                p.setFeedbackId(proFeedback.getRecordId());
+        if (task == null) {
+            throw new ServiceException("报工必须指定生产任务，请从待报工列表进入");
+        }
+        if (!ProConstants.TASK_STATUS_PRODUCING.equals(task.getStatus())) {
+            throw new ServiceException("任务「" + task.getTaskCode() + "」未下发或不处于生产中（当前状态："
+                    + taskStatusLabel(task.getStatus()) + "），不能报工");
+        }
+    }
+
+    private String taskStatusLabel(String status) {
+        if (status == null) {
+            return "未知";
+        }
+        switch (status) {
+            case ProConstants.TASK_STATUS_NORMAL: return "待排产";
+            case ProConstants.TASK_STATUS_PREPARE: return "待下发";
+            case ProConstants.TASK_STATUS_PRODUCING: return "生产中";
+            case ProConstants.TASK_STATUS_PAUSED: return "已暂停";
+            case ProConstants.TASK_STATUS_COMPLETED: return "已完成";
+            case ProConstants.TASK_STATUS_CANCEL: return "已取消";
+            default: return status;
+        }
+    }
+
+    /**
+     * 解析并应用「本次上机数量」系统默认值。
+     * <ul>
+     *   <li>无默认值（无路线/无任务排产数等）→ 返回 null，调用方不留痕；</li>
+     *   <li>用户未填（quantityInput 为 null）→ 直接写入默认值并返回 null（系统填充不留痕）；</li>
+     *   <li>用户显式传值 → 不改写入参，返回系统默认值（可能为 null）；
+     *       调用方在 insert 拿到 recordId 后比较，不一致才写 MANUAL 痕迹。</li>
+     * </ul>
+     */
+    private BigDecimal applyQuantityInput(ProFeedback fb, ProTask task) {
+        BigDecimal def = inputQuantityResolver.resolveDefaultInput(
+                fb.getWorkorderId(), fb.getRouteId(), fb.getProcessId(),
+                task != null ? task.getQuantity() : null);
+        if (def == null) {
+            return null;
+        }
+        if (fb.getQuantityInput() == null) {
+            fb.setQuantityInput(def);
+            return null;
+        }
+        return def;
+    }
+
+    /** 人工填写的上机数量与系统默认值不一致时写 MANUAL 痕迹（主表 insert 后调用，recordId 已回填） */
+    private void recordManualInputOverride(ProFeedback fb, BigDecimal inputDefault) {
+        if (inputDefault == null || fb.getQuantityInput() == null
+                || fb.getQuantityInput().compareTo(inputDefault) == 0) {
+            return;
+        }
+        feedbackChangeService.recordInputChange(fb.getRecordId(), fb,
+                inputDefault, fb.getQuantityInput(),
+                ProConstants.CHANGE_SOURCE_MANUAL, "上机数量由系统默认值人工调整");
+    }
+
+    /** 持久化报工子表：物料消耗（批量）+ 报工参数（逐条偏差判定） */
+    private void persistFeedbackChildren(ProFeedback fb) {
+        if (fb.getConsumeList() != null && !fb.getConsumeList().isEmpty()) {
+            for (ProFeedbackConsume c : fb.getConsumeList()) {
+                c.setFeedbackId(fb.getRecordId());
+                if (c.getWorkorderId() == null) c.setWorkorderId(fb.getWorkorderId());
+            }
+            consumeMapper.insertBatch(fb.getConsumeList());
+        }
+        if (fb.getParamList() != null && !fb.getParamList().isEmpty()) {
+            for (ProFeedbackParam p : fb.getParamList()) {
+                p.setFeedbackId(fb.getRecordId());
                 p.setIsDeviation(calcDeviation(p));
                 feedbackParamMapper.insertProFeedbackParam(p);
             }
         }
-        writeMaterialTrace(proFeedback);
-        return rows;
     }
 
     /**
@@ -536,9 +636,16 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
     @Override
     @Transactional
     public int updateProFeedback(ProFeedback proFeedback) {
+        ProFeedback old = qxxProFeedbackMapper.selectProFeedbackByRecordId(proFeedback.getRecordId());
         proFeedback.setUpdateTime(DateUtils.getNowDate());
         proFeedback.setUpdateBy(SecurityUtils.getUsername());
         int rows = qxxProFeedbackMapper.updateProFeedback(proFeedback);
+        // 上机数量修改留痕：null↔值也算差异，纯 null→null 不记（recordInputChange 内判等）
+        if (old != null && proFeedback.getQuantityInput() != null) {
+            feedbackChangeService.recordInputChange(proFeedback.getRecordId(), mergeChangeSnapshot(old, proFeedback),
+                    old.getQuantityInput(), proFeedback.getQuantityInput(),
+                    ProConstants.CHANGE_SOURCE_MANUAL, "报工修改");
+        }
         // 物料消耗：先删后插
         if (proFeedback.getConsumeList() != null) {
             consumeMapper.deleteByFeedbackId(proFeedback.getRecordId());
@@ -551,6 +658,16 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
             }
         }
         return rows;
+    }
+
+    /**
+     * 编辑留痕快照：更新接口为动态 SQL（未传字段为 null 不更新），taskId/workorderId 取旧行兜底，
+     * 避免痕迹表外键快照写成 null。
+     */
+    private ProFeedback mergeChangeSnapshot(ProFeedback old, ProFeedback incoming) {
+        if (incoming.getTaskId() == null) incoming.setTaskId(old.getTaskId());
+        if (incoming.getWorkorderId() == null) incoming.setWorkorderId(old.getWorkorderId());
+        return incoming;
     }
 
     @Autowired

@@ -32,6 +32,7 @@ import com.ruoyi.system.service.mes.pro.IProTaskService;
 import com.ruoyi.system.service.mes.pro.IScheduleService;
 import com.ruoyi.system.service.mes.pro.IProFeedbackService;
 import com.ruoyi.system.service.mes.pro.IProWorkorderDocService;
+import com.ruoyi.system.service.mes.pro.TaskReportDefaultsApplier;
 import com.ruoyi.system.domain.mes.pro.ProDocGenerationRequestVO;
 import com.ruoyi.system.domain.mes.pro.ProDocGenerationResultVO;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderKitDashboardVO;
@@ -64,6 +65,9 @@ public class ProWorkorderController extends BaseController
 
     @Autowired
     private IProFeedbackService proFeedbackService;
+
+    @Autowired
+    private TaskReportDefaultsApplier defaultsApplier;
 
     /**
      * 查询生产工单列表
@@ -355,6 +359,8 @@ public class ProWorkorderController extends BaseController
                 .filter(t -> ProConstants.WS_CODE_VENDOR.equals(t.getWorkstationCode()))
                 .collect(Collectors.toList());
         fillPendingFeedbackCount(allTasks);
+        // 工单维度报工入口：富化上机数量默认值与质检锁态
+        defaultsApplier.apply(reportableTasks);
 
         Map<String, Object> result = new HashMap<>();
         result.put("workorder", wo);

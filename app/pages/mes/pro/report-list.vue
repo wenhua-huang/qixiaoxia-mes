@@ -27,7 +27,10 @@
       <view v-for="item in list" :key="item.taskId" class="list-item" @click="goReport(item)">
         <view class="item-header">
           <text class="bold">{{ item.workorderCode }}</text>
-          <uni-tag type="warning" text="生产中" size="small" />
+          <view class="header-tags">
+            <uni-tag v-if="item.qcBlocked" type="error" text="不可开工" size="small" />
+            <uni-tag type="warning" text="生产中" size="small" />
+          </view>
         </view>
         <view class="item-body">
           <view class="item-row">
@@ -45,6 +48,10 @@
           <view class="item-row">
             <text class="label">排产 / 已产</text>
             <text class="value bold">{{ num(item.quantity) }} / {{ num(item.quantityProduced) }} {{ item.unitName || '' }}</text>
+          </view>
+          <view class="item-row">
+            <text class="label">报工人</text>
+            <text class="value">{{ item.workerNick || '未派工' }}</text>
           </view>
         </view>
         <view class="item-footer">
@@ -153,6 +160,7 @@ page { background-color: #f5f6f7; min-height: 100%; }
   display: flex; justify-content: space-between; align-items: center;
   padding-bottom: 16rpx; border-bottom: 1px solid #f5f5f5;
 }
+.header-tags { display: flex; align-items: center; gap: 8rpx; }
 .item-body { padding: 16rpx 0; }
 .item-row {
   display: flex; justify-content: space-between;

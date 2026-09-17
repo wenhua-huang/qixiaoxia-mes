@@ -1,5 +1,6 @@
 package com.ruoyi.system.mapper.mes.pro;
 
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.math.BigDecimal;
@@ -8,6 +9,10 @@ import com.ruoyi.system.domain.mes.pro.ProTask;
 
 public interface ProTaskMapper {
     ProTask selectProTaskByTaskId(Long taskId);
+
+    /** 按任务ID批量查（质检锁态批量查询消除 N+1）。factory_id 由拦截器注入 */
+    List<ProTask> selectProTaskByTaskIds(@Param("taskIds") Collection<Long> taskIds);
+
     List<ProTask> selectProTaskList(ProTask task);
 
     /**
@@ -19,6 +24,16 @@ public interface ProTaskMapper {
     List<ProTask> selectReportableTaskList(ProTask task);
     int insertProTask(ProTask task);
     int updateProTask(ProTask task);
+
+    /**
+     * 清空任务派工报工人/负责人快照（含 id 列）。
+     * updateProTask 的 id 列是动态 {@code <if>}，无法把 id 更新成 NULL；
+     * 手工编辑显式传 null 表示取消派人时，由 service 追加调用本语句。
+     * factory_id 由拦截器自动注入。
+     */
+    int clearTaskAssignee(@Param("taskId") Long taskId,
+                          @Param("clearWorker") boolean clearWorker,
+                          @Param("clearLeader") boolean clearLeader);
     int deleteProTaskByTaskId(Long taskId);
     int deleteProTaskByTaskIds(Long[] taskIds);
     /** 审核报工时原子增量更新任务已生产数量 */

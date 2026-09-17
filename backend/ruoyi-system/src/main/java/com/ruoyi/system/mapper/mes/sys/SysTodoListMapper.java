@@ -30,4 +30,24 @@ public interface SysTodoListMapper
      */
     public List<SysTodoList> selectPendingBySource(@Param("sourceDocType") String sourceDocType,
                                                    @Param("sourceDocId") Long sourceDocId);
+
+    /**
+     * 按「来源类型 + 来源单据ID + 来源单据编码」四元组查一条 PENDING 待办
+     * （PRO_QC_BLOCK 拦截待办幂等键：同一 IPQC 对同一任务只建一条）。
+     */
+    public SysTodoList selectPendingByDocAndCode(@Param("sourceDocType") String sourceDocType,
+                                                 @Param("sourceDocId") Long sourceDocId,
+                                                 @Param("sourceDocCode") String sourceDocCode);
+
+    /**
+     * 按同样四元组批量关闭 PENDING 待办（授权放行后联动）。
+     *
+     * @return 更新行数
+     */
+    public int completePendingByDocAndCode(@Param("sourceDocType") String sourceDocType,
+                                           @Param("sourceDocId") Long sourceDocId,
+                                           @Param("sourceDocCode") String sourceDocCode,
+                                           @Param("handleTime") java.util.Date handleTime,
+                                           @Param("handleResult") String handleResult,
+                                           @Param("updateBy") String updateBy);
 }

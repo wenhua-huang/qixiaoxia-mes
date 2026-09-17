@@ -73,14 +73,39 @@
           </el-select>
         </el-form-item>
         <el-form-item label="工作站" prop="workstationId">
-          <el-select v-model="taskForm.workstationId" style="width:100%" filterable
+          <!-- 外协任务锁定为外协占位（VENDOR），禁止改成厂内机台：否则会漏进厂内报工列表 -->
+          <el-input v-if="isVendorTask" model-value="外协（厂商加工）" disabled />
+          <el-select v-else v-model="taskForm.workstationId" style="width:100%" filterable
             :disabled="taskDialogMode==='view'"
             placeholder="请选择机台（必选）"
-            @focus="onWorkstationFocus">
+            @focus="onWorkstationFocus" @change="onWorkstationChange">
             <el-option v-for="ws in filteredWorkstationList" :key="ws.workstationId"
               :label="ws.workstationName + (ws.idle === false ? '（占用）' : (ws.idle === true ? '（空闲）' : ''))"
               :value="ws.workstationId" />
           </el-select>
+        </el-form-item>
+        <el-form-item label="报工人（派工）">
+          <el-select v-model="taskForm.workerId" style="width:100%" filterable remote clearable
+            :remote-method="searchWorkers" :loading="workerLoading"
+            placeholder="不派则报工时默认当前登录人"
+            :disabled="taskDialogMode==='view'">
+            <el-option v-for="u in workerOptions" :key="u.userId"
+              :label="`${u.nickName}（${u.userName}）`" :value="u.userId" />
+          </el-select>
+          <div class="form-tip">选机台后按「用户工作站」绑定自动推荐，可改派；不派则报工人取实际登录人</div>
+        </el-form-item>
+        <el-form-item label="负责人">
+          <el-select v-model="taskForm.leaderId" style="width:100%" filterable remote clearable
+            :remote-method="searchLeaders" :loading="leaderLoading"
+            placeholder="下发必填：质检拦截等待办的处理责任人"
+            :disabled="taskDialogMode==='view'">
+            <el-option v-for="u in leaderOptions" :key="u.userId"
+              :label="`${u.nickName}（${u.userName}）`" :value="u.userId" />
+          </el-select>
+          <div class="form-tip" :class="{ 'tip-warn': !taskForm.leaderId && !isVendorTask }">
+            <template v-if="isVendorTask">外协任务不要求内部负责人；质检拦截等待办按实际报工人/判定人兜底</template>
+            <template v-else>{{ taskForm.leaderId ? '已指定，任务可下发' : '未指定：任务可保存，但下发时会被拦截' }}</template>
+          </div>
         </el-form-item>
         <el-form-item label="排产数量">
           <el-input-number v-model="taskForm.quantity" :min="1" style="width:100%" :disabled="taskDialogMode==='view'" />
@@ -125,6 +150,8 @@ import { getWorkOrderGantt, getAvailableWorkstations, getWorkstationView } from 
 import { listWorkorder, getWorkorderDetail } from '@/api/mes/pro/workorder'
 import { listWorkstation } from '@/api/mes/md/workstation'
 import { addTask, updateTask, delTask } from '@/api/mes/pro/task'
+import { listUserWorkstation } from '@/api/mes/pro/userworkstation'
+import { listUser } from '@/api/system/user'
 import GanttChart from '@/components/GanttChart/index.vue'
 // import SnapShotPanel from './SnapShotPanel.vue'  // 排产快照面板暂时下线，恢复时取消注释
 import WorkOrderQueue from './WorkOrderQueue.vue'
@@ -161,6 +188,11 @@ const queryParams = reactive({
 const detailOpen = ref(false)
 const selectedTask = ref<any>({})
 
+// 外协占位机台编码（与后端 ProConstants.WS_CODE_VENDOR 对齐）：id=0，弹窗内锁定机台选择
+const WS_CODE_VENDOR = 'VENDOR'
+// 当前编辑的是否外协任务：机台锁定为外协占位，禁止改成厂内机台（否则 VENDOR 任务会漏进厂内报工列表）
+const isVendorTask = computed(() => taskForm.workstationCode === WS_CODE_VENDOR)
+
 // 任务状态改用 useDict('mes_pro_task_status') + dict-tag 渲染，不再硬编码 statusMap
 
 // 任务编辑弹窗状态
@@ -172,6 +204,7 @@ const taskForm = reactive({
   processId: null as number | null,
   processName: '',
   workstationId: null as number | null,
+  workstationCode: '',
   workstationName: '',
   quantity: 1,
   startTime: '' as string | null,
@@ -179,7 +212,45 @@ const taskForm = reactive({
   duration: 1,
   setupDuration: 0,
   colorCode: '#409eff',
+  workerId: null as number | null,
+  leaderId: null as number | null,
 })
+// 报工人/负责人下拉选项（remote 搜索；编辑回显时用行内快照直接构造，不发请求）
+const workerOptions = ref<any[]>([])
+const leaderOptions = ref<any[]>([])
+const workerLoading = ref(false)
+const leaderLoading = ref(false)
+let workerTimer: any = null
+let leaderTimer: any = null
+function searchWorkers(kw: string) {
+  clearTimeout(workerTimer)
+  workerTimer = setTimeout(() => doSearchUsers(kw, workerOptions, workerLoading), 300)
+}
+function searchLeaders(kw: string) {
+  clearTimeout(leaderTimer)
+  leaderTimer = setTimeout(() => doSearchUsers(kw, leaderOptions, leaderLoading), 300)
+}
+async function doSearchUsers(kw: string, opts: typeof workerOptions, loading: typeof workerLoading) {
+  loading.value = true
+  try {
+    // 系统用户列表仅支持账号/手机号模糊（不支持姓名），两路并发查询后按 userId 去重合并
+    const [byName, byPhone] = await Promise.all([
+      listUser({ userName: kw || undefined, status: '0', pageNum: 1, pageSize: 20 } as any),
+      listUser({ phonenumber: kw || undefined, status: '0', pageNum: 1, pageSize: 20 } as any)
+    ])
+    const rows: any[] = [...((byName as any)?.rows || []), ...((byPhone as any)?.rows || [])]
+    const dedup = rows.filter((r, i) => rows.findIndex(x => x.userId === r.userId) === i)
+    // 保留已选中但不在搜索结果里的回显项
+    const keep = opts.value.filter((o: any) => !dedup.some((r: any) => r.userId === o.userId) && o.__echo)
+    opts.value = [...keep, ...dedup.map((r: any) => ({ ...r, __echo: false }))]
+  } finally { loading.value = false }
+}
+/** 用任务行内的人员快照构造回显 option（快照存在时无需请求用户接口） */
+function echoUserOption(row: any, idKey: string, nameKey: string, nickKey: string) {
+  const id = row?.[idKey]
+  if (!id) return null
+  return { userId: id, userName: row?.[nameKey] || '', nickName: row?.[nickKey] || '', __echo: true }
+}
 // 排产弹窗表单 ref + 校验规则（机台必选，未选禁止保存）
 const taskFormRef = ref()
 const taskRules = {
@@ -259,6 +330,7 @@ function onProcessChange(processId: number | null) {
   }
   // 切换工序后重置工作站选择，按新工序加载可用工作站
   taskForm.workstationId = null
+  taskForm.workstationCode = ''
   loadAvailableWorkstations()
 }
 
@@ -274,6 +346,7 @@ function resetTaskForm() {
   taskForm.processId = null
   taskForm.processName = ''
   taskForm.workstationId = null
+  taskForm.workstationCode = ''
   taskForm.workstationName = ''
   taskForm.quantity = 1
   taskForm.startTime = null
@@ -281,6 +354,10 @@ function resetTaskForm() {
   taskForm.duration = 1
   taskForm.setupDuration = 0
   taskForm.colorCode = '#409eff'
+  taskForm.workerId = null
+  taskForm.leaderId = null
+  workerOptions.value = []
+  leaderOptions.value = []
 }
 
 /** 将 ISO 格式时间转换为 yyyy-MM-dd HH:mm:ss（#6） */
@@ -483,7 +560,8 @@ async function onTaskSelect(task: GanttTask) {
   taskForm.taskId = Number(task.id) || null
   taskForm.processId = (task as any).processId || null         // #5 填充工序
   taskForm.processName = task.processName || (task as any).processName || ''
-  taskForm.workstationId = (task as any).workstationId || null
+  taskForm.workstationId = (task as any).workstationId ?? null
+  taskForm.workstationCode = (task as any).workstationCode || ''
   taskForm.workstationName = (task as any).workstationName || ''
   taskForm.quantity = task.quantity || 1
   taskForm.startTime = normalizeTime(task.start)               // #6 ISO→空格格式
@@ -491,14 +569,21 @@ async function onTaskSelect(task: GanttTask) {
   taskForm.duration = task.duration || 1
   taskForm.setupDuration = (task as any).setupDuration || 0
   taskForm.colorCode = task.colorCode || '#409eff'
+  // 报工人/负责人回显：优先用甘特行内已有快照构造 option，不额外发请求
+  taskForm.workerId = (task as any).workerId || null
+  taskForm.leaderId = (task as any).leaderId || null
+  const wo2 = echoUserOption(task as any, 'workerId', 'workerName', 'workerNick')
+  workerOptions.value = wo2 ? [wo2] : []
+  const lo = echoUserOption(task as any, 'leaderId', 'leaderName', 'leaderNick')
+  leaderOptions.value = lo ? [lo] : []
   // 确保工作站列表已加载，使下拉能根据 id 显示名称（而非裸 id）
   const wid = (task as any).workstationId
   if (wid && !workstationList.value.some(w => w.workstationId === wid)) {
     await loadWorkstations()
   }
   detailOpen.value = true
-  // 编辑时按当前工序+时段加载可用工作站
-  loadAvailableWorkstations()
+  // 外协任务机台锁定，不需要加载厂内可用机台
+  if (!isVendorTask.value) loadAvailableWorkstations()
 }
 
 // 工作站下拉框聚焦时加载列表
@@ -506,6 +591,22 @@ function onWorkstationFocus() {
   if (workstationList.value.length === 0) {
     loadWorkstations()
   }
+}
+
+// 换机台时按「用户工作站」绑定软推荐报工人：仅当未派人时预填，不覆盖人工选择
+async function onWorkstationChange(wsId: number | null) {
+  if (!wsId || taskForm.workerId) return
+  try {
+    const res: any = await listUserWorkstation({ workstationId: wsId, enableFlag: '1', pageNum: 1, pageSize: 10 })
+    const bound: any[] = res?.rows || []
+    if (!bound.length) return
+    const u = bound[0]
+    taskForm.workerId = u.userId
+    if (!workerOptions.value.some(o => o.userId === u.userId)) {
+      workerOptions.value = [{ userId: u.userId, userName: u.userName, nickName: u.nickName, __echo: true }]
+    }
+    ElMessage.info(`已按该机台绑定推荐报工人：${u.nickName || u.userName}，可改派`)
+  } catch { /* 推荐失败静默：报工人本就可空，报工时登录人兜底 */ }
 }
 
 // 新增任务
@@ -553,8 +654,8 @@ async function submitTaskEdit() {
     ? await taskFormRef.value.validate().catch(() => false)
     : true
   if (!valid) return
-  // 兜底：表单规则未生效（如测试桩/程序化调用）时也绝不放行无机器台任务
-  if (!taskForm.workstationId) {
+  // 兜底：表单规则未生效（如测试桩/程序化调用）时也绝不放行无机器台任务（外协占位 id=0 合法）
+  if (!isVendorTask.value && !taskForm.workstationId) {
     ElMessage.warning('请选择机台')
     return
   }
@@ -571,10 +672,16 @@ async function submitTaskEdit() {
       duration: taskForm.duration,
       setupDuration: taskForm.setupDuration,
       colorCode: taskForm.colorCode,
+      // 人员只提交 id，后端查 sys_user 回填账号/姓名快照；null 表示取消派人（后端清空快照）
+      workerId: taskForm.workerId,
+      leaderId: taskForm.leaderId,
       workstationId: taskForm.workstationId,
-      // code/name 优先用所选机台（availableWorkstations 也可能含），避免全量列表未覆盖时丢名
-      workstationCode: ws?.workstationCode || (filteredWorkstationList.value.find((x: any) => x.workstationId === taskForm.workstationId)?.workstationCode) || '',
-      workstationName: ws?.workstationName || (filteredWorkstationList.value.find((x: any) => x.workstationId === taskForm.workstationId)?.workstationName) || ''
+      // 外协任务保留 VENDOR 占位快照（机台锁定不可改）；厂内任务 code/name 优先用所选机台
+      // （availableWorkstations 也可能含），避免全量列表未覆盖时丢名
+      workstationCode: isVendorTask.value ? WS_CODE_VENDOR
+        : (ws?.workstationCode || (filteredWorkstationList.value.find((x: any) => x.workstationId === taskForm.workstationId)?.workstationCode) || ''),
+      workstationName: isVendorTask.value ? (taskForm.workstationName || '外协')
+        : (ws?.workstationName || (filteredWorkstationList.value.find((x: any) => x.workstationId === taskForm.workstationId)?.workstationName) || '')
     }
     if (taskForm.taskId) {
       payload.taskId = taskForm.taskId
@@ -648,4 +755,6 @@ function findTask(id: string): GanttTask|undefined {
 .mb8 { margin-bottom: 8px; }
 .gantt-layout { display: flex; gap: 0; }
 .gantt-main { flex: 1; overflow: hidden; }
+.form-tip { font-size: 12px; line-height: 1.4; color: #909399; margin-top: 4px; }
+.form-tip.tip-warn { color: #e6a23c; }
 </style>

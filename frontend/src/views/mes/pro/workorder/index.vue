@@ -321,6 +321,14 @@
                   <span v-else style="color:#F56C6C">{{ scope.row.resourceName || '待指派机台' }}</span>
                 </template>
               </el-table-column>
+              <el-table-column label="负责人" align="center" width="90">
+                <template #default="scope">
+                  <el-tag v-if="scope.row.leaderAssigned" type="success" size="small">已指定</el-tag>
+                  <!-- 外协 VENDOR 任务无内部负责人指派入口，不标红 -->
+                  <span v-else-if="scope.row.execType === 'OUTSOURCE'" style="color:#909399">—</span>
+                  <el-tag v-else type="danger" size="small">待指派</el-tag>
+                </template>
+              </el-table-column>
               <el-table-column label="状态" align="center" width="100">
                 <template #default="scope">
                   <el-tag v-if="scope.row.assigned" type="success" size="small">
@@ -359,7 +367,7 @@
       </div>
 
       <template #footer>
-        <el-button v-if="isMachineHardBlock()" type="danger" @click="goAssignMachine">去甘特指派机台</el-button>
+        <el-button v-if="isScheduleHardBlock()" type="danger" @click="goAssignMachine">{{ hardBlockButtonText() }}</el-button>
         <el-button v-if="canOverrideStart()" v-hasPermi="['mes:pro:workorder:override']" type="warning" @click="handleOverrideStart">豁免开工</el-button>
         <el-button type="primary" @click="startCheckOpen=false">{{ startCheckAllPassed ? '完 成' : '关 闭' }}</el-button>
       </template>
@@ -811,14 +819,24 @@ export default {
         && this.startCheckSteps[1].status === 'error'
         && this.startCheckSteps[1].overridable === true
     },
-    // 排产检查硬性拦截（厂内工序未指派机台）：提示去甘特派机台，不提供豁免
-    isMachineHardBlock() {
+    // 排产检查硬性拦截（厂内未派机台 / 厂内工序缺负责人）：不提供豁免，跳甘特处理。
+    // 外协 VENDOR 任务无内部负责人指派入口，不参与负责人拦截
+    isScheduleHardBlock() {
       const s = this.startCheckSteps[1]
-      return !this.startCheckRunning && !this.startCheckAllPassed
-        && s && s.status === 'error' && s.overridable === false
-        && (s.details || []).some(d => d.execType === 'INHOUSE' && !d.assigned)
+      if (this.startCheckRunning || this.startCheckAllPassed || !s || s.status !== 'error' || s.overridable !== false) {
+        return false
+      }
+      const details = s.details || []
+      return details.some(d => d.execType === 'INHOUSE' && !d.assigned)
+        || details.some(d => d.execType === 'INHOUSE' && !d.leaderAssigned)
     },
-    // 硬性拦截时跳转甘特排产指派机台
+    // 缺负责人优先提示补负责人，否则提示派机台
+    hardBlockButtonText() {
+      const details = (this.startCheckSteps[1] && this.startCheckSteps[1].details) || []
+      return details.some(d => d.execType === 'INHOUSE' && !d.leaderAssigned)
+        ? '去甘特指派负责人' : '去甘特指派机台'
+    },
+    // 硬性拦截时跳转甘特排产处理
     goAssignMachine() {
       this.startCheckOpen = false
       this.$router.push({ path: '/mes/pro/gantt', query: { workorderId: this.startCheckWorkorderId } })

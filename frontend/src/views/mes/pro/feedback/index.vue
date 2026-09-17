@@ -117,11 +117,12 @@
           <span>{{ parseTime(scope.row.feedbackTime) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="260" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="310" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="success" size="small" icon="CircleCheck" @click="handleConfirm(scope.row)" v-if="scope.row.status==='PREPARE'" v-hasPermi="['mes:pro:feedback:edit']">确认</el-button>
           <el-button link type="primary" size="small" icon="Check" @click="handleAudit(scope.row)" v-if="scope.row.status==='CONFIRMED'" v-hasPermi="['mes:pro:feedback:edit']">审核</el-button>
           <el-button link type="primary" size="small" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:pro:feedback:edit']">修改</el-button>
+          <el-button link type="info" size="small" icon="Document" @click="handleViewChanges(scope.row)" v-hasPermi="['mes:pro:feedback:query']">痕迹</el-button>
           <el-button link type="primary" size="small" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:pro:feedback:remove']">删除</el-button>
         </template>
       </el-table-column>
@@ -223,6 +224,15 @@
                   <el-select v-model="form.cardId" placeholder="不选则自动取工单默认卡" clearable :disabled="optType === 'view'" style="width: 100%" @focus="loadCardOptions">
                     <el-option v-for="c in cardOptions" :key="c.cardId" :label="c.cardCode + (c.status ? ' (' + (cardStatusLabel(c.status)) + ')' : '')" :value="c.cardId" />
                   </el-select>
+                </el-form-item>
+              </el-col>
+            </el-row>
+
+            <!-- 上机数量：选择任务后由后端按工艺位置权威预填，人工调整与默认值不一致时后端留痕 -->
+            <el-row>
+              <el-col :span="8">
+                <el-form-item label="上机数量" prop="quantityInput">
+                  <el-input-number v-model="form.quantityInput" :min="0" style="width: 100%" />
                 </el-form-item>
               </el-col>
             </el-row>
@@ -395,11 +405,25 @@
 
       <template #footer>
         <div class="dialog-footer">
+          <el-button icon="Document" @click="handleViewChanges({ recordId: form.recordId, feedbackCode: form.feedbackCode })"
+            v-if="form.recordId != null" v-hasPermi="['mes:pro:feedback:query']">修改痕迹</el-button>
           <el-button type="primary" @click="submitForm" v-if="optType !== 'view'">确 定</el-button>
           <el-button @click="cancel">关 闭</el-button>
         </div>
       </template>
     </el-dialog>
+
+    <!-- 修改痕迹抽屉：上机数量默认值人工调整 / 报工编辑前后差异 -->
+    <el-drawer v-model="changeOpen" :title="'修改痕迹' + (changeFeedbackCode ? ' · ' + changeFeedbackCode : '')" size="620px" append-to-body>
+      <el-table v-loading="changeLoading" :data="changeList" border size="small">
+        <el-table-column label="时间" align="center" prop="createTime" width="160" />
+        <el-table-column label="操作人" align="center" prop="createBy" width="90" />
+        <el-table-column label="原值" align="center" prop="oldValue" width="80" />
+        <el-table-column label="新值" align="center" prop="newValue" width="80" />
+        <el-table-column label="变更说明" align="center" prop="changeReason" min-width="150" :show-overflow-tooltip="true" />
+      </el-table>
+      <el-empty v-if="!changeLoading && changeList.length === 0" description="暂无修改痕迹" />
+    </el-drawer>
   </div>
 </template>
 
@@ -407,7 +431,7 @@
 import { ref, reactive, getCurrentInstance } from 'vue'
 import { useRouter } from 'vue-router'
 import { Warning } from '@element-plus/icons-vue'
-import { listFeedback, getFeedback, addFeedback, updateFeedback, delFeedback, confirmFeedback, auditFeedback, batchConfirmFeedback, batchAuditFeedback, getConsumeDefaults } from '@/api/mes/pro/feedback'
+import { listFeedback, getFeedback, addFeedback, updateFeedback, delFeedback, confirmFeedback, auditFeedback, batchConfirmFeedback, batchAuditFeedback, getConsumeDefaults, getFeedbackChanges, getInputDefault } from '@/api/mes/pro/feedback'
 import { getTask } from '@/api/mes/pro/task'
 import { listParamTemplateByProcessId } from '@/api/mes/pro/paramtemplate'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
@@ -465,6 +489,12 @@ const activeTab = ref('feedback')
 const genLoading = ref(false)
 const ids = ref<number[]>([])
 const dataList = ref<any[]>([])
+
+// 修改痕迹抽屉
+const changeOpen = ref(false)
+const changeLoading = ref(false)
+const changeList = ref<any[]>([])
+const changeFeedbackCode = ref('')
 
 const queryFormRef = ref()
 const formRef = ref()
@@ -531,6 +561,7 @@ const form = reactive<any>({
   itemId: null,
   itemName: null,
   routeId: null,
+  quantityInput: null,
   quantityFeedback: 0,
   quantityQualified: 0,
   quantityUnqualified: 0,
@@ -642,6 +673,13 @@ function onTaskSelected(row: any) {
     form.itemId = row.itemId
     form.itemName = row.itemName
     form.routeId = row.routeId
+    // 上机数量默认值由后端按工艺位置权威计算（任务列表接口不富化），前端不自算
+    form.quantityInput = null
+    getInputDefault(row.taskId).then((res: any) => {
+      if (form.taskId === row.taskId) form.quantityInput = res.data ?? null
+    }).catch(() => {
+      // 全局响应拦截器已提示错误；默认值仅为便利，失败时用户可手工填写，不再二次 toast
+    })
     fetchConsumeDefaults(row.workorderId)
     if (row.processId) loadParamTemplates(row.processId)
   }
@@ -764,6 +802,7 @@ function reset() {
   form.itemId = null
   form.itemName = null
   form.routeId = null
+  form.quantityInput = null
   form.quantityFeedback = 0
   form.quantityQualified = 0
   form.quantityUnqualified = 0
@@ -788,6 +827,20 @@ function handleAdd() {
   optType.value = 'add'
   // 自动生成报工编码，避免用户忘记点击生成按钮
   generateFeedbackCode()
+}
+
+// ==================== 修改痕迹 ====================
+function handleViewChanges(row: any) {
+  if (!row || !row.recordId) return
+  changeFeedbackCode.value = row.feedbackCode || ''
+  changeList.value = []
+  changeOpen.value = true
+  changeLoading.value = true
+  getFeedbackChanges({ feedbackId: row.recordId }).then((res: any) => {
+    changeList.value = res.data || []
+  }).finally(() => {
+    changeLoading.value = false
+  })
 }
 
 function handleView(row: any) {

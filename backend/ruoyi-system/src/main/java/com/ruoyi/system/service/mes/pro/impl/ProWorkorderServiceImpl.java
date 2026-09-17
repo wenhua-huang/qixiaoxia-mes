@@ -1738,6 +1738,27 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
     }
 
     /**
+     * 按目标路线实际包含的工序过滤工单 BOM。父产品可同时挂多条工序集合不同的路线，
+     * 工单 BOM 只来自开单路线，fan-out 到缺工序的变体路线会产生跨路线孤儿行并触发归属校验；
+     * processId 为空的路线级物料不受工序集合限制，保留
+     */
+    private List<ProWorkorderBom> filterBomByRouteProcesses(List<ProWorkorderBom> bomList, Long routeId)
+    {
+        List<ProRouteProcess> routeProcesses = proRouteProcessService.selectProRouteProcessByRouteId(routeId);
+        Set<Long> routeProcessIds = routeProcesses == null ? new HashSet<>()
+                : routeProcesses.stream().map(ProRouteProcess::getProcessId).collect(Collectors.toSet());
+        List<ProWorkorderBom> matched = new ArrayList<>();
+        for (ProWorkorderBom bom : bomList)
+        {
+            if (bom.getProcessId() == null || routeProcessIds.contains(bom.getProcessId()))
+            {
+                matched.add(bom);
+            }
+        }
+        return matched;
+    }
+
+    /**
      * 将工单的 BOM 调整和参数调整值回填到变体的路线数据中（L3 → L2）
      * 确保变体路线反映工单的实际差异化配置，而不是简单复制父产品。
      *
@@ -1761,8 +1782,10 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
                 // 删除刚复制的 BOM 行（product_id = skuItemId, route_id = rp.routeId）
                 proRouteProductBomService.deleteByRouteIdAndProductId(rp.getRouteId(), skuItemId);
 
-                // 重新插入工单 BOM 行（L3 → L2）
-                for (ProWorkorderBom bom : bomList) {
+                // 重新插入工单 BOM 行（L3 → L2）；父产品可能挂多条工序集合不同的路线，
+                // 只回填该变体路线实际包含的工序物料，避免跨路线孤儿行
+                List<ProWorkorderBom> routeBomList = filterBomByRouteProcesses(bomList, rp.getRouteId());
+                for (ProWorkorderBom bom : routeBomList) {
                     ProRouteProductBom newBom = new ProRouteProductBom();
                     newBom.setRouteId(rp.getRouteId());
                     newBom.setProcessId(bom.getProcessId());

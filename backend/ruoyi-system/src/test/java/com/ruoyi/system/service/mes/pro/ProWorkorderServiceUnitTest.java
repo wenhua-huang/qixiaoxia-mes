@@ -481,6 +481,7 @@ class ProWorkorderServiceUnitTest {
         List<ProWorkorderBom> bomList = new ArrayList<>();
         bomList.add(bom);
         when(workorderBomService.selectProWorkorderBomByWorkorderId(1L)).thenReturn(bomList);
+        when(workorderMapper.selectProWorkorderByWorkorderId(1L)).thenReturn(testWorkorder);
 
         WmMaterialStock stock = new WmMaterialStock();
         stock.setItemId(200L);
@@ -516,6 +517,7 @@ class ProWorkorderServiceUnitTest {
         List<ProWorkorderBom> bomList = new ArrayList<>();
         bomList.add(bom);
         when(workorderBomService.selectProWorkorderBomByWorkorderId(1L)).thenReturn(bomList);
+        when(workorderMapper.selectProWorkorderByWorkorderId(1L)).thenReturn(testWorkorder);
 
         WmMaterialStock stock = new WmMaterialStock();
         stock.setItemId(200L);
@@ -554,6 +556,7 @@ class ProWorkorderServiceUnitTest {
         bomList.add(bomA);
         bomList.add(bomB);
         when(workorderBomService.selectProWorkorderBomByWorkorderId(50L)).thenReturn(bomList);
+        when(workorderMapper.selectProWorkorderByWorkorderId(50L)).thenReturn(testWorkorder);
 
         // 物料A库存仅30（不足），物料B库存200（充足）—— 批量查询一次返回，按 itemId 聚合
         WmMaterialStock stockA = new WmMaterialStock();
@@ -588,6 +591,7 @@ class ProWorkorderServiceUnitTest {
         List<ProWorkorderBom> bomList = new ArrayList<>();
         bomList.add(bom);
         when(workorderBomService.selectProWorkorderBomByWorkorderId(1L)).thenReturn(bomList);
+        when(workorderMapper.selectProWorkorderByWorkorderId(1L)).thenReturn(testWorkorder);
 
         // 两个仓库各100 → 汇总为200，仍不足
         WmMaterialStock stock1 = new WmMaterialStock();

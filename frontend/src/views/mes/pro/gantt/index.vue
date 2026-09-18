@@ -485,24 +485,29 @@ async function loadWorkstations() {
   }
 }
 
+// 加载工单工艺路线工序（新增任务下拉的数据源）。
+// 队列选单/搜索选单/URL 跳转三个入口必须一致调用，否则下拉会退化成"仅已建任务的工序"，
+// 未建任务的工序将永远无法选择
+async function loadRouteProcesses(workorderId: number | null | undefined) {
+  if (!workorderId) { routeProcesses.value = []; return }
+  try {
+    const res: any = await getWorkorderDetail(workorderId)
+    routeProcesses.value = res?.data?.routeProcesses || []
+  } catch { routeProcesses.value = [] }
+}
+
 function onQueueSelect(id: number) {
   queryParams.workorderId = id
   queryParams.workstationId = null
   queueRef.value?.setActive(id)
+  loadRouteProcesses(id)
   loadGanttData()
 }
 
 function onWorkorderChange(val: number | null) {
   queryParams.workorderId = val
   queueRef.value?.setActive(val)
-  // 加载路线工序（供新增任务时选择）
-  if (val) {
-    getWorkorderDetail(val).then((res: any) => {
-      routeProcesses.value = res?.data?.routeProcesses || []
-    }).catch(() => {})
-  } else {
-    routeProcesses.value = []
-  }
+  loadRouteProcesses(val)
   loadGanttData()
 }
 
@@ -551,6 +556,8 @@ function resetQuery() {
   queryParams.workorderId = null
   queryParams.workstationId = null
   ganttTasks.value = []
+  routeProcesses.value = []
+  queueRef.value?.setActive(null)
 }
 
 async function onTaskSelect(task: GanttTask) {
@@ -610,8 +617,14 @@ async function onWorkstationChange(wsId: number | null) {
 }
 
 // 新增任务
-function handleAddTask() {
-  if (!queryParams.workorderId) return
+async function handleAddTask() {
+  const workorderId = queryParams.workorderId
+  if (!workorderId) return
+  // 兜底：路线工序尚未加载（如队列选单后立即点击、或上次加载失败）时先补拉，
+  // 否则 processOptions 会从已建任务提取，导致未排产的工序选不到
+  if (routeProcesses.value.length === 0) {
+    await loadRouteProcesses(workorderId)
+  }
   // 确保有工序可选
   if (processOptions.value.length === 0) {
     ElMessage.warning('请先加载工单的甘特图数据，确保工艺路线有工序')

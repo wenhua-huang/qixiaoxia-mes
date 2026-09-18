@@ -99,7 +99,7 @@ function mountGantt() {
         'el-tooltip': { template: '<div><slot /></div>' },
         'GanttChart': { template: '<div class="gc-root"><div class="gc-bar" @click="$emit(\'select\', {id:\'1\',text:\'印刷→印刷机1号\',processName:\'印刷\',processId:10,workstationId:1,start:\'2026-07-01T08:00:00\',end:\'2026-07-01T09:00:00\',duration:60,quantity:100,colorCode:\'#409eff\'})" /></div>', emits: ['select', 'barMove'], methods: { render() {} } },
         'SnapShotPanel': { template: '<div class="snapshot-panel" />' },
-        'WorkOrderQueue': { template: '<div class="wo-queue"><div class="queue-card" @click="$emit(\'select\',1)" /></div>', emits: ['select', 'scheduled'] },
+        'WorkOrderQueue': { template: '<div class="wo-queue"><div class="queue-card" @click="$emit(\'select\',1)" /></div>', emits: ['select', 'scheduled'], methods: { setActive() {}, load() {} } },
         'UtilizationBar': { template: '<div />' },
         'right-toolbar': { template: '<div />' },
         'Pagination': { template: '<div />' },
@@ -221,13 +221,31 @@ describe('甘特图任务CRUD — 单元测试', () => {
       const vm = wrapper.vm as any
       vm.queryParams.workorderId = 1
       vm.routeProcesses = []  // 无工序
+      // detail 兜底也返回空路线（工单本身没配工艺路线工序）
+      ;(getWorkorderDetail as any).mockResolvedValueOnce({ data: { workorder: {}, routeProcesses: [] } })
 
       const warnSpy = vi.spyOn(ElMessage, 'warning')
-      vm.handleAddTask()
+      await vm.handleAddTask()
       await nextTick()
 
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('工艺路线'))
       expect(vm.detailOpen).toBe(false)
+    })
+
+    it('routeProcesses 缺失时先拉工单详情兜底，再打开弹窗（防止下拉退化成已建任务工序）', async () => {
+      const wrapper = mountGantt()
+      const vm = wrapper.vm as any
+      vm.queryParams.workorderId = 1
+      vm.routeProcesses = []  // 模拟队列选单未加载路线工序
+      vm.ganttTasks = [{ id: 'WO-1', text: '测试工单', type: 'project', quantity: 50, children: [] }]
+
+      await vm.handleAddTask()
+      await nextTick()
+
+      expect(getWorkorderDetail).toHaveBeenCalledWith(1)
+      expect(vm.routeProcesses).toHaveLength(2)
+      expect(vm.processOptions.map((p: any) => p.processId)).toEqual([10, 20])
+      expect(vm.detailOpen).toBe(true)
     })
 
     it('有工序选项时打开编辑弹窗并重置表单', async () => {
@@ -306,6 +324,40 @@ describe('甘特图任务CRUD — 单元测试', () => {
       await nextTick()
 
       expect(vm.processOptions).toHaveLength(2)  // 去重后仅2个
+    })
+  })
+
+  // ═══ onQueueSelect（左侧待排产工单队列）═══
+  describe('onQueueSelect — 队列选单加载路线工序', () => {
+    it('点击队列工单卡片后加载该工单工艺路线，下拉含全部路线工序而非仅有已建任务工序', async () => {
+      const wrapper = mountGantt()
+      const vm = wrapper.vm as any
+
+      // 初始无路线工序（模拟直接进入裸 /gantt 页，尚未从任何入口加载）
+      expect(vm.routeProcesses).toHaveLength(0)
+
+      await wrapper.find('.queue-card').trigger('click')
+      await nextTick()
+      await nextTick()
+
+      expect(vm.queryParams.workorderId).toBe(1)
+      expect(getWorkorderDetail).toHaveBeenCalledWith(1)
+      expect(vm.routeProcesses).toHaveLength(2)
+      expect(vm.processOptions.map((p: any) => p.processId)).toEqual([10, 20])
+    })
+  })
+
+  // ═══ resetQuery ═══
+  describe('resetQuery', () => {
+    it('重置时清空路线工序缓存与队列高亮，避免残留上一单的工序', async () => {
+      const wrapper = mountGantt()
+      const vm = wrapper.vm as any
+      vm.routeProcesses = [{ processId: 10, processName: '印刷', processCode: 'PRINT' }]
+      const setActiveSpy = vi.spyOn(vm.queueRef, 'setActive')
+      vm.resetQuery()
+      expect(vm.queryParams.workorderId).toBeNull()
+      expect(vm.routeProcesses).toHaveLength(0)
+      expect(setActiveSpy).toHaveBeenCalledWith(null)
     })
   })
 

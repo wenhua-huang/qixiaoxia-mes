@@ -20,9 +20,9 @@ import com.ruoyi.system.service.mes.wm.IWmIssueHeaderService;
 import com.ruoyi.system.service.mes.wm.IWmMaterialStockService;
 import com.ruoyi.system.service.mes.wm.IWmWarehouseService;
 import com.ruoyi.system.service.mes.wm.OutsourceIssueHelper;
+import com.ruoyi.system.domain.mes.pro.ProConstants;
 import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
 import com.ruoyi.system.domain.mes.pro.ProRouteProduct;
-import com.ruoyi.system.domain.mes.pro.ProTask;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderChange;
 import com.ruoyi.system.service.mes.pro.IProRouteProcessService;
 import com.ruoyi.system.service.mes.pro.IProRouteProductService;
@@ -427,7 +427,20 @@ class ProWorkorderServiceUnitTest {
         List<ProRouteProcess> routeProcesses = new ArrayList<>();
         routeProcesses.add(rproc);
         when(proRouteProcessService.selectProRouteProcessByRouteId(5L)).thenReturn(routeProcesses);
-        when(proTaskService.selectProTaskList(any(ProTask.class))).thenReturn(new ArrayList<>());
+        // 排产 FAIL：路线工序 7 无任何任务 → listProcessExecutionRows 返回"未排产"行（可豁免）。
+        // doSchedulingCheck 已不再调 selectProTaskList，排产明细统一收口到 listProcessExecutionRows。
+        Map<String, Object> unscheduledRow = new java.util.LinkedHashMap<>();
+        unscheduledRow.put("processId", 7L);
+        unscheduledRow.put("processCode", "PX");
+        unscheduledRow.put("processName", "工序X");
+        unscheduledRow.put("orderNum", 1);
+        unscheduledRow.put("execType", ProConstants.EXEC_TYPE_UNSCHEDULED);
+        unscheduledRow.put("execTypeName", "未排产");
+        unscheduledRow.put("resourceName", "");
+        unscheduledRow.put("assigned", false);
+        unscheduledRow.put("leaderAssigned", false);
+        when(proTaskService.listProcessExecutionRows(eq(1L), anyList()))
+                .thenReturn(List.of(unscheduledRow));
     }
 
     @Test

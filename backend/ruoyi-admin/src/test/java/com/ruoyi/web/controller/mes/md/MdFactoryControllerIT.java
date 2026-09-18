@@ -7,14 +7,17 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 工厂定义 Controller 集成测试
+ * 工厂定义 Controller 集成测试。
+ * 工厂是只读主数据（由开发直接 SQL 维护），Controller 仅暴露 /list 与 /listAll，
+ * 不提供详情、新增、修改、删除端点。
  */
-@DisplayName("工厂定义 Controller 集成测试")
+@DisplayName("工厂定义 Controller 集成测试（只读）")
 class MdFactoryControllerIT extends BaseIntegrationTest {
 
     private static boolean tablesReady = false;
@@ -51,67 +54,46 @@ class MdFactoryControllerIT extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("listAll 返回启用工厂")
+    @DisplayName("listAll 只返回启用工厂")
     void shouldListAllEnabled() {
+        jdbcTemplate.update(
+                "INSERT INTO qxx_md_factory (factory_code,factory_name,enable_flag,create_by,create_time) " +
+                "VALUES (?, '停用工厂', '0', 'admin', NOW())",
+                "FT_DISABLED_" + System.nanoTime());
+
         ResponseEntity<Map> resp = restTemplate.exchange(
                 "http://localhost:" + port + "/mes/md/factory/listAll",
                 HttpMethod.GET, authRequest(), Map.class);
         assertThat(resp.getBody().get("code")).isEqualTo(200);
+        List<Map> rows = (List<Map>) resp.getBody().get("data");
+        assertThat(rows).isNotEmpty();
+        assertThat(rows).allSatisfy(row -> assertThat(row.get("enableFlag")).isEqualTo("1"));
     }
 
     @Test
-    @DisplayName("新增工厂")
-    void shouldInsertFactory() {
-        String code = "FT_" + System.nanoTime();
-        Map<String, Object> body = Map.of("factoryCode", code, "factoryName", "测试工厂", "enableFlag", "1");
-        ResponseEntity<Map> resp = restTemplate.postForEntity(
-                "http://localhost:" + port + "/mes/md/factory", authRequest(body), Map.class);
-        assertThat(resp.getBody().get("code")).isEqualTo(200);
+    @DisplayName("只读契约：不暴露详情/新增/修改/删除端点")
+    void shouldNotExposeWriteEndpoints() {
+        String base = "http://localhost:" + port + "/mes/md/factory";
+        Map<String, Object> body = Map.of(
+                "factoryCode", "FT_RO_" + System.nanoTime(),
+                "factoryName", "只读测试", "enableFlag", "1");
 
-        String name = jdbcTemplate.queryForObject(
-                "SELECT factory_name FROM qxx_md_factory WHERE factory_code = ?", String.class, code);
-        assertThat(name).isEqualTo("测试工厂");
-    }
+        ResponseEntity<Map> getDetail = restTemplate.exchange(
+                base + "/1", HttpMethod.GET, authRequest(), Map.class);
+        ResponseEntity<Map> post = restTemplate.postForEntity(base, authRequest(body), Map.class);
+        ResponseEntity<Map> put = restTemplate.exchange(
+                base, HttpMethod.PUT, authRequest(body), Map.class);
+        ResponseEntity<Map> delete = restTemplate.exchange(
+                base + "/1", HttpMethod.DELETE, authRequest(), Map.class);
 
-    @Test
-    @DisplayName("编码重复拒绝")
-    void shouldRejectDuplicateCode() {
-        String code = "DUP_" + System.nanoTime();
-        jdbcTemplate.update("INSERT INTO qxx_md_factory (factory_code,factory_name,enable_flag,create_by,create_time) VALUES (?,?,?,?,NOW())",
-                code, "第一", "1", "admin");
-        Map<String, Object> body = Map.of("factoryCode", code, "factoryName", "第二", "enableFlag", "1");
-        ResponseEntity<Map> resp = restTemplate.postForEntity(
-                "http://localhost:" + port + "/mes/md/factory", authRequest(body), Map.class);
-        assertThat(resp.getBody().get("code")).isEqualTo(500);
-    }
+        // 端点不存在时落到全局异常处理，返回非 200 业务码；任何一个返回 200 都意味着写接口被重新开放
+        assertThat(getDetail.getBody().get("code")).isNotEqualTo(200);
+        assertThat(post.getBody().get("code")).isNotEqualTo(200);
+        assertThat(put.getBody().get("code")).isNotEqualTo(200);
+        assertThat(delete.getBody().get("code")).isNotEqualTo(200);
 
-    @Test
-    @DisplayName("getInfo 查询工厂详情")
-    void shouldGetFactoryById() {
-        ResponseEntity<Map> resp = restTemplate.exchange(
-                "http://localhost:" + port + "/mes/md/factory/1",
-                HttpMethod.GET, authRequest(), Map.class);
-        assertThat(resp.getBody().get("code")).isEqualTo(200);
-    }
-
-    @Test
-    @DisplayName("修改工厂")
-    void shouldUpdateFactory() {
-        jdbcTemplate.update("INSERT INTO qxx_md_factory (factory_id,factory_code,factory_name,enable_flag,create_by,create_time) VALUES (100,'FT_UP','旧名','1','admin',NOW())");
-        Map<String, Object> body = Map.of("factoryId", 100, "factoryCode", "FT_UP", "factoryName", "新名", "enableFlag", "1");
-        ResponseEntity<Map> resp = restTemplate.exchange(
-                "http://localhost:" + port + "/mes/md/factory",
-                HttpMethod.PUT, authRequest(body), Map.class);
-        assertThat(resp.getBody().get("code")).isEqualTo(200);
-    }
-
-    @Test
-    @DisplayName("删除工厂")
-    void shouldDeleteFactory() {
-        jdbcTemplate.update("INSERT INTO qxx_md_factory (factory_id,factory_code,factory_name,enable_flag,create_by,create_time) VALUES (101,'FT_DEL','待删','1','admin',NOW())");
-        ResponseEntity<Map> resp = restTemplate.exchange(
-                "http://localhost:" + port + "/mes/md/factory/101",
-                HttpMethod.DELETE, authRequest(), Map.class);
-        assertThat(resp.getBody().get("code")).isEqualTo(200);
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM qxx_md_factory WHERE factory_name = '只读测试'", Integer.class);
+        assertThat(count).isZero();
     }
 }

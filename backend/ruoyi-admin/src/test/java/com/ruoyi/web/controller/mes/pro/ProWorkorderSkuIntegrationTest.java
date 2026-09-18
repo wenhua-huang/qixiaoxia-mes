@@ -343,8 +343,10 @@ class ProWorkorderSkuIntegrationTest extends BaseIntegrationTest {
         bomList.add(bom2);
 
         // 参数：adjustedValue="5色" ≠ standardValue="4色"
+        // routeProductId 必填（qxx_pro_workorder_param.route_product_id NOT NULL，前端按路线产品逐行携带）
         List<Map<String, Object>> paramList = new ArrayList<>();
         Map<String, Object> p1 = new HashMap<>();
+        p1.put("routeProductId", 300);
         p1.put("templateId", 301); p1.put("standardValue", "4色");
         p1.put("adjustedValue", "5色");
         paramList.add(p1);
@@ -414,6 +416,9 @@ class ProWorkorderSkuIntegrationTest extends BaseIntegrationTest {
         woBody.put("productCode", "PROD-001");
         woBody.put("productName", "奔趣纸袋");
         woBody.put("routeProductId", 300);
+        // 主单位必填（qxx_pro_workorder.unit_of_measure NOT NULL，前端选产品时自动带出）
+        woBody.put("unitOfMeasure", "PCS");
+        woBody.put("unitName", "个");
         woBody.put("quantity", new BigDecimal("50"));
         woBody.put("factoryId", 1);
         woBody.put("createSkuVariant", false);
@@ -421,7 +426,9 @@ class ProWorkorderSkuIntegrationTest extends BaseIntegrationTest {
         List<Map<String, Object>> bomList = new ArrayList<>();
         Map<String, Object> bom = new HashMap<>();
         bom.put("itemId", 202); bom.put("itemCode", "MAT-INK-001");
-        bom.put("itemName", "水性油墨"); bom.put("unitName", "千克");
+        bom.put("itemName", "水性油墨");
+        bom.put("unitOfMeasure", "KG"); bom.put("unitName", "千克");
+        bom.put("itemOrProduct", "RAW");
         bom.put("quantity", new BigDecimal("1.0"));  // 有偏离但不创建变体
         bom.put("processId", 100); bom.put("processName", "印刷");
         bomList.add(bom);

@@ -10,6 +10,8 @@ export interface GanttTask {
   processId?: number
   processName?: string
   workstationId?: number
+  /** 'VENDOR' 表示外协占位机台（id=0），弹窗内锁定不可改为厂内机台 */
+  workstationCode?: string
   workstationName?: string
   workorderId?: number
   workorderName?: string

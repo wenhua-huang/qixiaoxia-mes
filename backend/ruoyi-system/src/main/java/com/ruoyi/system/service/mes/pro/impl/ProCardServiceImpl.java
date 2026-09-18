@@ -32,6 +32,7 @@ import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
 import com.ruoyi.system.domain.mes.pro.ProTask;
 import com.ruoyi.system.service.mes.pro.IProCardService;
 import com.ruoyi.system.service.mes.pro.IProFeedbackService;
+import com.ruoyi.system.service.mes.pro.TaskReportDefaultsApplier;
 import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 
 /**
@@ -61,6 +62,8 @@ public class ProCardServiceImpl implements IProCardService
     private ProRouteProcessMapper routeProcessMapper;
     @Autowired
     private IProFeedbackService proFeedbackService;
+    @Autowired
+    private TaskReportDefaultsApplier defaultsApplier;
     private TransactionTemplate txTemplate;
 
     @PostConstruct
@@ -207,6 +210,8 @@ public class ProCardServiceImpl implements IProCardService
                 .filter(t -> !ProConstants.WS_CODE_VENDOR.equals(t.getWorkstationCode()))
                 .collect(Collectors.toList());
         fillPendingCount(reportable);
+        // 一期默认值/锁态统一按工单+工序粒度，不按流转卡限定（与提交时重算同源）
+        defaultsApplier.apply(reportable);
         vo.setReportableTasks(reportable);
         // 外协任务不限状态：进行中/已完成均展示（供 App 呈现外协进度）
         List<ProTask> outsource = candidates.stream()

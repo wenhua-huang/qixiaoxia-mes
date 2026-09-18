@@ -8,6 +8,9 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.system.domain.mes.md.MdItem;
 import com.ruoyi.system.domain.mes.md.MdItemBatchConfig;
+import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
+import com.ruoyi.system.domain.mes.pro.ProRouteProduct;
+import com.ruoyi.system.domain.mes.pro.ProRouteProductBom;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderBom;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderParam;
@@ -45,6 +48,8 @@ class ProWorkorderServiceSkuUnitTest {
     @Mock private IMdItemService mdItemService;
     @Mock private IMdItemBatchConfigService mdItemBatchConfigService;
     @Mock private IProRouteProductService routeProductService;
+    @Mock private IProRouteProductBomService routeProductBomService;
+    @Mock private IProRouteProcessService routeProcessService;
     @Mock private IProWorkorderChangeService changeService;
     @Mock private com.ruoyi.system.service.mes.md.IMdProductBomService mdProductBomService;
     @InjectMocks private ProWorkorderServiceImpl workorderService;
@@ -341,5 +346,76 @@ class ProWorkorderServiceSkuUnitTest {
             verify(workorderParamService).insertProWorkorderParam(any(ProWorkorderParam.class));
             assertThat(result.getProductId()).isEqualTo(303L);
         }
+    }
+
+    // ══════════════════════════════════════════════
+    // 8. testCreateSkuVariant_MultiRouteBomFiltered
+    // ══════════════════════════════════════════════
+
+    @Test
+    @DisplayName("8. 父产品挂多条工序集合不同的路线 → 回填只插各变体路线包含的工序物料，不抛归属异常")
+    void testCreateSkuVariant_MultiRouteBomFiltered() {
+        try (MockedStatic<SecurityUtils> secUtils = mockStatic(SecurityUtils.class)) {
+            secUtils.when(SecurityUtils::getUsername).thenReturn("admin");
+
+            testWorkorder.setCreateSkuVariant(true);
+            testWorkorder.setSkuCode("ZD-01-V4");
+            testWorkorder.setSkuName("奔趣纸袋-多路线");
+
+            when(mdItemService.selectMdItemById(201L)).thenReturn(parentItem);
+            doAnswer(invocation -> {
+                MdItem item = invocation.getArgument(0);
+                item.setItemId(304L);
+                return 1;
+            }).when(mdItemService).insertMdItem(any(MdItem.class));
+            when(mdItemBatchConfigService.selectMdItemBatchConfigByItemId(201L)).thenReturn(null);
+            when(routeProductService.copyRouteProductForSku(anyLong(), anyLong(), anyString(), anyString())).thenReturn(2);
+            when(workorderBomService.insertProWorkorderBom(any(ProWorkorderBom.class))).thenReturn(1);
+
+            // 变体挂两条路线：路线10含工序100/101，路线11只含工序100
+            ProRouteProduct rp10 = new ProRouteProduct();
+            rp10.setRecordId(10L);
+            rp10.setRouteId(10L);
+            rp10.setItemId(304L);
+            ProRouteProduct rp11 = new ProRouteProduct();
+            rp11.setRecordId(11L);
+            rp11.setRouteId(11L);
+            rp11.setItemId(304L);
+            when(routeProductService.selectProRouteProductList(any())).thenReturn(List.of(rp10, rp11));
+            when(routeProcessService.selectProRouteProcessByRouteId(10L))
+                    .thenReturn(List.of(routeProcess(100L), routeProcess(101L)));
+            when(routeProcessService.selectProRouteProcessByRouteId(11L))
+                    .thenReturn(List.of(routeProcess(100L)));
+            when(routeProductBomService.deleteByRouteIdAndProductId(anyLong(), eq(304L))).thenReturn(1);
+            when(routeProductBomService.insertProRouteProductBom(any(ProRouteProductBom.class))).thenReturn(1);
+
+            // 工单 BOM 含两条工序物料
+            ProWorkorderBom bom100 = new ProWorkorderBom();
+            bom100.setProcessId(100L);
+            bom100.setItemId(100L);
+            bom100.setQuantity(new BigDecimal("0.5"));
+            ProWorkorderBom bom101 = new ProWorkorderBom();
+            bom101.setProcessId(101L);
+            bom101.setItemId(101L);
+            bom101.setQuantity(new BigDecimal("1"));
+            List<ProWorkorderBom> bomList = new ArrayList<>(List.of(bom100, bom101));
+
+            // when：不抛异常（修复前会在路线11插入工序101时抛"所选工序不属于该工艺路线"）
+            ProWorkorder result = workorderService.createWorkorderWithBom(testWorkorder, bomList, new ArrayList<>());
+            assertThat(result.getProductId()).isEqualTo(304L);
+
+            // then：共回填 3 行 —— 路线10两条，路线11只回填工序100
+            ArgumentCaptor<ProRouteProductBom> routeBomCaptor = ArgumentCaptor.forClass(ProRouteProductBom.class);
+            verify(routeProductBomService, times(3)).insertProRouteProductBom(routeBomCaptor.capture());
+            assertThat(routeBomCaptor.getAllValues())
+                    .extracting(b -> b.getRouteId() + "-" + b.getProcessId())
+                    .containsExactlyInAnyOrder("10-100", "10-101", "11-100");
+        }
+    }
+
+    private ProRouteProcess routeProcess(Long processId) {
+        ProRouteProcess p = new ProRouteProcess();
+        p.setProcessId(processId);
+        return p;
     }
 }

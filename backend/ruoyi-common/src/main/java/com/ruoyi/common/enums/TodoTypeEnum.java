@@ -10,6 +10,7 @@ public enum TodoTypeEnum
 {
     APPROVAL("APPROVAL", "审批"),
     QC_CHECK("QC_CHECK", "质检"),
+    PRO_QC_BLOCK("PRO_QC_BLOCK", "质检不合格拦截"),
     DV_CHECK("DV_CHECK", "点检"),
     MAINTEN("MAINTEN", "保养"),
     REPAIR("REPAIR", "维修"),

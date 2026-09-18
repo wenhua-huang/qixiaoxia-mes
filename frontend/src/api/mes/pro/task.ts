@@ -20,3 +20,11 @@ export function completeTask(taskId: number) { return request({ url: '/mes/pro/t
 export function cancelTask(taskId: number) { return request({ url: '/mes/pro/task/cancel/' + taskId, method: 'put' }) }
 // 工序进度汇总
 export function progressByWorkorder(workorderId: number) { return request({ url: '/mes/pro/task/progressByWorkorder/' + workorderId, method: 'get' }) }
+// 跟单质检不合格放行（理由必填，需 mes:pro:task:release 权限）
+export function releaseQcBlock(taskId: number, reason: string) {
+  return request({ url: '/mes/pro/task/releaseQcBlock/' + taskId, method: 'put', params: { reason } })
+}
+// 批量查询任务质检锁态（≤100，key=任务ID字符串，value={blocked, reason}）
+export function getQcBlockState(taskIds: number[]) {
+  return request({ url: '/mes/pro/task/qcBlockState', method: 'post', data: taskIds })
+}

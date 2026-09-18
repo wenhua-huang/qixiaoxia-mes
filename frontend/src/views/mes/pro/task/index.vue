@@ -54,6 +54,12 @@
       <el-table-column label="任务名称" align="center" prop="taskName" width="150" :show-overflow-tooltip="true" />
       <el-table-column label="生产工单" align="center" prop="workorderName" width="150" :show-overflow-tooltip="true" />
       <el-table-column label="工位" align="center" prop="workstationName" width="120" :show-overflow-tooltip="true" />
+      <el-table-column label="报工人" align="center" prop="workerNick" width="100" :show-overflow-tooltip="true">
+        <template #default="scope">{{ scope.row.workerNick || '-' }}</template>
+      </el-table-column>
+      <el-table-column label="负责人" align="center" prop="leaderNick" width="100" :show-overflow-tooltip="true">
+        <template #default="scope">{{ scope.row.leaderNick || '-' }}</template>
+      </el-table-column>
       <el-table-column label="工序" align="center" prop="processName" width="120" :show-overflow-tooltip="true" />
       <el-table-column label="计划数量" align="center" prop="quantity" width="90" />
       <el-table-column label="已生产" align="center" prop="quantityProduced" width="80" />
@@ -74,15 +80,17 @@
         </template>
       </el-table-column>
       <el-table-column label="总时长(h)" align="center" prop="duration" width="90" />
-      <el-table-column label="状态" align="center" prop="status" width="85">
+      <el-table-column label="状态" align="center" prop="status" width="110">
         <template #default="scope">
-          <span :style="{ color: statusColor[scope.row.status] }">{{ statusMap[scope.row.status] || scope.row.status }}</span>
+          <el-tag v-if="isQcBlocked(scope.row)" type="danger" size="small" effect="dark">不可开工</el-tag>
+          <span v-else :style="{ color: statusColor[scope.row.status] }">{{ statusMap[scope.row.status] || scope.row.status }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="280">
+      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="340">
         <template #default="scope">
+          <el-button link type="danger" icon="Unlock" @click="handleReleaseQcBlock(scope.row)" v-if="isQcBlocked(scope.row)" v-hasPermi="['mes:pro:task:release']">质检放行</el-button>
           <el-button link type="success" icon="Position" @click="handleDispatch(scope.row)" v-if="scope.row.status==='NORMAL'||scope.row.status==='PREPARE'" v-hasPermi="['mes:pro:task:edit']">下发</el-button>
-          <el-button link type="primary" icon="CircleCheck" @click="handleComplete(scope.row)" v-if="scope.row.status==='PRODUCING'" v-hasPermi="['mes:pro:task:edit']">完成</el-button>
+          <el-button link type="primary" icon="CircleCheck" @click="handleComplete(scope.row)" v-if="scope.row.status==='PRODUCING' && !isQcBlocked(scope.row)" v-hasPermi="['mes:pro:task:edit']">完成</el-button>
           <el-button link type="warning" icon="CircleClose" @click="handleCancelTask(scope.row)" v-if="scope.row.status!=='COMPLETED'&&scope.row.status!=='CANCEL'" v-hasPermi="['mes:pro:task:edit']">取消</el-button>
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:pro:task:edit']">修改</el-button>
           <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:pro:task:remove']">删除</el-button>
@@ -198,12 +206,15 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 跟单质检不合格放行 -->
+    <QcReleaseDialog ref="qcReleaseRef" @success="getList" />
   </div>
 </template>
 
 <script setup lang="ts" name="ProSchedule">
 import { ref, reactive, toRefs, getCurrentInstance } from 'vue'
-import { listTask, getTask, delTask, addTask, updateTask, dispatchTask, completeTask, cancelTask } from '@/api/mes/pro/task'
+import { listTask, getTask, delTask, addTask, updateTask, dispatchTask, completeTask, cancelTask, getQcBlockState } from '@/api/mes/pro/task'
 import { listWorkorder, getWorkorder } from '@/api/mes/pro/workorder'
 import { listAllProcess } from '@/api/mes/pro/process'
 import { listRouteProcessByRouteId } from '@/api/mes/pro/routeprocess'
@@ -211,6 +222,7 @@ import { listRouteProduct } from '@/api/mes/pro/routeproduct'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import WorkstationSelect from '@/components/workstationSelect/single.vue'
 import workorderSelect from '@/components/workorderSelect/single.vue'
+import QcReleaseDialog from './components/QcReleaseDialog.vue'
 
 const { proxy } = getCurrentInstance() as any
 
@@ -238,6 +250,29 @@ const statusColor: Record<string, string> = {
   PREPARE: '#E6A23C', NORMAL: '#409EFF', PRODUCING: '#67C23A', COMPLETED: '#909399', PAUSED: '#E6A23C', CANCEL: '#F56C6C'
 }
 
+// 跟单质检锁态：list 接口不富化，列表加载后对本页 PRODUCING 任务批量查询
+const QC_STATE_BATCH = 100  // 后端单次最多 100 个任务
+const qcBlockMap = ref<Record<string, { blocked: boolean; reason: string | null }>>({})
+const qcReleaseRef = ref<InstanceType<typeof QcReleaseDialog>>()
+function isQcBlocked(row: any) {
+  return !!qcBlockMap.value[String(row.taskId)]?.blocked
+}
+function loadQcBlockStates(rows: any[]) {
+  const ids = rows.filter((r: any) => r.status === 'PRODUCING').map((r: any) => r.taskId)
+  if (ids.length === 0) { qcBlockMap.value = {}; return }
+  // 按 100 分批后合并，避免分页调大时超上限导致整页锁态静默丢失
+  const batches: number[][] = []
+  for (let i = 0; i < ids.length; i += QC_STATE_BATCH) batches.push(ids.slice(i, i + QC_STATE_BATCH))
+  Promise.all(batches.map(b => getQcBlockState(b)))
+    .then((results: any[]) => {
+      qcBlockMap.value = Object.assign({}, ...results.map(r => r.data || {}))
+    })
+    .catch(() => { qcBlockMap.value = {} })
+}
+function handleReleaseQcBlock(row: any) {
+  qcReleaseRef.value?.open(row, qcBlockMap.value[String(row.taskId)]?.reason || null)
+}
+
 const data = reactive({
   form: {} as any,
   queryParams: { pageNum: 1, pageSize: 10 } as any,
@@ -262,6 +297,7 @@ function getList() {
     taskList.value = r.rows || []
     total.value = r.total || 0
     loading.value = false
+    loadQcBlockStates(taskList.value)
   }).catch(() => { loading.value = false })
 }
 

@@ -285,6 +285,27 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where ipqc_id = #{ipqcId}
     </update>
 
+    <!-- 跟单质检门控：工单+检验工序最新已判定单（一期不区分流转卡，与任务维度放行一致）。factory_id 由拦截器注入。 -->
+    <select id="selectLatestCompletedByProcess" resultMap="QcIpqcResult">
+        <include refid="selectQcIpqcVo"/>
+        where workorder_id = #{workorderId}
+          and process_id = #{processId}
+          and status = 'COMPLETED'
+        order by ipqc_id desc
+        limit 1
+    </select>
+
+    <!-- 批量锁态：多组（工单,检验工序）的已判定单一次查回，调用方分组取首条。factory_id 由拦截器注入。 -->
+    <select id="selectLatestCompletedByProcessPairs" resultMap="QcIpqcResult">
+        <include refid="selectQcIpqcVo"/>
+        where status = 'COMPLETED' and (
+        <foreach collection="pairs" item="pair" separator=" or ">
+            (workorder_id = #{pair.workorderId} and process_id = #{pair.processId})
+        </foreach>
+        )
+        order by ipqc_id desc
+    </select>
+
     <update id="closeIfActive">
         update qxx_qc_ipqc
         set status = 'CLOSED',

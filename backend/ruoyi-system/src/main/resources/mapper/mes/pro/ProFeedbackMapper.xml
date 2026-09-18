@@ -39,6 +39,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="expireDate"    column="expire_date"    />
         <result property="lotNumber"    column="lot_number"    />
         <result property="quantity"    column="quantity"    />
+        <result property="quantityInput"    column="quantity_input"    />
         <result property="quantityFeedback"    column="quantity_feedback"    />
         <result property="quantityQualified"    column="quantity_qualified"    />
         <result property="quantityUnqualified"    column="quantity_unqualified"    />
@@ -67,7 +68,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectProFeedbackVo">
-        select record_id, factory_id, feedback_type, feedback_code, workstation_id, workstation_code, workstation_name, workorder_id, workorder_code, workorder_name, card_id, route_id, route_code, process_id, process_code, process_name, task_id, task_code, item_id, item_code, item_name, unit_of_measure, unit_name, specification, vendor_id, vendor_code, vendor_name, outsource_factory_id, outsource_issue_id, outsource_issue_code, outsource_recpt_id, expire_date, lot_number, quantity, quantity_feedback, quantity_qualified, quantity_unqualified, quantity_uncheck, quantity_labor_scrap, quantity_material_scrap, quantity_other_scrap, user_name, nick_name, user_id, team_id, team_code, team_name, feedback_channel, feedback_time, record_user, record_nick, status, remark, create_by, create_time, update_by, update_time from qxx_pro_feedback
+        select record_id, factory_id, feedback_type, feedback_code, workstation_id, workstation_code, workstation_name, workorder_id, workorder_code, workorder_name, card_id, route_id, route_code, process_id, process_code, process_name, task_id, task_code, item_id, item_code, item_name, unit_of_measure, unit_name, specification, vendor_id, vendor_code, vendor_name, outsource_factory_id, outsource_issue_id, outsource_issue_code, outsource_recpt_id, expire_date, lot_number, quantity, quantity_input, quantity_feedback, quantity_qualified, quantity_unqualified, quantity_uncheck, quantity_labor_scrap, quantity_material_scrap, quantity_other_scrap, user_name, nick_name, user_id, team_id, team_code, team_name, feedback_channel, feedback_time, record_user, record_nick, status, remark, create_by, create_time, update_by, update_time from qxx_pro_feedback
     </sql>
 
     <select id="selectProFeedbackList" parameterType="ProFeedback" resultMap="ProFeedbackResult">
@@ -159,6 +160,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="expireDate != null">expire_date,</if>
             <if test="lotNumber != null">lot_number,</if>
             <if test="quantity != null">quantity,</if>
+            <if test="quantityInput != null">quantity_input,</if>
             <if test="quantityFeedback != null">quantity_feedback,</if>
             <if test="quantityQualified != null">quantity_qualified,</if>
             <if test="quantityUnqualified != null">quantity_unqualified,</if>
@@ -214,6 +216,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="expireDate != null">#{expireDate},</if>
             <if test="lotNumber != null">#{lotNumber},</if>
             <if test="quantity != null">#{quantity},</if>
+            <if test="quantityInput != null">#{quantityInput},</if>
             <if test="quantityFeedback != null">#{quantityFeedback},</if>
             <if test="quantityQualified != null">#{quantityQualified},</if>
             <if test="quantityUnqualified != null">#{quantityUnqualified},</if>
@@ -273,6 +276,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="expireDate != null">expire_date = #{expireDate},</if>
             <if test="lotNumber != null">lot_number = #{lotNumber},</if>
             <if test="quantity != null">quantity = #{quantity},</if>
+            <if test="quantityInput != null">quantity_input = #{quantityInput},</if>
             <if test="quantityFeedback != null">quantity_feedback = #{quantityFeedback},</if>
             <if test="quantityQualified != null">quantity_qualified = #{quantityQualified},</if>
             <if test="quantityUnqualified != null">quantity_unqualified = #{quantityUnqualified},</if>
@@ -317,6 +321,27 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where card_id = #{cardId}
           and process_id = #{processId}
           and status = 'AUDITED'
+    </select>
+
+    <!-- 统计工单某工序已审核(AUDITED)报工的报工数量合计（上机数量默认值：上工序累计产出）。
+         一期按工单+工序聚合，不区分流转卡；factory_id 由拦截器自动注入 SQL 文本。 -->
+    <select id="sumAuditedQuantityFeedback" resultType="java.math.BigDecimal">
+        select coalesce(sum(quantity_feedback), 0)
+        from qxx_pro_feedback
+        where workorder_id = #{workorderId}
+          and process_id = #{processId}
+          and status = 'AUDITED'
+          and quantity_feedback is not null
+    </select>
+
+    <!-- 统计工单某工序全部报工的本次上机数量合计（上机数量默认值：本工序累计已投入）。
+         一期按工单+工序聚合；factory_id 由拦截器自动注入 SQL 文本。 -->
+    <select id="sumQuantityInput" resultType="java.math.BigDecimal">
+        select coalesce(sum(quantity_input), 0)
+        from qxx_pro_feedback
+        where workorder_id = #{workorderId}
+          and process_id = #{processId}
+          and quantity_input is not null
     </select>
 
     <!-- 查询有 PREPARE（待审核）报工的 taskId（不去重，Java 端按出现次数计数） -->

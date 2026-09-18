@@ -90,6 +90,9 @@ class TeamSnapshotWriteTest {
     @Mock private IQcFactoryService qcFactoryService;
     @Mock private RedisLockTemplate lockTemplate;
     @Mock private PlatformTransactionManager transactionManager;
+    @Mock private ProInputQuantityResolver inputQuantityResolver;
+    @Mock private IProFeedbackChangeService feedbackChangeService;
+    @Mock private IProQcBlockService qcBlockService;
     @InjectMocks private ProFeedbackServiceImpl feedbackService;
 
     // ── ProWorkrecordServiceImpl 依赖 ──

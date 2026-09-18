@@ -26,6 +26,7 @@ import com.ruoyi.system.service.mes.qc.IQcFactoryService;
 import com.ruoyi.system.service.mes.qc.IQcIpqcService;
 import com.ruoyi.system.service.mes.qc.IQcJudgeService;
 import com.ruoyi.system.service.mes.qc.IQcOrderLineService;
+import com.ruoyi.system.service.mes.pro.IProQcBlockService;
 import com.ruoyi.system.service.mes.qc.QcCodeGenerator;
 import com.ruoyi.system.service.mes.qc.QcConstants;
 import com.ruoyi.system.service.mes.qc.QcTodoHelper;
@@ -67,6 +68,9 @@ public class QcIpqcServiceImpl implements IQcIpqcService
 
     @Autowired
     private QcTodoHelper qcTodoHelper;
+
+    @Autowired
+    private IProQcBlockService proQcBlockService;
 
     @Autowired
     private RedisLockTemplate lockTemplate;
@@ -293,20 +297,18 @@ public class QcIpqcServiceImpl implements IQcIpqcService
      * 判定通过后不自动流转流转卡，只完成检验单（流转卡推进仍由报工链路负责）。
      */
     @Override
-    public void judgeIpqc(Long ipqcId, String concessionReason)
+    public List<String> judgeIpqc(Long ipqcId, String concessionReason)
     {
         String lockKey = QcConstants.LOCK_JUDGE + "IPQC:" + ipqcId;
-        // 块状 void lambda 显式绑定 Runnable 重载（表达式 lambda 会歧义绑定到 Supplier 重载）
-        lockTemplate.execute(lockKey, () -> {
-            txTemplate.execute(tx -> {
-                doJudgeIpqc(ipqcId, concessionReason);
-                return null;
-            });
-        });
+        return lockTemplate.execute(lockKey,
+                () -> txTemplate.execute(tx -> doJudgeIpqc(ipqcId, concessionReason)));
     }
 
-    /** 锁+事务内判定：守卫 → 载入行/缺陷 → 引擎判定 → 让步处理 → 行结果回填 → 头回写 */
-    private void doJudgeIpqc(Long ipqcId, String concessionReason)
+    /**
+     * 锁+事务内判定：守卫 → 载入行/缺陷 → 引擎判定 → 让步处理 → 行结果回填 → 头回写；
+     * FAIL 时联动下波工序拦截待办，返回被拦工序名（PASS/CONCESSION 返回空列表）。
+     */
+    private List<String> doJudgeIpqc(Long ipqcId, String concessionReason)
     {
         QcIpqc ipqc = qcIpqcMapper.selectQcIpqcByIpqcId(ipqcId);
         if (ipqc == null)
@@ -342,6 +344,12 @@ public class QcIpqcServiceImpl implements IQcIpqcService
         ipqc.setInspector(SecurityUtils.getUsername());
         qcIpqcMapper.updateQcIpqc(ipqc);
         qcTodoHelper.completeTodo(QcConstants.TYPE_IPQC, ipqcId, finalResult);
+        // FAIL 硬连：为下波工序任务建拦截待办（弱依赖：单条待办失败只告警，不回滚判定）
+        if (QcConstants.RESULT_FAIL.equals(finalResult))
+        {
+            return proQcBlockService.onIpqcFailed(ipqc);
+        }
+        return List.of();
     }
 
     /** 判定配置取 IPQC 头快照（Ac 值/三档缺陷率阈值）+ 实际检测数 */

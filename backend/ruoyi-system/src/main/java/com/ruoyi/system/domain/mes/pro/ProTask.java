@@ -44,6 +44,12 @@ public class ProTask extends BaseEntity
     @Excel(name = "合格品数量") private BigDecimal quantityQualified;
     @Excel(name = "不合格品数量") private BigDecimal quantityUnqualified;
     @Excel(name = "调整数量") private BigDecimal quantityChanged;
+    @Excel(name = "派工报工人ID") private Long workerId;
+    @Excel(name = "派工报工人") private String workerNick;
+    private String workerName;
+    @Excel(name = "任务负责人ID") private Long leaderId;
+    @Excel(name = "任务负责人") private String leaderNick;
+    private String leaderName;
     private Long clientId;
     private String clientCode;
     private String clientName;
@@ -78,6 +84,13 @@ public class ProTask extends BaseEntity
 
     /** 该任务待审核(PREPARE)报工数（非持久化，由 feedbackEntry 回填，供前端展示状态） */
     private Integer pendingFeedbackCount;
+
+    /** 报工默认上机数量（非持久化，查询入口富化） */
+    private BigDecimal defaultQuantityInput;
+    /** 质检不合格阻塞态（非持久化，实时派生） */
+    private Boolean qcBlocked;
+    /** 阻塞原因文案 */
+    private String qcBlockReason;
 
     public Long getTaskId() { return taskId; }
     public void setTaskId(Long v) { this.taskId = v; }
@@ -131,6 +144,18 @@ public class ProTask extends BaseEntity
     public void setQuantityUnqualified(BigDecimal v) { this.quantityUnqualified = v; }
     public BigDecimal getQuantityChanged() { return quantityChanged; }
     public void setQuantityChanged(BigDecimal v) { this.quantityChanged = v; }
+    public Long getWorkerId() { return workerId; }
+    public void setWorkerId(Long v) { this.workerId = v; }
+    public String getWorkerName() { return workerName; }
+    public void setWorkerName(String v) { this.workerName = v; }
+    public String getWorkerNick() { return workerNick; }
+    public void setWorkerNick(String v) { this.workerNick = v; }
+    public Long getLeaderId() { return leaderId; }
+    public void setLeaderId(Long v) { this.leaderId = v; }
+    public String getLeaderName() { return leaderName; }
+    public void setLeaderName(String v) { this.leaderName = v; }
+    public String getLeaderNick() { return leaderNick; }
+    public void setLeaderNick(String v) { this.leaderNick = v; }
     public Long getClientId() { return clientId; }
     public void setClientId(Long v) { this.clientId = v; }
     public String getClientCode() { return clientCode; }
@@ -178,6 +203,13 @@ public class ProTask extends BaseEntity
 
     public Integer getPendingFeedbackCount() { return pendingFeedbackCount; }
     public void setPendingFeedbackCount(Integer v) { this.pendingFeedbackCount = v; }
+
+    public BigDecimal getDefaultQuantityInput() { return defaultQuantityInput; }
+    public void setDefaultQuantityInput(BigDecimal v) { this.defaultQuantityInput = v; }
+    public Boolean getQcBlocked() { return qcBlocked; }
+    public void setQcBlocked(Boolean v) { this.qcBlocked = v; }
+    public String getQcBlockReason() { return qcBlockReason; }
+    public void setQcBlockReason(String v) { this.qcBlockReason = v; }
 
     @Override
     public String toString() {

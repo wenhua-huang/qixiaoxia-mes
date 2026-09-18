@@ -8,6 +8,8 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
+import com.ruoyi.common.core.domain.entity.SysUser;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.exception.ServiceException;
@@ -28,7 +30,9 @@ import com.ruoyi.system.domain.mes.pro.ProProcess;
 import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
 import com.ruoyi.system.domain.mes.pro.ProRouteProduct;
 import com.ruoyi.system.domain.mes.md.MdWorkstation;
+import com.ruoyi.system.service.ISysUserService;
 import com.ruoyi.system.service.mes.pro.IProTaskService;
+import com.ruoyi.system.service.mes.pro.TaskReportDefaultsApplier;
 
 /**
  * 生产任务/排产Service业务层处理
@@ -60,6 +64,12 @@ public class ProTaskServiceImpl implements IProTaskService
     @Autowired
     private MdWorkstationMapper mdWorkstationMapper;
 
+    @Autowired
+    private ISysUserService userService;
+
+    @Autowired
+    private TaskReportDefaultsApplier defaultsApplier;
+
     @Override
     public ProTask selectProTaskByTaskId(Long taskId)
     {
@@ -75,13 +85,43 @@ public class ProTaskServiceImpl implements IProTaskService
     @Override
     public List<ProTask> selectReportableTaskList(ProTask proTask)
     {
-        return proTaskMapper.selectReportableTaskList(proTask);
+        List<ProTask> list = proTaskMapper.selectReportableTaskList(proTask);
+        // 一期默认值/锁态均按工单+工序粒度聚合
+        defaultsApplier.apply(list);
+        return list;
     }
 
     @Override
     public List<ProTask> selectAll()
     {
         return proTaskMapper.selectProTaskList(new ProTask());
+    }
+
+    /**
+     * 回填派工报工人/负责人快照：客户端只传 id，这里按 id 查 sys_user 补账号(userName)与姓名(nickName)；
+     * id 为 null 表示取消派人，name/nick 一并置 null（配合 updateProTask 的无条件 SET 实现清空）。
+     * 仅手工新增/编辑调用；状态流转、甘特拖拽、批量改态均不走此方法。
+     */
+    private void fillWorkerSnapshot(ProTask task)
+    {
+        fillOne(task.getWorkerId(), task::setWorkerId, task::setWorkerName, task::setWorkerNick);
+        fillOne(task.getLeaderId(), task::setLeaderId, task::setLeaderName, task::setLeaderNick);
+    }
+
+    private void fillOne(Long userId, Consumer<Long> idSetter,
+                         Consumer<String> nameSetter, Consumer<String> nickSetter)
+    {
+        if (userId == null)
+        {
+            idSetter.accept(null);
+            nameSetter.accept(null);
+            nickSetter.accept(null);
+            return;
+        }
+        SysUser u = userService.selectUserById(userId);
+        if (u == null) throw new ServiceException("指定的人员不存在：" + userId);
+        nameSetter.accept(u.getUserName());
+        nickSetter.accept(u.getNickName());
     }
 
     /**
@@ -194,6 +234,7 @@ public class ProTaskServiceImpl implements IProTaskService
     @Transactional
     public int insertProTask(ProTask proTask)
     {
+        fillWorkerSnapshot(proTask);
         proTask.setCreateTime(DateUtils.getNowDate());
         proTask.setCreateBy(SecurityUtils.getUsername());
         if (proTask.getStatus() == null) proTask.setStatus(ProConstants.TASK_STATUS_NORMAL);
@@ -265,11 +306,22 @@ public class ProTaskServiceImpl implements IProTaskService
     }
 
     @Override
+    @Transactional
     public int updateProTask(ProTask proTask)
     {
+        // 显式传 null id = 取消派人：先记下标记（fillWorkerSnapshot 会把 id 置 null，
+        // updateProTask 的动态 <if> 无法把 id 列 SET NULL，需追加 clearTaskAssignee）
+        boolean clearWorker = proTask.getWorkerId() == null;
+        boolean clearLeader = proTask.getLeaderId() == null;
+        fillWorkerSnapshot(proTask);
         proTask.setUpdateTime(DateUtils.getNowDate());
         proTask.setUpdateBy(SecurityUtils.getUsername());
-        return proTaskMapper.updateProTask(proTask);
+        int rows = proTaskMapper.updateProTask(proTask);
+        if (proTask.getTaskId() != null && (clearWorker || clearLeader))
+        {
+            proTaskMapper.clearTaskAssignee(proTask.getTaskId(), clearWorker, clearLeader);
+        }
+        return rows;
     }
 
     @Override
@@ -302,6 +354,9 @@ public class ProTaskServiceImpl implements IProTaskService
             throw new ServiceException("只有待排产/正常状态的任务才能下发，当前状态：" + task.getStatus());
         // 机台闸门：厂内工序必须指派真实且启用的机台才能下发（外协 VENDOR 不占厂内机台，放行）
         assertWorkstationAssigned(task);
+        // 负责人闸门：下发即推进到生产中，负责人是质检拦截等待办的第一责任人（厂内必填；
+        // 外协 VENDOR 任务在甘特上没有指派内部负责人的入口，放行，质检待办按报工人/判定人兜底）
+        assertLeaderAssigned(task);
         task.setStatus(ProConstants.TASK_STATUS_PRODUCING);
         task.setUpdateTime(DateUtils.getNowDate());
         task.setUpdateBy(SecurityUtils.getUsername());
@@ -369,6 +424,7 @@ public class ProTaskServiceImpl implements IProTaskService
             row.put("execTypeName", "未排产");
             row.put("resourceName", "");
             row.put("assigned", false);
+            row.put("leaderAssigned", false);
             return row;
         }
         // 外协工序：任一任务挂厂商即按外协（外厂机器，不校验厂内机台）
@@ -380,6 +436,7 @@ public class ProTaskServiceImpl implements IProTaskService
             row.put("execTypeName", "外协");
             row.put("resourceName", vendor.getWorkstationName() != null ? vendor.getWorkstationName() : "外协");
             row.put("assigned", true);
+            row.put("leaderAssigned", isLeaderAssigned(tasks));
             return row;
         }
         // 厂内工序：任一"可下发"任务未指派有效机台即待指派（与 dispatchByWorkorder 闸门口径一致）
@@ -391,13 +448,21 @@ public class ProTaskServiceImpl implements IProTaskService
         {
             row.put("resourceName", ProConstants.WS_NAME_PENDING);
             row.put("assigned", false);
+            row.put("leaderAssigned", isLeaderAssigned(tasks));
             return row;
         }
         // 机台名取自已指派真实机台的任务（避免取到终态/占位任务导致名称为空）
         ProTask assignedTask = tasks.stream().filter(this::isWorkstationAssigned).findFirst().orElse(tasks.get(0));
         row.put("resourceName", assignedTask.getWorkstationName() != null ? assignedTask.getWorkstationName() : "已指派机台");
         row.put("assigned", true);
+        row.put("leaderAssigned", isLeaderAssigned(tasks));
         return row;
+    }
+
+    /** 工序级负责人落实判定：该工序下任一可下发任务无负责人即视为未落实（厂内/外协同口径） */
+    private boolean isLeaderAssigned(List<ProTask> tasks)
+    {
+        return tasks.stream().noneMatch(t -> TASK_DISPATCHABLE.contains(t.getStatus()) && t.getLeaderId() == null);
     }
 
     @Override
@@ -407,7 +472,29 @@ public class ProTaskServiceImpl implements IProTaskService
         List<String> pendingNames = collectPendingInHouseNames(workorderId);
         if (!pendingNames.isEmpty())
             throw new ServiceException("以下工序尚未指派有效机台，请先在甘特排产中指派后再下发：" + String.join("、", pendingNames));
+        // 负责人闸门：与单任务下发同口径，仅厂内任务必填，缺一个整体拒绝（工单开工走此入口）
+        List<String> noLeaderNames = collectMissingLeaderNames(workorderId);
+        if (!noLeaderNames.isEmpty())
+            throw new ServiceException("以下工序任务尚未指定负责人，请先在甘特排产任务弹窗指派负责人后再开工："
+                    + String.join("、", noLeaderNames));
         proTaskMapper.updateStatusByWorkorder(workorderId, TASK_DISPATCHABLE, ProConstants.TASK_STATUS_PRODUCING);
+    }
+
+    /** 收集工单下"未指定负责人"的可下发任务工序名（仅厂内；外协 VENDOR 无内部负责人指派入口，豁免） */
+    private List<String> collectMissingLeaderNames(Long workorderId)
+    {
+        ProTask q = new ProTask();
+        q.setWorkorderId(workorderId);
+        List<String> names = new ArrayList<>();
+        for (ProTask t : proTaskMapper.selectProTaskList(q))
+        {
+            if (!TASK_DISPATCHABLE.contains(t.getStatus())) continue;
+            if (ProConstants.WS_CODE_VENDOR.equals(t.getWorkstationCode())) continue;
+            if (t.getLeaderId() != null) continue;
+            String name = t.getProcessName() != null ? t.getProcessName() : ("任务#" + t.getTaskId());
+            if (!names.contains(name)) names.add(name);
+        }
+        return names;
     }
 
     /** 收集工单下"待指派机台"的厂内可下发任务工序名（外协 VENDOR 放行，不占厂内机台） */
@@ -447,6 +534,14 @@ public class ProTaskServiceImpl implements IProTaskService
         MdWorkstation ws = mdWorkstationMapper.selectMdWorkstationByWorkstationId(wsId);
         if (ws == null || !"1".equals(ws.getEnableFlag()))
             throw new ServiceException("该任务指派的机台不存在或已停用，请在甘特排产中重新指派机台后再下发");
+    }
+
+    /** 下发前负责人闸门：厂内任务未指定负责人则拒绝（外协 VENDOR 豁免，无内部负责人指派入口） */
+    private void assertLeaderAssigned(ProTask task)
+    {
+        if (ProConstants.WS_CODE_VENDOR.equals(task.getWorkstationCode())) return;
+        if (task.getLeaderId() == null)
+            throw new ServiceException("该任务尚未指定负责人，请先在甘特排产任务弹窗指派负责人后再下发");
     }
 
     @Override

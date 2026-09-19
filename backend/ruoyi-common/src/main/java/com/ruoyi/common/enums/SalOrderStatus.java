@@ -1,29 +1,26 @@
 package com.ruoyi.common.enums;
 
 /**
- * 销售订单状态枚举
- *
- * <p>审核状态机（方案 A：审核 = 生效）：
+ * 销售订单状态枚举（主线四态 + 链外作废）
  * <pre>
- *   PREPARE(待提交) ──提交──▶ PENDING(待审核) ──审核通过──▶ CONFIRMED(已确认) ──▶ CLOSED(已关闭)
- *        │                      │                     =可转工单
- *        │                   驳回(必填意见)
- *        ◀─────────────────────┘  (回退 PREPARE)
- *
- *   CANCEL(已取消) 可由 PREPARE/PENDING/CONFIRMED 流入（终态）
+ *   CONFIRMED(已确认) ──任一工单开工──▶ PRODUCING(生产中) ──全部明细发齐──▶ SHIPPED(已出货) ──人工结单──▶ CLOSED(已结单)
+ *        │                                   │
+ *        └──────────── 取消 ─────────────────┘
+ *                       ▼
+ *                 CANCEL(已取消，链外终态)
  * </pre>
- *
- * <p>对应字典：sys_dict_type = 'mes_sal_order_status'（见 V124 迁移种子）
+ * 工序任务报工不改变订单状态，只驱动进度百分比。
+ * 对应字典：sys_dict_type = 'mes_sal_order_status'（V124 建，V151 收敛）
  *
  * @author qixiaoxia
  * @date 2026-08-13
  */
 public enum SalOrderStatus {
 
-    PREPARE("PREPARE", "待提交"),
-    PENDING("PENDING", "待审核"),
     CONFIRMED("CONFIRMED", "已确认"),
-    CLOSED("CLOSED", "已关闭"),
+    PRODUCING("PRODUCING", "生产中"),
+    SHIPPED("SHIPPED", "已出货"),
+    CLOSED("CLOSED", "已结单"),
     CANCEL("CANCEL", "已取消");
 
     private final String code;

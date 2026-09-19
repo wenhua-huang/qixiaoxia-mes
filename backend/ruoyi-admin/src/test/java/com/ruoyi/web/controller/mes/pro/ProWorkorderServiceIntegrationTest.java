@@ -223,6 +223,18 @@ class ProWorkorderServiceIntegrationTest extends BaseIntegrationTest {
         jdbcTemplate.execute("DELETE FROM qxx_pro_workorder");
     }
 
+    /**
+     * 按生产表 NOT NULL 约束插一条工单种子。
+     * order_source/product_code/product_name/unit_of_measure 均为 NOT NULL 无默认值，裸 INSERT 必须显式给。
+     */
+    private void seedWorkorder(String code, String name, int quantity, String status) {
+        jdbcTemplate.update(
+                "INSERT INTO qxx_pro_workorder (workorder_code, workorder_name, order_source, product_id, " +
+                "product_code, product_name, unit_of_measure, factory_id, quantity, status, create_by, create_time) " +
+                "VALUES (?, ?, 'MANUAL', 1, 'PROD-001', '测试产品', 'PCS', 1, ?, ?, 'admin', NOW())",
+                code, name, quantity, status);
+    }
+
     // ══════════════════════════════════════════════
     // testCreateWorkorderFullChain
     // ══════════════════════════════════════════════
@@ -239,6 +251,8 @@ class ProWorkorderServiceIntegrationTest extends BaseIntegrationTest {
         woBody.put("productId", 1);
         woBody.put("productCode", "PROD-001");
         woBody.put("productName", "测试产品");
+        woBody.put("unitOfMeasure", "PCS");
+        woBody.put("unitName", "个");
         woBody.put("quantity", 50);
         woBody.put("factoryId", 1);
         woBody.put("status", "PREPARE");
@@ -261,6 +275,9 @@ class ProWorkorderServiceIntegrationTest extends BaseIntegrationTest {
         woBody2.put("workorderName", "含BOM工单");
         woBody2.put("productId", 1);
         woBody2.put("productCode", "PROD-001");
+        woBody2.put("productName", "测试产品");
+        woBody2.put("unitOfMeasure", "PCS");
+        woBody2.put("unitName", "个");
         woBody2.put("quantity", 100);
         woBody2.put("factoryId", 1);
 
@@ -293,6 +310,9 @@ class ProWorkorderServiceIntegrationTest extends BaseIntegrationTest {
         body.put("workorderName", "重复测试");
         body.put("productId", 1);
         body.put("productCode", "PROD-001");
+        body.put("productName", "测试产品");
+        body.put("unitOfMeasure", "PCS");
+        body.put("unitName", "个");
         body.put("quantity", 10);
         body.put("factoryId", 1);
 
@@ -315,9 +335,7 @@ class ProWorkorderServiceIntegrationTest extends BaseIntegrationTest {
     void testConcurrentEdit() {
         // 先创建一个工单
         String code = "WO_CONC_" + System.nanoTime();
-        jdbcTemplate.update(
-                "INSERT INTO qxx_pro_workorder (workorder_code, workorder_name, product_id, factory_id, quantity, status, create_by, create_time) " +
-                "VALUES (?, '并发测试', 1, 1, 100, 'PREPARE', 'admin', NOW())", code);
+        seedWorkorder(code, "并发测试", 100, "PREPARE");
 
         Long workorderId = jdbcTemplate.queryForObject(
                 "SELECT workorder_id FROM qxx_pro_workorder WHERE workorder_code = ?", Long.class, code);
@@ -358,12 +376,8 @@ class ProWorkorderServiceIntegrationTest extends BaseIntegrationTest {
         // 插入测试数据
         String code1 = "WO_LIST1_" + System.nanoTime();
         String code2 = "WO_LIST2_" + System.nanoTime();
-        jdbcTemplate.update(
-                "INSERT INTO qxx_pro_workorder (workorder_code, workorder_name, product_id, factory_id, quantity, status, create_by, create_time) " +
-                "VALUES (?, '列表测试1', 1, 1, 50, 'PREPARE', 'admin', NOW())", code1);
-        jdbcTemplate.update(
-                "INSERT INTO qxx_pro_workorder (workorder_code, workorder_name, product_id, factory_id, quantity, status, create_by, create_time) " +
-                "VALUES (?, '列表测试2', 1, 1, 80, 'PRODUCING', 'admin', NOW())", code2);
+        seedWorkorder(code1, "列表测试1", 50, "PREPARE");
+        seedWorkorder(code2, "列表测试2", 80, "PRODUCING");
 
         String listUrl = "http://localhost:" + port + "/mes/pro/workorder/list";
 
@@ -387,9 +401,7 @@ class ProWorkorderServiceIntegrationTest extends BaseIntegrationTest {
     @DisplayName("查询工单详情：GET /{workorderId}")
     void testGetWorkorderById() {
         String code = "WO_DETAIL_" + System.nanoTime();
-        jdbcTemplate.update(
-                "INSERT INTO qxx_pro_workorder (workorder_code, workorder_name, product_id, product_code, factory_id, quantity, status, create_by, create_time) " +
-                "VALUES (?, '详情测试', 1, 'PROD-001', 1, 200, 'PREPARE', 'admin', NOW())", code);
+        seedWorkorder(code, "详情测试", 200, "PREPARE");
 
         Long workorderId = jdbcTemplate.queryForObject(
                 "SELECT workorder_id FROM qxx_pro_workorder WHERE workorder_code = ?", Long.class, code);
@@ -410,9 +422,7 @@ class ProWorkorderServiceIntegrationTest extends BaseIntegrationTest {
     @DisplayName("修改工单：PUT 更新工单信息")
     void testUpdateWorkorder() {
         String code = "WO_EDIT_" + System.nanoTime();
-        jdbcTemplate.update(
-                "INSERT INTO qxx_pro_workorder (workorder_code, workorder_name, product_id, factory_id, quantity, status, create_by, create_time) " +
-                "VALUES (?, '修改前', 1, 1, 100, 'PREPARE', 'admin', NOW())", code);
+        seedWorkorder(code, "修改前", 100, "PREPARE");
 
         Long workorderId = jdbcTemplate.queryForObject(
                 "SELECT workorder_id FROM qxx_pro_workorder WHERE workorder_code = ?", Long.class, code);
@@ -444,9 +454,7 @@ class ProWorkorderServiceIntegrationTest extends BaseIntegrationTest {
     @DisplayName("删除工单：DELETE /{workorderIds}")
     void testDeleteWorkorder() {
         String code = "WO_DEL_" + System.nanoTime();
-        jdbcTemplate.update(
-                "INSERT INTO qxx_pro_workorder (workorder_code, workorder_name, product_id, factory_id, quantity, status, create_by, create_time) " +
-                "VALUES (?, '待删除', 1, 1, 10, 'PREPARE', 'admin', NOW())", code);
+        seedWorkorder(code, "待删除", 10, "PREPARE");
 
         Long workorderId = jdbcTemplate.queryForObject(
                 "SELECT workorder_id FROM qxx_pro_workorder WHERE workorder_code = ?", Long.class, code);
@@ -481,10 +489,13 @@ class ProWorkorderServiceIntegrationTest extends BaseIntegrationTest {
         bomItem.put("itemId", 100);
         bomItem.put("itemCode", "MAT-001");
         bomItem.put("itemName", "测试物料");
+        bomItem.put("unitOfMeasure", "KG");
         bomItem.put("unitName", "kg");
+        bomItem.put("itemOrProduct", "RAW");
         bomItem.put("quantity", new java.math.BigDecimal("0.5"));
 
         Map<String, Object> paramItem = new HashMap<>();
+        paramItem.put("routeProductId", 0L);
         paramItem.put("templateId", 1L);
         paramItem.put("standardValue", "100");
         paramItem.put("adjustedValue", "105");
@@ -494,6 +505,9 @@ class ProWorkorderServiceIntegrationTest extends BaseIntegrationTest {
         wo.put("workorderName", "updateWithBom测试");
         wo.put("productId", 1);
         wo.put("productCode", "PROD-001");
+        wo.put("productName", "测试产品");
+        wo.put("unitOfMeasure", "PCS");
+        wo.put("unitName", "个");
         wo.put("quantity", 100);
         wo.put("factoryId", 1);
 
@@ -527,10 +541,13 @@ class ProWorkorderServiceIntegrationTest extends BaseIntegrationTest {
         newBom.put("itemId", 100);
         newBom.put("itemCode", "MAT-001");
         newBom.put("itemName", "测试物料");
+        newBom.put("unitOfMeasure", "KG");
         newBom.put("unitName", "kg");
+        newBom.put("itemOrProduct", "RAW");
         newBom.put("quantity", new java.math.BigDecimal("0.3")); // changed: 0.5 → 0.3
 
         Map<String, Object> newParam = new HashMap<>();
+        newParam.put("routeProductId", 0L);
         newParam.put("templateId", 2L); // new template
         newParam.put("standardValue", "200");
         newParam.put("adjustedValue", "210");
@@ -587,11 +604,13 @@ class ProWorkorderServiceIntegrationTest extends BaseIntegrationTest {
         // 1. 创建工单含2个参数
         String code = "WO_UPSERT_" + System.nanoTime();
         Map<String, Object> param1 = new HashMap<>();
+        param1.put("routeProductId", 0L);
         param1.put("templateId", 1L);
         param1.put("standardValue", "100");
         param1.put("adjustedValue", "110");
 
         Map<String, Object> param2 = new HashMap<>();
+        param2.put("routeProductId", 0L);
         param2.put("templateId", 2L);
         param2.put("standardValue", "200");
         param2.put("adjustedValue", "220");
@@ -601,6 +620,9 @@ class ProWorkorderServiceIntegrationTest extends BaseIntegrationTest {
         wo.put("workorderName", "参数upsert测试");
         wo.put("productId", 1);
         wo.put("productCode", "PROD-001");
+        wo.put("productName", "测试产品");
+        wo.put("unitOfMeasure", "PCS");
+        wo.put("unitName", "个");
         wo.put("quantity", 50);
         wo.put("factoryId", 1);
 
@@ -625,11 +647,13 @@ class ProWorkorderServiceIntegrationTest extends BaseIntegrationTest {
         // 2. updateWithBom：保留param1（按recordId适配）、删除param2、新增param3
         Map<String, Object> updatedParam1 = new HashMap<>();
         updatedParam1.put("recordId", recordId1); // ← 已有recordId → 触发update
+        updatedParam1.put("routeProductId", 0L);
         updatedParam1.put("templateId", 1L);
         updatedParam1.put("standardValue", "100");
         updatedParam1.put("adjustedValue", "150"); // 修改值
 
         Map<String, Object> newParam3 = new HashMap<>();
+        newParam3.put("routeProductId", 0L);
         newParam3.put("templateId", 3L); // 无recordId → 触发insert
         newParam3.put("standardValue", "300");
         newParam3.put("adjustedValue", "330");
@@ -706,7 +730,9 @@ class ProWorkorderServiceIntegrationTest extends BaseIntegrationTest {
         bomItem.put("itemId", 100);
         bomItem.put("itemCode", "MAT-001");
         bomItem.put("itemName", "测试物料");
+        bomItem.put("unitOfMeasure", "KG");
         bomItem.put("unitName", "kg");
+        bomItem.put("itemOrProduct", "RAW");
         bomItem.put("quantity", new java.math.BigDecimal("1.0"));
 
         Map<String, Object> wo = new HashMap<>();
@@ -714,6 +740,9 @@ class ProWorkorderServiceIntegrationTest extends BaseIntegrationTest {
         wo.put("workorderName", "清空BOM测试");
         wo.put("productId", 1);
         wo.put("productCode", "PROD-001");
+        wo.put("productName", "测试产品");
+        wo.put("unitOfMeasure", "PCS");
+        wo.put("unitName", "个");
         wo.put("quantity", 10);
         wo.put("factoryId", 1);
 
@@ -766,6 +795,9 @@ class ProWorkorderServiceIntegrationTest extends BaseIntegrationTest {
         wo.put("workorderName", "变更追踪测试");
         wo.put("productId", 1);
         wo.put("productCode", "PROD-001");
+        wo.put("productName", "测试产品");
+        wo.put("unitOfMeasure", "PCS");
+        wo.put("unitName", "个");
         wo.put("quantity", 100);
         wo.put("factoryId", 1);
 

@@ -50,6 +50,15 @@ public class SalOrderLine extends BaseEntity
     private String packageReq;
     private String shippingReq;
 
+    /** 开单时带出的产品-路线绑定ID(qxx_pro_route_product.record_id)，可人工改选 */
+    private Long routeProductId;
+
+    /** 路线编码冗余快照 */
+    private String routeCode;
+
+    /** 路线名称冗余快照 */
+    private String routeName;
+
     @JsonFormat(pattern = "yyyy-MM-dd")
     private Date requestDate;
 
@@ -100,6 +109,12 @@ public class SalOrderLine extends BaseEntity
     public void setPackageReq(String v) { this.packageReq = v; }
     public String getShippingReq() { return shippingReq; }
     public void setShippingReq(String v) { this.shippingReq = v; }
+    public Long getRouteProductId() { return routeProductId; }
+    public void setRouteProductId(Long v) { this.routeProductId = v; }
+    public String getRouteCode() { return routeCode; }
+    public void setRouteCode(String v) { this.routeCode = v; }
+    public String getRouteName() { return routeName; }
+    public void setRouteName(String v) { this.routeName = v; }
     public Date getRequestDate() { return requestDate; }
     public void setRequestDate(Date v) { this.requestDate = v; }
     public Map<String, Object> getLineAttrs() { return lineAttrs; }

@@ -60,7 +60,9 @@ class MdItemTypeControllerIT extends BaseIntegrationTest {
                 "http://localhost:" + port + "/mes/md/itemtype/list",
                 HttpMethod.GET, authRequest(), Map.class);
         assertThat(resp.getBody().get("code")).isEqualTo(200);
-        assertThat((Integer) resp.getBody().get("total")).isGreaterThanOrEqualTo(1);
+        // list 返回 AjaxResult 包裹的全量列表（不分页，无 total）
+        List<Map> data = (List<Map>) resp.getBody().get("data");
+        assertThat(data).isNotEmpty();
     }
 
     @Test

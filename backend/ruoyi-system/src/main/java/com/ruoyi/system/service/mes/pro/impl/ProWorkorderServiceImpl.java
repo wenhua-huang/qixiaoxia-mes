@@ -17,6 +17,7 @@ import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.core.redis.RedisLockTemplate;
+import com.ruoyi.common.enums.SalOrderType;
 import com.ruoyi.common.enums.WmIssueConstants;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
@@ -636,7 +637,7 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         proWorkorder.setCreateBy(SecurityUtils.getUsername());
         if (proWorkorder.getStatus() == null) proWorkorder.setStatus("PREPARE");
         if (proWorkorder.getWorkorderType() == null) proWorkorder.setWorkorderType("SELF");
-        if (proWorkorder.getOrderType() == null) proWorkorder.setOrderType("NEW");
+        if (proWorkorder.getOrderType() == null) proWorkorder.setOrderType(SalOrderType.STANDARD.getCode());
         if (proWorkorder.getOrderSource() == null) proWorkorder.setOrderSource("MANUAL");
         return qxxProWorkorderMapper.insertProWorkorder(proWorkorder);
     }
@@ -921,9 +922,14 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
     public List<Map<String, Object>> checkMaterialReadiness(Long workorderId)
     {
         // 1. 获取工单 BOM 物料清单
+        ProWorkorder wo = selectProWorkorderByWorkorderId(workorderId);
+        if (wo == null) throw new ServiceException("工单不存在");
         List<ProWorkorderBom> bomList = proWorkorderBomService.selectProWorkorderBomByWorkorderId(workorderId);
         if (bomList == null || bomList.isEmpty()) {
-            throw new ServiceException("工单无 BOM 数据，请先维护物料清单");
+            if (hasRouteBomForProduct(wo)) {
+                throw new ServiceException("工单 BOM 未同步，请编辑工单并保存后再开工");
+            }
+            throw new ServiceException("工单无 BOM 数据，请先在工艺路线维护该产品的物料清单");
         }
 
         // 2. 本工单已备料量（领料单 ALLOCATED/PARTIAL_ISSUED/ISSUED）—— 预占/出库时已扣
@@ -974,6 +980,22 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         }
 
         return result;
+    }
+
+    /**
+     * 判断工艺路线模板下是否已维护该工单产品的 BOM（快照为空时用于区分"未维护"与"未同步"）
+     */
+    private boolean hasRouteBomForProduct(ProWorkorder wo)
+    {
+        if (wo.getRouteProductId() == null) return false;
+        ProRouteProduct routeProduct = proRouteProductService
+                .selectProRouteProductByRecordId(wo.getRouteProductId());
+        if (routeProduct == null) return false;
+        List<ProRouteProductBom> routeBoms = proRouteProductBomService
+                .selectProRouteProductBomByRouteId(routeProduct.getRouteId());
+        if (routeBoms == null) return false;
+        return routeBoms.stream().anyMatch(rb -> routeProduct.getItemId() != null
+                && routeProduct.getItemId().equals(rb.getProductId()));
     }
 
     /**
@@ -1237,6 +1259,12 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         }
         if (!unscheduled.isEmpty())
             return schedulingFail(step, "以下工序尚未排产，请先进行排产操作：" + String.join("、", unscheduled), true);
+        // 负责人是硬约束（与甘特单任务下发、批量下发同口径，仅厂内任务）：无负责人豁免后开工仍会被拦
+        // 外协 VENDOR 任务没有内部负责人指派入口，不在此列（质检待办按报工人/判定人兜底）
+        List<String> missingLeader = execNamesByLeader(rows, false);
+        if (!missingLeader.isEmpty())
+            return schedulingFail(step, "以下工序任务尚未指定负责人，请先在甘特排产任务弹窗指派负责人后再开工："
+                    + String.join("、", missingLeader), false);
 
         long outsourceCount = rows.stream().filter(r -> ProConstants.EXEC_TYPE_OUTSOURCE.equals(r.get("execType"))).count();
         step.put("status", "PASS");
@@ -1262,6 +1290,19 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         for (Map<String, Object> r : rows)
             if (execType.equals(r.get("execType")) && Boolean.TRUE.equals(r.get("assigned")) == assigned)
                 names.add(String.valueOf(r.get("processName")));
+        return names;
+    }
+
+    /** 按负责人落实标志取工序名（仅厂内行；外协 VENDOR 豁免，未排产行到达此方法前已提前返回） */
+    private List<String> execNamesByLeader(List<Map<String, Object>> rows, boolean leaderAssigned)
+    {
+        List<String> names = new ArrayList<>();
+        for (Map<String, Object> r : rows)
+        {
+            if (ProConstants.EXEC_TYPE_OUTSOURCE.equals(r.get("execType"))) continue;
+            if (Boolean.TRUE.equals(r.get("leaderAssigned")) == leaderAssigned)
+                names.add(String.valueOf(r.get("processName")));
+        }
         return names;
     }
 
@@ -1535,7 +1576,7 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         if (workorder.getWorkorderType() == null)
             workorder.setWorkorderType("SELF");
         if (workorder.getOrderType() == null)
-            workorder.setOrderType("NEW");
+            workorder.setOrderType(SalOrderType.STANDARD.getCode());
         if (workorder.getOrderSource() == null)
             workorder.setOrderSource("MANUAL");
 
@@ -1727,6 +1768,27 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
     }
 
     /**
+     * 按目标路线实际包含的工序过滤工单 BOM。父产品可同时挂多条工序集合不同的路线，
+     * 工单 BOM 只来自开单路线，fan-out 到缺工序的变体路线会产生跨路线孤儿行并触发归属校验；
+     * processId 为空的路线级物料不受工序集合限制，保留
+     */
+    private List<ProWorkorderBom> filterBomByRouteProcesses(List<ProWorkorderBom> bomList, Long routeId)
+    {
+        List<ProRouteProcess> routeProcesses = proRouteProcessService.selectProRouteProcessByRouteId(routeId);
+        Set<Long> routeProcessIds = routeProcesses == null ? new HashSet<>()
+                : routeProcesses.stream().map(ProRouteProcess::getProcessId).collect(Collectors.toSet());
+        List<ProWorkorderBom> matched = new ArrayList<>();
+        for (ProWorkorderBom bom : bomList)
+        {
+            if (bom.getProcessId() == null || routeProcessIds.contains(bom.getProcessId()))
+            {
+                matched.add(bom);
+            }
+        }
+        return matched;
+    }
+
+    /**
      * 将工单的 BOM 调整和参数调整值回填到变体的路线数据中（L3 → L2）
      * 确保变体路线反映工单的实际差异化配置，而不是简单复制父产品。
      *
@@ -1750,8 +1812,10 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
                 // 删除刚复制的 BOM 行（product_id = skuItemId, route_id = rp.routeId）
                 proRouteProductBomService.deleteByRouteIdAndProductId(rp.getRouteId(), skuItemId);
 
-                // 重新插入工单 BOM 行（L3 → L2）
-                for (ProWorkorderBom bom : bomList) {
+                // 重新插入工单 BOM 行（L3 → L2）；父产品可能挂多条工序集合不同的路线，
+                // 只回填该变体路线实际包含的工序物料，避免跨路线孤儿行
+                List<ProWorkorderBom> routeBomList = filterBomByRouteProcesses(bomList, rp.getRouteId());
+                for (ProWorkorderBom bom : routeBomList) {
                     ProRouteProductBom newBom = new ProRouteProductBom();
                     newBom.setRouteId(rp.getRouteId());
                     newBom.setProcessId(bom.getProcessId());

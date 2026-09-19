@@ -59,10 +59,24 @@ public class QcConstants {
     public static final String LOCK_JUDGE = "qc:judge:";
     public static final String LOCK_GENERATE = "qc:generate:";
     // QC_CHECK 待办：优先级/状态/处理结果（类型用 TodoTypeEnum.QC_CHECK，与 sys_todo_list 字典口径一致）
+    public static final String TODO_PRIORITY_HIGH = "HIGH";
     public static final String TODO_PRIORITY_NORMAL = "NORMAL";
     public static final String TODO_STATUS_PENDING = "PENDING";
     public static final String TODO_STATUS_COMPLETED = "COMPLETED";
     public static final String TODO_RESULT_PASS = "检验合格";
     public static final String TODO_RESULT_FAIL = "检验不合格";
     public static final String TODO_RESULT_CONCESSION = "让步接收";
+    /** PRO_QC_BLOCK 待办放行关闭时的处理结果前缀（后接人工填写的放行理由） */
+    public static final String TODO_RESULT_BLOCK_RELEASED_PREFIX = "人工放行：";
+    /** PRO_QC_BLOCK 待办来源单据类型固定为 IPQC（与 TYPE_IPQC 同值，独立常量表语义） */
+    public static final String BLOCK_TODO_SOURCE_TYPE = TYPE_IPQC;
+
+    /**
+     * 拼接质检拦截待办的 source_doc_code：同一张 IPQC 对每个被拦任务各有一条待办，
+     * 用「检验单号::TASK:任务ID」作为四元组幂等键的一部分。
+     */
+    public static String buildBlockTodoCode(String ipqcCode, Long taskId)
+    {
+        return ipqcCode + "::TASK:" + taskId;
+    }
 }

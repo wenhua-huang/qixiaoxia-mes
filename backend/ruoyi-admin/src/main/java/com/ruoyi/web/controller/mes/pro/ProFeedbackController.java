@@ -11,13 +11,17 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.system.domain.mes.pro.ProFeedback;
+import com.ruoyi.system.domain.mes.pro.ProTask;
 import com.ruoyi.system.service.mes.pro.IProFeedbackService;
+import com.ruoyi.system.service.mes.pro.IProTaskService;
+import com.ruoyi.system.service.mes.pro.TaskReportDefaultsApplier;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.page.TableDataInfo;
 
@@ -34,8 +38,17 @@ public class ProFeedbackController extends BaseController
     @Autowired
     private IProFeedbackService proFeedbackService;
 
+    @Autowired
+    private com.ruoyi.system.service.mes.pro.IProFeedbackChangeService proFeedbackChangeService;
+
     @Autowired(required = false)
     private com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator autoCodeGenerator;
+
+    @Autowired
+    private IProTaskService proTaskService;
+
+    @Autowired
+    private TaskReportDefaultsApplier defaultsApplier;
 
     /**
      * 获取工单默认物料消耗（新增报工时预填）
@@ -81,6 +94,36 @@ public class ProFeedbackController extends BaseController
         List<ProFeedback> list = proFeedbackService.selectProFeedbackList(proFeedback);
         ExcelUtil<ProFeedback> util = new ExcelUtil<ProFeedback>(ProFeedback.class);
         util.exportExcel(response, list, "报工记录数据");
+    }
+
+    /**
+     * 查询报工字段变更痕迹（上机数量默认值人工调整 / 报工修改留痕）；feedbackId 优先，缺省按 taskId 查
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:feedback:query')")
+    @GetMapping("/change/list")
+    public AjaxResult changeList(@RequestParam(required = false) Long feedbackId,
+                                 @RequestParam(required = false) Long taskId)
+    {
+        if (feedbackId != null) {
+            return success(proFeedbackChangeService.selectByFeedback(feedbackId));
+        }
+        return success(proFeedbackChangeService.selectByTask(taskId));
+    }
+
+    /**
+     * 查询单个任务的「本次上机数量」系统默认值（PC 报工选择任务后预填，不自算）
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:feedback:query')")
+    @GetMapping("/inputDefault/{taskId}")
+    public AjaxResult inputDefault(@PathVariable Long taskId)
+    {
+        ProTask task = proTaskService.selectProTaskByTaskId(taskId);
+        if (task == null)
+        {
+            return error("任务不存在");
+        }
+        defaultsApplier.apply(task);
+        return success(task.getDefaultQuantityInput());
     }
 
     /**

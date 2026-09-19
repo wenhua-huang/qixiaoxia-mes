@@ -150,6 +150,9 @@ public class GanttDataServiceImpl implements IGanttDataService
                 item.put("processId", pt.getProcessId());
                 item.put("processName", rp.getProcessName());
                 item.put("workstationId", pt.getWorkstationId());
+                // 外协 VENDOR 任务 workstationId=0，前端需靠 code 识别并锁定机台选择（防止被改成厂内任务漏进报工列表）
+                item.put("workstationCode", pt.getWorkstationCode());
+                item.put("workstationName", pt.getWorkstationName());
                 item.put("colorCode", rp.getColorCode() != null ? rp.getColorCode() : com.ruoyi.system.domain.mes.pro.ProConstants.DEFAULT_COLOR_CODE);
                 item.put("predecessorId", pt.getPredecessorId());
                 item.put("status", pt.getStatus());
@@ -312,6 +315,7 @@ public class GanttDataServiceImpl implements IGanttDataService
             item.put("processId", pt.getProcessId());
             item.put("processName", pt.getProcessName());
             item.put("workstationId", pt.getWorkstationId());
+            item.put("workstationCode", pt.getWorkstationCode());
             item.put("workstationName", pt.getWorkstationName());
             item.put("workorderId", pt.getWorkorderId());
             item.put("workorderName", pt.getWorkorderName());
@@ -411,6 +415,13 @@ public class GanttDataServiceImpl implements IGanttDataService
         item.put("actualStartTime", aStart != null ? sdf.format(aStart) : null);
         item.put("actualEndTime", aEnd != null ? sdf.format(aEnd) : null);
         item.put("progressPercent", percent(pt.getQuantityProduced(), pt.getQuantity()));
+        // 派工报工人/负责人快照（供甘特弹窗编辑回显，避免前端按 id 补查用户）
+        item.put("workerId", pt.getWorkerId());
+        item.put("workerName", pt.getWorkerName());
+        item.put("workerNick", pt.getWorkerNick());
+        item.put("leaderId", pt.getLeaderId());
+        item.put("leaderName", pt.getLeaderName());
+        item.put("leaderNick", pt.getLeaderNick());
         String level = DelayLevelEvaluator.evaluateTask(pt.getStartTime(), pt.getEndTime(),
             aStart, aEnd, pt.getStatus(), pt.getQuantity(), pt.getQuantityProduced(),
             warnHours, tol, new Date());

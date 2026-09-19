@@ -37,6 +37,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where route_id = #{routeId}
     </select>
 
+    <select id="selectByRouteIds" resultMap="ProRouteResult">
+        <include refid="selectProRouteVo"/>
+        where route_id in
+        <foreach item="routeId" collection="routeIds" open="(" separator="," close=")">#{routeId}</foreach>
+    </select>
+
     <select id="selectProRouteByRouteCode" parameterType="String" resultMap="ProRouteResult">
         <include refid="selectProRouteVo"/>
         where route_code = #{routeCode}

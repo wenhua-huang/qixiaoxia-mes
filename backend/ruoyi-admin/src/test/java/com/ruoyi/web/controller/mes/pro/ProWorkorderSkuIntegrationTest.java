@@ -48,10 +48,14 @@ class ProWorkorderSkuIntegrationTest extends BaseIntegrationTest {
             jdbcTemplate.execute("CREATE TABLE qxx_pro_route (route_id bigint(20) NOT NULL AUTO_INCREMENT, factory_id bigint(20) NOT NULL DEFAULT 1, route_code varchar(64) NOT NULL, route_name varchar(255) DEFAULT NULL, enable_flag char(1) DEFAULT '1', remark varchar(500) DEFAULT '', create_by varchar(64) DEFAULT '', create_time datetime DEFAULT CURRENT_TIMESTAMP, update_by varchar(64) DEFAULT '', update_time datetime, PRIMARY KEY (route_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
             jdbcTemplate.execute("CREATE TABLE qxx_pro_route_process (record_id bigint(20) NOT NULL AUTO_INCREMENT, factory_id bigint(20) NOT NULL DEFAULT 1, route_id bigint(20) NOT NULL, process_id bigint(20) DEFAULT NULL, process_code varchar(64) DEFAULT NULL, process_name varchar(255) DEFAULT NULL, process_type varchar(32) DEFAULT NULL, order_num int(11) DEFAULT 1, next_process_id bigint(20) DEFAULT NULL, next_process_code varchar(64) DEFAULT NULL, next_process_name varchar(255) DEFAULT NULL, link_type varchar(32) DEFAULT NULL, default_pre_time int(11) DEFAULT NULL, default_suf_time int(11) DEFAULT NULL, color_code varchar(32) DEFAULT NULL, key_flag char(1) DEFAULT '0', is_check char(1) DEFAULT 'N', is_outsource char(1) DEFAULT 'N', vendor_id bigint(20) DEFAULT NULL, vendor_code varchar(64) DEFAULT NULL, vendor_name varchar(255) DEFAULT NULL, outsource_factory_id bigint(20) DEFAULT NULL, remark varchar(500) DEFAULT '', create_by varchar(64) DEFAULT '', create_time datetime DEFAULT CURRENT_TIMESTAMP, update_by varchar(64) DEFAULT '', update_time datetime, PRIMARY KEY (record_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
             jdbcTemplate.execute("INSERT IGNORE INTO qxx_pro_route (route_id, factory_id, route_code, route_name) VALUES (200, 1, 'RT-001', '纸袋标准路线')");
+            // 路线工序（与下方路线 BOM 的 process_id 100/101 对应；SKU 变体复制路线后按工序集合过滤回填）
+            jdbcTemplate.execute("INSERT IGNORE INTO qxx_pro_route_process (record_id, factory_id, route_id, process_id, process_code, process_name, order_num, key_flag) VALUES "
+                + "(1001, 1, 200, 100, 'PRINT', '印刷', 1, 'Y'), "
+                + "(1002, 1, 200, 101, 'BAG', '制袋', 2, 'N')");
 
             // 路线产品关联
             jdbcTemplate.execute("DROP TABLE IF EXISTS qxx_pro_route_product");
-            jdbcTemplate.execute("CREATE TABLE qxx_pro_route_product (record_id bigint(20) NOT NULL AUTO_INCREMENT, factory_id bigint(20) NOT NULL DEFAULT 1, route_id bigint(20) NOT NULL, item_id bigint(20) NOT NULL, item_code varchar(64) DEFAULT NULL, item_name varchar(255) DEFAULT NULL, specification varchar(500) DEFAULT NULL, unit_of_measure varchar(64) DEFAULT NULL, unit_name varchar(64) DEFAULT NULL, quantity int(11) DEFAULT 1, production_time bigint(20) DEFAULT NULL, time_unit_type varchar(32) DEFAULT NULL, remark varchar(500) DEFAULT '', create_by varchar(64) DEFAULT '', create_time datetime DEFAULT CURRENT_TIMESTAMP, update_by varchar(64) DEFAULT '', update_time datetime, PRIMARY KEY (record_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            jdbcTemplate.execute("CREATE TABLE qxx_pro_route_product (record_id bigint(20) NOT NULL AUTO_INCREMENT, factory_id bigint(20) NOT NULL DEFAULT 1, route_id bigint(20) NOT NULL, item_id bigint(20) NOT NULL, item_code varchar(64) DEFAULT NULL, item_name varchar(255) DEFAULT NULL, specification varchar(500) DEFAULT NULL, unit_of_measure varchar(64) DEFAULT NULL, unit_name varchar(64) DEFAULT NULL, quantity int(11) DEFAULT 1, production_time bigint(20) DEFAULT NULL, time_unit_type varchar(32) DEFAULT NULL, apply_order_type varchar(50) DEFAULT NULL, apply_outsource char(1) DEFAULT NULL, apply_package char(1) DEFAULT NULL, is_default char(1) DEFAULT 'N', remark varchar(500) DEFAULT '', create_by varchar(64) DEFAULT '', create_time datetime DEFAULT CURRENT_TIMESTAMP, update_by varchar(64) DEFAULT '', update_time datetime, PRIMARY KEY (record_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
             // 路线BOM
             jdbcTemplate.execute("DROP TABLE IF EXISTS qxx_pro_route_product_bom");
@@ -339,8 +343,10 @@ class ProWorkorderSkuIntegrationTest extends BaseIntegrationTest {
         bomList.add(bom2);
 
         // 参数：adjustedValue="5色" ≠ standardValue="4色"
+        // routeProductId 必填（qxx_pro_workorder_param.route_product_id NOT NULL，前端按路线产品逐行携带）
         List<Map<String, Object>> paramList = new ArrayList<>();
         Map<String, Object> p1 = new HashMap<>();
+        p1.put("routeProductId", 300);
         p1.put("templateId", 301); p1.put("standardValue", "4色");
         p1.put("adjustedValue", "5色");
         paramList.add(p1);
@@ -410,6 +416,9 @@ class ProWorkorderSkuIntegrationTest extends BaseIntegrationTest {
         woBody.put("productCode", "PROD-001");
         woBody.put("productName", "奔趣纸袋");
         woBody.put("routeProductId", 300);
+        // 主单位必填（qxx_pro_workorder.unit_of_measure NOT NULL，前端选产品时自动带出）
+        woBody.put("unitOfMeasure", "PCS");
+        woBody.put("unitName", "个");
         woBody.put("quantity", new BigDecimal("50"));
         woBody.put("factoryId", 1);
         woBody.put("createSkuVariant", false);
@@ -417,7 +426,9 @@ class ProWorkorderSkuIntegrationTest extends BaseIntegrationTest {
         List<Map<String, Object>> bomList = new ArrayList<>();
         Map<String, Object> bom = new HashMap<>();
         bom.put("itemId", 202); bom.put("itemCode", "MAT-INK-001");
-        bom.put("itemName", "水性油墨"); bom.put("unitName", "千克");
+        bom.put("itemName", "水性油墨");
+        bom.put("unitOfMeasure", "KG"); bom.put("unitName", "千克");
+        bom.put("itemOrProduct", "RAW");
         bom.put("quantity", new BigDecimal("1.0"));  // 有偏离但不创建变体
         bom.put("processId", 100); bom.put("processName", "印刷");
         bomList.add(bom);

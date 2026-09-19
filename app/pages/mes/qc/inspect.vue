@@ -27,6 +27,11 @@
       <text v-if="form.checkResult === 'CONCESSION'" class="rb-sub">让步接收</text>
     </view>
 
+    <!-- IPQC 不合格后回显实际被拦的下道工序（判定接口返回，仅本次页面生命周期内展示） -->
+    <view v-if="type === 'IPQC' && blockedProcesses.length" class="block-line">
+      已拦截下道工序：{{ blockedProcesses.join('、') }}，需放行后方可报工
+    </view>
+
     <view v-if="loadError" class="error-box">检验单加载失败：{{ loadError }}</view>
 
     <!-- 检测项 -->
@@ -122,6 +127,8 @@ const judgePopup = ref(null)
 const predictResult = ref(null)
 const predictReasons = ref([])
 const concessionInput = ref('')
+// IPQC 判不合格后被拦截的下道工序名（判定接口返回），横幅下红行回显
+const blockedProcesses = ref([])
 
 const readonly = computed(() => form.value.status === 'COMPLETED' || form.value.status === 'CLOSED')
 const bannerIcon = computed(() => {
@@ -202,6 +209,7 @@ function save() {
 
 function onJudge() {
   showLineError.value = false
+  blockedProcesses.value = []
   if (!form.value.quantityCheck || form.value.quantityCheck < 1) {
     proxy.$modal.msgWarning('请填写本次检测数量'); return
   }
@@ -252,7 +260,9 @@ function doJudge(concession) {
     const id = form.value[cfg.value.id]
     // 先保存最新录入，再单次 judge（让步理由随本次提交）
     return api(buildBody()).then(() => judgeApi(id, concession ? concessionInput.value.trim() : null))
-  }).then(() => {
+  }).then((judgeRes) => {
+    // 仅 IPQC judge 返回 blockedProcesses；IQC/OQC/RQC 无此数据，可选链兜底
+    blockedProcesses.value = judgeRes?.data?.blockedProcesses || []
     predictResult.value = null
     proxy.$modal.msgSuccess('判定完成')
     return loadDetail(form.value[cfg.value.id])
@@ -279,6 +289,7 @@ page { background: #f5f6f7; }
   .rb-sub { font-size: 24rpx; font-weight: normal; margin-left: auto; } }
 .section-title { font-size: 28rpx; color: #606266; margin: 12rpx 0 16rpx; }
 .error-box { background: #fef0f0; color: #f56c6c; padding: 24rpx; border-radius: 12rpx; font-size: 28rpx; margin-bottom: 20rpx; }
+.block-line { background: #fef0f0; color: #f56c6c; border: 1rpx solid #f56c6c; border-radius: 12rpx; padding: 20rpx 24rpx; font-size: 26rpx; line-height: 1.5; margin-bottom: 20rpx; }
 .concession-box { background: #fdf6ec; padding: 20rpx; border-radius: 8rpx; font-size: 26rpx; margin-top: 16rpx; }
 .footer-bar { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; padding: 16rpx 24rpx; display: flex; gap: 20rpx; box-shadow: 0 -2rpx 12rpx rgba(0,0,0,.06); }
 .btn-save { flex: 1; background: #f4f4f5; color: #606266; font-size: 30rpx; border-radius: 44rpx; }

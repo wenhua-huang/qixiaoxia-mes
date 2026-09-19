@@ -147,7 +147,7 @@
           </el-col>
         </el-row>
         <el-row><el-col :span="12"><el-form-item label="计划数量" prop="quantity"><el-input-number v-model="form.quantity" :min="1" style="width:100%" :disabled="optType==='view'" /></el-form-item></el-col><el-col :span="12"><el-form-item label="需求日期" prop="requestDate"><el-date-picker v-model="form.requestDate" type="date" value-format="YYYY-MM-DD HH:mm:ss" placeholder="请选择" style="width:100%" :disabled="optType==='view'" /></el-form-item></el-col></el-row>
-        <el-row><el-col :span="12"><el-form-item label="客户订单号"><el-input v-model="form.clientOrderCode" placeholder="客户PO号" :disabled="optType==='view'" /></el-form-item></el-col><el-col :span="12"><el-form-item label="订单类型"><el-select v-model="form.orderType" style="width:100%" :disabled="optType==='view'"><el-option label="新单" value="NEW" /><el-option label="返单" value="REPEAT" /><el-option label="备货订单" value="STOCK" /></el-select></el-form-item></el-col></el-row>
+        <el-row><el-col :span="12"><el-form-item label="客户订单号"><el-input v-model="form.clientOrderCode" placeholder="客户PO号" :disabled="optType==='view'" /></el-form-item></el-col><el-col :span="12"><el-form-item label="订单类型"><el-select v-model="form.orderType" style="width:100%" :disabled="optType==='view'"><el-option v-for="d in salOrderTypeOptions" :key="d.dictValue" :label="d.dictLabel" :value="d.dictValue" /></el-select></el-form-item></el-col></el-row>
         <el-row><el-col :span="12"><el-form-item label="产品尺寸"><el-input v-model="form.productSize" placeholder="如254*127*330mm" :disabled="optType==='view'" /></el-form-item></el-col><el-col :span="12"><el-form-item label="绳料规格"><el-input v-model="form.ropeSpec" placeholder="纸袋专用" :disabled="optType==='view'" /></el-form-item></el-col></el-row>
         <el-row><el-col :span="24"><el-form-item label="印刷要求"><el-input v-model="form.printingReq" placeholder="如1色满版黑印刷" :disabled="optType==='view'" /></el-form-item></el-col></el-row>
         <el-row><el-col :span="24"><el-form-item label="包装要求"><el-input v-model="form.packageReq" placeholder="如250个/箱,贴唛头" :disabled="optType==='view'" /></el-form-item></el-col></el-row>
@@ -321,6 +321,14 @@
                   <span v-else style="color:#F56C6C">{{ scope.row.resourceName || '待指派机台' }}</span>
                 </template>
               </el-table-column>
+              <el-table-column label="负责人" align="center" width="90">
+                <template #default="scope">
+                  <el-tag v-if="scope.row.leaderAssigned" type="success" size="small">已指定</el-tag>
+                  <!-- 外协 VENDOR 任务无内部负责人指派入口，不标红 -->
+                  <span v-else-if="scope.row.execType === 'OUTSOURCE'" style="color:#909399">—</span>
+                  <el-tag v-else type="danger" size="small">待指派</el-tag>
+                </template>
+              </el-table-column>
               <el-table-column label="状态" align="center" width="100">
                 <template #default="scope">
                   <el-tag v-if="scope.row.assigned" type="success" size="small">
@@ -359,7 +367,7 @@
       </div>
 
       <template #footer>
-        <el-button v-if="isMachineHardBlock()" type="danger" @click="goAssignMachine">去甘特指派机台</el-button>
+        <el-button v-if="isScheduleHardBlock()" type="danger" @click="goAssignMachine">{{ hardBlockButtonText() }}</el-button>
         <el-button v-if="canOverrideStart()" v-hasPermi="['mes:pro:workorder:override']" type="warning" @click="handleOverrideStart">豁免开工</el-button>
         <el-button type="primary" @click="startCheckOpen=false">{{ startCheckAllPassed ? '完 成' : '关 闭' }}</el-button>
       </template>
@@ -393,6 +401,7 @@ import WorkorderProgressDialog from './components/WorkorderProgressDialog.vue'
 import { listAllProcess } from '@/api/mes/pro/process'
 import { getItem } from '@/api/mes/md/item'
 import { getEffAttrSchema } from '@/api/mes/md/attr'
+import { getDicts } from '@/api/system/dict/data'
 
 export default {
   name: 'Workorder',
@@ -419,6 +428,8 @@ export default {
       ],
       startCheckRunning: false, startCheckAllPassed: false, startCheckActiveStep: 0,
       statusMap: { PREPARE: '待生产', PRODUCING: '生产中', COMPLETED: '已完成', CANCEL: '已取消', CLOSED: '已关闭' },
+      // 销售订单类型字典(mes_sal_order_type)
+      salOrderTypeOptions: [],
       statusColor: { PREPARE: '#E6A23C', PRODUCING: '#409EFF', COMPLETED: '#67C23A', CANCEL: '#909399', CLOSED: '#909399' },
       itemOrProductMap: { RAW: '原料', SEMI: '半成品', FINISHED: '成品', AUXILIARY: '辅料', PACK: '包材' },
       // SKU变体对话框
@@ -473,7 +484,7 @@ export default {
       return Object.values(map).sort((a, b) => (orderMap[a.processId] || 99) - (orderMap[b.processId] || 99))
     },
   },
-  created() { this.getList(); listAllProcess().then(r=>{ this.processOptions=r.data||[] }) },
+  created() { this.getList(); listAllProcess().then(r=>{ this.processOptions=r.data||[] }); getDicts('mes_sal_order_type').then(r => { this.salOrderTypeOptions = r.data || [] }) },
   methods: {
     getList() { this.loading=true; listWorkorder({ ...this.queryParams, includeProgress: true }).then(r=>{ this.workorderList=r.rows; this.total=r.total; }).catch(()=>{}).finally(()=>{ this.loading=false }) },
     formatRemaining(min) { if (min == null || min <= 0) return '—'; return min >= 60 ? (Math.round(min/60*10)/10) + 'h' : min + 'm'; },
@@ -498,7 +509,7 @@ export default {
       return s.processName + '（' + state + '） ' + p + '/' + q + ' · ' + pct + '%';
     },
     cancel() { this.open=false; this.reset() },
-    reset() { this.form={ workorderId:null, workorderCode:null, workorderName:null, workorderType:'SELF', orderSource:'MANUAL', productId:null, productCode:null, productName:null, productSpc:null, unitOfMeasure:'PCS', unitName:'个', quantity:1, status:'PREPARE', clientOrderCode:null, orderType:'NEW', productSize:null, ropeSpec:null, printingReq:null, packageReq:null, lineAttrs:{}, requestDate:null, remark:null }; this.effAttrSchema=[]; this.autoGenFlag=false; this.step=1; this.prorouteId=null; this.bomList=[]; this.paramList=[]; this.routeProcesses=[]; this.routeOptions=[]; this.showProcessSelector=false },
+    reset() { this.form={ workorderId:null, workorderCode:null, workorderName:null, workorderType:'SELF', orderSource:'MANUAL', productId:null, productCode:null, productName:null, productSpc:null, unitOfMeasure:'PCS', unitName:'个', quantity:1, status:'PREPARE', clientOrderCode:null, orderType:'STANDARD', productSize:null, ropeSpec:null, printingReq:null, packageReq:null, lineAttrs:{}, requestDate:null, remark:null }; this.effAttrSchema=[]; this.autoGenFlag=false; this.step=1; this.prorouteId=null; this.bomList=[]; this.paramList=[]; this.routeProcesses=[]; this.routeOptions=[]; this.showProcessSelector=false },
     handleQuery() { this.queryParams.pageNum=1; this.getList() },
     resetQuery() { this.$refs.queryForm?.resetFields(); this.handleQuery() },
     handleSelectionChange(sel) { this.ids=sel.map(i=>i.workorderId); this.single=sel.length!==1; this.multiple=!sel.length },
@@ -811,14 +822,24 @@ export default {
         && this.startCheckSteps[1].status === 'error'
         && this.startCheckSteps[1].overridable === true
     },
-    // 排产检查硬性拦截（厂内工序未指派机台）：提示去甘特派机台，不提供豁免
-    isMachineHardBlock() {
+    // 排产检查硬性拦截（厂内未派机台 / 厂内工序缺负责人）：不提供豁免，跳甘特处理。
+    // 外协 VENDOR 任务无内部负责人指派入口，不参与负责人拦截
+    isScheduleHardBlock() {
       const s = this.startCheckSteps[1]
-      return !this.startCheckRunning && !this.startCheckAllPassed
-        && s && s.status === 'error' && s.overridable === false
-        && (s.details || []).some(d => d.execType === 'INHOUSE' && !d.assigned)
+      if (this.startCheckRunning || this.startCheckAllPassed || !s || s.status !== 'error' || s.overridable !== false) {
+        return false
+      }
+      const details = s.details || []
+      return details.some(d => d.execType === 'INHOUSE' && !d.assigned)
+        || details.some(d => d.execType === 'INHOUSE' && !d.leaderAssigned)
     },
-    // 硬性拦截时跳转甘特排产指派机台
+    // 缺负责人优先提示补负责人，否则提示派机台
+    hardBlockButtonText() {
+      const details = (this.startCheckSteps[1] && this.startCheckSteps[1].details) || []
+      return details.some(d => d.execType === 'INHOUSE' && !d.leaderAssigned)
+        ? '去甘特指派负责人' : '去甘特指派机台'
+    },
+    // 硬性拦截时跳转甘特排产处理
     goAssignMachine() {
       this.startCheckOpen = false
       this.$router.push({ path: '/mes/pro/gantt', query: { workorderId: this.startCheckWorkorderId } })

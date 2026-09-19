@@ -403,7 +403,7 @@ describe('生产工单 — workorder/index.vue submitForm', () => {
     expect(vm.startCheckSteps[1].status).toBe('error') // 排产FAIL→error
     expect(vm.startCheckSteps[1].overridable).toBe(true)
     expect(vm.canOverrideStart()).toBe(true)
-    expect(vm.isMachineHardBlock()).toBe(false) // 未排产不是机台硬拦截
+    expect(vm.isScheduleHardBlock()).toBe(false) // 未排产不是机台硬拦截
   })
 
   it('开工检查厂内工序未指派机台（硬拦截）时不显示豁免、显示去指派按钮', async () => {
@@ -423,7 +423,7 @@ describe('生产工单 — workorder/index.vue submitForm', () => {
     expect(vm.startCheckSteps[1].status).toBe('error')
     expect(vm.startCheckSteps[1].overridable).toBe(false)
     expect(vm.canOverrideStart()).toBe(false)      // 厂内无机台不可豁免
-    expect(vm.isMachineHardBlock()).toBe(true)    // 显示"去甘特指派机台"
+    expect(vm.isScheduleHardBlock()).toBe(true)    // 显示"去甘特指派机台"
   })
 
   it('开工检查全通过时 canOverrideStart 应为 false（无豁免按钮）', async () => {

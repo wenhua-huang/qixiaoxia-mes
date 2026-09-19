@@ -187,6 +187,17 @@
             <el-table-column label="标准工时" align="center" width="100">
               <template #default="scope">{{ scope.row.productionTime }} {{ scope.row.timeUnitType }}</template>
             </el-table-column>
+            <el-table-column label="适用维度" align="center" min-width="160">
+              <template #default="scope">
+                <el-tag v-if="scope.row.applyOrderType" size="small">{{ orderTypeLabel(scope.row.applyOrderType) }}</el-tag>
+                <el-tag v-if="scope.row.applyOutsource==='Y'" size="small" type="warning" style="margin-left:2px">外发</el-tag>
+                <el-tag v-else-if="scope.row.applyOutsource==='N'" size="small" type="info" style="margin-left:2px">非外发</el-tag>
+                <el-tag v-if="scope.row.applyPackage==='Y'" size="small" type="success" style="margin-left:2px">包装</el-tag>
+                <el-tag v-else-if="scope.row.applyPackage==='N'" size="small" type="info" style="margin-left:2px">无包装</el-tag>
+                <el-tag v-if="scope.row.isDefault==='Y'" size="small" type="primary" style="margin-left:2px">默认</el-tag>
+                <span v-if="!scope.row.applyOrderType && scope.row.applyOutsource==null && scope.row.applyPackage==null" style="color:#909399;font-size:12px">不限</span>
+              </template>
+            </el-table-column>
             <el-table-column label="操作" align="center" width="80" v-if="optType !== 'view'" class-name="small-padding fixed-width">
               <template #default="scope">
                 <el-tooltip content="修改" placement="top"><el-button link type="primary" icon="Edit" @click.stop="handleUpdateProduct(scope.row)"></el-button></el-tooltip>
@@ -277,6 +288,16 @@
             </el-row>
           </template>
         </el-form-item>
+        <el-form-item label="适用订单类型">
+          <el-select v-model="prodForm.applyOrderType" clearable placeholder="不限" style="width:100%">
+            <el-option v-for="d in orderTypeOptions" :key="d.dictValue" :label="d.dictLabel" :value="d.dictValue" />
+          </el-select>
+        </el-form-item>
+        <el-row>
+          <el-col :span="8"><el-form-item label="适用外发"><el-select v-model="prodForm.applyOutsource" clearable placeholder="不限" style="width:100%"><el-option label="是" value="Y" /><el-option label="否" value="N" /></el-select></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="适用包装"><el-select v-model="prodForm.applyPackage" clearable placeholder="不限" style="width:100%"><el-option label="是" value="Y" /><el-option label="否" value="N" /></el-select></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="默认路线"><el-switch v-model="prodForm.isDefault" active-value="Y" inactive-value="N" /></el-form-item></el-col>
+        </el-row>
         <el-form-item label="基准批量" prop="quantity"><el-input-number v-model="prodForm.quantity" :min="1" style="width:100%" /></el-form-item>
         <el-form-item label="标准生产用时" prop="productionTime"><el-input-number v-model="prodForm.productionTime" :min="0" :precision="2" style="width:70%" /><el-select v-model="prodForm.timeUnitType" style="width:28%;margin-left:2%"><el-option v-for="d in timeTypeOptions" :key="d.value" :label="d.label" :value="d.value" /></el-select></el-form-item>
         <el-form-item label="备注"><el-input v-model="prodForm.remark" type="textarea" maxlength="500" /></el-form-item>
@@ -358,7 +379,12 @@
 
     <!-- 工序BOM弹窗 -->
     <el-dialog :title="'BOM物料 — ' + _procBomTitle" v-model="_procBomOpen" width="700px" append-to-body>
-      <el-row :gutter="10" class="mb8">
+      <el-row :gutter="10" class="mb8" align="middle">
+        <el-col :span="9">
+          <el-select v-model="_procProductRecordId" placeholder="选择产品" size="small" style="width:100%" @change="handleProcProductChange">
+            <el-option v-for="p in productList" :key="p.recordId" :label="p.itemName + ' (' + p.itemCode + ')'" :value="p.recordId" />
+          </el-select>
+        </el-col>
         <el-col :span="1.5">
           <el-button type="primary" plain size="small" @click="handleAddProcBomItem" v-if="optType!=='view'">新增物料</el-button>
         </el-col>
@@ -376,7 +402,12 @@
 
     <!-- 工序参数弹窗 -->
     <el-dialog :title="'工序参数 — ' + _procParamTitle" v-model="_procParamOpen" width="600px" append-to-body>
-      <el-row :gutter="10" class="mb8">
+      <el-row :gutter="10" class="mb8" align="middle">
+        <el-col :span="11">
+          <el-select v-model="_procProductRecordId" placeholder="选择产品" size="small" style="width:100%" @change="handleProcProductChange">
+            <el-option v-for="p in productList" :key="p.recordId" :label="p.itemName + ' (' + p.itemCode + ')'" :value="p.recordId" />
+          </el-select>
+        </el-col>
         <el-col :span="1.5">
           <el-button type="warning" plain size="small" @click="handleInitParamFromTemplate" v-if="optType!=='view'">从模版初始化</el-button>
         </el-col>
@@ -404,6 +435,7 @@ import { listParamTemplateByProcessId } from '@/api/mes/pro/paramtemplate'
 import { listAllProcess } from '@/api/mes/pro/process'
 import { listAllVendor } from '@/api/mes/md/vendor'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
+import { getDicts } from '@/api/system/dict/data'
 import ItemSelect from '@/components/itemSelect/single.vue'
 
 export default {
@@ -420,13 +452,17 @@ export default {
       rpOpen: false, rpTitle: '', rpForm: {},
       // 关联产品搜索
       productSearchKey: '',
+      // 销售订单类型字典(mes_sal_order_type), 绑定维度用
+      orderTypeOptions: [],
       // 关联产品弹窗
       prodOpen: false, prodTitle: '', prodForm: {},
       // BOM弹窗
-      bomOpen: false, bomTitle: '', bomTab: 'bom', bomSearchKey: '', currentRouteProductId: null,
-      _bomAddOpen: false, _bomItemForm: { processId: null, itemId: null, itemCode: null, itemName: null, specification: null, unitOfMeasure: null, unitName: null, quantity: 1 },
+      bomOpen: false, bomTitle: '', bomTab: 'bom', bomSearchKey: '', currentRouteProductId: null, currentBomProductId: null,
+      _bomAddOpen: false, _bomAddFrom: 'product', _bomItemForm: { processId: null, itemId: null, itemCode: null, itemName: null, specification: null, unitOfMeasure: null, unitName: null, quantity: 1 },
       // 工序BOM弹窗
       _procBomOpen: false, _procBomTitle: '', _procBomLoading: false, _procBomList: [],
+      // 工序BOM/参数弹窗当前选中的路线产品（qxx_pro_route_product.record_id）
+      _procProductRecordId: null,
       // 工序参数弹窗
       _procParamOpen: false, _procParamTitle: '', _procParamLoading: false, _procParamList: [],
       _currentProcProcessId: null, _templateMap: {},
@@ -448,7 +484,7 @@ export default {
       prodRules: { itemId: [{ required: true, message: '产品物料不能为空', trigger: 'blur' }], quantity: [{ required: true, message: '批量不能为空', trigger: 'blur' }] },
     }
   },
-  created() { this.getList(); this.loadAllProcess() },
+  created() { this.getList(); this.loadAllProcess(); this.loadOrderTypeDict() },
   computed: {
     filteredProductList() {
       if (!this.productSearchKey) return this.productList
@@ -467,9 +503,15 @@ export default {
       )
     },
   },
+  watch: {
+    bomOpen(open) { if (!open) this.currentBomProductId = null },
+  },
   methods: {
     getList() { this.loading = true; listRoute(this.queryParams).then(r => { this.routeList = r.rows; this.total = r.total; }).catch(()=>{}).finally(()=>{ this.loading = false }) },
     loadAllProcess() { listAllProcess().then(r => { this.allProcessOptions = r.data || [] }) },
+    /** 订单类型字典, 用于绑定维度下拉与标签 */
+    loadOrderTypeDict() { getDicts('mes_sal_order_type').then(r => { this.orderTypeOptions = r.data || [] }) },
+    orderTypeLabel(v) { const d = this.orderTypeOptions.find(o => o.dictValue === v); return d ? d.dictLabel : v },
     cancel() { this.open = false; this.reset() },
     reset() {
       this.form = { routeId: null, routeCode: null, routeName: null, routeDesc: null, enableFlag: '1', remark: null }
@@ -557,7 +599,7 @@ export default {
     },
     loadProductList(routeId) { this.productLoading = true; listRouteProductByRouteId(routeId).then(r => { this.productList = r.data || []; this.productLoading = false }).catch(() => { this.productLoading = false }) },
     handleAddProduct() {
-      this.prodForm = { routeId: this.form.routeId, itemId: null, itemCode: null, itemName: null, specification: null, unitOfMeasure: null, unitName: null, quantity: 1, productionTime: 1, timeUnitType: 'MINUTE', remark: null }
+      this.prodForm = { routeId: this.form.routeId, itemId: null, itemCode: null, itemName: null, specification: null, unitOfMeasure: null, unitName: null, quantity: 1, productionTime: 1, timeUnitType: 'MINUTE', applyOrderType: null, applyOutsource: null, applyPackage: null, isDefault: 'N', remark: null }
       this.prodTitle = '关联产品'; this.prodOpen = true
     },
     handleUpdateProduct(row) { this.prodForm = { ...row }; this.prodTitle = '修改产品关联'; this.prodOpen = true },
@@ -565,8 +607,11 @@ export default {
     submitProdForm() {
       this.$refs.prodForm.validate(valid => {
         if (!valid) return
-        if (this.prodForm.recordId != null) { updateRouteProduct(this.prodForm).then(() => { this.$modal.msgSuccess('修改成功'); this.prodOpen = false; this.loadProductList(this.form.routeId) }) }
-        else { addRouteProduct(this.prodForm).then(() => { this.$modal.msgSuccess('关联成功'); this.prodOpen = false; this.loadProductList(this.form.routeId) }) }
+        // 空串/空值归 null, null 即"不限"通配维度
+        const payload = { ...this.prodForm }
+        ;['applyOrderType', 'applyOutsource', 'applyPackage'].forEach(k => { if (!payload[k]) payload[k] = null })
+        if (payload.recordId != null) { updateRouteProduct(payload).then(() => { this.$modal.msgSuccess('修改成功'); this.prodOpen = false; this.loadProductList(this.form.routeId) }) }
+        else { addRouteProduct(payload).then(() => { this.$modal.msgSuccess('关联成功'); this.prodOpen = false; this.loadProductList(this.form.routeId) }) }
       })
     },
     // BOM/参数查看
@@ -574,6 +619,7 @@ export default {
     handleViewProductBom(row) {
       this.bomTitle = '产品工艺详情 - ' + (row.itemName || row.itemCode)
       this.currentRouteProductId = row.recordId
+      this.currentBomProductId = row.itemId
       this.bomOpen = true; this.bomTab = 'bom'
       this.loadBomData(); this.loadParamData()
     },
@@ -608,6 +654,7 @@ export default {
     },
     // BOM 操作
     handleAddBomItem() {
+      this._bomAddFrom = 'product'
       this._bomProcessId = this.processList.length > 0 ? this.processList[0].processId : null
       this._bomItemForm = { processId: this._bomProcessId, itemId: null, itemCode: null, itemName: null, specification: null, unitOfMeasure: null, unitName: null, quantity: 1 }
       this._bomAddOpen = true
@@ -633,7 +680,8 @@ export default {
       if (this.productList.length === 0) { this.$modal.msgWarning('请先在「关联产品」Tab 关联至少一个产品'); return }
       this._currentProcProcessId = row.processId
       this._procBomTitle = row.processName || row.processCode
-      this.currentRouteProductId = this.productList[0].recordId
+      this._procProductRecordId = this.productList[0].recordId
+      this.currentRouteProductId = this._procProductRecordId
       this._procBomOpen = true
       this._loadProcBomData()
     },
@@ -641,14 +689,24 @@ export default {
       if (this.productList.length === 0) { this.$modal.msgWarning('请先在「关联产品」Tab 关联至少一个产品'); return }
       this._currentProcProcessId = row.processId
       this._procParamTitle = row.processName || row.processCode
-      this.currentRouteProductId = this.productList[0].recordId
+      this._procProductRecordId = this.productList[0].recordId
+      this.currentRouteProductId = this._procProductRecordId
       this._procParamOpen = true
       this._loadProcParamData()
     },
+    // 工序BOM/参数弹窗切换产品：同步参数归属并按当前弹窗重新加载
+    handleProcProductChange(recordId) {
+      this.currentRouteProductId = recordId
+      if (this._procBomOpen) this._loadProcBomData()
+      if (this._procParamOpen) this._loadProcParamData()
+    },
     _loadProcBomData() {
       this._procBomLoading = true
+      const prod = this.productList.find(p => p.recordId === this._procProductRecordId)
+      const productId = prod ? prod.itemId : null
       listRouteProductBomByRouteId(this.form.routeId).then(r => {
-        this._procBomList = (r.data || []).filter(b => b.processId === this._currentProcProcessId)
+        this._procBomList = (r.data || []).filter(b => b.processId === this._currentProcProcessId
+          && (productId == null || b.productId === productId))
         this._procBomLoading = false
       }).catch(() => { this._procBomLoading = false })
     },
@@ -680,6 +738,7 @@ export default {
       return t ? t.imageUrl : ''
     },
     handleAddProcBomItem() {
+      this._bomAddFrom = 'process'
       this._bomItemForm.processId = this._currentProcProcessId
       this._bomItemForm.itemId = null; this._bomItemForm.itemCode = null; this._bomItemForm.itemName = null
       this._bomItemForm.specification = null; this._bomItemForm.unitOfMeasure = null; this._bomItemForm.unitName = null; this._bomItemForm.quantity = 1
@@ -687,15 +746,20 @@ export default {
     },
     confirmAddBomItem() {
       if (!this._bomItemForm.itemId) { this.$modal.msgWarning('请选择物料'); return }
-      // productId：关联产品 Tab 打开时传 actual productId，工序 BOM 弹窗打开时传 null（不限产品）
-      const prod = this.productList.find(p => p.recordId === this.currentRouteProductId)
+      // 产品归属：产品详情弹窗用 currentRouteProductId，工序BOM弹窗用下拉选中的 _procProductRecordId
+      const refRecordId = this._bomAddFrom === 'process' ? this._procProductRecordId : this.currentRouteProductId
+      const prod = this.productList.find(p => p.recordId === refRecordId)
       addRouteProductBom({
         routeId: this.form.routeId, processId: this._bomItemForm.processId,
         productId: prod ? prod.itemId : null,
         itemId: this._bomItemForm.itemId, itemCode: this._bomItemForm.itemCode, itemName: this._bomItemForm.itemName,
         specification: this._bomItemForm.specification, unitOfMeasure: this._bomItemForm.unitOfMeasure, unitName: this._bomItemForm.unitName,
         quantity: this._bomItemForm.quantity
-      }).then(() => { this._bomAddOpen = false; this._loadProcBomData(); this.$modal.msgSuccess('新增成功') }).catch(() => { this._bomAddOpen = false })
+      }).then(() => {
+        this._bomAddOpen = false
+        if (this._bomAddFrom === 'process') this._loadProcBomData(); else this.loadBomData()
+        this.$modal.msgSuccess('新增成功')
+      }).catch(() => { this._bomAddOpen = false })
     },
     handleProcBomQtyChange(row, val) { if (row.recordId) updateRouteProductBom({ ...row, quantity: val }).then(() => {}) },
     handleDelProcBomItem(row) {

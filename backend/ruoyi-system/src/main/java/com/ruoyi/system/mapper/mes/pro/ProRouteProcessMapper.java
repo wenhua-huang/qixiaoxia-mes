@@ -1,5 +1,6 @@
 package com.ruoyi.system.mapper.mes.pro;
 
+import java.util.Collection;
 import java.util.List;
 import org.apache.ibatis.annotations.Param;
 import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
@@ -17,6 +18,9 @@ public interface ProRouteProcessMapper
     public List<ProRouteProcess> selectProRouteProcessList(ProRouteProcess proRouteProcess);
 
     public List<ProRouteProcess> selectProRouteProcessByRouteId(Long routeId);
+
+    /** 按多个路线ID批量拉工序节点（批量解析外发校验用，避免逐路线查询） */
+    public List<ProRouteProcess> selectByRouteIds(@Param("routeIds") Collection<Long> routeIds);
 
     public ProRouteProcess selectLastProcessByRouteId(Long routeId);
 

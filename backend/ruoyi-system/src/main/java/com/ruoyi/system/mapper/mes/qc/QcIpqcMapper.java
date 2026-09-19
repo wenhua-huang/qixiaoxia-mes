@@ -5,6 +5,7 @@ import java.util.Date;
 import java.util.List;
 import org.apache.ibatis.annotations.Param;
 import com.ruoyi.system.domain.mes.qc.QcIpqc;
+import com.ruoyi.system.domain.mes.qc.WorkorderProcessPair;
 
 /**
  * 过程检验单Mapper接口（factory_id 由 FactoryIdInterceptor 自动注入）
@@ -58,4 +59,25 @@ public interface QcIpqcMapper
     public int closeIfActive(@Param("id") Long id,
                              @Param("updateBy") String updateBy,
                              @Param("updateTime") Date updateTime);
+
+    /**
+     * 取工单在指定检验工序上最新一张已完成(COMPLETED)检验单（跟单质检门控核心查询）。
+     * 一期按工单+工序粒度，不区分流转卡（与任务维度放行一致）。
+     *
+     * @param workorderId 工单ID
+     * @param processId   检验工序ID（前驱 is_check='Y' 节点）
+     * @return 最新判定单；无已判定单返回 null
+     */
+    public QcIpqc selectLatestCompletedByProcess(@Param("workorderId") Long workorderId,
+                                                 @Param("processId") Long processId);
+
+    /**
+     * 批量取多组（工单ID, 检验工序ID）下的全部已完成(COMPLETED)检验单，按 ipqc_id 倒序。
+     * 调用方按 pair 分组取第一条即「该组最新一张」（qcBlockState 批量锁态消除 N+1）。
+     * 单层平铺 SQL，factory_id 由拦截器在末尾 WHERE 注入。
+     *
+     * @param pairs （工单,工序）组合，非空由调用方保证
+     */
+    public List<QcIpqc> selectLatestCompletedByProcessPairs(
+            @Param("pairs") List<WorkorderProcessPair> pairs);
 }

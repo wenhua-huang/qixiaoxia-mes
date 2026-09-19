@@ -11,11 +11,13 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.BusinessType;
+import com.ruoyi.system.domain.mes.pro.ProConstants;
 import com.ruoyi.system.domain.mes.pro.ProTask;
 import com.ruoyi.system.service.mes.pro.IProTaskService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
@@ -36,6 +38,9 @@ public class ProTaskController extends BaseController
 
     @Autowired(required = false)
     private com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator autoCodeGenerator;
+
+    @Autowired
+    private com.ruoyi.system.service.mes.pro.IProQcBlockService qcBlockService;
 
     @PreAuthorize("@ss.hasPermi('mes:pro:task:list')")
     @GetMapping("/list")
@@ -111,8 +116,9 @@ public class ProTaskController extends BaseController
         // 校验
         if (proTask.getQuantity() != null && proTask.getQuantity().compareTo(java.math.BigDecimal.ZERO) <= 0)
             return error("排产数量必须大于0！");
-        // 机台必填：厂内工序排产必须落到具体工作站（外协任务由自动排产生成，不走手工新增）
-        if (proTask.getWorkstationId() == null || proTask.getWorkstationId() <= 0)
+        // 机台必填：厂内工序排产必须落到具体工作站；外协任务打 VENDOR 占位(id=0)，不占厂内机台（甘特页可手工建外协任务）
+        if (!isVendorPlaceholder(proTask)
+                && (proTask.getWorkstationId() == null || proTask.getWorkstationId() <= 0))
             return error("请选择机台");
         if (proTask.getDuration() != null && proTask.getDuration() <= 0)
             proTask.setDuration(1);
@@ -125,10 +131,20 @@ public class ProTaskController extends BaseController
     @PutMapping
     public AjaxResult edit(@RequestBody ProTask proTask)
     {
-        // 机台校验：传了机台则必须是真实工作站(>0)；外协任务(VENDOR,id=0)编辑时不传机台、动态SQL不改机台列
-        if (proTask.getWorkstationId() != null && proTask.getWorkstationId() <= 0)
+        // 机台校验：传了机台则必须是真实工作站(>0)；外协 VENDOR 占位(id=0)放行（前端编辑外协任务会携带 VENDOR 快照）。
+        // id=null 表示部分更新不改机台列，照旧放行
+        Long workstationId = proTask.getWorkstationId();
+        if (workstationId != null && workstationId <= 0 && !isVendorPlaceholder(proTask))
             return error("请选择机台");
         return toAjax(proTaskService.updateProTask(proTask));
+    }
+
+    /**
+     * 外协虚拟工作站占位：workstation_code='VENDOR'（与下发/报工/开工等机台闸门口径一致，见 ProConstants.WS_CODE_VENDOR）
+     */
+    private boolean isVendorPlaceholder(ProTask proTask)
+    {
+        return ProConstants.WS_CODE_VENDOR.equals(proTask.getWorkstationCode());
     }
 
     /**
@@ -173,5 +189,30 @@ public class ProTaskController extends BaseController
     public AjaxResult remove(@PathVariable Long[] taskIds)
     {
         return toAjax(proTaskService.deleteProTaskByTaskIds(taskIds));
+    }
+
+    /**
+     * 质检不合格拦截授权放行：留痕 + 关闭拦截待办（理由至少 2 个字符）
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:task:release')")
+    @Log(title = "质检拦截放行", businessType = BusinessType.UPDATE)
+    @PutMapping("/releaseQcBlock/{taskId}")
+    public AjaxResult releaseQcBlock(@PathVariable("taskId") Long taskId,
+                                     @RequestParam("reason") String reason)
+    {
+        qcBlockService.release(taskId, reason);
+        return success();
+    }
+
+    /**
+     * 批量查询任务质检锁态（PC 放行工作台用，单次最多 100 个任务）
+     *
+     * @return key=任务ID字符串，value={blocked:boolean, reason:string}
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:task:list')")
+    @PostMapping("/qcBlockState")
+    public AjaxResult qcBlockState(@RequestBody List<Long> taskIds)
+    {
+        return success(qcBlockService.qcBlockState(taskIds));
     }
 }

@@ -111,15 +111,18 @@ public class QcIpqcController extends BaseController
     }
 
     /**
-     * 执行判定（行值录入完成后触发；FAIL 可带让步理由升级为 CONCESSION）
+     * 执行判定（行值录入完成后触发；FAIL 可带让步理由升级为 CONCESSION）。
+     * FAIL 时 data.blockedProcesses 返回被硬拦的下波工序名（PASS/CONCESSION 为空列表），
+     * 仅在 data 上新增字段，HTTP/code 语义不变，不破坏 App 既有调用。
      */
     @PreAuthorize("@ss.hasPermi('mes:qc:ipqc:judge')")
     @Log(title = "IPQC判定", businessType = BusinessType.UPDATE)
     @PutMapping("/judge/{ipqcId}")
     public AjaxResult judge(@PathVariable("ipqcId") Long ipqcId, @RequestBody Map<String, String> body)
     {
-        qcIpqcService.judgeIpqc(ipqcId, body == null ? null : body.get("concessionReason"));
-        return AjaxResult.success();
+        List<String> blockedProcesses =
+                qcIpqcService.judgeIpqc(ipqcId, body == null ? null : body.get("concessionReason"));
+        return AjaxResult.success(Map.of("blockedProcesses", blockedProcesses == null ? List.of() : blockedProcesses));
     }
 
     /**

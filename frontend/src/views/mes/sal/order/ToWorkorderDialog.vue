@@ -155,6 +155,8 @@ export default {
       twBomList: [], twParamList: [],
       twSkuDialogOpen: false, twSkuChoice: '', twDeviationList: [],
       twBomEditOpen: false, twBomEditIdx: -1, twBomEditForm: {},
+      // 异步请求序号: 切换行/路线或重开向导时丢弃过期响应, 防止旧行 BOM/参数污染
+      twReqSeq: 0,
       twForm: emptyTwForm(null)
     }
   },
@@ -184,13 +186,19 @@ export default {
   methods: {
     /** 打开向导：重置状态 + 拉订单可转行 */
     initWizard() {
+      const seq = ++this.twReqSeq
       const row = this.order || {}
       this.twOrderCode = row.orderCode || ''
       this.twStep = 1; this.twAutoGenFlag = true
       this.twLines = []; this.twRouteOptions = []; this.twProductId = null; this.twProductCode = ''; this.twProductName = ''
       this.twBomList = []; this.twParamList = []; this.twRouteProcesses = []; this.twActiveProcesses = []
+      this.twSkuDialogOpen = false; this.twSkuChoice = ''; this.twDeviationList = []
+      this.twBomEditOpen = false; this.twBomEditIdx = -1; this.twBomEditForm = {}
       this.twForm = emptyTwForm(row.requestDate ? row.requestDate + ' 00:00:00' : null)
-      if (row.orderId) getOrderDetail(row.orderId).then(r => { this.twLines = r.data.lines || [] }).catch(() => {})
+      if (row.orderId) getOrderDetail(row.orderId).then(r => {
+        if (seq !== this.twReqSeq) return
+        this.twLines = r.data.lines || []
+      }).catch(() => {})
       this.twAutoGen()
     },
     twCancel() { this.dialogVisible = false; this.twStep = 1 },
@@ -199,6 +207,7 @@ export default {
       this.twStep = 2
     },
     twSelectLine(line) {
+      const seq = ++this.twReqSeq
       this.twForm.lineId = line.lineId; this.twForm.quantity = line.quantityConvertible
       this.twForm.workorderName = (line.productName || '') + '-' + this.twOrderCode
       // 默认沿用开单带出的路线, 可改选; 置空不影响 BOM/参数装载
@@ -210,9 +219,11 @@ export default {
       this.twRouteOptions = []
       if (line.productId) {
         listRouteProduct({ itemId: line.productId, pageSize: 100 }).then(r => {
+          if (seq !== this.twReqSeq || this.twForm.lineId !== line.lineId) return
           if (r.rows && r.rows.length > 0) {
             const rows = r.rows
             listRoute({ pageSize: 1000 }).then(routeRes => {
+              if (seq !== this.twReqSeq || this.twForm.lineId !== line.lineId) return
               const routeMap = {}; (routeRes.rows || []).forEach(rt => { routeMap[rt.routeId] = rt.routeName || rt.routeCode || '路线#' + rt.routeId })
               this.twRouteOptions = rows.map(rp => ({ ...rp, _routeName: routeMap[rp.routeId] || '路线#' + rp.routeId }))
               // 默认路线存在则主动装载其工序/BOM/参数
@@ -223,18 +234,23 @@ export default {
       }
     },
     onTwRouteChange(recordId) {
+      const seq = ++this.twReqSeq
       const rp = this.twRouteOptions.find(r => r.recordId === recordId)
       if (!rp) { this.twBomList = []; this.twParamList = []; this.twRouteProcesses = []; return }
       listRouteProcessByRouteId(rp.routeId).then(res => {
+        if (seq !== this.twReqSeq || this.twForm.routeProductId !== recordId) return
         this.twRouteProcesses = res.data || []
         const routePids = new Set(this.twRouteProcesses.map(p => p.processId))
         listRouteProductBomByRouteId(rp.routeId).then(r => {
+          if (seq !== this.twReqSeq || this.twForm.routeProductId !== recordId) return
           this.twBomList = (r.data || []).filter(b => this.twProductId === b.productId && routePids.has(b.processId))
                 .map(b => ({ ...b, _processId: b.processId, _processName: this.getTwProcessName(b.processId) }))
         })
         listRouteProcessParamByRouteProductId(recordId).then(r => {
+          if (seq !== this.twReqSeq || this.twForm.routeProductId !== recordId) return
           const l2Params = r.data || []
           listParamTemplate({ pageSize: 1000 }).then(tmplRes => {
+            if (seq !== this.twReqSeq || this.twForm.routeProductId !== recordId) return
             const allTemplates = tmplRes.rows || []
             const routeTemplates = allTemplates.filter(t => routePids.has(t.processId))
             const templateMap = {}; allTemplates.forEach(t => { templateMap[t.templateId] = t })

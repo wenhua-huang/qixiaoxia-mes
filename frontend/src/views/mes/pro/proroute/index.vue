@@ -191,9 +191,11 @@
               <template #default="scope">
                 <el-tag v-if="scope.row.applyOrderType" size="small">{{ orderTypeLabel(scope.row.applyOrderType) }}</el-tag>
                 <el-tag v-if="scope.row.applyOutsource==='Y'" size="small" type="warning" style="margin-left:2px">外发</el-tag>
+                <el-tag v-else-if="scope.row.applyOutsource==='N'" size="small" type="info" style="margin-left:2px">非外发</el-tag>
                 <el-tag v-if="scope.row.applyPackage==='Y'" size="small" type="success" style="margin-left:2px">包装</el-tag>
+                <el-tag v-else-if="scope.row.applyPackage==='N'" size="small" type="info" style="margin-left:2px">无包装</el-tag>
                 <el-tag v-if="scope.row.isDefault==='Y'" size="small" type="primary" style="margin-left:2px">默认</el-tag>
-                <span v-if="!scope.row.applyOrderType && scope.row.applyOutsource!=='Y' && scope.row.applyPackage!=='Y'" style="color:#909399;font-size:12px">不限</span>
+                <span v-if="!scope.row.applyOrderType && scope.row.applyOutsource==null && scope.row.applyPackage==null" style="color:#909399;font-size:12px">不限</span>
               </template>
             </el-table-column>
             <el-table-column label="操作" align="center" width="80" v-if="optType !== 'view'" class-name="small-padding fixed-width">

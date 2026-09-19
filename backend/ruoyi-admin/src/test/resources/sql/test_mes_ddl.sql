@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS qxx_md_vendor (
   vendor_code        varchar(64)     not null                   comment '供应商编码',
   vendor_name        varchar(255)    not null                   comment '供应商名称',
   vendor_type        varchar(50)     default 'MATERIAL'         comment '供应商类型',
+  outsource_factory_id bigint(20)    default null               comment '外协场景：该供应商对应的系统工厂ID(关联qxx_md_factory)',
   contact            varchar(64)     default null               comment '联系人',
   phone              varchar(64)     default null               comment '电话',
   address            varchar(500)    default null               comment '地址',

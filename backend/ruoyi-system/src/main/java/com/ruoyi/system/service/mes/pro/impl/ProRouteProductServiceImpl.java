@@ -22,6 +22,8 @@ import com.ruoyi.system.service.mes.pro.IProRouteProductService;
 @Service
 public class ProRouteProductServiceImpl implements IProRouteProductService
 {
+    private static final String YES = "Y";
+
     @Autowired
     private ProRouteMapper qxxProRouteMapper;
     @Autowired
@@ -54,7 +56,7 @@ public class ProRouteProductServiceImpl implements IProRouteProductService
         validateSingleDefault(p);
         p.setCreateTime(DateUtils.getNowDate());
         p.setCreateBy(SecurityUtils.getUsername());
-        return qxxProRouteProductMapper.insertProRouteProduct(p);
+        return guardDefaultUnique(() -> qxxProRouteProductMapper.insertProRouteProduct(p), p);
     }
 
     @Override
@@ -62,17 +64,26 @@ public class ProRouteProductServiceImpl implements IProRouteProductService
         validateSingleDefault(p);
         p.setUpdateTime(DateUtils.getNowDate());
         p.setUpdateBy(SecurityUtils.getUsername());
-        return qxxProRouteProductMapper.updateProRouteProduct(p);
+        return guardDefaultUnique(() -> qxxProRouteProductMapper.updateProRouteProduct(p), p);
+    }
+
+    /** 并发下 check-then-insert 同时通过时由 uk_route_product_default 兜底, 转成业务异常 */
+    private int guardDefaultUnique(java.util.function.IntSupplier action, ProRouteProduct p) {
+        try {
+            return action.getAsInt();
+        } catch (org.springframework.dao.DuplicateKeyException e) {
+            throw new ServiceException("产品[" + p.getItemName() + "]已存在默认路线，同产品只能设一条默认路线");
+        }
     }
 
     /** 同一产品至多一条 is_default='Y'，保证默认路线解析结果确定 */
     private void validateSingleDefault(ProRouteProduct p) {
-        if (!"Y".equals(p.getIsDefault()) || p.getItemId() == null) return;
+        if (!YES.equals(p.getIsDefault()) || p.getItemId() == null) return;
         ProRouteProduct query = new ProRouteProduct();
         query.setItemId(p.getItemId());
         List<ProRouteProduct> siblings = qxxProRouteProductMapper.selectProRouteProductList(query);
         for (ProRouteProduct sib : siblings) {
-            if ("Y".equals(sib.getIsDefault()) && !sib.getRecordId().equals(p.getRecordId())) {
+            if (YES.equals(sib.getIsDefault()) && !sib.getRecordId().equals(p.getRecordId())) {
                 throw new ServiceException("产品[" + p.getItemName() + "]已存在默认路线，同产品只能设一条默认路线");
             }
         }
@@ -132,9 +143,16 @@ public class ProRouteProductServiceImpl implements IProRouteProductService
                     newProc.setProcessCode(pp.getProcessCode());
                     newProc.setProcessName(pp.getProcessName());
                     newProc.setOrderNum(pp.getOrderNum());
+                    newProc.setLinkType(pp.getLinkType());
                     newProc.setKeyFlag(pp.getKeyFlag());
                     newProc.setIsCheck(pp.getIsCheck());
                     newProc.setNextProcessId(pp.getNextProcessId());
+                    // 外发节点标志与外协厂冗余四列必须整体复制, 否则变体路线在 B2 外发硬阻断下不可用
+                    newProc.setIsOutsource(pp.getIsOutsource());
+                    newProc.setVendorId(pp.getVendorId());
+                    newProc.setVendorCode(pp.getVendorCode());
+                    newProc.setVendorName(pp.getVendorName());
+                    newProc.setOutsourceFactoryId(pp.getOutsourceFactoryId());
                     newProc.setCreateTime(DateUtils.getNowDate());
                     newProc.setCreateBy(SecurityUtils.getUsername());
                     qxxProRouteProcessMapper.insertProRouteProcess(newProc);
@@ -153,6 +171,11 @@ public class ProRouteProductServiceImpl implements IProRouteProductService
             skuRouteProduct.setQuantity(parent.getQuantity());
             skuRouteProduct.setProductionTime(parent.getProductionTime());
             skuRouteProduct.setTimeUnitType(parent.getTimeUnitType());
+            // 继承父绑定的四维标签, 变体才能在相同订单维度下命中自己的路线(item 不同, 不触唯一索引)
+            skuRouteProduct.setApplyOrderType(parent.getApplyOrderType());
+            skuRouteProduct.setApplyOutsource(parent.getApplyOutsource());
+            skuRouteProduct.setApplyPackage(parent.getApplyPackage());
+            skuRouteProduct.setIsDefault(parent.getIsDefault());
             skuRouteProduct.setCreateTime(DateUtils.getNowDate());
             skuRouteProduct.setCreateBy(SecurityUtils.getUsername());
             qxxProRouteProductMapper.insertProRouteProduct(skuRouteProduct);

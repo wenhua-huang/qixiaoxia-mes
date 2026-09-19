@@ -79,6 +79,40 @@ class V150MigrationIT extends BaseIntegrationTest {
             "WHERE rp.factory_id=1 AND r.route_code='RT-OUTSRC' AND rp.is_outsource='1' AND rp.vendor_code='OUT-WANLONG'",
             Integer.class);
         assertThat(wanlong).isEqualTo(outsourceNodes);
+        // 冗余 outsource_factory_id 必须与供应商主数据一起回填
+        Integer factoryMatched = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM qxx_pro_route_process rp JOIN qxx_pro_route r ON r.route_id=rp.route_id " +
+            "JOIN qxx_md_vendor v ON v.vendor_id=rp.vendor_id " +
+            "WHERE rp.factory_id=1 AND r.route_code='RT-OUTSRC' AND rp.is_outsource='1' " +
+            "AND rp.outsource_factory_id <=> v.outsource_factory_id",
+            Integer.class);
+        assertThat(factoryMatched).isEqualTo(outsourceNodes);
+    }
+
+    @Test
+    @DisplayName("两表 order_type 列默认值已改为 STANDARD")
+    void should_changeOrderTypeDefaultToStandard() {
+        String orderDefault = jdbcTemplate.queryForObject(
+            "SELECT column_default FROM information_schema.columns WHERE table_schema=DATABASE() " +
+            "AND table_name='qxx_sal_order' AND column_name='order_type'", String.class);
+        String workorderDefault = jdbcTemplate.queryForObject(
+            "SELECT column_default FROM information_schema.columns WHERE table_schema=DATABASE() " +
+            "AND table_name='qxx_pro_workorder' AND column_name='order_type'", String.class);
+        assertThat(orderDefault).isEqualTo("STANDARD");
+        assertThat(workorderDefault).isEqualTo("STANDARD");
+    }
+
+    @Test
+    @DisplayName("同产品默认路线唯一索引存在, 重复 is_default=Y 被数据库拒绝")
+    void should_enforceSingleDefaultRoute() {
+        Integer idx = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() " +
+            "AND table_name='qxx_pro_route_product' AND index_name='uk_route_product_default'", Integer.class);
+        assertThat(idx).isGreaterThan(0);
+        Integer guardCol = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() " +
+            "AND table_name='qxx_pro_route_product' AND column_name='is_default_guard'", Integer.class);
+        assertThat(guardCol).isEqualTo(1);
     }
 
     @Test

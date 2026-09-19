@@ -115,7 +115,7 @@
       <el-row :gutter="10" class="mb8">
         <el-col :span="1.5"><el-button type="primary" plain size="small" @click="handleAddLine">添加行</el-button></el-col>
       </el-row>
-      <el-table :data="lineList" size="small">
+      <el-table :data="lineList" size="small" v-loading="dimRecalcing">
         <el-table-column label="行号" align="center" prop="lineNo" width="60" />
         <el-table-column label="产品" align="center" prop="productName" :show-overflow-tooltip="true" />
         <el-table-column label="数量" align="center" prop="quantity" width="90" />
@@ -183,6 +183,8 @@ export default {
       queryParams: { pageNum: 1, pageSize: 10, orderCode: null, orderName: null, clientName: null, clientOrderCode: null, businessLine: null, orderType: null, status: null, source: null },
       form: {}, lineList: [],
       lineEditOpen: false, editingLine: null,
+      // 头维度批量重算: loading + 自增序号丢弃过期响应(连续切换/明细变动)
+      dimRecalcing: false, headDimReqSeq: 0,
       twOpen: false, twOrder: {},
       rules: {
         orderCode: [{ required: true, message: '销售订单号不能为空', trigger: 'blur' }],
@@ -246,34 +248,45 @@ export default {
       this.recalcTotalAmount()
     },
     handleEditLine(row) { this.editingLine = { ...row }; this.lineEditOpen = true },
-    /** 订单类型/外发/包装变更后, 按新头维度批量重算明细默认路线(手空行同样重算, 命中才覆盖) */
+    /** 订单类型/外发/包装变更后, 按新头维度批量重算明细默认路线(命中才覆盖) */
     async onHeadDimensionChange() {
       if (!this.lineList.length) return
       try { await this.$modal.confirm('订单类型/标志已变更，是否按新条件重新匹配全部明细的工艺路线？') }
       catch { return }
+      const seq = ++this.headDimReqSeq
       const itemIds = [...new Set(this.lineList.map(l => l.productId).filter(Boolean))]
       if (!itemIds.length) return
-      const [batchRes, routeRes] = await Promise.all([
-        resolveRouteProductBatch({ itemIds, orderType: this.form.orderType, outsourceFlag: this.form.outsourceFlag, packageFlag: this.form.packageFlag }),
-        listRoute({ pageSize: 1000 })
-      ])
-      const map = batchRes.data || {}
-      const routeMap = {}
-      ;(routeRes.rows || []).forEach(rt => { routeMap[rt.routeId] = rt })
-      const blocked = []
-      this.lineList.forEach(l => {
-        const m = map[l.productId]
-        if (!m) return
-        if (m.hardBlocked) { blocked.push(l.productName); return }
-        if (m.matched) {
-          l.routeProductId = m.routeProductId
-          const rt = routeMap[m.routeId]
-          l.routeCode = rt ? rt.routeCode : null
-          l.routeName = rt ? (rt.routeName || rt.routeCode) : null
-        }
-      })
-      if (blocked.length) this.$modal.msgError('以下产品无匹配的外发工艺路线：' + blocked.join('、'))
-      else this.$modal.msgSuccess('已按新条件重新匹配工艺路线')
+      // 行快照: 重算期间用户增删改行后, 过期结果整体丢弃
+      const snapshot = this.lineList.map(l => l.lineId + ':' + l.productId).join('|')
+      this.dimRecalcing = true
+      try {
+        const [batchRes, routeRes] = await Promise.all([
+          resolveRouteProductBatch({ itemIds, orderType: this.form.orderType, outsourceFlag: this.form.outsourceFlag, packageFlag: this.form.packageFlag }),
+          listRoute({ pageSize: 1000 })
+        ])
+        if (seq !== this.headDimReqSeq || snapshot !== this.lineList.map(l => l.lineId + ':' + l.productId).join('|')) return
+        const map = batchRes.data || {}
+        const routeMap = {}
+        ;(routeRes.rows || []).forEach(rt => { routeMap[rt.routeId] = rt })
+        const blocked = []
+        this.lineList.forEach(l => {
+          const m = map[l.productId]
+          if (!m) return
+          if (m.hardBlocked) { blocked.push(l.productName); return }
+          if (m.matched) {
+            l.routeProductId = m.routeProductId
+            const rt = routeMap[m.routeId]
+            l.routeCode = rt ? rt.routeCode : null
+            l.routeName = rt ? (rt.routeName || rt.routeCode) : null
+          }
+        })
+        if (blocked.length) this.$modal.msgError('以下产品无匹配的外发工艺路线：' + blocked.join('、'))
+        else this.$modal.msgSuccess('已按新条件重新匹配工艺路线')
+      } catch {
+        if (seq === this.headDimReqSeq) this.$modal.msgError('工艺路线重算失败，请重试')
+      } finally {
+        if (seq === this.headDimReqSeq) this.dimRecalcing = false
+      }
     },
     handleDeleteLine(idx) { this.lineList.splice(idx, 1); this.lineList.forEach((l, i) => { l.lineNo = i + 1 }); this.recalcTotalAmount() },
     recalcTotalAmount() { this.form.totalAmount = this.lineList.reduce((s, l) => s + (Number(l.lineAmount) || Number(l.unitPrice || 0) * Number(l.quantity || 0) || 0), 0) },

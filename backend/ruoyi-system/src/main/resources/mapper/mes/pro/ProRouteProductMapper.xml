@@ -54,6 +54,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by record_id desc
     </select>
 
+    <select id="selectByItemIds" resultMap="ProRouteProductResult">
+        <include refid="selectProRouteProductVo"/>
+        where item_id in
+        <foreach item="itemId" collection="itemIds" open="(" separator="," close=")">#{itemId}</foreach>
+        order by record_id desc
+    </select>
+
+    <select id="selectByRecordIds" resultMap="ProRouteProductResult">
+        <include refid="selectProRouteProductVo"/>
+        where record_id in
+        <foreach item="recordId" collection="recordIds" open="(" separator="," close=")">#{recordId}</foreach>
+    </select>
+
     <insert id="insertProRouteProduct" parameterType="ProRouteProduct" useGeneratedKeys="true" keyProperty="recordId">
         insert into qxx_pro_route_product
         <trim prefix="(" suffix=")" suffixOverrides=",">

@@ -94,7 +94,7 @@
       </el-tab-pane>
     </el-tabs>
     <template #footer>
-      <el-button type="primary" @click="confirm">确 定</el-button>
+      <el-button type="primary" :disabled="routeBlocked" @click="confirm">确 定</el-button>
       <el-button @click="showFlag = false">取 消</el-button>
     </template>
     <ItemSelect ref="itemSelectRef" @onSelected="onProductSelected" />
@@ -136,6 +136,10 @@ const effAttrSchema = ref<MdItemTypeAttr[]>([])
 const routeOptions = ref<any[]>([])
 const routeBlocked = ref(false)
 const routeBlockMsg = ref('')
+// 异步请求序号: 快速切换产品/弹窗重开时丢弃过期响应, 防止旧产品路线污染当前行
+let routeReqSeq = 0
+// 扩展属性(schema/快照)加载序号, 同理防止旧产品属性覆盖当前行
+let attrReqSeq = 0
 const form = reactive<SalOrderLine>({})
 const rules = {
   productName: [{ required: true, message: '请选择产品', trigger: 'change' }],
@@ -143,6 +147,12 @@ const rules = {
 }
 
 function initForm() {
+  routeReqSeq++ // 使上一产品的在途响应作废
+  attrReqSeq++
+  routeOptions.value = []
+  routeBlocked.value = false
+  routeBlockMsg.value = ''
+  effAttrSchema.value = []
   const src = props.line
   title.value = src && src.lineId ? '修改明细行' : '新增明细行'
   activeTab.value = 'basic'
@@ -166,24 +176,35 @@ async function loadRouteOptions(selectResolved = true) {
   routeBlocked.value = false
   routeBlockMsg.value = ''
   if (!form.productId) { routeOptions.value = []; return }
-  const [bindRes, routeRes] = await Promise.all([
-    listRouteProduct({ itemId: form.productId, pageSize: 100 }),
-    listRoute({ pageSize: 1000 })
-  ])
-  const routeMap: Record<number, string> = {}
-  ;(routeRes.rows || []).forEach((rt: any) => { routeMap[rt.routeId] = rt.routeName || rt.routeCode })
-  routeOptions.value = (bindRes.rows || []).map((rp: any) => ({
-    ...rp, _routeName: routeMap[rp.routeId] || ('路线#' + rp.routeId)
-  }))
-  if (selectResolved) await applyResolvedRoute()
+  const seq = ++routeReqSeq
+  const itemId = form.productId
+  try {
+    const [bindRes, routeRes] = await Promise.all([
+      listRouteProduct({ itemId, pageSize: 100 }),
+      listRoute({ pageSize: 1000 })
+    ])
+    if (seq !== routeReqSeq || form.productId !== itemId || !showFlag.value) return
+    const routeMap: Record<number, string> = {}
+    ;(routeRes.rows || []).forEach((rt: any) => { routeMap[rt.routeId] = rt.routeName || rt.routeCode })
+    routeOptions.value = (bindRes.rows || []).map((rp: any) => ({
+      ...rp, _routeName: routeMap[rp.routeId] || ('路线#' + rp.routeId)
+    }))
+    if (selectResolved) await applyResolvedRoute(seq, itemId)
+  } catch {
+    if (seq === routeReqSeq && form.productId === itemId && showFlag.value) {
+      routeOptions.value = []
+      ElMessage.error('工艺路线候选加载失败，请重试')
+    }
+  }
 }
 
-async function applyResolvedRoute() {
-  if (!form.productId) return
+async function applyResolvedRoute(seq: number, itemId: number) {
+  if (form.productId !== itemId) return
   const r = await resolveRouteProduct({
-    itemId: form.productId, orderType: props.orderType,
+    itemId, orderType: props.orderType,
     outsourceFlag: props.outsourceFlag, packageFlag: props.packageFlag
   })
+  if (seq !== routeReqSeq || form.productId !== itemId || !showFlag.value) return
   const d = r.data || {}
   if (d.hardBlocked) {
     routeBlocked.value = true
@@ -206,16 +227,21 @@ function onRouteChange(recordId: number | undefined) {
 
 /** 选物料后拉详情：取 extAttrs（物料扩展属性快照）+ 按分类拉 schema */
 function loadExtAttrsByProduct(itemId: number, snapshot?: Record<string, any>) {
+  const seq = ++attrReqSeq
   getItem(itemId).then(r => {
+    if (seq !== attrReqSeq || form.productId !== itemId || !showFlag.value) return
     const item = r.data
     // 优先用传入快照（编辑已有行），否则用物料当前 extAttrs（新选料时快照）
     form.lineAttrs = snapshot && Object.keys(snapshot).length ? { ...snapshot } : { ...(item.extAttrs || {}) }
     if (item.itemTypeId) {
-      getEffAttrSchema(item.itemTypeId).then(s => { effAttrSchema.value = s.data || [] })
+      getEffAttrSchema(item.itemTypeId).then(s => {
+        if (seq !== attrReqSeq || form.productId !== itemId || !showFlag.value) return
+        effAttrSchema.value = s.data || []
+      }).catch(() => { if (seq === attrReqSeq) ElMessage.error('扩展属性配置加载失败') })
     } else {
       effAttrSchema.value = []
     }
-  })
+  }).catch(() => { if (seq === attrReqSeq && form.productId === itemId) ElMessage.error('物料详情加载失败') })
 }
 
 function onProductSelected(row: any) {
@@ -225,6 +251,10 @@ function onProductSelected(row: any) {
   form.productSpc = row.specification
   form.unitOfMeasure = row.unitOfMeasure
   form.unitName = row.unitName
+  // 立即清空旧产品路线, 避免候选加载窗口期内误提交跨产品路线
+  form.routeProductId = null
+  form.routeCode = null
+  form.routeName = null
   if (row.itemId) {
     loadExtAttrsByProduct(row.itemId)
     loadRouteOptions(true)

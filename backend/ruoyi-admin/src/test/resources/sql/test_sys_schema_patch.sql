@@ -248,7 +248,8 @@ SELECT 1, r.route_id, p.process_id, p.process_code, p.process_name, 1, 'SS', 'N'
 FROM qxx_pro_route r JOIN qxx_pro_process p ON p.process_code='PRC-OUT-PRINT'
 WHERE r.route_code='RT-OUTSRC'
   AND NOT EXISTS (SELECT 1 FROM qxx_pro_route_process rp WHERE rp.route_id=r.route_id AND rp.process_id=p.process_id);
--- 外协供应商(万隆)
-INSERT INTO qxx_md_vendor (factory_id, vendor_code, vendor_name, vendor_type, enable_flag, create_by, create_time)
-SELECT 1, 'OUT-WANLONG', '万隆外协厂', 'OUTSOURCE', '1', 'admin', NOW()
+-- 外协供应商(万隆), 带工厂映射以便 V150 ⑤g 回填 outsource_factory_id
+INSERT INTO qxx_md_vendor (factory_id, vendor_code, vendor_name, vendor_type, enable_flag, outsource_factory_id, create_by, create_time)
+SELECT 1, 'OUT-WANLONG', '万隆外协厂', 'OUTSOURCE', '1', 1, 'admin', NOW()
 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM qxx_md_vendor WHERE vendor_code='OUT-WANLONG');
+UPDATE qxx_md_vendor SET outsource_factory_id=1 WHERE vendor_code='OUT-WANLONG' AND outsource_factory_id IS NULL;

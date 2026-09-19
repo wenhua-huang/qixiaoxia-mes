@@ -61,6 +61,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by order_num asc
     </select>
 
+    <select id="selectByRouteIds" resultMap="ProRouteProcessResult">
+        <include refid="selectProRouteProcessVo"/>
+        where route_id in
+        <foreach item="routeId" collection="routeIds" open="(" separator="," close=")">#{routeId}</foreach>
+        order by route_id, order_num asc
+    </select>
+
     <select id="selectLastProcessByRouteId" parameterType="Long" resultMap="ProRouteProcessResult">
         <include refid="selectProRouteProcessVo"/>
         where route_id = #{routeId}

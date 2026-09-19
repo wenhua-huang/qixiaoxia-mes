@@ -41,6 +41,22 @@ CALL add_col_if_missing('qxx_pro_route_product', 'is_default', 'ALTER TABLE qxx_
 
 DROP PROCEDURE IF EXISTS add_col_if_missing;
 
+-- 列默认值仍为已废弃的 NEW, 改为 STANDARD, 防止裸 INSERT 落入库内不存在的字典值
+DROP PROCEDURE IF EXISTS mod_default_if_not;
+CREATE PROCEDURE mod_default_if_not(IN tbl VARCHAR(64), IN col VARCHAR(64), IN ddl TEXT)
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                   WHERE table_schema=DATABASE() AND table_name=tbl AND column_name=col
+                     AND column_default='STANDARD') THEN
+        SET @s = ddl; PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+    END IF;
+END;
+CALL mod_default_if_not('qxx_sal_order', 'order_type',
+    'ALTER TABLE qxx_sal_order MODIFY COLUMN order_type varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT ''STANDARD'' COMMENT ''订单类型 STANDARD/SMALL_BATCH/GIFT/STOCK/PLATE''');
+CALL mod_default_if_not('qxx_pro_workorder', 'order_type',
+    'ALTER TABLE qxx_pro_workorder MODIFY COLUMN order_type varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT ''STANDARD'' COMMENT ''订单类型 STANDARD/SMALL_BATCH/GIFT/STOCK/PLATE''');
+DROP PROCEDURE IF EXISTS mod_default_if_not;
+
 -- ---------- ④ 字典: 删旧两值, 备新五值 ----------
 DELETE FROM sys_dict_data WHERE dict_type = 'mes_sal_order_type' AND dict_value IN ('NEW','REPEAT');
 
@@ -162,9 +178,59 @@ SET rp.apply_order_type='STANDARD', rp.is_default='Y'
 WHERE rp.factory_id=1 AND r.route_code='RT-STANDARD' AND rp.apply_order_type IS NULL;
 
 -- ---------- ⑤g RT-OUTSRC 外发节点补供应商(按 route+is_outsource 定位) ----------
+-- 前置: 部分 Flyway 全新库的 qxx_md_vendor 基线缺 outsource_factory_id(生产手工建表已含), 幂等补齐
+DROP PROCEDURE IF EXISTS add_vendor_factory_col;
+CREATE PROCEDURE add_vendor_factory_col()
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='qxx_md_vendor' AND column_name='outsource_factory_id') THEN
+        ALTER TABLE qxx_md_vendor ADD COLUMN outsource_factory_id bigint(20) DEFAULT NULL COMMENT '外协场景：该供应商对应的系统工厂ID(关联qxx_md_factory)';
+        ALTER TABLE qxx_md_vendor ADD KEY idx_outsource_factory_id (outsource_factory_id);
+    END IF;
+END;
+CALL add_vendor_factory_col();
+DROP PROCEDURE IF EXISTS add_vendor_factory_col;
+-- route_process 是外协 8 张冗余表之一, vendor 三列与 outsource_factory_id 必须同时回填;
+-- 守卫含 outsource_factory_id IS NULL, 供应商主数据后补工厂映射后重跑可补齐
 UPDATE qxx_pro_route_process rp
 JOIN qxx_pro_route r ON r.route_id=rp.route_id
 JOIN qxx_md_vendor v ON v.factory_id=1 AND v.vendor_code='OUT-WANLONG'
-SET rp.vendor_id=v.vendor_id, rp.vendor_code=v.vendor_code, rp.vendor_name=v.vendor_name
+SET rp.vendor_id=v.vendor_id, rp.vendor_code=v.vendor_code, rp.vendor_name=v.vendor_name,
+    rp.outsource_factory_id=v.outsource_factory_id
 WHERE rp.factory_id=1 AND r.route_code='RT-OUTSRC' AND rp.is_outsource='1'
-  AND rp.vendor_id IS NULL;
+  AND (rp.vendor_id IS NULL OR rp.outsource_factory_id IS NULL);
+
+-- ---------- ⑤h 同产品至多一条默认路线: 先收敛存量重复, 再建唯一约束 ----------
+-- 每 factory+item 仅保留 record_id 最小的一条 is_default='Y', 其余置 N
+UPDATE qxx_pro_route_product rp
+JOIN (
+  SELECT factory_id, item_id, MIN(record_id) AS keep_id
+  FROM qxx_pro_route_product WHERE is_default='Y' AND item_id IS NOT NULL
+  GROUP BY factory_id, item_id HAVING COUNT(*) > 1
+) d ON d.factory_id=rp.factory_id AND d.item_id=rp.item_id
+SET rp.is_default='N' WHERE rp.record_id <> d.keep_id;
+
+-- MySQL 无部分索引: 生成列仅在 is_default='Y' 时取 factory-item 键, 唯一索引保证同产品一条默认;
+-- 非默认行为 NULL, 唯一索引允许多个 NULL
+DROP PROCEDURE IF EXISTS add_col_if_missing;
+CREATE PROCEDURE add_col_if_missing(IN tbl VARCHAR(64), IN col VARCHAR(64), IN ddl TEXT)
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name=tbl AND column_name=col) THEN
+        SET @s = ddl; PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+    END IF;
+END;
+CALL add_col_if_missing('qxx_pro_route_product', 'is_default_guard',
+    'ALTER TABLE qxx_pro_route_product ADD COLUMN is_default_guard varchar(100)
+     GENERATED ALWAYS AS (CASE WHEN is_default=''Y'' THEN CONCAT(factory_id,''-'',item_id) ELSE NULL END) STORED');
+DROP PROCEDURE IF EXISTS add_col_if_missing;
+
+DROP PROCEDURE IF EXISTS add_idx_if_missing;
+CREATE PROCEDURE add_idx_if_missing()
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.statistics
+                   WHERE table_schema=DATABASE() AND table_name='qxx_pro_route_product'
+                     AND index_name='uk_route_product_default') THEN
+        CREATE UNIQUE INDEX uk_route_product_default ON qxx_pro_route_product(is_default_guard);
+    END IF;
+END;
+CALL add_idx_if_missing();
+DROP PROCEDURE IF EXISTS add_idx_if_missing;

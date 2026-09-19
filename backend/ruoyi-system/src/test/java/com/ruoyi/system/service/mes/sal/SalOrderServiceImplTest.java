@@ -25,14 +25,21 @@ import com.ruoyi.common.core.redis.RedisLockTemplate;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
+import com.ruoyi.system.domain.mes.pro.ProRoute;
+import com.ruoyi.system.domain.mes.pro.ProRouteProduct;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
+import com.ruoyi.system.domain.mes.pro.dto.RouteResolveResult;
 import com.ruoyi.system.domain.mes.sal.SalOrder;
 import com.ruoyi.system.domain.mes.sal.SalOrderCreateRequest;
 import com.ruoyi.system.domain.mes.sal.SalOrderLine;
 import com.ruoyi.system.domain.mes.sal.SalOrderToWorkorderRequest;
+import com.ruoyi.system.mapper.mes.pro.ProRouteMapper;
+import com.ruoyi.system.mapper.mes.pro.ProRouteProcessMapper;
+import com.ruoyi.system.mapper.mes.pro.ProRouteProductMapper;
 import com.ruoyi.system.mapper.mes.sal.SalOrderLineMapper;
 import com.ruoyi.system.mapper.mes.sal.SalOrderMapper;
 import com.ruoyi.system.service.mes.pro.IProWorkorderService;
+import com.ruoyi.system.service.mes.pro.ProRouteResolveService;
 import com.ruoyi.system.service.mes.sal.impl.SalOrderServiceImpl;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -40,6 +47,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
@@ -59,6 +68,10 @@ class SalOrderServiceImplTest
     @Mock private IProWorkorderService proWorkorderService;
     @Mock private RedisLockTemplate lockTemplate;
     @Mock private PlatformTransactionManager transactionManager;
+    @Mock private ProRouteResolveService proRouteResolveService;
+    @Mock private ProRouteProductMapper proRouteProductMapper;
+    @Mock private ProRouteMapper proRouteMapper;
+    @Mock private ProRouteProcessMapper proRouteProcessMapper;
 
     @InjectMocks
     private SalOrderServiceImpl salOrderService;
@@ -80,6 +93,9 @@ class SalOrderServiceImplTest
 
         // 手动建 txTemplate(@PostConstruct 在 Mockito 下不触发)
         ReflectionTestUtils.setField(salOrderService, "txTemplate", new TransactionTemplate(transactionManager));
+
+        // 默认: 行无手选路线且无默认路线可带(留空手选), 既有用例不受影响
+        when(proRouteResolveService.resolve(any(), any(), any(), any())).thenReturn(RouteResolveResult.empty());
     }
 
     @AfterEach
@@ -348,6 +364,259 @@ class SalOrderServiceImplTest
                 .isInstanceOf(ServiceException.class).hasMessageContaining("已确认");
     }
 
+    // ============ 默认工艺路线带出 / 外发校验 ============
+
+    @Test
+    @DisplayName("createWithLines - 行无路线时按头维度自动回填; 手选路线不被覆盖只补快照")
+    void createWithLines_routeFillAndKeepManual()
+    {
+        // --- 场景A: 行无路线 -> resolveBatch 命中绑定2/路线20, 自动回填
+        SalOrder orderA = buildOrder(null, "SO-ROUTE-A", "PREPARE");
+        SalOrderLine lineA = new SalOrderLine();
+        lineA.setProductId(100L);
+        lineA.setProductName("演示产品");
+        lineA.setQuantity(new BigDecimal("10"));
+        when(salOrderMapper.insertSalOrder(any(SalOrder.class))).thenAnswer(inv -> {
+            ((SalOrder) inv.getArgument(0)).setOrderId(1L);
+            return 1;
+        });
+        when(proRouteResolveService.resolveBatch(anyList(), eq("STANDARD"), eq("N"), eq("N")))
+                .thenReturn(Map.of(100L, matchedResult(2L, 20L)));
+        when(proRouteMapper.selectByRouteIds(anyCollection())).thenReturn(List.of(route(20L, "RT-X", "路线X")));
+
+        SalOrderCreateRequest reqA = new SalOrderCreateRequest();
+        reqA.setOrder(orderA);
+        reqA.setLines(Collections.singletonList(lineA));
+        salOrderService.createWithLines(reqA);
+
+        ArgumentCaptor<SalOrderLine> capA = ArgumentCaptor.forClass(SalOrderLine.class);
+        verify(salOrderLineMapper).insertSalOrderLine(capA.capture());
+        assertThat(capA.getValue().getRouteProductId()).isEqualTo(2L);
+        assertThat(capA.getValue().getRouteCode()).isEqualTo("RT-X");
+
+        // --- 场景B: 行已选绑定9 -> 不调 resolveBatch, 批量拉绑定校验归属并补快照
+        reset(proRouteResolveService, proRouteProductMapper, proRouteMapper, salOrderLineMapper);
+        SalOrder orderB = buildOrder(null, "SO-ROUTE-B", "PREPARE");
+        SalOrderLine lineB = new SalOrderLine();
+        lineB.setProductId(100L);
+        lineB.setQuantity(new BigDecimal("10"));
+        lineB.setRouteProductId(9L);
+        when(salOrderMapper.insertSalOrder(any(SalOrder.class))).thenAnswer(inv -> {
+            ((SalOrder) inv.getArgument(0)).setOrderId(2L);
+            return 1;
+        });
+        ProRouteProduct own = new ProRouteProduct();
+        own.setRecordId(9L);
+        own.setRouteId(90L);
+        own.setItemId(100L);
+        when(proRouteProductMapper.selectByRecordIds(anyCollection())).thenReturn(List.of(own));
+        when(proRouteMapper.selectByRouteIds(anyCollection())).thenReturn(List.of(route(90L, "RT-MANUAL", "手选路线")));
+
+        SalOrderCreateRequest reqB = new SalOrderCreateRequest();
+        reqB.setOrder(orderB);
+        reqB.setLines(Collections.singletonList(lineB));
+        salOrderService.createWithLines(reqB);
+
+        verify(proRouteResolveService, never()).resolveBatch(anyList(), anyString(), anyString(), anyString());
+        ArgumentCaptor<SalOrderLine> capB = ArgumentCaptor.forClass(SalOrderLine.class);
+        verify(salOrderLineMapper).insertSalOrderLine(capB.capture());
+        assertThat(capB.getValue().getRouteProductId()).isEqualTo(9L);
+        assertThat(capB.getValue().getRouteName()).isEqualTo("手选路线");
+    }
+
+    @Test
+    @DisplayName("createWithLines - 外发=Y 解析被硬阻断 -> 整单拒绝且不落行")
+    void createWithLines_outsourceBlocked_rejected()
+    {
+        SalOrder order = buildOrder(null, "SO-OUT-BLOCK", "PREPARE");
+        order.setOutsourceFlag("Y");
+        SalOrderLine line = new SalOrderLine();
+        line.setProductId(100L);
+        line.setQuantity(new BigDecimal("10"));
+        when(salOrderMapper.insertSalOrder(any(SalOrder.class))).thenAnswer(inv -> {
+            ((SalOrder) inv.getArgument(0)).setOrderId(3L);
+            return 1;
+        });
+        when(proRouteResolveService.resolveBatch(anyList(), anyString(), anyString(), anyString()))
+                .thenReturn(Map.of(100L, RouteResolveResult.blocked("产品未配置含外发工序的工艺路线")));
+
+        SalOrderCreateRequest req = new SalOrderCreateRequest();
+        req.setOrder(order);
+        req.setLines(Collections.singletonList(line));
+        assertThatThrownBy(() -> salOrderService.createWithLines(req))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("外发");
+        verify(salOrderLineMapper, never()).insertSalOrderLine(any());
+    }
+
+    @Test
+    @DisplayName("createWithLines - 手选路线不属于该产品 -> 拒绝")
+    void createWithLines_manualRouteOfOtherItem_rejected()
+    {
+        SalOrder order = buildOrder(null, "SO-ROUTE-OTHER", "PREPARE");
+        SalOrderLine line = new SalOrderLine();
+        line.setProductId(100L);
+        line.setProductName("演示产品");
+        line.setQuantity(new BigDecimal("10"));
+        line.setRouteProductId(9L);
+        when(salOrderMapper.insertSalOrder(any(SalOrder.class))).thenAnswer(inv -> {
+            ((SalOrder) inv.getArgument(0)).setOrderId(4L);
+            return 1;
+        });
+        ProRouteProduct other = new ProRouteProduct();
+        other.setRecordId(9L);
+        other.setRouteId(90L);
+        other.setItemId(999L);
+        when(proRouteProductMapper.selectByRecordIds(anyCollection())).thenReturn(List.of(other));
+
+        SalOrderCreateRequest req = new SalOrderCreateRequest();
+        req.setOrder(order);
+        req.setLines(Collections.singletonList(line));
+        assertThatThrownBy(() -> salOrderService.createWithLines(req))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("不属于该产品");
+        verify(salOrderLineMapper, never()).insertSalOrderLine(any());
+    }
+
+    @Test
+    @DisplayName("toWorkorder - 请求未指定路线时沿用订单行带出的路线")
+    void toWorkorder_fallbackToLineRoute()
+    {
+        SalOrderLine line = buildLine(10L, 1L, new BigDecimal("100"));
+        line.setProductId(2L);
+        line.setRouteProductId(77L);
+        when(salOrderLineMapper.selectSalOrderLineByLineId(10L)).thenReturn(line);
+        when(salOrderMapper.selectSalOrderByOrderId(1L)).thenReturn(buildOrder(1L, "SO001", "CONFIRMED"));
+        when(salOrderLineMapper.sumProducedQtyByLineId(10L)).thenReturn(BigDecimal.ZERO);
+        ProRouteProduct binding = new ProRouteProduct();
+        binding.setRecordId(77L);
+        binding.setRouteId(770L);
+        binding.setItemId(2L);
+        when(proRouteProductMapper.selectProRouteProductByRecordId(77L)).thenReturn(binding);
+        when(proRouteMapper.selectProRouteByRouteId(770L)).thenReturn(route(770L, "RT-77", "沿用路线"));
+        when(proWorkorderService.createWorkorderWithBom(any(), any(), any())).thenAnswer(inv -> {
+            ((ProWorkorder) inv.getArgument(0)).setWorkorderId(99L);
+            return inv.getArgument(0);
+        });
+
+        SalOrderToWorkorderRequest req = new SalOrderToWorkorderRequest();
+        req.setLineId(10L);
+        req.setQuantity(new BigDecimal("50"));
+        req.setWorkorderCode("WO001");
+        salOrderService.toWorkorder(req);
+
+        ArgumentCaptor<ProWorkorder> captor = ArgumentCaptor.forClass(ProWorkorder.class);
+        verify(proWorkorderService).createWorkorderWithBom(captor.capture(), any(), any());
+        assertThat(captor.getValue().getRouteProductId()).isEqualTo(77L);
+    }
+
+    @Test
+    @DisplayName("toWorkorder - 外发订单但路线无外发节点 -> 拒绝")
+    void toWorkorder_outsourceRouteWithoutNode_rejected()
+    {
+        SalOrderLine line = buildLine(10L, 1L, new BigDecimal("100"));
+        line.setProductId(2L);
+        line.setRouteProductId(77L);
+        SalOrder order = buildOrder(1L, "SO001", "CONFIRMED");
+        order.setOutsourceFlag("Y");
+        when(salOrderLineMapper.selectSalOrderLineByLineId(10L)).thenReturn(line);
+        when(salOrderMapper.selectSalOrderByOrderId(1L)).thenReturn(order);
+        when(salOrderLineMapper.sumProducedQtyByLineId(10L)).thenReturn(BigDecimal.ZERO);
+        ProRouteProduct binding = new ProRouteProduct();
+        binding.setRecordId(77L);
+        binding.setRouteId(770L);
+        binding.setItemId(2L);
+        when(proRouteProductMapper.selectProRouteProductByRecordId(77L)).thenReturn(binding);
+        com.ruoyi.system.domain.mes.pro.ProRouteProcess node = new com.ruoyi.system.domain.mes.pro.ProRouteProcess();
+        node.setIsOutsource("0");
+        when(proRouteProcessMapper.selectProRouteProcessByRouteId(770L))
+                .thenReturn(Collections.singletonList(node));
+
+        SalOrderToWorkorderRequest req = new SalOrderToWorkorderRequest();
+        req.setLineId(10L);
+        req.setQuantity(new BigDecimal("50"));
+        req.setWorkorderCode("WO001");
+        req.setRouteProductId(77L);
+        assertThatThrownBy(() -> salOrderService.toWorkorder(req))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("外发");
+        verify(proWorkorderService, never()).createWorkorderWithBom(any(), any(), any());
+    }
+
+    // ============ 测试数据构造 ============
+    @Test
+    @DisplayName("toWorkorder - 请求与订单行均无路线时现场解析兜底(第三级)")
+    void toWorkorder_resolveOnTheFly_when_bothNull()
+    {
+        SalOrderLine line = buildLine(10L, 1L, new BigDecimal("100"));
+        line.setProductId(2L);
+        when(salOrderLineMapper.selectSalOrderLineByLineId(10L)).thenReturn(line);
+        when(salOrderMapper.selectSalOrderByOrderId(1L)).thenReturn(buildOrder(1L, "SO001", "CONFIRMED"));
+        when(salOrderLineMapper.sumProducedQtyByLineId(10L)).thenReturn(BigDecimal.ZERO);
+        when(proRouteResolveService.resolve(eq(2L), any(), any(), any()))
+                .thenReturn(matchedResult(88L, 880L));
+        when(proWorkorderService.createWorkorderWithBom(any(), any(), any())).thenAnswer(inv -> inv.getArgument(0));
+
+        SalOrderToWorkorderRequest req = new SalOrderToWorkorderRequest();
+        req.setLineId(10L);
+        req.setQuantity(new BigDecimal("50"));
+        req.setWorkorderCode("WO001");
+        salOrderService.toWorkorder(req);
+
+        ArgumentCaptor<ProWorkorder> captor = ArgumentCaptor.forClass(ProWorkorder.class);
+        verify(proWorkorderService).createWorkorderWithBom(captor.capture(), any(), any());
+        assertThat(captor.getValue().getRouteProductId()).isEqualTo(88L);
+    }
+
+    @Test
+    @DisplayName("toWorkorder - 向导传入其他产品的路线 -> 拒绝(归属校验覆盖显式传值路径)")
+    void toWorkorder_explicitRouteOfOtherItem_rejected()
+    {
+        SalOrderLine line = buildLine(10L, 1L, new BigDecimal("100"));
+        line.setProductId(2L);
+        when(salOrderLineMapper.selectSalOrderLineByLineId(10L)).thenReturn(line);
+        when(salOrderMapper.selectSalOrderByOrderId(1L)).thenReturn(buildOrder(1L, "SO001", "CONFIRMED"));
+        when(salOrderLineMapper.sumProducedQtyByLineId(10L)).thenReturn(BigDecimal.ZERO);
+        ProRouteProduct other = new ProRouteProduct();
+        other.setRecordId(77L);
+        other.setItemId(999L);
+        when(proRouteProductMapper.selectProRouteProductByRecordId(77L)).thenReturn(other);
+
+        SalOrderToWorkorderRequest req = new SalOrderToWorkorderRequest();
+        req.setLineId(10L);
+        req.setQuantity(new BigDecimal("50"));
+        req.setWorkorderCode("WO001");
+        req.setRouteProductId(77L);
+        assertThatThrownBy(() -> salOrderService.toWorkorder(req))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("不属于该产品");
+        verify(proWorkorderService, never()).createWorkorderWithBom(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("createWithLines - 非法标志位/订单类型 -> 拒绝(防绕过外发阻断)")
+    void createWithLines_illegalDimensions_rejected()
+    {
+        SalOrder orderBadFlag = buildOrder(null, "SO-BAD-FLAG", "PREPARE");
+        orderBadFlag.setOutsourceFlag("y");
+        stubOrderCodeUnique("SO-BAD-FLAG");
+        SalOrderCreateRequest req1 = new SalOrderCreateRequest();
+        req1.setOrder(orderBadFlag);
+        req1.setLines(Collections.emptyList());
+        assertThatThrownBy(() -> salOrderService.createWithLines(req1))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("Y/N");
+
+        SalOrder orderBadType = buildOrder(null, "SO-BAD-TYPE", "PREPARE");
+        orderBadType.setOrderType("NEW");
+        stubOrderCodeUnique("SO-BAD-TYPE");
+        SalOrderCreateRequest req2 = new SalOrderCreateRequest();
+        req2.setOrder(orderBadType);
+        req2.setLines(Collections.emptyList());
+        assertThatThrownBy(() -> salOrderService.createWithLines(req2))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("非法订单类型");
+        verify(salOrderMapper, never()).insertSalOrder(any());
+    }
+
+    private void stubOrderCodeUnique(String code) {
+        when(salOrderMapper.checkOrderCodeUnique(argThat(o -> o != null && code.equals(o.getOrderCode())))).thenReturn(null);
+    }
+
     // ============ 测试数据构造 ============
     private SalOrder buildOrder(Long id, String code, String status)
     {
@@ -369,4 +638,19 @@ class SalOrderServiceImplTest
 
     @SuppressWarnings("unused")
     private List<SalOrderLine> unused() { return Collections.emptyList(); }
+
+    private RouteResolveResult matchedResult(long recordId, long routeId) {
+        ProRouteProduct rp = new ProRouteProduct();
+        rp.setRecordId(recordId);
+        rp.setRouteId(routeId);
+        return RouteResolveResult.matched(rp);
+    }
+
+    private ProRoute route(long routeId, String code, String name) {
+        ProRoute r = new ProRoute();
+        r.setRouteId(routeId);
+        r.setRouteCode(code);
+        r.setRouteName(name);
+        return r;
+    }
 }

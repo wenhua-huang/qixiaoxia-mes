@@ -186,9 +186,11 @@ public class SalOrderPdfExporter extends AbstractPdfExporter<SalOrder>
     {
         return switch (s == null ? "" : s)
         {
-            case "NEW" -> "新单";
-            case "REPEAT" -> "返单";
+            case "STANDARD" -> "标品";
+            case "SMALL_BATCH" -> "小批量";
+            case "GIFT" -> "礼品";
             case "STOCK" -> "备货订单";
+            case "PLATE" -> "制版";
             default -> str(s);
         };
     }

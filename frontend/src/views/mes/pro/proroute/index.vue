@@ -187,6 +187,17 @@
             <el-table-column label="标准工时" align="center" width="100">
               <template #default="scope">{{ scope.row.productionTime }} {{ scope.row.timeUnitType }}</template>
             </el-table-column>
+            <el-table-column label="适用维度" align="center" min-width="160">
+              <template #default="scope">
+                <el-tag v-if="scope.row.applyOrderType" size="small">{{ orderTypeLabel(scope.row.applyOrderType) }}</el-tag>
+                <el-tag v-if="scope.row.applyOutsource==='Y'" size="small" type="warning" style="margin-left:2px">外发</el-tag>
+                <el-tag v-else-if="scope.row.applyOutsource==='N'" size="small" type="info" style="margin-left:2px">非外发</el-tag>
+                <el-tag v-if="scope.row.applyPackage==='Y'" size="small" type="success" style="margin-left:2px">包装</el-tag>
+                <el-tag v-else-if="scope.row.applyPackage==='N'" size="small" type="info" style="margin-left:2px">无包装</el-tag>
+                <el-tag v-if="scope.row.isDefault==='Y'" size="small" type="primary" style="margin-left:2px">默认</el-tag>
+                <span v-if="!scope.row.applyOrderType && scope.row.applyOutsource==null && scope.row.applyPackage==null" style="color:#909399;font-size:12px">不限</span>
+              </template>
+            </el-table-column>
             <el-table-column label="操作" align="center" width="80" v-if="optType !== 'view'" class-name="small-padding fixed-width">
               <template #default="scope">
                 <el-tooltip content="修改" placement="top"><el-button link type="primary" icon="Edit" @click.stop="handleUpdateProduct(scope.row)"></el-button></el-tooltip>
@@ -277,6 +288,16 @@
             </el-row>
           </template>
         </el-form-item>
+        <el-form-item label="适用订单类型">
+          <el-select v-model="prodForm.applyOrderType" clearable placeholder="不限" style="width:100%">
+            <el-option v-for="d in orderTypeOptions" :key="d.dictValue" :label="d.dictLabel" :value="d.dictValue" />
+          </el-select>
+        </el-form-item>
+        <el-row>
+          <el-col :span="8"><el-form-item label="适用外发"><el-select v-model="prodForm.applyOutsource" clearable placeholder="不限" style="width:100%"><el-option label="是" value="Y" /><el-option label="否" value="N" /></el-select></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="适用包装"><el-select v-model="prodForm.applyPackage" clearable placeholder="不限" style="width:100%"><el-option label="是" value="Y" /><el-option label="否" value="N" /></el-select></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="默认路线"><el-switch v-model="prodForm.isDefault" active-value="Y" inactive-value="N" /></el-form-item></el-col>
+        </el-row>
         <el-form-item label="基准批量" prop="quantity"><el-input-number v-model="prodForm.quantity" :min="1" style="width:100%" /></el-form-item>
         <el-form-item label="标准生产用时" prop="productionTime"><el-input-number v-model="prodForm.productionTime" :min="0" :precision="2" style="width:70%" /><el-select v-model="prodForm.timeUnitType" style="width:28%;margin-left:2%"><el-option v-for="d in timeTypeOptions" :key="d.value" :label="d.label" :value="d.value" /></el-select></el-form-item>
         <el-form-item label="备注"><el-input v-model="prodForm.remark" type="textarea" maxlength="500" /></el-form-item>
@@ -414,6 +435,7 @@ import { listParamTemplateByProcessId } from '@/api/mes/pro/paramtemplate'
 import { listAllProcess } from '@/api/mes/pro/process'
 import { listAllVendor } from '@/api/mes/md/vendor'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
+import { getDicts } from '@/api/system/dict/data'
 import ItemSelect from '@/components/itemSelect/single.vue'
 
 export default {
@@ -430,6 +452,8 @@ export default {
       rpOpen: false, rpTitle: '', rpForm: {},
       // 关联产品搜索
       productSearchKey: '',
+      // 销售订单类型字典(mes_sal_order_type), 绑定维度用
+      orderTypeOptions: [],
       // 关联产品弹窗
       prodOpen: false, prodTitle: '', prodForm: {},
       // BOM弹窗
@@ -460,7 +484,7 @@ export default {
       prodRules: { itemId: [{ required: true, message: '产品物料不能为空', trigger: 'blur' }], quantity: [{ required: true, message: '批量不能为空', trigger: 'blur' }] },
     }
   },
-  created() { this.getList(); this.loadAllProcess() },
+  created() { this.getList(); this.loadAllProcess(); this.loadOrderTypeDict() },
   computed: {
     filteredProductList() {
       if (!this.productSearchKey) return this.productList
@@ -485,6 +509,9 @@ export default {
   methods: {
     getList() { this.loading = true; listRoute(this.queryParams).then(r => { this.routeList = r.rows; this.total = r.total; }).catch(()=>{}).finally(()=>{ this.loading = false }) },
     loadAllProcess() { listAllProcess().then(r => { this.allProcessOptions = r.data || [] }) },
+    /** 订单类型字典, 用于绑定维度下拉与标签 */
+    loadOrderTypeDict() { getDicts('mes_sal_order_type').then(r => { this.orderTypeOptions = r.data || [] }) },
+    orderTypeLabel(v) { const d = this.orderTypeOptions.find(o => o.dictValue === v); return d ? d.dictLabel : v },
     cancel() { this.open = false; this.reset() },
     reset() {
       this.form = { routeId: null, routeCode: null, routeName: null, routeDesc: null, enableFlag: '1', remark: null }
@@ -572,7 +599,7 @@ export default {
     },
     loadProductList(routeId) { this.productLoading = true; listRouteProductByRouteId(routeId).then(r => { this.productList = r.data || []; this.productLoading = false }).catch(() => { this.productLoading = false }) },
     handleAddProduct() {
-      this.prodForm = { routeId: this.form.routeId, itemId: null, itemCode: null, itemName: null, specification: null, unitOfMeasure: null, unitName: null, quantity: 1, productionTime: 1, timeUnitType: 'MINUTE', remark: null }
+      this.prodForm = { routeId: this.form.routeId, itemId: null, itemCode: null, itemName: null, specification: null, unitOfMeasure: null, unitName: null, quantity: 1, productionTime: 1, timeUnitType: 'MINUTE', applyOrderType: null, applyOutsource: null, applyPackage: null, isDefault: 'N', remark: null }
       this.prodTitle = '关联产品'; this.prodOpen = true
     },
     handleUpdateProduct(row) { this.prodForm = { ...row }; this.prodTitle = '修改产品关联'; this.prodOpen = true },
@@ -580,8 +607,11 @@ export default {
     submitProdForm() {
       this.$refs.prodForm.validate(valid => {
         if (!valid) return
-        if (this.prodForm.recordId != null) { updateRouteProduct(this.prodForm).then(() => { this.$modal.msgSuccess('修改成功'); this.prodOpen = false; this.loadProductList(this.form.routeId) }) }
-        else { addRouteProduct(this.prodForm).then(() => { this.$modal.msgSuccess('关联成功'); this.prodOpen = false; this.loadProductList(this.form.routeId) }) }
+        // 空串/空值归 null, null 即"不限"通配维度
+        const payload = { ...this.prodForm }
+        ;['applyOrderType', 'applyOutsource', 'applyPackage'].forEach(k => { if (!payload[k]) payload[k] = null })
+        if (payload.recordId != null) { updateRouteProduct(payload).then(() => { this.$modal.msgSuccess('修改成功'); this.prodOpen = false; this.loadProductList(this.form.routeId) }) }
+        else { addRouteProduct(payload).then(() => { this.$modal.msgSuccess('关联成功'); this.prodOpen = false; this.loadProductList(this.form.routeId) }) }
       })
     },
     // BOM/参数查看

@@ -3,9 +3,13 @@ package com.ruoyi.system.service.mes.sal.impl;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -16,13 +20,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.ruoyi.common.core.redis.RedisLockTemplate;
 import com.ruoyi.common.enums.SalOrderStatus;
+import com.ruoyi.common.enums.SalOrderType;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.domain.mes.md.MdItem;
+import com.ruoyi.system.domain.mes.pro.ProRoute;
+import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
+import com.ruoyi.system.domain.mes.pro.ProRouteProduct;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderBom;
+import com.ruoyi.system.domain.mes.pro.dto.RouteResolveResult;
 import com.ruoyi.system.domain.mes.sal.CrmOrderCreateRequest;
 import com.ruoyi.system.domain.mes.sal.CrmOrderLineDTO;
 import com.ruoyi.system.domain.mes.sal.SalConstants;
@@ -31,9 +40,13 @@ import com.ruoyi.system.domain.mes.sal.SalOrderCreateRequest;
 import com.ruoyi.system.domain.mes.sal.SalOrderLine;
 import com.ruoyi.system.domain.mes.sal.SalOrderToWorkorderRequest;
 import com.ruoyi.system.mapper.mes.md.MdItemMapper;
+import com.ruoyi.system.mapper.mes.pro.ProRouteMapper;
+import com.ruoyi.system.mapper.mes.pro.ProRouteProcessMapper;
+import com.ruoyi.system.mapper.mes.pro.ProRouteProductMapper;
 import com.ruoyi.system.mapper.mes.sal.SalOrderLineMapper;
 import com.ruoyi.system.mapper.mes.sal.SalOrderMapper;
 import com.ruoyi.system.service.mes.pro.IProWorkorderService;
+import com.ruoyi.system.service.mes.pro.ProRouteResolveService;
 import com.ruoyi.system.service.mes.sal.ISalOrderService;
 import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 
@@ -69,6 +82,18 @@ public class SalOrderServiceImpl implements ISalOrderService
     private IProWorkorderService proWorkorderService;
 
     @Autowired
+    private ProRouteResolveService proRouteResolveService;
+
+    @Autowired
+    private ProRouteProductMapper proRouteProductMapper;
+
+    @Autowired
+    private ProRouteMapper proRouteMapper;
+
+    @Autowired
+    private ProRouteProcessMapper proRouteProcessMapper;
+
+    @Autowired
     private RedisLockTemplate lockTemplate;
 
     @Autowired
@@ -77,6 +102,10 @@ public class SalOrderServiceImpl implements ISalOrderService
     private TransactionTemplate txTemplate;
 
     private static final String LOCK_PREFIX = "sal:order:line:toWorkorder:";
+    private static final String YES = "Y";
+    private static final String NO = "N";
+    /** qxx_pro_route_process.is_outsource 外发节点取值为 1/0（与订单 Y/N 标志不同源） */
+    private static final String OUTSOURCE_NODE = "1";
 
     @PostConstruct
     void initTx()
@@ -118,13 +147,13 @@ public class SalOrderServiceImpl implements ISalOrderService
         SalOrder order = req.getOrder();
         validateOrderCode(order);
         if (order.getStatus() == null) order.setStatus(SalOrderStatus.PREPARE.getCode());
-        if (order.getOrderType() == null) order.setOrderType("NEW");
+        normalizeOrderDimensions(order);
         if (order.getSampleFlag() == null) order.setSampleFlag("N");
         if (order.getSource() == null) order.setSource(SalConstants.SOURCE_DIRECT);
         order.setCreateBy(SecurityUtils.getUsername());
         order.setCreateTime(DateUtils.getNowDate());
         salOrderMapper.insertSalOrder(order);
-        saveLines(order.getOrderId(), req.getLines(), true);
+        saveLines(order, req.getLines(), true);
         return order;
     }
 
@@ -144,8 +173,10 @@ public class SalOrderServiceImpl implements ISalOrderService
         order.setOrderDate(req.getOrderDate() != null ? req.getOrderDate() : DateUtils.getNowDate());
         order.setRequestDate(req.getRequestDate());
         order.setRemark(req.getRemark());
-        order.setOrderType("NEW");
-        order.setSampleFlag("N");
+        order.setOrderType(SalOrderType.STANDARD.getCode());
+        order.setSampleFlag(NO);
+        order.setOutsourceFlag(NO);
+        order.setPackageFlag(NO);
         // CRM 推单无 MES 内"提交"动作，到 MES 即待审核
         order.setStatus(SalOrderStatus.PENDING.getCode());
         order.setSource(SalConstants.SOURCE_CRM);
@@ -202,12 +233,13 @@ public class SalOrderServiceImpl implements ISalOrderService
         {
             throw new ServiceException("仅待提交(PREPARE)订单可修改,审核中/已确认订单不可改,如需调整请先驳回或取消");
         }
+        normalizeOrderDimensions(order);
         order.setUpdateBy(SecurityUtils.getUsername());
         order.setUpdateTime(DateUtils.getNowDate());
         salOrderMapper.updateSalOrder(order);
         // PREPARE 状态无转工单,可安全全量替换行(line_id 重置不影响 FK)
         salOrderLineMapper.deleteSalOrderLineByOrderId(order.getOrderId());
-        saveLines(order.getOrderId(), req.getLines(), true);
+        saveLines(order, req.getLines(), true);
         return order;
     }
 
@@ -407,10 +439,10 @@ public class SalOrderServiceImpl implements ISalOrderService
         wo.setShippingReq(line.getShippingReq());
         // 扩展属性（分类驱动的动态属性）从销售明细继承到工单（深拷贝避免共享引用）
         wo.setLineAttrs(line.getLineAttrs() == null ? null : new java.util.HashMap<>(line.getLineAttrs()));
-        wo.setOrderType(StringUtils.isNotEmpty(order.getOrderType()) ? order.getOrderType() : "NEW");
+        wo.setOrderType(StringUtils.isNotEmpty(order.getOrderType()) ? order.getOrderType() : SalOrderType.STANDARD.getCode());
         wo.setRequestDate(req.getRequestDate() != null ? req.getRequestDate()
                 : (line.getRequestDate() != null ? line.getRequestDate() : order.getRequestDate()));
-        wo.setRouteProductId(req.getRouteProductId());
+        wo.setRouteProductId(resolveWorkorderRoute(order, line, req));
         wo.setCreateSkuVariant(req.getCreateSkuVariant());
         wo.setSkuCode(req.getSkuCode());
         wo.setSkuName(req.getSkuName());
@@ -419,14 +451,47 @@ public class SalOrderServiceImpl implements ISalOrderService
         return wo;
     }
 
-    private void saveLines(Long orderId, List<SalOrderLine> lines, boolean isCreate)
+    /**
+     * 转工单项路线: 请求显式指定 → 订单行存值 → 现场按头维度解析, 三级兜底;
+     * 最终路线必须属于该产品, 外发订单还必须含实际外发节点, 否则阻断。
+     */
+    private Long resolveWorkorderRoute(SalOrder order, SalOrderLine line, SalOrderToWorkorderRequest req)
+    {
+        Long routeProductId = req.getRouteProductId() != null
+                ? req.getRouteProductId() : line.getRouteProductId();
+        boolean outsource = YES.equals(order.getOutsourceFlag());
+        if (routeProductId == null)
+        {
+            RouteResolveResult result = proRouteResolveService.resolve(line.getProductId(),
+                    order.getOrderType(), order.getOutsourceFlag(), order.getPackageFlag());
+            if (result.isHardBlocked()) throw new ServiceException(result.getMessage());
+            if (result.isMatched()) return result.getRouteProductId();
+            if (outsource)
+            {
+                throw new ServiceException("外发订单必须选择含外发工序的工艺路线后再转工单: " + line.getProductName());
+            }
+            return null;
+        }
+        ProRouteProduct binding = proRouteProductMapper.selectProRouteProductByRecordId(routeProductId);
+        if (binding == null || !Objects.equals(binding.getItemId(), line.getProductId()))
+        {
+            throw new ServiceException("选择的工艺路线不属于该产品: " + line.getProductName());
+        }
+        if (outsource && !routeHasOutsourceNode(binding.getRouteId()))
+        {
+            throw new ServiceException("订单标记外发，但所选路线不含外发工序: " + line.getProductName());
+        }
+        return routeProductId;
+    }
+
+    private void saveLines(SalOrder order, List<SalOrderLine> lines, boolean isCreate)
     {
         if (lines == null || lines.isEmpty()) return;
         int lineNo = 1;
         for (SalOrderLine line : lines)
         {
             if (!isCreate) line.setLineId(null);
-            line.setOrderId(orderId);
+            line.setOrderId(order.getOrderId());
             line.setLineNo(lineNo++);
             if (line.getQuantity() == null) throw new ServiceException("明细行订单数量不能为空");
             if (line.getLineAmount() == null && line.getUnitPrice() != null)
@@ -435,8 +500,109 @@ public class SalOrderServiceImpl implements ISalOrderService
             }
             line.setCreateBy(SecurityUtils.getUsername());
             line.setCreateTime(DateUtils.getNowDate());
+        }
+        resolveLinesRoute(order, lines);
+        for (SalOrderLine line : lines)
+        {
             salOrderLineMapper.insertSalOrderLine(line);
         }
+    }
+
+    /**
+     * 批量解析/校验全部明细行路线: 未手选的走一次 resolveBatch, 手选的一次 IN 拉绑定,
+     * 外发节点与路线名快照同样批量预取, 全程无逐行查询。
+     */
+    private void resolveLinesRoute(SalOrder order, List<SalOrderLine> lines)
+    {
+        Map<Long, ProRouteProduct> manualBindings = loadManualBindings(lines);
+        Map<Long, RouteResolveResult> autoResults = resolveAutoLines(order, lines);
+        Set<Long> outsourceRoutes = YES.equals(order.getOutsourceFlag())
+                ? outsourceNodeRoutes(manualBindings.values()) : Set.of();
+        Map<Long, ProRoute> routeMap = loadRouteSnapshots(lines, manualBindings, autoResults);
+
+        for (SalOrderLine line : lines)
+        {
+            Long routeId = assignLineRoute(order, line, manualBindings, autoResults, outsourceRoutes);
+            ProRoute route = routeId == null ? null : routeMap.get(routeId);
+            if (route != null)
+            {
+                line.setRouteCode(route.getRouteCode());
+                line.setRouteName(route.getRouteName());
+            }
+        }
+    }
+
+    private Map<Long, ProRouteProduct> loadManualBindings(List<SalOrderLine> lines)
+    {
+        Set<Long> recordIds = lines.stream().map(SalOrderLine::getRouteProductId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        if (recordIds.isEmpty()) return Map.of();
+        return proRouteProductMapper.selectByRecordIds(recordIds).stream()
+                .collect(Collectors.toMap(ProRouteProduct::getRecordId, b -> b, (a, b) -> a));
+    }
+
+    private Map<Long, RouteResolveResult> resolveAutoLines(SalOrder order, List<SalOrderLine> lines)
+    {
+        List<Long> itemIds = lines.stream()
+                .filter(l -> l.getRouteProductId() == null)
+                .map(SalOrderLine::getProductId).filter(Objects::nonNull).distinct().toList();
+        if (itemIds.isEmpty()) return Map.of();
+        return proRouteResolveService.resolveBatch(itemIds, order.getOrderType(),
+                order.getOutsourceFlag(), order.getPackageFlag());
+    }
+
+    /** 含 is_outsource='1' 节点的路线ID集合（一次 IN 查询） */
+    private Set<Long> outsourceNodeRoutes(java.util.Collection<ProRouteProduct> bindings)
+    {
+        Set<Long> routeIds = bindings.stream().map(ProRouteProduct::getRouteId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        if (routeIds.isEmpty()) return Set.of();
+        return proRouteProcessMapper.selectByRouteIds(routeIds).stream()
+                .filter(n -> OUTSOURCE_NODE.equals(n.getIsOutsource()))
+                .map(ProRouteProcess::getRouteId).collect(Collectors.toSet());
+    }
+
+    private Map<Long, ProRoute> loadRouteSnapshots(List<SalOrderLine> lines,
+            Map<Long, ProRouteProduct> manualBindings, Map<Long, RouteResolveResult> autoResults)
+    {
+        Set<Long> routeIds = new HashSet<>(manualBindings.values().stream()
+                .map(ProRouteProduct::getRouteId).filter(Objects::nonNull).collect(Collectors.toSet()));
+        autoResults.values().stream().filter(RouteResolveResult::isMatched)
+                .map(RouteResolveResult::getRouteId).forEach(routeIds::add);
+        if (routeIds.isEmpty()) return Map.of();
+        return proRouteMapper.selectByRouteIds(routeIds).stream()
+                .collect(Collectors.toMap(ProRoute::getRouteId, r -> r, (a, b) -> a));
+    }
+
+    /** 落定单行路线: 自动解析(阻断即抛)或手选归属/外发节点校验, 返回最终 routeId(无则 null) */
+    private Long assignLineRoute(SalOrder order, SalOrderLine line,
+            Map<Long, ProRouteProduct> manualBindings, Map<Long, RouteResolveResult> autoResults,
+            Set<Long> outsourceRoutes)
+    {
+        if (line.getRouteProductId() == null)
+        {
+            RouteResolveResult result = autoResults.get(line.getProductId());
+            if (result != null && result.isHardBlocked()) throw new ServiceException(result.getMessage());
+            if (result == null || !result.isMatched()) return null;
+            line.setRouteProductId(result.getRouteProductId());
+            return result.getRouteId();
+        }
+        ProRouteProduct binding = manualBindings.get(line.getRouteProductId());
+        if (binding == null || !Objects.equals(binding.getItemId(), line.getProductId()))
+        {
+            throw new ServiceException("明细行选择的工艺路线不属于该产品: " + line.getProductName());
+        }
+        if (YES.equals(order.getOutsourceFlag()) && !outsourceRoutes.contains(binding.getRouteId()))
+        {
+            throw new ServiceException("订单标记外发，但所选路线不含外发工序: " + line.getProductName());
+        }
+        return binding.getRouteId();
+    }
+
+    private boolean routeHasOutsourceNode(Long routeId)
+    {
+        List<ProRouteProcess> nodes = proRouteProcessMapper.selectProRouteProcessByRouteId(routeId);
+        return nodes != null && nodes.stream().anyMatch(n -> OUTSOURCE_NODE.equals(n.getIsOutsource()));
     }
 
     private void fillConvertible(SalOrderLine line)
@@ -446,6 +612,32 @@ public class SalOrderServiceImpl implements ISalOrderService
         line.setQuantityProduced(produced);
         BigDecimal qty = line.getQuantity() == null ? BigDecimal.ZERO : line.getQuantity();
         line.setQuantityConvertible(qty.subtract(produced));
+    }
+
+    /**
+     * 头维度归一化：null 给默认值；订单类型必须是 5 值枚举之一；两标志只接受 Y/N。
+     * 不信任前端值域，防止 "y"/"YES" 之类绕过 "Y".equals 外发硬阻断。
+     */
+    private void normalizeOrderDimensions(SalOrder order)
+    {
+        String type = order.getOrderType();
+        if (type == null)
+        {
+            order.setOrderType(SalOrderType.STANDARD.getCode());
+        }
+        else if (SalOrderType.fromCode(type) == null)
+        {
+            throw new ServiceException("非法订单类型: " + type);
+        }
+        order.setOutsourceFlag(normalizeYn(order.getOutsourceFlag(), "是否外发"));
+        order.setPackageFlag(normalizeYn(order.getPackageFlag(), "是否包装"));
+    }
+
+    private String normalizeYn(String value, String field)
+    {
+        if (value == null) return NO;
+        if (YES.equals(value) || NO.equals(value)) return value;
+        throw new ServiceException(field + "只接受 Y/N, 实际: " + value);
     }
 
     private void validateOrderCode(SalOrder order)

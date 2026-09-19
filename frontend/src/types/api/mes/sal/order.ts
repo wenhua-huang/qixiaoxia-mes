@@ -7,7 +7,7 @@ export interface SalOrderQueryParams extends PageDomain {
   clientName?: string;
   clientOrderCode?: string;
   businessLine?: string;
-  /** 订单类型：NEW=新单 REPEAT=返单 STOCK=备货订单（字典 mes_sal_order_type） */
+  /** 订单类型：STANDARD=标品 SMALL_BATCH=小批量 GIFT=礼品 STOCK=备货订单 PLATE=制版（字典 mes_sal_order_type） */
   orderType?: string;
   status?: string;
   /** 订单来源：1=直接新增 2=CRM系统 */
@@ -28,6 +28,10 @@ export interface SalOrder extends BaseEntity {
   salesperson?: string;
   businessLine?: string;
   sampleFlag?: string;
+  /** 是否外发 Y/N */
+  outsourceFlag?: string;
+  /** 是否包装 Y/N */
+  packageFlag?: string;
   /** 订单来源：1=直接新增 2=CRM系统 */
   source?: number;
   orderDate?: string;
@@ -64,6 +68,12 @@ export interface SalOrderLine extends BaseEntity {
   ropeSpec?: string;
   packageReq?: string;
   shippingReq?: string;
+  /** 绑定的产品-路线 record_id（开单按头维度自动带出，可手改） */
+  routeProductId?: number;
+  /** 路线编码快照 */
+  routeCode?: string;
+  /** 路线名称快照 */
+  routeName?: string;
   requestDate?: string;
   /** 扩展属性(扁平JSON {attrCode:value})，分类驱动的动态属性快照 */
   lineAttrs?: Record<string, any>;

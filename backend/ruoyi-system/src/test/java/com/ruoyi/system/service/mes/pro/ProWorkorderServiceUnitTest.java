@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import com.ruoyi.common.enums.SalOrderType;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.core.redis.RedisLockTemplate;
 import com.ruoyi.common.utils.SecurityUtils;
@@ -778,7 +779,7 @@ class ProWorkorderServiceUnitTest {
         workorderService.insertProWorkorder(wo);
         assertThat(wo.getStatus()).isEqualTo("PREPARE");
         assertThat(wo.getWorkorderType()).isEqualTo("SELF");
-        assertThat(wo.getOrderType()).isEqualTo("NEW");
+        assertThat(wo.getOrderType()).isEqualTo(SalOrderType.STANDARD.getCode());
         assertThat(wo.getOrderSource()).isEqualTo("MANUAL");
         assertThat(wo.getCreateTime()).isNotNull();
     }

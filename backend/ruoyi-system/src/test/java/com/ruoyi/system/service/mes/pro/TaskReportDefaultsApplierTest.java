@@ -89,7 +89,7 @@ class TaskReportDefaultsApplierTest {
                 .thenReturn(List.of(node(OTHER_PROCESS_ID, 1)));
         when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, FIRST_PROCESS_ID))
                 .thenReturn(new BigDecimal("500"));
-        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, SECOND_PROCESS_ID))
+        when(feedbackMapper.sumQuantityFeedback(WORKORDER_ID, SECOND_PROCESS_ID))
                 .thenReturn(new BigDecimal("120"));
 
         ProTask first = task(ROUTE_9, FIRST_PROCESS_ID, "1000");
@@ -101,7 +101,7 @@ class TaskReportDefaultsApplierTest {
         // 路线 9 两个任务只查一次（旧实现每任务 2~3 次），路线 8 一次
         verify(routeProcessMapper, times(1)).selectProRouteProcessByRouteId(ROUTE_9);
         verify(routeProcessMapper, times(1)).selectProRouteProcessByRouteId(ROUTE_8);
-        // 首道=排产数；非首道=上道已审 500 − 本道上机 120 = 380；另一路线首道=300
+        // 首道=排产数；非首道=上道已审 500 − 本道已产出 120 = 380；另一路线首道=300
         assertThat(first.getDefaultQuantityInput()).isEqualByComparingTo("1000");
         assertThat(second.getDefaultQuantityInput()).isEqualByComparingTo("380");
         assertThat(otherRoute.getDefaultQuantityInput()).isEqualByComparingTo("300");
@@ -114,7 +114,7 @@ class TaskReportDefaultsApplierTest {
                 .thenReturn(List.of(node(FIRST_PROCESS_ID, 1), node(SECOND_PROCESS_ID, 2)));
         when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, FIRST_PROCESS_ID))
                 .thenReturn(new BigDecimal("500"));
-        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, SECOND_PROCESS_ID))
+        when(feedbackMapper.sumQuantityFeedback(WORKORDER_ID, SECOND_PROCESS_ID))
                 .thenReturn(new BigDecimal("120"));
 
         ProTask second = task(ROUTE_9, SECOND_PROCESS_ID, "1000");

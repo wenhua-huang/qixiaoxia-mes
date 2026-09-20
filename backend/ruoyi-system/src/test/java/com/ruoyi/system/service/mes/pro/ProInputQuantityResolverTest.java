@@ -24,7 +24,10 @@ import static org.mockito.Mockito.when;
  * 报工「本次上机数量」默认值解析单元测试。
  *
  * <p>规则：首道工序默认=任务排产数；其余工序=上一道工序累计已审核(AUDITED)报工产出
- * − 本工序累计上机数，差额最小钳 0；无路线/节点信息返回 null（不默认）。
+ * − 本工序累计报工产出（含待审核），差额最小钳 0；无路线/节点信息返回 null（不默认）。
+ *
+ * <p>关键口径：减项是「报工产出」而非「上机数量」——上机不消耗在制品，产出才消耗
+ * （见 {@link ProInputQuantityResolver} 类注释中的 2 上机 / 1 产出示例）。
  *
  * @author qixiaoxia
  */
@@ -74,12 +77,12 @@ class ProInputQuantityResolverTest {
     }
 
     @Test
-    @DisplayName("非首道: 上工序已审产出500、本工序上机0 → 默认500")
+    @DisplayName("非首道: 上工序已审产出500、本工序产出0 → 默认500")
     void should_return_produced_when_no_input_yet() {
         stubCurrentAndPrev(false);
         when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, PREV_PROCESS_ID))
                 .thenReturn(new BigDecimal("500"));
-        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, CURRENT_PROCESS_ID))
+        when(feedbackMapper.sumQuantityFeedback(WORKORDER_ID, CURRENT_PROCESS_ID))
                 .thenReturn(BigDecimal.ZERO);
         BigDecimal result = resolver.resolveDefaultInput(
                 WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, new BigDecimal("1000"));
@@ -87,16 +90,29 @@ class ProInputQuantityResolverTest {
     }
 
     @Test
-    @DisplayName("非首道: 上工序已审500、本工序已上机480 → 默认剩余20")
+    @DisplayName("非首道: 上工序已审500、本工序已产出480 → 默认剩余20")
     void should_return_remaining_when_some_input() {
         stubCurrentAndPrev(false);
         when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, PREV_PROCESS_ID))
                 .thenReturn(new BigDecimal("500"));
-        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, CURRENT_PROCESS_ID))
+        when(feedbackMapper.sumQuantityFeedback(WORKORDER_ID, CURRENT_PROCESS_ID))
                 .thenReturn(new BigDecimal("480"));
         BigDecimal result = resolver.resolveDefaultInput(
                 WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, new BigDecimal("1000"));
         assertThat(result).isEqualByComparingTo("20");
+    }
+
+    @Test
+    @DisplayName("回归: 本工序已上机2但首批只产出1（机台仍压1在制）→ 默认1，与上机数无关")
+    void should_count_wip_loaded_but_not_yet_produced() {
+        stubCurrentAndPrev(false);
+        when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, PREV_PROCESS_ID))
+                .thenReturn(new BigDecimal("2"));
+        when(feedbackMapper.sumQuantityFeedback(WORKORDER_ID, CURRENT_PROCESS_ID))
+                .thenReturn(new BigDecimal("1"));
+        BigDecimal result = resolver.resolveDefaultInput(
+                WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, new BigDecimal("1000"));
+        assertThat(result).isEqualByComparingTo("1");
     }
 
     @Test
@@ -105,7 +121,7 @@ class ProInputQuantityResolverTest {
         stubCurrentAndPrev(false);
         when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, PREV_PROCESS_ID))
                 .thenReturn(new BigDecimal("300").add(new BigDecimal("200")));
-        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, CURRENT_PROCESS_ID))
+        when(feedbackMapper.sumQuantityFeedback(WORKORDER_ID, CURRENT_PROCESS_ID))
                 .thenReturn(BigDecimal.ZERO);
         BigDecimal result = resolver.resolveDefaultInput(
                 WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, new BigDecimal("1000"));
@@ -113,12 +129,12 @@ class ProInputQuantityResolverTest {
     }
 
     @Test
-    @DisplayName("非首道: 本工序上机超过上工序产出(差额为负) → 钳为0")
+    @DisplayName("非首道: 本工序产出超过上工序产出(差额为负) → 钳为0")
     void should_clamp_to_zero_when_remaining_negative() {
         stubCurrentAndPrev(false);
         when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, PREV_PROCESS_ID))
                 .thenReturn(new BigDecimal("300"));
-        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, CURRENT_PROCESS_ID))
+        when(feedbackMapper.sumQuantityFeedback(WORKORDER_ID, CURRENT_PROCESS_ID))
                 .thenReturn(new BigDecimal("500"));
         BigDecimal result = resolver.resolveDefaultInput(
                 WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, new BigDecimal("1000"));
@@ -152,7 +168,7 @@ class ProInputQuantityResolverTest {
                 .thenReturn(Optional.of(node(PREV_PROCESS_ID, 1)));
         when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, PREV_PROCESS_ID))
                 .thenReturn(new BigDecimal("120"));
-        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, CURRENT_PROCESS_ID))
+        when(feedbackMapper.sumQuantityFeedback(WORKORDER_ID, CURRENT_PROCESS_ID))
                 .thenReturn(new BigDecimal("20"));
         BigDecimal result = resolver.resolveDefaultInput(
                 WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, new BigDecimal("1000"));
@@ -175,7 +191,7 @@ class ProInputQuantityResolverTest {
                 .thenReturn(Optional.of(node(PREV_PROCESS_ID, 1)));
         when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, PREV_PROCESS_ID))
                 .thenReturn(new BigDecimal("500"));
-        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, CURRENT_PROCESS_ID))
+        when(feedbackMapper.sumQuantityFeedback(WORKORDER_ID, CURRENT_PROCESS_ID))
                 .thenReturn(new BigDecimal("120"));
         BigDecimal result = resolver.resolveDefaultInput(
                 WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID,
@@ -218,7 +234,7 @@ class ProInputQuantityResolverTest {
         stubCurrentAndPrev(false);
         when(feedbackMapper.sumAuditedQuantityFeedback(WORKORDER_ID, PREV_PROCESS_ID))
                 .thenReturn(null);
-        when(feedbackMapper.sumQuantityInput(WORKORDER_ID, CURRENT_PROCESS_ID))
+        when(feedbackMapper.sumQuantityFeedback(WORKORDER_ID, CURRENT_PROCESS_ID))
                 .thenReturn(null);
         BigDecimal result = resolver.resolveDefaultInput(
                 WORKORDER_ID, ROUTE_ID, CURRENT_PROCESS_ID, new BigDecimal("1000"));

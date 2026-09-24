@@ -1,7 +1,7 @@
 import type { PageDomain, BaseEntity } from "../../common";
 
-/** 销售订单状态（四态主线 + CANCEL 链外） */
-export type SalOrderStatus = 'CONFIRMED' | 'PRODUCING' | 'SHIPPED' | 'CLOSED' | 'CANCEL'
+/** 销售订单状态（五态主线 + CANCEL 链外） */
+export type SalOrderStatus = 'PENDING_ACCEPT' | 'CONFIRMED' | 'PRODUCING' | 'SHIPPED' | 'CLOSED' | 'CANCEL'
 
 export interface SalOrderQueryParams extends PageDomain {
   orderCode?: string;

@@ -25,7 +25,7 @@ public interface ISalOrderService
     public SalOrder createWithLines(SalOrderCreateRequest req);
     /** CRM 等外部系统推单：productCode 反查物料，orderCode 缺省自动生成，source 标记为 CRM */
     public SalOrder createFromCrm(CrmOrderCreateRequest req);
-    /** 修改订单(头+全量替换行,仅 CONFIRMED 状态可改) */
+    /** 修改订单(头+全量替换行,仅 PENDING_ACCEPT/CONFIRMED 状态可改) */
     public SalOrder updateWithLines(SalOrderCreateRequest req);
     /** 详情(头+行,行带已转量/可转量,头带生产进度) */
     public SalOrder getDetail(Long orderId);
@@ -35,8 +35,10 @@ public interface ISalOrderService
 
     /** 结单:SHIPPED->CLOSED */
     public int closeOrder(Long orderId);
-    /** 取消:CONFIRMED/PRODUCING->CANCEL（SHIPPED/CLOSED/CANCEL 不可取消） */
+    /** 取消:PENDING_ACCEPT/CONFIRMED/PRODUCING->CANCEL（SHIPPED/CLOSED/CANCEL 不可取消） */
     public int cancelOrder(Long orderId);
+    /** 接单:PENDING_ACCEPT->CONFIRMED（仅待接单可接，其他态拒绝） */
+    public int acceptOrder(Long orderId);
 
     public int deleteSalOrderByOrderIds(Long[] orderIds);
 

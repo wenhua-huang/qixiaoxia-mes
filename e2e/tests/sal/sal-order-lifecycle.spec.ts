@@ -14,7 +14,7 @@ test.describe('销售订单生命周期', () => {
     await page.setViewportSize({ width: 1920, height: 1080 })
   })
 
-  test('完整流程：建单 -> 确认 -> 转工单 -> 工单页验证来源', async ({ page }) => {
+  test('完整流程：建单 -> 接单 -> 转工单 -> 工单页验证来源', async ({ page }) => {
     const uniqueCode = 'E2E-SO-' + Date.now().toString(36).toUpperCase()
 
     // ==== 导航到 销售管理 -> 销售订单 ====
@@ -88,23 +88,23 @@ test.describe('销售订单生命周期', () => {
     // 保存订单（createWithLines）
     await dialog.locator('button').filter({ hasText: '保 存' }).first().click()
     await page.waitForTimeout(2000)
-    console.log('  ✅ 销售订单创建成功（PREPARE）')
+    console.log('  ✅ 销售订单创建成功（PENDING_ACCEPT）')
 
-    // ==== Step 2：搜索 + 确认 ====
+    // ==== Step 2：搜索 + 接单 ====
     await page.locator('input[placeholder*="销售订单号"]').first().fill(uniqueCode)
     await page.locator('button').filter({ hasText: '搜索' }).first().click()
     await page.waitForTimeout(2000)
     await expect(page.locator('.el-table__body tr').first()).toBeVisible({ timeout: 5000 })
 
-    const confirmBtn = page.locator('.el-table__body .el-button').filter({ hasText: '确认' }).first()
-    await expect(confirmBtn).toBeVisible({ timeout: 5000 })
-    await confirmBtn.click()
+    const acceptBtn = page.locator('.el-table__body .el-button').filter({ hasText: /^接单$/ }).first()
+    await expect(acceptBtn).toBeVisible({ timeout: 5000 })
+    await acceptBtn.click()
     await page.waitForTimeout(500)
     const mb1 = page.locator('.el-message-box__btns button').filter({ hasText: '确定' }).first()
     await expect(mb1).toBeVisible({ timeout: 3000 })
     await mb1.click()
     await page.waitForTimeout(2000)
-    console.log('  ✅ 确认成功（PREPARE -> CONFIRMED）')
+    console.log('  ✅ 接单成功（PENDING_ACCEPT -> CONFIRMED）')
 
     // ==== Step 3：转工单(2步向导) ====
     const toWoBtn = page.locator('.el-table__body .el-button').filter({ hasText: '生成工单' }).first()
@@ -177,7 +177,7 @@ test.describe('销售订单生命周期', () => {
     console.log(`  ✅ 工单页验证通过：工单 ${woCode} 来源销售订单 ${uniqueCode}`)
   })
 
-  test('选路线流程：API建单(item_id=219有路线) → 确认 → 转工单选路线 → BOM提交', async ({ page }) => {
+  test('选路线流程：API建单(item_id=219有路线) → 接单 → 转工单选路线 → BOM提交', async ({ page }) => {
     const uniqueCode = 'E2E-RT-' + Date.now().toString(36).toUpperCase()
     const API_BASE = 'http://localhost:5173/dev-api'
 
@@ -196,7 +196,7 @@ test.describe('销售订单生命周期', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + args.token },
         body: JSON.stringify({
-          order: { orderCode: args.code, orderName: 'E2E路线测试', status: 'PREPARE', clientName: '测试' },
+          order: { orderCode: args.code, orderName: 'E2E路线测试', status: 'PENDING_ACCEPT', clientName: '测试' },
           lines: [{ productId: 211, productCode: 'FIN-BENQU-001', productName: '奔趣纸袋 小号', unitOfMeasure: 'PCS', unitName: '个', quantity: 100 }]
         })
       })
@@ -207,13 +207,15 @@ test.describe('销售订单生命周期', () => {
     expect(orderId).toBeTruthy()
     console.log(`  ✅ API建单成功(orderId=${orderId})`)
 
-    // API确认
+    // API接单
     await page.evaluate(async (args) => {
-      await fetch(args.base + '/mes/sal/order/confirm/' + args.oid, {
+      const r = await fetch(args.base + '/mes/sal/order/accept/' + args.oid, {
         method: 'PUT', headers: { 'Authorization': 'Bearer ' + args.token }
       })
+      const d = await r.json()
+      if (d.code !== 200) throw new Error('接单失败: ' + JSON.stringify(d))
     }, { base: API_BASE, token, oid: orderId })
-    console.log('  ✅ API确认成功')
+    console.log('  ✅ API接单成功')
 
     // Step 2: 导航到销售订单页
     const routesReady = page.waitForResponse(r => r.url().includes('/getRouters') && r.status() === 200, { timeout: 20000 })

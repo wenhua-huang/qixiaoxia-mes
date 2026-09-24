@@ -98,7 +98,7 @@ const statusLabel = computed(() => {
   return d ? (d.label || d.dictLabel) : (v || '')
 })
 const statusTagType = computed(() => {
-  const map: Record<string, string> = { CONFIRMED: 'success', PRODUCING: 'warning', SHIPPED: 'primary', CLOSED: 'info', CANCEL: 'danger' }
+  const map: Record<string, string> = { PENDING_ACCEPT: 'info', CONFIRMED: 'success', PRODUCING: 'warning', SHIPPED: 'primary', CLOSED: 'info', CANCEL: 'danger' }
   return map[order.value.status || ''] || 'info'
 })
 const orderTypeText = computed(() => {

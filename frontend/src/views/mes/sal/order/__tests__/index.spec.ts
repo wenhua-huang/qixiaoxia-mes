@@ -2,11 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import SalOrder from '../index.vue'
+import OrderEditDialog from '../OrderEditDialog.vue'
 
 // ==================== Mock APIs ====================
 const mockListOrder = vi.fn()
 const mockResolveBatch = vi.fn()
 const mockListRoute = vi.fn()
+const mockAcceptOrder = vi.fn()
 const mockModal = { confirm: vi.fn(), msgSuccess: vi.fn(), msgError: vi.fn(), msgWarning: vi.fn() }
 vi.mock('@/api/mes/sal/order', () => ({
   listOrder: (...args: any[]) => mockListOrder(...args),
@@ -17,6 +19,7 @@ vi.mock('@/api/mes/sal/order', () => ({
   updateOrderWithLines: vi.fn().mockResolvedValue({ code: 200 }),
   closeOrder: vi.fn().mockResolvedValue({ code: 200 }),
   cancelOrder: vi.fn().mockResolvedValue({ code: 200 }),
+  acceptOrder: (...args: any[]) => mockAcceptOrder(...args),
   toWorkorder: vi.fn().mockResolvedValue({ code: 200, data: { workorderCode: 'WO001' } }),
   delOrder: vi.fn().mockResolvedValue({ code: 200 }),
 }))
@@ -54,7 +57,8 @@ vi.mock('@/api/mes/pro/workorder', () => ({ checkDeviation: vi.fn().mockResolved
 
 const globalStubs = {
   stubs: { ClientSelect: true, LineEdit: true, ToWorkorderDialog: true, 'right-toolbar': true, pagination: true },
-  mocks: { parseTime: (t: any) => (t ? String(t).slice(0, 10) : ''), $modal: mockModal },
+  // resetForm 为若依全局 mixin 方法（清校验态），测试环境未注册全局插件，空桩即可
+  mocks: { parseTime: (t: any) => (t ? String(t).slice(0, 10) : ''), $modal: mockModal, resetForm: vi.fn() },
 }
 
 describe('SalOrder index.vue', () => {
@@ -66,6 +70,13 @@ describe('SalOrder index.vue', () => {
     const wrapper = mount(SalOrder, { global: globalStubs })
     await nextTick(); await nextTick()
     return wrapper
+  }
+
+  /** 经列表页 handleAdd 打开新增弹窗，返回对话框组件 vm（表单/明细/重算逻辑已抽到 OrderEditDialog） */
+  async function openAddDialog(wrapper: ReturnType<typeof mount>) {
+    ;(wrapper.vm as any).handleAdd()
+    await nextTick(); await nextTick()
+    return wrapper.findComponent(OrderEditDialog).vm as any
   }
 
   it('挂载时调用 listOrder 加载列表', async () => {
@@ -144,6 +155,39 @@ describe('SalOrder index.vue', () => {
     expect(btnTexts.filter(t => t === '')).toHaveLength(0)
   })
 
+  it('待接单订单：有接单/改/删/取消，无生成工单/结单', async () => {
+    mockListOrder.mockResolvedValue({ rows: [
+      { orderId: 5, orderCode: 'SO005', orderName: 'x', clientName: 'c', status: 'PENDING_ACCEPT', progressPercent: 0 }
+    ], total: 1 })
+    const wrapper = mount(SalOrder, { global: globalStubs })
+    await nextTick(); await nextTick()
+    const btnTexts = wrapper.findAll('tbody tr')[0]!.findAll('button').map(b => b.text().trim())
+    expect(btnTexts).toContain('查看')
+    expect(btnTexts).toContain('接单')
+    expect(btnTexts).toContain('改')
+    expect(btnTexts).toContain('取消')
+    expect(btnTexts).not.toContain('生成工单')
+    expect(btnTexts).not.toContain('结单')
+    // 删除图标按钮是行内唯一无文本按钮：应出现
+    expect(btnTexts.filter(t => t === '')).toHaveLength(1)
+  })
+
+  it('点接单确认后调 acceptOrder 并刷新列表提示成功', async () => {
+    mockListOrder.mockResolvedValue({ rows: [
+      { orderId: 5, orderCode: 'SO005', orderName: 'x', clientName: 'c', status: 'PENDING_ACCEPT' }
+    ], total: 1 })
+    mockAcceptOrder.mockResolvedValue({ code: 200 })
+    const wrapper = mount(SalOrder, { global: globalStubs })
+    await nextTick(); await nextTick()
+    const callsBefore = mockListOrder.mock.calls.length
+    ;(wrapper.vm as any).handleAccept({ orderId: 5, orderCode: 'SO005' })
+    await new Promise(resolve => setTimeout(resolve, 10))  // handleAccept 不返回 promise，用宏任务等链落完
+    expect(mockAcceptOrder).toHaveBeenCalledTimes(1)
+    expect(mockAcceptOrder).toHaveBeenCalledWith(5)
+    expect(mockListOrder.mock.calls.length).toBe(callsBefore + 1)
+    expect(mockModal.msgSuccess).toHaveBeenCalledWith('接单成功')
+  })
+
   it('已出货订单显示结单按钮，不显示取消', async () => {
     mockListOrder.mockResolvedValue({ rows: [
       { orderId: 2, orderCode: 'SO002', orderName: 'x', clientName: 'c', status: 'SHIPPED', progressPercent: 100 }
@@ -188,53 +232,62 @@ describe('SalOrder index.vue', () => {
     expect(wrapper.exists()).toBe(true)
   })
 
+  it('handleAdd 打开 OrderEditDialog 且新单占位待接单', async () => {
+    const wrapper = await mountPage()
+    const dlg = await openAddDialog(wrapper)
+    expect(dlg.open).toBe(true)
+    expect(dlg.optType).toBe('add')
+    expect(dlg.form.status).toBe('PENDING_ACCEPT') // 真实默认值由后端落库，前端占位保持同口径
+    expect(dlg.form.orderCode).toBe('SO20260715001') // 自动生成开关默认开，拉取流水号
+  })
+
   it('头维度变更确认后: 按新维度批量重算并覆盖命中行的路线', async () => {
     const wrapper = await mountPage()
-    const vm: any = wrapper.vm
-    vm.form.orderType = 'PLATE'; vm.form.outsourceFlag = 'N'; vm.form.packageFlag = 'N'
-    vm.lineList = [{ lineId: 1, productId: 227, productName: '产品A', routeProductId: 1, routeName: '旧路线' }]
+    const dlg = await openAddDialog(wrapper)
+    dlg.form.orderType = 'PLATE'; dlg.form.outsourceFlag = 'N'; dlg.form.packageFlag = 'N'
+    dlg.lineList = [{ lineId: 1, productId: 227, productName: '产品A', routeProductId: 1, routeName: '旧路线' }]
     mockResolveBatch.mockResolvedValue({ data: { 227: { matched: true, routeProductId: 404, routeId: 51 } } })
     mockListRoute.mockResolvedValue({ rows: [{ routeId: 51, routeCode: 'RT-PLATE', routeName: '制版路线' }] })
 
-    await vm.onHeadDimensionChange()
+    await dlg.onHeadDimensionChange()
 
     expect(mockResolveBatch).toHaveBeenCalledTimes(1)
     expect(mockResolveBatch.mock.calls[0][0]).toMatchObject({ itemIds: [227], orderType: 'PLATE', outsourceFlag: 'N', packageFlag: 'N' })
-    expect(vm.lineList[0].routeProductId).toBe(404)
-    expect(vm.lineList[0].routeName).toBe('制版路线')
+    expect(dlg.lineList[0].routeProductId).toBe(404)
+    expect(dlg.lineList[0].routeName).toBe('制版路线')
     expect(mockModal.msgSuccess).toHaveBeenCalled()
   })
 
   it('头维度变更取消确认: 不调重算接口, 行路线保持不变', async () => {
     const wrapper = await mountPage()
-    const vm: any = wrapper.vm
-    vm.lineList = [{ lineId: 1, productId: 227, productName: '产品A', routeName: '旧路线' }]
+    const dlg = await openAddDialog(wrapper)
+    dlg.lineList = [{ lineId: 1, productId: 227, productName: '产品A', routeName: '旧路线' }]
     mockModal.confirm.mockRejectedValue(new Error('cancel'))
 
-    await vm.onHeadDimensionChange()
+    await dlg.onHeadDimensionChange()
 
     expect(mockResolveBatch).not.toHaveBeenCalled()
-    expect(vm.lineList[0].routeName).toBe('旧路线')
+    expect(dlg.lineList[0].routeName).toBe('旧路线')
   })
 
   it('批量重算遇到外发硬阻断: 提示阻断产品且不覆盖该行', async () => {
     const wrapper = await mountPage()
-    const vm: any = wrapper.vm
-    vm.lineList = [{ lineId: 1, productId: 227, productName: '产品A', routeProductId: 1, routeName: '旧路线' }]
+    const dlg = await openAddDialog(wrapper)
+    dlg.lineList = [{ lineId: 1, productId: 227, productName: '产品A', routeProductId: 1, routeName: '旧路线' }]
     mockResolveBatch.mockResolvedValue({ data: { 227: { hardBlocked: true, message: '无外发路线' } } })
     mockListRoute.mockResolvedValue({ rows: [] })
 
-    await vm.onHeadDimensionChange()
+    await dlg.onHeadDimensionChange()
 
-    expect(vm.lineList[0].routeProductId).toBe(1)
+    expect(dlg.lineList[0].routeProductId).toBe(1)
     expect(mockModal.msgError.mock.calls[0][0]).toContain('产品A')
   })
 
   it('连续切换头维度: 先返回的过期响应被丢弃, 不污染明细行', async () => {
     const wrapper = await mountPage()
-    const vm: any = wrapper.vm
-    vm.form.orderType = 'STANDARD'
-    vm.lineList = [{ lineId: 1, productId: 227, productName: '产品A' }]
+    const dlg = await openAddDialog(wrapper)
+    dlg.form.orderType = 'STANDARD'
+    dlg.lineList = [{ lineId: 1, productId: 227, productName: '产品A' }]
     let resolveFirst!: (v: any) => void
     const first = new Promise(r => { resolveFirst = r })
     let resolveSecond!: (v: any) => void
@@ -242,9 +295,9 @@ describe('SalOrder index.vue', () => {
     mockResolveBatch.mockReturnValueOnce(first).mockReturnValueOnce(second)
     mockListRoute.mockResolvedValue({ rows: [] })
 
-    vm.onHeadDimensionChange()
+    dlg.onHeadDimensionChange()
     await nextTick()
-    vm.onHeadDimensionChange()
+    dlg.onHeadDimensionChange()
     await nextTick()
     resolveSecond({ data: { 227: { matched: true, routeProductId: 405, routeId: 52 } } })
     await Promise.resolve(); await nextTick()
@@ -252,6 +305,6 @@ describe('SalOrder index.vue', () => {
     await Promise.resolve(); await nextTick()
 
     expect(mockResolveBatch).toHaveBeenCalledTimes(2)
-    expect(vm.lineList[0].routeProductId).toBe(405)
+    expect(dlg.lineList[0].routeProductId).toBe(405)
   })
 })

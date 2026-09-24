@@ -3867,3 +3867,67 @@ CREATE TABLE IF NOT EXISTS `qxx_wm_outsource_order` (
   KEY `idx_source` (`source_type`,`source_ref_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='通用外协订单头表';
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+-- ------------------------------------------------------------
+-- 补：V136 基线快照遗漏 qxx_pro_slitting_record（V92 建，V94/V98/V99/V117 演进）。
+-- V162 下线分切模块的反冲存储过程需 SELECT 此表，缺表会导致全新 Testcontainers
+-- 库 Flyway 迁移在 V162 失败、所有 IT 上下文加载失败。DDL 取自开发库真实结构，
+-- 快照仅用于全新 IT 库；生产/开发库由正式迁移建表，与此无关。
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `qxx_pro_slitting_record` (
+  `slit_id` bigint NOT NULL AUTO_INCREMENT COMMENT '分切记录ID',
+  `factory_id` bigint NOT NULL COMMENT '工厂ID',
+  `slit_batch_no` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '分切批次号',
+  `feedback_id` bigint DEFAULT NULL COMMENT '关联报工记录ID',
+  `workorder_id` bigint DEFAULT NULL COMMENT '生产工单ID',
+  `workorder_code` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '生产工单编码',
+  `route_id` bigint DEFAULT NULL COMMENT '工艺路线ID',
+  `process_id` bigint DEFAULT NULL COMMENT '工序ID',
+  `process_code` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '工序编码',
+  `process_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '工序名称',
+  `card_id` bigint DEFAULT NULL COMMENT '流转卡ID',
+  `parent_roll_id` bigint DEFAULT NULL COMMENT '母卷ID(外协发料时回填)',
+  `parent_roll_code` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '母卷号',
+  `source_item_id` bigint DEFAULT NULL COMMENT '领料母卷物料ID',
+  `source_item_code` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '领料母卷物料编码',
+  `source_item_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '领料母卷物料名称',
+  `source_warehouse_id` bigint DEFAULT NULL COMMENT '领料出库仓库ID',
+  `source_warehouse_code` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '领料出库仓库编码',
+  `source_warehouse_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '领料出库仓库名称',
+  `pick_qty` decimal(14,4) DEFAULT '0.0000' COMMENT '领料数量(吨)',
+  `pick_time` datetime DEFAULT NULL COMMENT '领料时间',
+  `pick_by` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '领料人',
+  `parent_item_id` bigint DEFAULT NULL COMMENT '母卷物料ID',
+  `parent_item_code` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '母卷物料编码',
+  `parent_item_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '母卷物料名称',
+  `parent_width` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '母卷门幅(mm)',
+  `parent_weight` decimal(14,4) DEFAULT '0.0000' COMMENT '母卷分切前重量(吨)',
+  `child_count` int DEFAULT '0' COMMENT '子卷数量',
+  `child_total_weight` decimal(14,4) DEFAULT '0.0000' COMMENT '子卷总重量(吨)',
+  `edge_item_id` bigint DEFAULT NULL COMMENT '纸边物料ID',
+  `edge_item_code` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '纸边物料编码',
+  `edge_item_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '纸边物料名称',
+  `edge_weight` decimal(14,4) DEFAULT '0.0000' COMMENT '纸边重量(kg)',
+  `loss_weight` decimal(14,4) DEFAULT '0.0000' COMMENT '损耗重量=母卷-子卷-纸边(吨)',
+  `loss_rate` decimal(8,4) DEFAULT '0.0000' COMMENT '损耗率(%)',
+  `operator` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '操作人',
+  `workstation_id` bigint DEFAULT NULL COMMENT '工作站ID(分切设备)',
+  `slit_time` datetime DEFAULT NULL COMMENT '分切时间',
+  `status` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT 'EXECUTED' COMMENT '状态:EXECUTED-已执行',
+  `slit_mode` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT 'INTERNAL' COMMENT '分切模式:INTERNAL-厂内,OUTSOURCE-外协',
+  `vendor_id` bigint DEFAULT NULL COMMENT '外协厂商ID',
+  `vendor_code` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '外协厂商编码',
+  `vendor_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '外协厂商名称',
+  `remark` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '备注',
+  `create_by` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '创建者',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '更新者',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`slit_id`),
+  UNIQUE KEY `uk_slit_batch_no` (`slit_batch_no`),
+  KEY `idx_factory_id` (`factory_id`),
+  KEY `idx_parent_roll` (`parent_roll_id`),
+  KEY `idx_workorder` (`workorder_id`),
+  KEY `idx_feedback` (`feedback_id`),
+  KEY `idx_slitting_vendor` (`vendor_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='分切作业记录表';

@@ -142,8 +142,8 @@ public class SalOrderServiceImpl implements ISalOrderService
     {
         SalOrder order = req.getOrder();
         validateOrderCode(order);
-        // 建单即已确认（审核流已废弃），忽略前端可能传入的旧状态
-        order.setStatus(SalOrderStatus.CONFIRMED.getCode());
+        // 建单即待接单（V161），忽略前端可能传入的状态；人工接单后才 CONFIRMED
+        order.setStatus(SalOrderStatus.PENDING_ACCEPT.getCode());
         normalizeOrderDimensions(order);
         if (order.getSampleFlag() == null) order.setSampleFlag("N");
         if (order.getSource() == null) order.setSource(SalConstants.SOURCE_DIRECT);
@@ -174,8 +174,8 @@ public class SalOrderServiceImpl implements ISalOrderService
         order.setSampleFlag(NO);
         order.setOutsourceFlag(NO);
         order.setPackageFlag(NO);
-        // CRM 推单无 MES 内"提交/审核"动作，到 MES 即已确认（createWithLines 同样强制 CONFIRMED）
-        order.setStatus(SalOrderStatus.CONFIRMED.getCode());
+        // CRM 推单同样落待接单，需 MES 内人工接单（createWithLines 还会再强制一次）
+        order.setStatus(SalOrderStatus.PENDING_ACCEPT.getCode());
         order.setSource(SalConstants.SOURCE_CRM);
 
         if (req.getLines() == null || req.getLines().isEmpty())
@@ -226,8 +226,9 @@ public class SalOrderServiceImpl implements ISalOrderService
         validateOrderCode(order);
         SalOrder existing = salOrderMapper.selectSalOrderByOrderId(order.getOrderId());
         if (existing == null) throw new ServiceException("销售订单不存在");
-        if (!SalOrderStatus.CONFIRMED.is(existing.getStatus())) {
-            throw new ServiceException("仅已确认(CONFIRMED)订单可修改,生产中已派生工单不可改,如需调整请取消后重建");
+        if (!SalOrderStatus.PENDING_ACCEPT.is(existing.getStatus())
+                && !SalOrderStatus.CONFIRMED.is(existing.getStatus())) {
+            throw new ServiceException("仅待接单/已确认订单可修改,生产中已派生工单不可改,如需调整请取消后重建");
         }
         assertNoDerivedWorkorder(order.getOrderId(), "修改");
         normalizeOrderDimensions(order);
@@ -239,7 +240,7 @@ public class SalOrderServiceImpl implements ISalOrderService
         order.setUpdateBy(SecurityUtils.getUsername());
         order.setUpdateTime(DateUtils.getNowDate());
         salOrderMapper.updateSalOrder(order);
-        // CONFIRMED 且未派生工单才可整单改单,全量替换行（派生工单即使未开工也被上面闸门拦截，避免工单引用成孤儿）
+        // 待接单/已确认且未派生工单才可整单改单,全量替换行（派生工单即使未开工也被上面闸门拦截，避免工单引用成孤儿）
         salOrderLineMapper.deleteSalOrderLineByOrderId(order.getOrderId());
         saveLines(order, req.getLines(), true);
         return order;
@@ -298,6 +299,7 @@ public class SalOrderServiceImpl implements ISalOrderService
         return updateStatus(orderId, SalOrderStatus.CLOSED.getCode());
     }
 
+    // PENDING_ACCEPT/CONFIRMED/PRODUCING 均可取消（SHIPPED/CLOSED/CANCEL 拦截）
     @Override
     public int cancelOrder(Long orderId)
     {
@@ -311,6 +313,16 @@ public class SalOrderServiceImpl implements ISalOrderService
     }
 
     @Override
+    public int acceptOrder(Long orderId)
+    {
+        SalOrder order = mustExist(orderId);
+        if (!SalOrderStatus.PENDING_ACCEPT.is(order.getStatus())) {
+            throw new ServiceException("仅待接单订单可接单");
+        }
+        return updateStatus(orderId, SalOrderStatus.CONFIRMED.getCode());
+    }
+
+    @Override
     @Transactional
     public int deleteSalOrderByOrderIds(Long[] orderIds)
     {
@@ -318,10 +330,11 @@ public class SalOrderServiceImpl implements ISalOrderService
         {
             SalOrder order = salOrderMapper.selectSalOrderByOrderId(orderId);
             if (order == null) continue;
-            // 仅已确认(CONFIRMED)可删:转工单后(PRODUCING 起)删除会使工单 sales_order_line_id 成孤儿
-            if (!SalOrderStatus.CONFIRMED.is(order.getStatus()))
+            // 仅待接单/已确认可删:转工单后(PRODUCING 起)删除会使工单 sales_order_line_id 成孤儿
+            if (!SalOrderStatus.PENDING_ACCEPT.is(order.getStatus())
+                    && !SalOrderStatus.CONFIRMED.is(order.getStatus()))
             {
-                throw new ServiceException("订单 " + order.getOrderCode() + " 非已确认状态,不可删除");
+                throw new ServiceException("订单 " + order.getOrderCode() + " 非待接单/已确认状态,不可删除");
             }
             assertNoDerivedWorkorder(orderId, "删除");
             salOrderLineMapper.deleteSalOrderLineByOrderId(orderId);
@@ -627,7 +640,7 @@ public class SalOrderServiceImpl implements ISalOrderService
         return order;
     }
 
-    /** 改/删闸门：订单 CONFIRMED 但已派生工单（含未开工 PREPARE）时拒绝，避免行硬删使工单引用成孤儿+可转量重复占用 */
+    /** 改/删闸门：订单仅待接单/已确认可操作，但已派生工单（含未开工 PREPARE）时拒绝，避免行硬删使工单引用成孤儿+可转量重复占用 */
     private void assertNoDerivedWorkorder(Long orderId, String action)
     {
         List<SalOrderWorkorderCountRow> rows =

@@ -74,7 +74,7 @@ public class SalOrder extends BaseEntity
     @Excel(name = "付款方式")
     private String paymentMethod;
 
-    @Excel(name = "状态", readConverterExp = "CONFIRMED=已确认,PRODUCING=生产中,SHIPPED=已出货,CLOSED=已结单,CANCEL=已取消")
+    @Excel(name = "状态", readConverterExp = "PENDING_ACCEPT=待接单,CONFIRMED=已确认,PRODUCING=生产中,SHIPPED=已出货,CLOSED=已结单,CANCEL=已取消")
     private String status;
 
     @Excel(name = "审核人")

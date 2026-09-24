@@ -1,8 +1,6 @@
 package com.ruoyi.system.domain.mes.pro;
 
-import java.math.BigDecimal;
 import java.util.Date;
-import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
@@ -22,12 +20,25 @@ public class ProUserWorkstation extends BaseEntity
     private Long recordId;
     private Long factoryId;
     private Long userId;
+
+    @Excel(name = "用户名")
     private String userName;
+
+    @Excel(name = "昵称")
     private String nickName;
+
     private Long workstationId;
+
+    @Excel(name = "工位编码")
     private String workstationCode;
+
+    @Excel(name = "工位名称")
     private String workstationName;
+
+    @Excel(name = "启用状态", readConverterExp = "1=启用,0=停用")
     private String enableFlag;
+
+    @Excel(name = "绑定时间", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     private Date operationTime;
 
     // —— 非持久查询字段（仅 GET 列表查询入参，不进 JSON 输出/insert/update）——

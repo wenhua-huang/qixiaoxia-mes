@@ -1,11 +1,11 @@
 ---
 name: deploy
-description: Use to publish this project to the production server (115.29.234.204). Triggers on "deploy", "发布", "上线", "发布到生产", "发布生产", "ship to prod". Runs: build frontend locally → ssh to server → git pull → mvn build backend → systemctl restart qxx-backend → tar-upload dist → reload nginx → verify endpoints (must hit a new endpoint, captcha 200 does not prove the new jar). Also covers optional mobile app (uni-app) tar upload if the user just built it in HBuilder. Reads server credentials and paths from root AGENTS.md.
+description: Use to publish this project to the production server (115.29.234.204). Triggers on "deploy", "发布", "上线", "发布到生产", "发布生产", "ship to prod". Runs: build frontend locally → ssh to server → git pull → mvn build backend → systemctl restart qxx-backend → tar-upload dist → reload nginx → verify endpoints (must hit a new endpoint, captcha 200 does not prove the new jar). Also covers optional mobile app (uni-app): build H5 with `npm run build:h5` (CLI, no HBuilder needed) then tar-upload. Reads server credentials and paths from root AGENTS.md.
 ---
 
 # 生产环境发布
 
-发布流程：本机构建前端 → 服务器拉代码 → 编译后端 → 重启 → 上传前端 → 重载 Nginx →（可选）上传移动端 app。
+发布流程：本机构建前端 → 服务器拉代码 → 编译后端 → 重启 → 上传前端 → 重载 Nginx →（可选）CLI 构建并上传移动端 app。
 
 ## 前置条件
 
@@ -153,35 +153,64 @@ EOF
 
 ### 5. （可选）发布移动端 app
 
-⚠️ **app 构建只能手动在 HBuilder 里做**（GUI 工具，无法命令行触发）。本步骤只负责上传已构建好的 web 包。
+#### 5.1 本机构建 H5（CLI，不需要 HBuilder）
 
-**前置**：用户在 HBuilder 里点了"发行 → 网站-PC Web 或手机 H5"，输出到
-`app/unpackage/dist/build/web/`（日志里会看到 `项目 app 导出Web成功`）。
-
-确认本机输出目录存在再继续：
 ```bash
-ls /Users/huangwenhua/company/self/qixiaoxia-mes/app/unpackage/dist/build/web/ 2>/dev/null \
-  && echo "✅ HBuilder 已导出" || echo "❌ 请先在 HBuilder 里发行 web"
+cd /Users/huangwenhua/company/self/qixiaoxia-mes/app && npm run build:h5
 ```
 
-**部署**（备份旧版 → tar 管道上传新版 → reload nginx）。app 包小文件多，同样走 tar 单连接，不用 `scp -r`：
+产物在 `app/dist/build/h5/`（约 2-3MB，`index.html` + `assets/` + `static/`）。
+CLI 产物与 HBuilder "发行 → 网站" 产物（`app/unpackage/dist/build/web/`）结构等价：
+index.html 都引用相对路径 `./assets/*`，`app/config.js` 在 production 下把 baseUrl 烤成 `/prod-api`，
+页面按路由 chunk 分包。两种来源任选其一，**默认走 CLI**；仅当用户明确用 HBuilder 导出时才用
+`unpackage/dist/build/web/`（先确认目录的修改时间是本次导出，旧导出会带着已删页面上线）。
+
+**打包前必须核对（2026-09-24 实际事故）**：`tar czf - .` 的 `.` 是当前 shell cwd，
+而 shell 工作目录在命令调用之间会持久。漏 `cd` 会把整个 app 工程（含 node_modules，300MB+）
+解进生产 `app/dist/`，index.html 变成引用未编译 `/main.js` 的 Vite 模板，页面直接白屏，
+1.8GB 小机还会出现瞬时 502。上传前在**同一条命令**里 cd 并自检：
+
+```bash
+cd /Users/huangwenhua/company/self/qixiaoxia-mes/app/dist/build/h5 && pwd && ls && \
+  du -sh . && grep -o 'index-[A-Za-z0-9_-]*\.js' index.html | head -1
+# 期望：只有 assets/index.html/static；du 几 MB（不是几百 MB）；打印入口 hash
+```
+
+#### 5.2 部署（备份旧版 → tar 单连接上传 → reload）
+
+app 包小文件多，走 tar 管道，不用 `scp -r`：
 ```bash
 # 备份当前版本（带时间戳，便于回滚；首次部署 dist 不存在也不报错）
 ssh qxx 'if [ -d /var/www/qixiaoxia-mes/app/dist ]; then mv /var/www/qixiaoxia-mes/app/dist /var/www/qixiaoxia-mes/app/dist.bak.$(date +%s); fi; mkdir -p /var/www/qixiaoxia-mes/app/dist'
 
-# 上传新构建（HBuilder 输出目录内容 → 服务器 nginx 实际目录）
-cd /Users/huangwenhua/company/self/qixiaoxia-mes/app/unpackage/dist/build/web && \
+# 上传：cd 与 tar 必须在同一条命令里（用 5.1 自检过的目录）
+cd /Users/huangwenhua/company/self/qixiaoxia-mes/app/dist/build/h5 && \
   tar czf - . 2>/dev/null | ssh qxx 'tar xzf - -C /var/www/qixiaoxia-mes/app/dist/ 2>/dev/null'
 
-# reload + 验证（200 之外再确认首页引用的是新构建的 hash 资源）
-ssh qxx 'nginx -s reload && curl -s -o /dev/null -w "app /app/ → %{http_code}\n" http://localhost/app/ && curl -s -o /dev/null -w "app 图片代理 /app/prod-api/ → %{http_code}\n" http://localhost/app/prod-api/captchaImage'
+# reload + 验证
+ssh qxx 'nginx -s reload && \
+  curl -s -o /dev/null -w "app /app/ → %{http_code}\n" http://localhost/app/ && \
+  curl -s -o /dev/null -w "app 图片代理 /app/prod-api/ → %{http_code}\n" http://localhost/app/prod-api/captchaImage'
 ```
 
 期望两条均 `HTTP 200`。
 
+#### 5.3 部署后核对（确认跑的是新包而不是旧/错内容）
+
+```bash
+ssh qxx 'du -sh /var/www/qixiaoxia-mes/app/dist/; \
+  grep -o "index-[A-Za-z0-9_-]*\.js" /var/www/qixiaoxia-mes/app/dist/index.html | head -1; \
+  ls /var/www/qixiaoxia-mes/app/dist/ | tr "\n" " "; echo'
+```
+
+- 体积应只有几 MB（434MB/300MB 量级 = 又把工程传上去了，立即清空重传）
+- hash 必须与 5.1 本机 grep 出的一致；顶层只能有 `assets index.html static`
+- 删除过页面的发布，再 `grep -rl "<已删路径>" app/dist/assets/ | wc -l` 确认为 0
+
 **关键路径对应**：
-- 本机 HBuilder 输出：`app/unpackage/dist/build/web/`
-- 服务器 nginx 实际目录：`app/dist/`（不是 `app/unpackage/dist/build/web/`！）
+- 本机 CLI 输出（默认）：`app/dist/build/h5/`
+- 本机 HBuilder 输出（备选）：`app/unpackage/dist/build/web/`
+- 服务器 nginx 实际目录：`app/dist/`（**不是**上面任一输出目录的原样路径！）
 - nginx location：`/app/` → `alias /var/www/qixiaoxia-mes/app/dist/;`
 
 **回滚**：
@@ -202,8 +231,9 @@ ssh qxx 'rm -rf /var/www/qixiaoxia-mes/app/dist && mv /var/www/qixiaoxia-mes/app
 | Nginx 502 | 后端未就绪 | 等 `curl :8081` 返回 200 后再重载 |
 | 前端 404 | dist/ 未上传或路径错误 | 确认上传目标路径 `/var/www/qixiaoxia-mes/frontend/dist/`，且 `index.html` 在该目录直接存在 |
 | 登录验证码报错 | 服务器已关闭验证码 | `"uuid":""` 传空字符串 |
-| app `/app/` 404 | 上传路径写错（常见错：传到 `app/unpackage/dist/build/web/` 而非 `app/dist/`，或把 `web/` 目录本身解成了 `app/dist/web/`） | 确认服务器 `app/dist/index.html` 直接存在（多一层 web 目录就是 tar 时没 cd 进去）；nginx location 是 `alias /var/www/qixiaoxia-mes/app/dist/` |
-| app `/app/` 白屏 | HBuilder 输出后没 reload nginx，或浏览器缓存 | `ssh qxx 'nginx -s reload'`；强制刷新（Cmd+Shift+R） |
+| app `/app/` 404 | 上传路径写错（常见错：把 `h5/` 或 `web/` 目录本身解成了 `app/dist/h5/`，多套一层） | 确认服务器 `app/dist/index.html` 直接存在（多一层目录就是 tar 时没 cd 进去）；nginx location 是 `alias /var/www/qixiaoxia-mes/app/dist/` |
+| app `/app/` 白屏 | 部署后没 reload nginx，或浏览器缓存；**或 tar 时 cwd 是 app 工程根，把含 node_modules 的整工程解进了 app/dist**，index.html 变成引用 `/main.js` 的 Vite 模板（2026-09-24 实际事故，dist 体积飙到几百 MB 可识别） | `ssh qxx 'nginx -s reload'`、强制刷新（Cmd+Shift+R）；后者清空 `app/dist`，在同一条命令里 `cd app/dist/build/h5` 自检体积/hash 后重新 tar 上传 |
+| 上传 app 时 `/app/prod-api/` 瞬时 502，后端其实 active | 1.8GB 小机正在解几百 MB 误传文件，IO/内存压力导致 nginx 反代短暂失败 | 不是后端问题，清空误传、重传正确小包后自动恢复；重试验证 200 即可 |
 | app 接口跨域 | app 走相对路径 `/prod-api/`，但访问路径带了 `/app/` 前缀 | 检查 `app/config.js` 的 `baseUrl` 配置是否相对路径，nginx 是否正确代理 `/app/prod-api/` |
 | app 里图片裂开（HTML 而非图片）| uni-app H5 把 `<image src="/prod-api/xxx">` 自动前缀化为 `/app/prod-api/xxx`，nginx 若无对应 location 就走 SPA fallback 返回 `app/dist/index.html`（Content-Type: text/html，几百字节）| 服务器 `/etc/nginx/conf.d/qixiaoxia-mes.conf` 必须有 `location /app/prod-api/ { proxy_pass http://127.0.0.1:8081/; ... }`；对比 `./nginx.conf` 权威副本，缺就用本 skill "nginx 配置"章节同步 |
-| 步骤 5 找不到本机 web 包 | HBuilder 未发行 | 用户先在 HBuilder 点"发行 → 网站"，看到 `项目 app 导出Web成功` 再跑步骤 5 |
+| 步骤 5 找不到本机 web 包 | 还没构建 | 默认直接跑 `cd app && npm run build:h5`，产物 `app/dist/build/h5/`；仅在用户坚持用 HBuilder 时才让其在 HBuilder 点"发行 → 网站"，看到 `项目 app 导出Web成功` 后用 `unpackage/dist/build/web/` |

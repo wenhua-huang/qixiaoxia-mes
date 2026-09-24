@@ -98,7 +98,7 @@ test.describe('销售订单生命周期', () => {
 
     const acceptBtn = page.locator('.el-table__body .el-button').filter({ hasText: /^接单$/ }).first()
     await expect(acceptBtn).toBeVisible({ timeout: 5000 })
-    acceptBtn.click()
+    await acceptBtn.click()
     await page.waitForTimeout(500)
     const mb1 = page.locator('.el-message-box__btns button').filter({ hasText: '确定' }).first()
     await expect(mb1).toBeVisible({ timeout: 3000 })

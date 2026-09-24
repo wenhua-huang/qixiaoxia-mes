@@ -19,6 +19,9 @@ export interface GanttRow {
   noDrag?: boolean
   /** 泳道行类型：PENDING=待指派 / VENDOR=外协（用于行样式） */
   laneType?: string
+  /** 返工/补做异常任务（红角标） */
+  isException?: boolean
+  exceptionCode?: string
 }
 </script>
 
@@ -71,6 +74,13 @@ const actualStyle = computed(() => {
 
 const progressWidth = computed(() => (props.row.progress || 0) + '%')
 
+// 角标横向对齐计划条起点（wrap 全宽，不能靠父级定位）
+const badgeStyle = computed(() => {
+  const r = props.row
+  if (!valid(r.s)) return { display: 'none' }
+  return { left: props.posX(r.s) + 'px' }
+})
+
 const riskClass = computed(() => {
   switch (props.row.delayLevel) {
     case 'WARNING': return 'risk-warning'
@@ -100,7 +110,7 @@ function onResizeR(e: MouseEvent) {
   <div class="gc-bar-wrap">
     <!-- 计划条基底（浅色轨道） -->
     <div class="gc-bar"
-      :class="[riskClass, { readonly: readonly, constrained: constrained }]"
+      :class="[riskClass, { readonly: readonly, constrained: constrained, 'ex-bar': row.isException }]"
       :style="planStyle"
       @mouseup="onBarClick"
       @mousedown="onBarDown">
@@ -108,6 +118,8 @@ function onResizeR(e: MouseEvent) {
       <div v-if="!readonly" class="gc-resize-r" @mousedown.stop="onResizeR" />
       <div v-if="!hasActual" class="gc-bar-progress" :style="{ width: progressWidth }" />
     </div>
+    <!-- 异常(返工/补做)任务红角标 -->
+    <span v-if="row.isException" class="gc-bar-ex" :style="badgeStyle" :title="`异常任务 ${row.exceptionCode || ''}`">⚠</span>
     <!-- 实际条（实色 + 进度填充） -->
     <div v-if="hasActual" class="gc-bar-actual" :style="actualStyle">
       <div class="gc-bar-progress" :style="{ width: progressWidth }" />
@@ -135,6 +147,11 @@ function onResizeR(e: MouseEvent) {
 .gc-bar-progress {
   position:absolute; left:0; top:0; height:100%; background:rgba(0,0,0,.25);
   pointer-events:none; border-radius:inherit;
+}
+.gc-bar.ex-bar { box-shadow: inset 4px 0 0 #f56c6c; }
+.gc-bar-ex {
+  position:absolute; top:-7px; z-index:4; font-size:12px; line-height:1;
+  color:#f56c6c; pointer-events:none; text-shadow:0 0 2px #fff, 0 0 2px #fff;
 }
 .gc-resize-l, .gc-resize-r { width:6px; height:100%; position:absolute; top:0; cursor:ew-resize; z-index:3; }
 .gc-resize-l { left:0; border-radius:4px 0 0 4px; }

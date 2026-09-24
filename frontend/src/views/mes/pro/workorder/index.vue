@@ -20,7 +20,14 @@
 
     <el-table v-loading="loading" :data="workorderList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="工单编码" align="center" prop="workorderCode" width="130" />
+      <el-table-column label="工单编码" align="center" prop="workorderCode" width="130">
+        <template #default="scope">
+          <div>{{ scope.row.workorderCode }}</div>
+          <el-tag v-if="openStateMap[String(scope.row.workorderId)]?.openCount" type="danger" size="small" effect="plain" class="mt2">
+            异常{{ openStateMap[String(scope.row.workorderId)].openCount }}
+          </el-tag>
+        </template>
+      </el-table-column>
       <el-table-column label="工单名称" align="center" prop="workorderName" :show-overflow-tooltip="true"><template #default="scope"><el-button link @click="handleView(scope.row)" v-hasPermi="['mes:pro:workorder:query']">{{ scope.row.workorderName }}</el-button></template></el-table-column>
       <el-table-column label="来源销售订单" align="center" prop="sourceCode" width="140" :show-overflow-tooltip="true" />
       <el-table-column label="产品" align="center" prop="productName" :show-overflow-tooltip="true" />
@@ -87,6 +94,17 @@
 
     <!-- 新增/编辑弹窗 — 2 Step 向导 -->
     <el-dialog :title="title" v-model="open" width="1000px" append-to-body @close="cancel">
+      <!-- E5：未关闭异常警示区（查看态），存在未关闭异常时工单完工将被硬拦 -->
+      <el-alert v-if="optType==='view' && openExceptions.length" type="error" :closable="false" show-icon class="mb8">
+        <template #title>该工单有 {{ openExceptions.length }} 条异常未关闭，完工将被硬拦</template>
+        <template #default>
+          <div v-for="ex in openExceptions" :key="ex.exceptionId" class="ex-line">
+            <el-button link type="danger" @click="goExceptionDetail(ex)">⚠ {{ ex.exceptionCode }}</el-button>
+            <span class="ex-meta">{{ ex.processName || '-' }} · {{ parseTime(ex.occurTime, '{m}-{d} {h}:{i}') }}</span>
+            <el-button link type="danger" @click="goExceptionDetail(ex)">前往处理 ›</el-button>
+          </div>
+        </template>
+      </el-alert>
       <el-steps :active="step" finish-status="success" simple style="margin-bottom:20px" v-if="optType==='add' || optType==='edit'">
         <el-step title="基本信息" /><el-step title="工序明细" />
       </el-steps>
@@ -401,6 +419,8 @@ import WorkorderProgressDialog from './components/WorkorderProgressDialog.vue'
 import { listAllProcess } from '@/api/mes/pro/process'
 import { getItem } from '@/api/mes/md/item'
 import { getEffAttrSchema } from '@/api/mes/md/attr'
+import { openExceptionState, openExceptionByWorkorder } from '@/api/mes/pro/exception'
+import { checkPermi } from '@/utils/permission'
 
 export default {
   name: 'Workorder',
@@ -434,6 +454,11 @@ export default {
       queryParams: { pageNum: 1, pageSize: 10, workorderCode: null, productName: null, status: null },
       effAttrSchema: [],
       form: {},
+      // E5：工单未关闭异常角标（列表批量态）与查看弹窗明细
+      openStateMap: {},
+      openExceptions: [],
+      // 查看弹窗异常请求序号：连看 A/B 工单时丢弃 A 的晚到响应，防串显
+      viewExceptionSeq: 0,
       rules: {
         workorderCode: [{ required: true, message: '编码不能为空', trigger: 'blur' }],
         workorderName: [{ required: true, message: '名称不能为空', trigger: 'blur' }],
@@ -483,7 +508,27 @@ export default {
   },
   created() { this.getList(); listAllProcess().then(r=>{ this.processOptions=r.data||[] }) },
   methods: {
-    getList() { this.loading=true; listWorkorder({ ...this.queryParams, includeProgress: true }).then(r=>{ this.workorderList=r.rows; this.total=r.total; }).catch(()=>{}).finally(()=>{ this.loading=false }) },
+    getList() {
+      this.loading=true
+      listWorkorder({ ...this.queryParams, includeProgress: true }).then(r=>{
+        this.workorderList=r.rows; this.total=r.total
+        this.loadExceptionState(r.rows || [])
+      }).catch(()=>{}).finally(()=>{ this.loading=false })
+    },
+    // 列表异常角标：按 100 分批（后端 openState 单次上限 100），无权限静默跳过
+    loadExceptionState(rows) {
+      this.openStateMap = {}
+      if (!checkPermi(['mes:pro:exception:list'])) return
+      const ids = rows.map(r => r.workorderId)
+      const batches = []
+      for (let i = 0; i < ids.length; i += 100) batches.push(ids.slice(i, i + 100))
+      Promise.all(batches.map(b => openExceptionState(b)))
+        .then(results => { Object.assign(this.openStateMap, ...results.map(r => r.data || {})) })
+        .catch(() => { this.openStateMap = {} })
+    },
+    goExceptionDetail(ex) {
+      this.$router.push({ path: '/mes/pro/exception_detail', query: { exceptionId: ex.exceptionId } })
+    },
     formatRemaining(min) { if (min == null || min <= 0) return '—'; return min >= 60 ? (Math.round(min/60*10)/10) + 'h' : min + 'm'; },
     firstUndone(steps) { const i = (steps || []).findIndex(s => !s.done); return i < 0 ? -1 : i; },
     stepPct(s) {
@@ -510,11 +555,21 @@ export default {
     handleQuery() { this.queryParams.pageNum=1; this.getList() },
     resetQuery() { this.$refs.queryForm?.resetFields(); this.handleQuery() },
     handleSelectionChange(sel) { this.ids=sel.map(i=>i.workorderId); this.single=sel.length!==1; this.multiple=!sel.length },
-    handleAdd() { this.reset(); this.open=true; this.title='新增生产工单'; this.optType='add'; this.step=1 },
+    handleAdd() { this.reset(); this.viewExceptionSeq++; this.open=true; this.title='新增生产工单'; this.optType='add'; this.step=1 },
     // 查看：后端一次返回全部数据，前端直接展示
-    handleView(row) { this.reset(); this.loadDetail(row.workorderId).then(() => { this.open=true; this.title='查看生产工单'; this.optType='view' }) },
+    handleView(row) {
+      this.reset();
+      this.openExceptions = []
+      if (checkPermi(['mes:pro:exception:query'])) {
+        const seq = ++this.viewExceptionSeq
+        openExceptionByWorkorder(row.workorderId).then(r => {
+          if (seq === this.viewExceptionSeq) this.openExceptions = r.data || []
+        }).catch(() => {})
+      }
+      this.loadDetail(row.workorderId).then(() => { this.open=true; this.title='查看生产工单'; this.optType='view' })
+    },
     // 修改：后端一次返回全部数据，前端直接展示（step 由 reset 初始化为 1）
-    handleUpdate(row) { this.reset(); const id=row.workorderId||this.ids[0]; this.loadDetail(id).then(() => { this.open=true; this.optType = this.form.status==='PREPARE' ? 'edit' : 'view'; this.title = this.optType==='edit' ? '修改生产工单' : '查看生产工单' }) },
+    handleUpdate(row) { this.reset(); this.viewExceptionSeq++; const id=row.workorderId||this.ids[0]; this.loadDetail(id).then(() => { this.open=true; this.optType = this.form.status==='PREPARE' ? 'edit' : 'view'; this.title = this.optType==='edit' ? '修改生产工单' : '查看生产工单' }) },
     // 合并查询：一次请求获取工单头+BOM+参数+路线工序+路线选项（后端已全部组装）
     loadDetail(workorderId) {
       return getWorkorderDetail(workorderId).then(r => {
@@ -914,4 +969,7 @@ export default {
   0%, 100% { box-shadow: 0 0 0 3px rgba(64,158,255,.2); }
   50% { box-shadow: 0 0 0 5px rgba(64,158,255,.08); }
 }
+.mt2 { margin-top: 2px; }
+.ex-line { display: flex; align-items: center; gap: 8px; line-height: 24px; }
+.ex-meta { color: #606266; font-size: 12px; }
 </style>

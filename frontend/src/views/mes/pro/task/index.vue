@@ -50,7 +50,19 @@
     <!-- 表格 -->
     <el-table v-loading="loading" :data="taskList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="任务编码" align="center" prop="taskCode" width="150" :show-overflow-tooltip="true" />
+      <el-table-column label="任务编码" align="center" prop="taskCode" width="170" :show-overflow-tooltip="true">
+        <template #default="scope">
+          <el-tag v-if="scope.row.isException === 'Y'" type="danger" size="small" effect="dark" class="mr4">异常</el-tag>
+          <span>{{ scope.row.taskCode }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="关联异常单" align="center" prop="exceptionCode" width="140">
+        <template #default="scope">
+          <el-button v-if="scope.row.exceptionCode && checkPermi(['mes:pro:exception:query'])" link type="danger" @click.stop="goException(scope.row)">{{ scope.row.exceptionCode }}</el-button>
+          <span v-else-if="scope.row.exceptionCode" style="color:#f56c6c">{{ scope.row.exceptionCode }}</span>
+          <span v-else>-</span>
+        </template>
+      </el-table-column>
       <el-table-column label="任务名称" align="center" prop="taskName" width="150" :show-overflow-tooltip="true" />
       <el-table-column label="生产工单" align="center" prop="workorderName" width="150" :show-overflow-tooltip="true" />
       <el-table-column label="工位" align="center" prop="workstationName" width="120" :show-overflow-tooltip="true" />
@@ -86,12 +98,13 @@
           <span v-else :style="{ color: statusColor[scope.row.status] }">{{ statusMap[scope.row.status] || scope.row.status }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="340">
+      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="380">
         <template #default="scope">
           <el-button link type="danger" icon="Unlock" @click="handleReleaseQcBlock(scope.row)" v-if="isQcBlocked(scope.row)" v-hasPermi="['mes:pro:task:release']">质检放行</el-button>
           <el-button link type="success" icon="Position" @click="handleDispatch(scope.row)" v-if="scope.row.status==='NORMAL'||scope.row.status==='PREPARE'" v-hasPermi="['mes:pro:task:edit']">下发</el-button>
           <el-button link type="primary" icon="CircleCheck" @click="handleComplete(scope.row)" v-if="scope.row.status==='PRODUCING' && !isQcBlocked(scope.row)" v-hasPermi="['mes:pro:task:edit']">完成</el-button>
           <el-button link type="warning" icon="CircleClose" @click="handleCancelTask(scope.row)" v-if="scope.row.status!=='COMPLETED'&&scope.row.status!=='CANCEL'" v-hasPermi="['mes:pro:task:edit']">取消</el-button>
+          <el-button link type="danger" icon="Warning" @click="handleReportException(scope.row)" v-if="scope.row.status!=='COMPLETED'&&scope.row.status!=='CANCEL'" v-hasPermi="['mes:pro:exception:add']">报异常</el-button>
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:pro:task:edit']">修改</el-button>
           <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:pro:task:remove']">删除</el-button>
         </template>
@@ -209,22 +222,30 @@
 
     <!-- 跟单质检不合格放行 -->
     <QcReleaseDialog ref="qcReleaseRef" @success="getList" />
+    <!-- E1：PC 工序任务报异常 -->
+    <ExceptionCreateDialog ref="exceptionCreateRef" @success="goNewException" />
   </div>
 </template>
 
 <script setup lang="ts" name="ProSchedule">
 import { ref, reactive, toRefs, getCurrentInstance } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { listTask, getTask, delTask, addTask, updateTask, dispatchTask, completeTask, cancelTask, getQcBlockState } from '@/api/mes/pro/task'
 import { listWorkorder, getWorkorder } from '@/api/mes/pro/workorder'
 import { listAllProcess } from '@/api/mes/pro/process'
 import { listRouteProcessByRouteId } from '@/api/mes/pro/routeprocess'
 import { listRouteProduct } from '@/api/mes/pro/routeproduct'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
+import { checkPermi } from '@/utils/permission'
+import { TASK_STATUS_LABEL as statusMap, TASK_STATUS_COLOR as statusColor } from '../taskStatus'
 import WorkstationSelect from '@/components/workstationSelect/single.vue'
 import workorderSelect from '@/components/workorderSelect/single.vue'
 import QcReleaseDialog from './components/QcReleaseDialog.vue'
+import ExceptionCreateDialog from '../exception/components/ExceptionCreateDialog.vue'
 
 const { proxy } = getCurrentInstance() as any
+const router = useRouter()
+const route = useRoute()
 
 const wsSelectRef = ref<InstanceType<typeof WorkstationSelect>>()
 const woSelectRef = ref()
@@ -242,13 +263,6 @@ const optType = ref('')
 const autoGenFlag = ref(false)
 const workorderOptions = ref<any[]>([])
 const processOptions = ref<any[]>([])
-
-const statusMap: Record<string, string> = {
-  PREPARE: '待排产', NORMAL: '正常', PRODUCING: '生产中', COMPLETED: '已完成', PAUSED: '暂停', CANCEL: '取消'
-}
-const statusColor: Record<string, string> = {
-  PREPARE: '#E6A23C', NORMAL: '#409EFF', PRODUCING: '#67C23A', COMPLETED: '#909399', PAUSED: '#E6A23C', CANCEL: '#F56C6C'
-}
 
 // 跟单质检锁态：list 接口不富化，列表加载后对本页 PRODUCING 任务批量查询
 const QC_STATE_BATCH = 100  // 后端单次最多 100 个任务
@@ -290,6 +304,19 @@ const data = reactive({
 const { queryParams, form, rules } = toRefs(data)
 
 // ===================== 列表加载 =====================
+
+function goException(row: any) {
+  router.push({ path: '/mes/pro/exception_detail', query: { exceptionId: row.exceptionId } })
+}
+
+// E1：PC 端工序任务直接报异常，提交后跳详情供主管定责
+const exceptionCreateRef = ref<InstanceType<typeof ExceptionCreateDialog>>()
+function handleReportException(row: any) {
+  exceptionCreateRef.value?.open(row)
+}
+function goNewException(exceptionId: number) {
+  router.push({ path: '/mes/pro/exception_detail', query: { exceptionId } })
+}
 
 function getList() {
   loading.value = true
@@ -478,10 +505,15 @@ function handleExport() {
   proxy.download('/mes/pro/task/export', { ...queryParams.value }, `schedule_${Date.now()}.xlsx`)
 }
 
+// 异常详情「处理单据」跳回：按任务编号自动过滤定位
+if (route.query.taskCode) {
+  queryParams.value.taskCode = String(route.query.taskCode)
+}
 getList()
 </script>
 
 <style lang="scss" scoped>
 .app-container { padding: 16px; }
 .mb8 { margin-bottom: 8px; }
+.mr4 { margin-right: 4px; }
 </style>

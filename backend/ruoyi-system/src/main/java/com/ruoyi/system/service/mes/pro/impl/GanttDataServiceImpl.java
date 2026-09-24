@@ -427,6 +427,10 @@ public class GanttDataServiceImpl implements IGanttDataService
             warnHours, tol, new Date());
         item.put("delayLevel", level);
         item.put("behindSchedule", ProConstants.DELAY_BEHIND.equals(level));
+        // 异常(返工/补做)任务红角标（异常模块 E4）
+        item.put("isException", ProExceptionConstants.YES.equals(pt.getIsException()));
+        item.put("exceptionId", pt.getExceptionId());
+        item.put("exceptionCode", pt.getExceptionCode());
     }
 
     /** 读 sys_config 整数，缺失或非法返回默认值。 */

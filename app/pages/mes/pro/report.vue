@@ -92,6 +92,11 @@
       <uni-section title="报工数量" type="line"></uni-section>
       <!-- 跟单质检不合格硬拦：展示原因，授权角色可在此一键放行 -->
       <qc-block-bar v-if="isBlocked" :task="selectedTask" @released="onBlockReleased" />
+      <!-- 异常上报入口：为当前选中的工序任务报异常（质检硬拦时也可上报） -->
+      <view class="exception-entry" @click="goReportException">
+        <text class="exception-entry-text">⚠ 报异常</text>
+        <uni-icons type="right" size="14" color="#f56c6c"></uni-icons>
+      </view>
       <view class="form-box">
         <view class="worker-row">
           <text class="qty-label">报工人</text>
@@ -450,6 +455,12 @@ function selectTask(task) {
   }
 }
 
+// 携当前任务跳转异常上报页
+function goReportException() {
+  if (!selectedTask.value) return
+  uni.navigateTo({ url: '/pages/mes/pro/exception-create?taskId=' + selectedTask.value.taskId })
+}
+
 // 加载工序参数模板（只加载报工可见 isReportVisible=Y 且启用 enableFlag=1 的）
 function loadParams(processId) {
   listParamTemplateByProcessId(processId).then(res => {
@@ -682,6 +693,13 @@ page { background-color: #f5f6f7; min-height: 100%; }
 }
 
 .form-box { padding: 16rpx 24rpx 24rpx; }
+
+.exception-entry {
+  display: flex; align-items: center; justify-content: space-between;
+  margin: 16rpx 24rpx 0; padding: 18rpx 24rpx;
+  background: #fef0f0; border: 1rpx solid #fab6b6; border-radius: 12rpx;
+}
+.exception-entry-text { font-size: 26rpx; color: #f56c6c; font-weight: 500; }
 
 .param-row {
   padding: 20rpx 0;

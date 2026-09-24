@@ -26,6 +26,7 @@
             :title="'缺料：' + ((r.raw as any).materialStatus?.shortageNames || '')" style="cursor:help">🔴</span>
           <span v-else-if="r.t==='p' && (r.raw as any).materialStatus?.status==='ok'"
             :title="物料齐套" style="cursor:help">🟢</span>
+          <span v-if="r.t==='t' && r.isException" class="ex-flag" :title="'异常(返工/补做)任务 ' + (r.exceptionCode||'')">⚠</span>
           <span :style="{paddingLeft:r.t==='p'||r.bars?'4px':'20px'}">{{ r.text }}</span>
         </div>
       </div>
@@ -97,12 +98,8 @@ const dayStatusMap = ref<Map<string, boolean>>(new Map()) // date → working?
 async function fetchCalendar() {
   try {
     const res: any = await request({
-      url: '/mes/pro/gantt/calendar/dayStatus',
-      method: 'get',
-      params: {
-        from: range.s.toISOString().slice(0,10),
-        to: range.e.toISOString().slice(0,10)
-      }
+      url: '/mes/pro/gantt/calendar/dayStatus', method: 'get',
+      params: { from: range.s.toISOString().slice(0, 10), to: range.e.toISOString().slice(0, 10) }
     })
     const list = res?.data || []
     const m = new Map<string, boolean>()
@@ -150,7 +147,9 @@ function buildRows() {
           aS: c.actualStartTime ? parseDate(c.actualStartTime) : null,
           aE: c.actualEndTime ? parseDate(c.actualEndTime) : null,
           progress: typeof c.progressPercent === 'number' ? Math.min(100, Math.max(0, c.progressPercent)) : 0,
-          delayLevel: c.delayLevel || 'NORMAL'
+          delayLevel: c.delayLevel || 'NORMAL',
+          isException: !!c.isException,
+          exceptionCode: c.exceptionCode
         }
         if (c.end) prevEndMs = parseDate(c.end).getTime()
         isFirst = false
@@ -187,32 +186,18 @@ async function render() {
 
 /** 机台泳道视图：按 lanes 内全部任务的时间范围自动定位视窗（默认窗口只覆盖本周，8 月任务会落到视口外） */
 function fitRangeToLanes() {
-  let min = Infinity, max = -Infinity
-  for (const lane of props.lanes || []) {
-    for (const t of lane.tasks || []) {
-      for (const v of [t.start, t.end, t.actualStartTime, t.actualEndTime]) {
-        if (!v) continue
-        const tm = parseDate(v).getTime()
-        if (!Number.isNaN(tm)) { if (tm < min) min = tm; if (tm > max) max = tm }
-      }
-    }
+  const values: Array<string | null | undefined> = []
+  for (const lane of props.lanes || []) for (const t of lane.tasks || []) {
+    values.push(t.start, t.end, t.actualStartTime, t.actualEndTime)
   }
-  if (!Number.isFinite(min)) return
-  const HOUR = 3600000, DAY = 86400000
-  let s = min - HOUR, e = max + HOUR
-  const MAX = 60 * DAY
-  if (e - s > MAX) e = s + MAX
-  mode.value = e - s <= 2 * DAY ? 'day' : 'week'
-  const grid = mode.value === 'day' ? HOUR : DAY
-  range.s = new Date(Math.floor(s / grid) * grid)
-  range.e = new Date(e)
+  applyFitRange(values)
 }
 
 // ---- init ----
 onMounted(render)
 watch(() => [props.tasks, props.lanes], () => nextTick(render), { deep: true })
 // 机台泳道数据切换（切视角/刷新）时自动定位时间窗；引用变化才触发，用户手动翻页/缩放不受影响
-watch(() => props.lanes, (lanes) => {
+watch(() => props.lanes, (lanes: WorkstationLane[] | null) => {
   if (lanes && lanes.length) { fitRangeToLanes(); nextTick(render) }
 })
 
@@ -261,28 +246,35 @@ function onScroll(e: Event) {
   }
 }
 
-/** 按任务时间范围自动定位视窗（供只读详情/进度弹窗使用） */
-function fitToData() {
+/**
+ * 按任务时间字段整体范围定位视窗：留 1 小时边距、跨度上限 60 天、≤2 天切小时格。
+ * 无有效时间返回 false（默认窗口只覆盖本周，范围外任务会落到视口外）
+ */
+function applyFitRange(values: Array<string | null | undefined>): boolean {
   let min = Infinity, max = -Infinity
-  for (const p of props.tasks) {
-    for (const c of p.children || []) {
-      for (const v of [c.start, c.end, c.actualStartTime, c.actualEndTime]) {
-        if (!v) continue
-        const t = parseDate(v).getTime()
-        if (!Number.isNaN(t)) { if (t < min) min = t; if (t > max) max = t }
-      }
-    }
+  for (const v of values) {
+    if (!v) continue
+    const tm = parseDate(v).getTime()
+    if (!Number.isNaN(tm)) { if (tm < min) min = tm; if (tm > max) max = tm }
   }
-  if (!Number.isFinite(min)) return
+  if (!Number.isFinite(min)) return false
   const HOUR = 3600000, DAY = 86400000
   let s = min - HOUR, e = max + HOUR
-  const MAX = 60 * DAY
-  if (e - s > MAX) e = s + MAX
+  if (e - s > 60 * DAY) e = s + 60 * DAY
   mode.value = e - s <= 2 * DAY ? 'day' : 'week'
   const grid = mode.value === 'day' ? HOUR : DAY
-  s = Math.floor(s / grid) * grid
-  range.s = new Date(s)
+  range.s = new Date(Math.floor(s / grid) * grid)
   range.e = new Date(e)
+  return true
+}
+
+/** 按任务时间范围自动定位视窗（供只读详情/进度弹窗使用） */
+function fitToData() {
+  const values: Array<string | null | undefined> = []
+  for (const p of props.tasks) for (const c of p.children || []) {
+    values.push(c.start, c.end, c.actualStartTime, c.actualEndTime)
+  }
+  if (!applyFitRange(values)) return
   render()
   nextTick(() => { if (rightRef.value) rightRef.value.scrollLeft = 0 })
 }
@@ -297,6 +289,7 @@ defineExpose({ render, fitToData })
 .gc-left { flex-shrink:0; border-right:1px solid #e4e7ed; }
 .gc-left-hd { height:32px; line-height:32px; padding:0 8px; font-weight:600; font-size:12px; background:#f5f7fa; border-bottom:1px solid #dcdfe6; }
 .gc-left-cell { display:flex; align-items:center; padding:0 4px; font-size:12px; border-bottom:1px solid #f2f3f5; overflow:hidden; white-space:nowrap; &.proj { font-weight:600; background:#fafafa; } &.lane { font-weight:600; background:#f5f7fa; } &.lane-pending { color:#f56c6c; background:#fef0f0; } &.lane-vendor { color:#909399; background:#f4f4f5; } }
+.ex-flag { color:#f56c6c; font-size:13px; margin-right:2px; }
 .gc-right { flex:1; overflow:auto; max-height:calc(100vh - 280px); }
 .gc-time-hd { height:32px; position:sticky; top:0; z-index:2; background:#f5f7fa; border-bottom:1px solid #dcdfe6; }
 .gc-time-cell { position:absolute; top:0; height:100%; line-height:32px; text-align:center; font-size:10px; border-right:1px solid #e4e7ed; color:#606266; &.we { background:#fef0f0; color:#f56c6c; } }

@@ -64,6 +64,7 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
     @Autowired private com.ruoyi.system.service.mes.wm.OutsourceIssueHelper outsourceIssueHelper;
     @Autowired private com.ruoyi.system.mapper.mes.wm.WmOutsourceOrderMapper wmOutsourceOrderMapper;
     @Autowired private com.ruoyi.system.service.mes.qc.IQcFactoryService qcFactoryService;
+    @Autowired private IProExceptionBlockService proExceptionBlockService;
 
     // ---- 单据类型常量 ----
     private static final String DOC_ISSUE = "ISSUE";
@@ -1063,6 +1064,8 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
         BigDecimal produced = wo.getQuantityProduced() != null ? wo.getQuantityProduced() : BigDecimal.ZERO;
         BigDecimal planned = wo.getQuantity() != null ? wo.getQuantity() : BigDecimal.ZERO;
         if (produced.compareTo(planned) < 0) return;
+        // E5 硬拦：存在未关闭异常单时禁止工单自动完工（整笔报工审核回滚）
+        proExceptionBlockService.assertCompletable(workorderId);
         proWorkorderMapper.completeWorkorderIfProducing(
                 workorderId,
                 new Date(),

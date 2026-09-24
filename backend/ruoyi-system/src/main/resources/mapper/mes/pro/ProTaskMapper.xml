@@ -59,6 +59,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="predecessorId"    column="predecessor_id"    />
         <result property="snapshotId"    column="snapshot_id"    />
         <result property="ganttSort"    column="gantt_sort"    />
+        <result property="isException"    column="is_exception"    />
+        <result property="exceptionId"    column="exception_id"    />
+        <result property="exceptionCode"    column="exception_code"    />
+        <result property="originTaskId"    column="origin_task_id"    />
         <result property="remark"    column="remark"    />
         <result property="createBy"    column="create_by"    />
         <result property="createTime"    column="create_time"    />
@@ -67,7 +71,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectProTaskVo">
-        select task_id, factory_id, task_code, task_name, workorder_id, workorder_code, workorder_name, workstation_id, workstation_code, workstation_name, route_id, route_code, process_id, process_code, process_name, item_id, item_code, item_name, specification, unit_of_measure, unit_name, quantity, quantity_produced, quantity_qualified, quantity_unqualified, quantity_changed, worker_id, worker_name, worker_nick, leader_id, leader_name, leader_nick, client_id, client_code, client_name, client_nick, machine_code, setup_duration, unit_duration, offline_qty, start_time, duration, end_time, color_code, request_date, finish_date, cancel_date, vendor_id, vendor_code, outsource_factory_id, status, predecessor_id, snapshot_id, gantt_sort, remark, create_by, create_time, update_by, update_time from qxx_pro_task
+        select task_id, factory_id, task_code, task_name, workorder_id, workorder_code, workorder_name, workstation_id, workstation_code, workstation_name, route_id, route_code, process_id, process_code, process_name, item_id, item_code, item_name, specification, unit_of_measure, unit_name, quantity, quantity_produced, quantity_qualified, quantity_unqualified, quantity_changed, worker_id, worker_name, worker_nick, leader_id, leader_name, leader_nick, client_id, client_code, client_name, client_nick, machine_code, setup_duration, unit_duration, offline_qty, start_time, duration, end_time, color_code, request_date, finish_date, cancel_date, vendor_id, vendor_code, outsource_factory_id, status, predecessor_id, snapshot_id, gantt_sort,
+               is_exception, exception_id, exception_code, origin_task_id,
+               remark, create_by, create_time, update_by, update_time from qxx_pro_task
     </sql>
 
     <select id="selectProTaskList" parameterType="ProTask" resultMap="ProTaskResult">
@@ -101,7 +107,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                t.client_name, t.client_nick, t.machine_code, t.setup_duration, t.unit_duration, t.offline_qty,
                t.start_time, t.duration, t.end_time, t.color_code, t.request_date, t.finish_date, t.cancel_date,
                t.vendor_id, t.vendor_code, t.outsource_factory_id, t.status, t.predecessor_id, t.snapshot_id,
-               t.gantt_sort, t.remark, t.create_by, t.create_time, t.update_by, t.update_time
+               t.gantt_sort, t.is_exception, t.exception_id, t.exception_code, t.origin_task_id,
+               t.remark, t.create_by, t.create_time, t.update_by, t.update_time
         from qxx_pro_task t
         inner join qxx_pro_workorder wo on wo.workorder_id = t.workorder_id
         <where>
@@ -187,6 +194,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="predecessorId != null">predecessor_id,</if>
             <if test="snapshotId != null">snapshot_id,</if>
             <if test="ganttSort != null">gantt_sort,</if>
+            <if test="isException != null and isException != ''">is_exception,</if>
+            <if test="exceptionId != null">exception_id,</if>
+            <if test="exceptionCode != null">exception_code,</if>
+            <if test="originTaskId != null">origin_task_id,</if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
@@ -244,6 +255,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="predecessorId != null">#{predecessorId},</if>
             <if test="snapshotId != null">#{snapshotId},</if>
             <if test="ganttSort != null">#{ganttSort},</if>
+            <if test="isException != null and isException != ''">#{isException},</if>
+            <if test="exceptionId != null">#{exceptionId},</if>
+            <if test="exceptionCode != null">#{exceptionCode},</if>
+            <if test="originTaskId != null">#{originTaskId},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
@@ -307,6 +322,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="predecessorId != null">predecessor_id = #{predecessorId},</if>
             <if test="snapshotId != null">snapshot_id = #{snapshotId},</if>
             <if test="ganttSort != null">gantt_sort = #{ganttSort},</if>
+            <if test="isException != null and isException != ''">is_exception = #{isException},</if>
+            <if test="exceptionId != null">exception_id = #{exceptionId},</if>
+            <if test="exceptionCode != null">exception_code = #{exceptionCode},</if>
+            <if test="originTaskId != null">origin_task_id = #{originTaskId},</if>
             <if test="remark != null">remark = #{remark},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="updateTime != null">update_time = #{updateTime},</if>
@@ -369,5 +388,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         update qxx_pro_task
         set status = 'COMPLETED', update_by = #{operator}, update_time = NOW()
         where task_id = #{taskId} and status = 'PRODUCING'
+    </update>
+
+    <!-- 异常顺延改期：只精准更新计划完成时间，避免全实体 update 覆盖并发状态（异常模块 E3） -->
+    <update id="updateTaskEndTime">
+        update qxx_pro_task
+        set end_time = #{endTime}, update_by = #{operator}, update_time = NOW()
+        where task_id = #{taskId}
     </update>
 </mapper>

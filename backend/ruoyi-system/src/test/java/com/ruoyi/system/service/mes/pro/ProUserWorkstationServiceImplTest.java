@@ -2,8 +2,10 @@ package com.ruoyi.system.service.mes.pro;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
 
 import com.ruoyi.common.core.domain.entity.SysUser;
+import com.ruoyi.common.core.redis.RedisLockTemplate;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.system.domain.mes.md.MdWorkstation;
@@ -25,11 +27,14 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.*;
 
 /**
@@ -44,6 +49,8 @@ class ProUserWorkstationServiceImplTest {
     @Mock private ProUserWorkstationMapper mapper;
     @Mock private ISysUserService userService;
     @Mock private MdWorkstationMapper workstationMapper;
+    @Mock private RedisLockTemplate lockTemplate;
+    @Mock private PlatformTransactionManager transactionManager;
     @InjectMocks private ProUserWorkstationServiceImpl service;
 
     private MockedStatic<SecurityUtils> securityUtilsMock;
@@ -52,6 +59,12 @@ class ProUserWorkstationServiceImplTest {
     void setUp() {
         securityUtilsMock = mockStatic(SecurityUtils.class);
         securityUtilsMock.when(SecurityUtils::getUsername).thenReturn("admin");
+        securityUtilsMock.when(SecurityUtils::getFactoryId).thenReturn(1L);
+        // 锁模板立即执行传入动作；TransactionTemplate 用真实实例 + mock 事务管理器，回调照常执行
+        doAnswer(inv -> ((Supplier<?>) inv.getArgument(1)).get())
+                .when(lockTemplate).execute(anyString(), any(Supplier.class));
+        doAnswer(inv -> { ((Runnable) inv.getArgument(1)).run(); return null; })
+                .when(lockTemplate).execute(anyString(), any(Runnable.class));
     }
 
     @AfterEach
@@ -178,10 +191,17 @@ class ProUserWorkstationServiceImplTest {
         assertThatThrownBy(() -> service.batchBind(empty))
                 .isInstanceOf(ServiceException.class).hasMessageContaining("人员");
 
+        // 上限校验在去重之后：需 51 个不同 ID 才触发
         UserWorkstationBatchRequest tooMany = req();
-        tooMany.setUserIds(java.util.stream.Stream.generate(() -> 1L).limit(51).toList());
+        tooMany.setUserIds(java.util.stream.LongStream.rangeClosed(1, 51).boxed().toList());
         assertThatThrownBy(() -> service.batchBind(tooMany))
                 .isInstanceOf(ServiceException.class).hasMessageContaining("50");
+
+        // 剔空后为空列表：报「请选择绑定人员」，不得静默成 0/0/0
+        UserWorkstationBatchRequest nullId = req();
+        nullId.setUserIds(java.util.Arrays.asList((Long) null));
+        assertThatThrownBy(() -> service.batchBind(nullId))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("人员");
     }
 
     @Test
@@ -246,6 +266,45 @@ class ProUserWorkstationServiceImplTest {
 
         assertThatThrownBy(() -> service.updateProUserWorkstation(patch))
                 .isInstanceOf(ServiceException.class).hasMessageContaining("已绑定此工位");
+        verify(mapper, never()).updateProUserWorkstation(any());
+    }
+
+    @Test
+    @DisplayName("批量绑定：经工厂级 Redisson 锁模板串行执行（先锁后事务）")
+    void batchBind_runsUnderFactoryLock() {
+        when(userService.selectUserById(1L)).thenReturn(user(1L));
+        when(workstationMapper.selectMdWorkstationByWorkstationId(100L)).thenReturn(ws(100L, "1"));
+        when(mapper.selectByUserAndWorkstation(1L, 100L)).thenReturn(new ArrayList<>());
+
+        service.batchBind(req());
+
+        verify(lockTemplate).execute(
+                startsWith("mes:pro:userworkstation:bind:"), any(Supplier.class));
+        verify(mapper).insertProUserWorkstation(any());
+    }
+
+    @Test
+    @DisplayName("单条新增成功：委托批处理写入，名称/时间/启用标志由后端回填")
+    void insert_newPair_delegatesToBatchWithFilledNames() {
+        when(userService.selectUserById(1L)).thenReturn(user(1L));
+        when(workstationMapper.selectMdWorkstationByWorkstationId(100L)).thenReturn(ws(100L, "1"));
+        when(mapper.selectByUserAndWorkstation(1L, 100L)).thenReturn(new ArrayList<>());
+
+        ProUserWorkstation e = new ProUserWorkstation();
+        e.setUserId(1L);
+        e.setWorkstationId(100L);
+        int rows = service.insertProUserWorkstation(e);
+
+        assertThat(rows).isEqualTo(1);
+        verify(mapper).insertProUserWorkstation(argThat(x ->
+                x.getUserId().equals(1L)
+                && "zhangsan".equals(x.getUserName())
+                && "张三".equals(x.getNickName())
+                && x.getWorkstationId().equals(100L)
+                && "WS-001".equals(x.getWorkstationCode())
+                && "一号工位".equals(x.getWorkstationName())
+                && "1".equals(x.getEnableFlag())
+                && x.getOperationTime() != null));
         verify(mapper, never()).updateProUserWorkstation(any());
     }
 }

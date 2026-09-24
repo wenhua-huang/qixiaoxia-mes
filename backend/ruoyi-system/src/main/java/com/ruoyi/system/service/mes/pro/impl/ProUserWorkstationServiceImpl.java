@@ -6,12 +6,13 @@ import java.util.List;
 import java.util.Objects;
 
 import com.ruoyi.common.core.domain.entity.SysUser;
+import com.ruoyi.common.core.redis.RedisLockTemplate;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import com.ruoyi.system.domain.mes.md.MdWorkstation;
 import com.ruoyi.system.mapper.mes.md.MdWorkstationMapper;
 import com.ruoyi.system.mapper.mes.pro.ProUserWorkstationMapper;
@@ -27,10 +28,24 @@ public class ProUserWorkstationServiceImpl implements IProUserWorkstationService
     private static final int MAX_USERS = 50;
     private static final int MAX_WORKSTATIONS = 20;
     private static final int REMARK_MAX = 500;
+    /** 绑定写入工厂级粗锁：低频管理操作（单批最多 1000 对），工厂内串行最简单可靠 */
+    private static final String LOCK_BIND_PREFIX = "mes:pro:userworkstation:bind:";
 
-    @Autowired private ProUserWorkstationMapper proUserWorkstationMapper;
-    @Autowired private ISysUserService userService;
-    @Autowired private MdWorkstationMapper workstationMapper;
+    private final ProUserWorkstationMapper proUserWorkstationMapper;
+    private final ISysUserService userService;
+    private final MdWorkstationMapper workstationMapper;
+    private final RedisLockTemplate lockTemplate;
+    private final TransactionTemplate txTemplate;
+
+    public ProUserWorkstationServiceImpl(ProUserWorkstationMapper proUserWorkstationMapper,
+            ISysUserService userService, MdWorkstationMapper workstationMapper,
+            RedisLockTemplate lockTemplate, PlatformTransactionManager transactionManager) {
+        this.proUserWorkstationMapper = proUserWorkstationMapper;
+        this.userService = userService;
+        this.workstationMapper = workstationMapper;
+        this.lockTemplate = lockTemplate;
+        this.txTemplate = new TransactionTemplate(transactionManager);
+    }
 
     @Override
     public ProUserWorkstation selectProUserWorkstationByRecordId(Long recordId) {
@@ -60,11 +75,22 @@ public class ProUserWorkstationServiceImpl implements IProUserWorkstationService
     }
 
     @Override
-    @Transactional
     public UserWorkstationBatchResult batchBind(UserWorkstationBatchRequest req) {
-        validateRequest(req);
-        List<SysUser> users = resolveUsers(req.getUserIds());
-        List<MdWorkstation> stations = resolveStations(req.getWorkstationIds());
+        // 先锁后事务：check-then-act 在工厂级锁内串行，无唯一索引下兜底「一对只许一行」
+        return lockTemplate.execute(bindLockKey(),
+                () -> txTemplate.execute(tx -> doBatchBind(req)));
+    }
+
+    private UserWorkstationBatchResult doBatchBind(UserWorkstationBatchRequest req) {
+        if (req == null) {
+            throw new ServiceException("请选择绑定人员");
+        }
+        // 先去重+剔空再校验：[null] 不得静默成 0/0/0
+        List<Long> userIds = normalizeIds(req.getUserIds());
+        List<Long> stationIds = normalizeIds(req.getWorkstationIds());
+        validateRequest(userIds, stationIds, req.getRemark());
+        List<SysUser> users = resolveUsers(userIds);
+        List<MdWorkstation> stations = resolveStations(stationIds);
         UserWorkstationBatchResult result = new UserWorkstationBatchResult();
         for (SysUser user : users) {
             for (MdWorkstation station : stations) {
@@ -75,7 +101,6 @@ public class ProUserWorkstationServiceImpl implements IProUserWorkstationService
     }
 
     @Override
-    @Transactional
     public int insertProUserWorkstation(ProUserWorkstation e) {
         if (e.getUserId() == null || e.getWorkstationId() == null) {
             throw new ServiceException("用户和工位不能为空");
@@ -101,14 +126,37 @@ public class ProUserWorkstationServiceImpl implements IProUserWorkstationService
         ProUserWorkstation old = proUserWorkstationMapper.selectProUserWorkstationByRecordId(e.getRecordId());
         if (old == null) throw new ServiceException("绑定记录不存在");
 
-        boolean pairChanging = (e.getUserId() != null && !e.getUserId().equals(old.getUserId()))
-                || (e.getWorkstationId() != null && !e.getWorkstationId().equals(old.getWorkstationId()));
-        if (pairChanging) {
-            applyChangedPair(e, old);
+        if (isPairChanging(e, old)) {
+            // 改绑与批量绑定同锁：冲突检查+更新原子，事务提交后才放锁
+            return lockTemplate.execute(bindLockKey(),
+                    () -> txTemplate.execute(tx -> doUpdateChangedPair(e)));
         }
+        // 仅启停用：不涉绑定对，保持原样不加锁
+        return applyUpdate(e);
+    }
+
+    private boolean isPairChanging(ProUserWorkstation patch, ProUserWorkstation old) {
+        return (patch.getUserId() != null && !patch.getUserId().equals(old.getUserId()))
+                || (patch.getWorkstationId() != null && !patch.getWorkstationId().equals(old.getWorkstationId()));
+    }
+
+    /** 锁内重读最新记录再做冲突检查/回填，同事务更新 */
+    private Integer doUpdateChangedPair(ProUserWorkstation patch) {
+        ProUserWorkstation current =
+                proUserWorkstationMapper.selectProUserWorkstationByRecordId(patch.getRecordId());
+        if (current == null) throw new ServiceException("绑定记录不存在");
+        applyChangedPair(patch, current);
+        return applyUpdate(patch);
+    }
+
+    private int applyUpdate(ProUserWorkstation e) {
         e.setUpdateTime(DateUtils.getNowDate());
         e.setUpdateBy(SecurityUtils.getUsername());
         return proUserWorkstationMapper.updateProUserWorkstation(e);
+    }
+
+    private static String bindLockKey() {
+        return LOCK_BIND_PREFIX + SecurityUtils.getFactoryId();
     }
 
     @Override
@@ -123,27 +171,35 @@ public class ProUserWorkstationServiceImpl implements IProUserWorkstationService
 
     // ══════════ 私有 ══════════
 
-    private void validateRequest(UserWorkstationBatchRequest req) {
-        if (req == null || req.getUserIds() == null || req.getUserIds().isEmpty()) {
+    /** 剔空+去重；null 列表按空列表处理 */
+    private List<Long> normalizeIds(List<Long> ids) {
+        if (ids == null) {
+            return List.of();
+        }
+        return ids.stream().filter(Objects::nonNull).distinct().toList();
+    }
+
+    private void validateRequest(List<Long> userIds, List<Long> stationIds, String remark) {
+        if (userIds.isEmpty()) {
             throw new ServiceException("请选择绑定人员");
         }
-        if (req.getWorkstationIds() == null || req.getWorkstationIds().isEmpty()) {
+        if (stationIds.isEmpty()) {
             throw new ServiceException("请选择绑定工位");
         }
-        if (req.getUserIds().size() > MAX_USERS) {
+        if (userIds.size() > MAX_USERS) {
             throw new ServiceException("单次最多绑定 " + MAX_USERS + " 人");
         }
-        if (req.getWorkstationIds().size() > MAX_WORKSTATIONS) {
+        if (stationIds.size() > MAX_WORKSTATIONS) {
             throw new ServiceException("单次最多绑定 " + MAX_WORKSTATIONS + " 个工位");
         }
-        if (req.getRemark() != null && req.getRemark().length() > REMARK_MAX) {
+        if (remark != null && remark.length() > REMARK_MAX) {
             throw new ServiceException("备注不能超过 " + REMARK_MAX + " 字");
         }
     }
 
     private List<SysUser> resolveUsers(List<Long> ids) {
         List<SysUser> users = new ArrayList<>();
-        for (Long uid : distinct(ids)) {
+        for (Long uid : ids) {
             SysUser u = userService.selectUserById(uid);
             if (u == null) throw new ServiceException("用户不存在：" + uid);
             users.add(u);
@@ -153,7 +209,7 @@ public class ProUserWorkstationServiceImpl implements IProUserWorkstationService
 
     private List<MdWorkstation> resolveStations(List<Long> ids) {
         List<MdWorkstation> stations = new ArrayList<>();
-        for (Long wid : distinct(ids)) {
+        for (Long wid : ids) {
             MdWorkstation w = workstationMapper.selectMdWorkstationByWorkstationId(wid);
             if (w == null || !"1".equals(w.getEnableFlag())) {
                 throw new ServiceException("工位不存在或已停用：" + wid);
@@ -217,9 +273,5 @@ public class ProUserWorkstationServiceImpl implements IProUserWorkstationService
         e.setWorkstationId(station.getWorkstationId());
         e.setWorkstationCode(station.getWorkstationCode());
         e.setWorkstationName(station.getWorkstationName());
-    }
-
-    private List<Long> distinct(List<Long> ids) {
-        return ids.stream().filter(Objects::nonNull).distinct().toList();
     }
 }

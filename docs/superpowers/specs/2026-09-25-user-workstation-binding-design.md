@@ -54,7 +54,7 @@ List<Long> workstationIds; // 必填，1..20
 String remark;             // 选填，<=500
 ```
 
-Service 方法 `batchBind(UserWorkstationBatchRequest req)`，`@Transactional`，循环每个（user, workstation）对，规则：
+Service 方法 `batchBind(UserWorkstationBatchRequest req)`：先获取工厂级 Redisson 锁（见 4.5），锁内以编程式事务（`TransactionTemplate`，先锁后事务）循环每个（user, workstation）对，规则：
 
 1. 用户：`ISysUserService.selectUserById(userId)`，为空抛 `ServiceException("用户不存在: " + userId)`；
 2. 工位：`MdWorkstationMapper.selectMdWorkstationByWorkstationId(id)`，为空或 `enableFlag != '1'` 抛 `ServiceException("工位不存在或已停用: " + 名称/ID)`；任一工位非法则整批失败（0 写入），人员非法同理——前置校验全部通过后才进入写入；
@@ -93,9 +93,16 @@ domain 增加两个**非持久**查询字段 `userKeyword`、`workstationKeyword
 
 > 人员选择复用 `components/UserSelect/multi.vue`，它内部调 `/system/user/list`（需 system:user:list）。这与工作站页"操作人员"子表是同一既有依赖；本页定位为管理员配置页，接受该依赖，不为其新建用户查询接口。
 
-### 4.5 错误处理
+### 4.5 并发与一致性
 
-- 入参非法（空列表、超上限）→ `ServiceException`，前端弹错误消息；
+- 绑定写入（批量绑定、单条新增、改绑）用工厂级 Redisson 锁 `mes:pro:userworkstation:bind:{factoryId}` 串行化，**先锁后事务**（`RedisLockTemplate.execute` + `TransactionTemplate`，与质检放行 `ProQcBlockServiceImpl` 同范式，waitSec 用模板默认 5 秒）：查重 → insert / 重启用 / 改绑的 check-then-act 整体在锁内事务中完成，事务提交后才释放锁；
+- 该锁是「同一（用户, 工位）只许一行」在**表无唯一索引**前提下的并发兜底；本次不动表结构，`qxx_pro_user_workstation` 仍无唯一索引；
+- 取工厂级粗锁（而非逐（人,工位）细锁）：低频管理页操作，单批最多 1000 对，工厂内串行最简单可靠；
+- 仅启停用（只传 recordId + enableFlag）不改变绑定对，不进锁。
+
+### 4.6 错误处理
+
+- 入参非法（空列表、超上限）→ `ServiceException`，前端弹错误消息；入参 ID 列表先剔空、去重再校验（`[null]` 不得静默成 0/0/0）；
 - 前置校验阶段失败 → 抛异常整事务回滚，0 写入（不做部分成功）；
 - 重复绑定属于正常业务分支，跳过并在结果中统计，不算错误。
 

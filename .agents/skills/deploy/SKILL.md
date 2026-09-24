@@ -1,6 +1,6 @@
 ---
 name: deploy
-description: Use to publish this project to the production server (115.29.234.204). Triggers on "deploy", "发布", "上线", "发布到生产", "发布生产", "ship to prod". Runs: build frontend locally → ssh to server → git pull → mvn build backend → restart backend → scp dist → reload nginx → verify all endpoints return 200. Also covers optional mobile app (uni-app) upload if the user just built it in HBuilder. Reads server credentials and paths from root AGENTS.md.
+description: Use to publish this project to the production server (115.29.234.204). Triggers on "deploy", "发布", "上线", "发布到生产", "发布生产", "ship to prod". Runs: build frontend locally → ssh to server → git pull → mvn build backend → systemctl restart qxx-backend → tar-upload dist → reload nginx → verify endpoints (must hit a new endpoint, captcha 200 does not prove the new jar). Also covers optional mobile app (uni-app) tar upload if the user just built it in HBuilder. Reads server credentials and paths from root AGENTS.md.
 ---
 
 # 生产环境发布
@@ -11,6 +11,7 @@ description: Use to publish this project to the production server (115.29.234.20
 
 - **SSH 免密已配**：`~/.ssh/config` 含 `Host qxx` 别名 → `115.29.234.204`（root，密钥 `~/.ssh/id_ed25519`）。本 skill 所有 ssh/scp 均用 `qxx` 别名，无需密码
 - 服务器 Docker 容器正常运行（MySQL:3307, Redis:6380, MinIO:9010）
+- **后端由 systemd 单元 `qxx-backend.service` 守护**（enabled，`Restart=always`，`RestartSec=5`，ExecStart 含全部 JVM 内存参数，日志 append 到 `/tmp/qxx-backend.log`）。重启一律 `systemctl restart qxx-backend.service`，**禁止 kill + 手动 nohup**（kill 后 5 秒内会被旧 jar 自动拉起抢 8081，详见故障排查表）
 - **服务器仅 1.8GB 内存，前端构建必须在本机完成，禁止在服务器跑 `vite build`**
 - 项目根路径：`/Users/huangwenhua/company/self/qixiaoxia-mes`（本机，main 分支）与 `/var/www/qixiaoxia-mes`（服务器）
 
@@ -73,12 +74,12 @@ ssh qxx 'cp /etc/nginx/conf.d/qixiaoxia-mes.conf.bak.<timestamp> /etc/nginx/conf
 cd /Users/huangwenhua/company/self/qixiaoxia-mes/frontend && npx vite build
 ```
 
-### 2. 服务器端：拉代码 → 编译 → 重启后端
+### 2. 服务器端：拉代码 → 编译 → systemctl 重启后端
 
-> ⚠️ **不要把「启动 JVM」放进 heredoc**。实测多次 heredoc 内 `setsid nohup java ... & disown` 会静默无效果（`ps` 无进程、日志文件 0 字节），像整段命令被跳过。原因未彻底定位（疑似 heredoc 内 `&`/`disown` 与 ssh 分配的 pty/session 行为交互出问题），已在本机 2026-07-27 复现两次。
-> **稳定做法**：git pull + mvn build 保留 heredoc；**停旧进程、启动 JVM、轮询就绪** 拆成 3 条独立单行 ssh 命令。单行 ssh 每次稳定生效。
+> ⚠️ **关键：整个构建过程不要停后端。** `qxx-backend.service` 是 `Restart=always`，JVM 一退出 5 秒内就会被 systemd 用**磁盘上的旧 jar** 拉起；若此时新 jar 还没打完，8081 会被旧进程占住，之后手动/再次启动的新 JVM 全部因端口占用退出——表现是 `captchaImage` 一直 200 但跑的是旧代码（2026-09-24 实际踩过）。
+> 正确顺序：**旧 JVM 照常服务 → 拉码 → 打包 → `systemctl restart` 一次切换**。Linux 允许运行中的 JVM 继续持有被覆盖前的 jar inode，打包不影响在跑的进程。
 
-#### 2.1 拉代码 + 编译（heredoc OK）
+#### 2.1 拉代码 + 编译（heredoc，JVM 保持运行）
 
 ```bash
 ssh qxx << 'EOF'
@@ -93,36 +94,29 @@ ls -la /var/www/qixiaoxia-mes/backend/ruoyi-admin/target/ruoyi-admin.jar
 EOF
 ```
 
-#### 2.2 停旧进程（单行 ssh，避免 heredoc）
+1.8GB 小内存机实测：JVM 运行中打包可行（峰值后仍有余量）。若 `free -m` available 不足 300MB 导致 Maven 被 OOM Killer 杀，正确做法是 `systemctl stop qxx-backend` → 打包 → `systemctl start qxx-backend`（stop 后守护不会自动拉起），**不要**用 kill/pkill。
 
-> ⚠️ **`pkill/pgrep -f` 的模式必须用 `^java` 锚定开头**。单行 ssh 时远端是 `bash -c '<整串命令>'`，其命令行里就含 `ruoyi-admin.jar` 字样；若写成 `pkill -f 'ruoyi-admin.jar'`，会把执行命令的 bash 自身也匹配上杀掉，导致 SSH 返回 255（旧 java 虽已被杀，但脚本中途死掉，后续 kill 端口/sleep 都不执行）。用 `^java.*ruoyi-admin.jar` 只匹配以 `java` 开头的真正 JVM 进程。
-
-```bash
-ssh qxx "pkill -f '^java.*classworlds.launcher.Launcher' 2>/dev/null; pkill -9 -f '^java.*ruoyi-admin.jar' 2>/dev/null; sleep 2; kill \$(lsof -ti :8081) 2>/dev/null; sleep 2; echo '残留 java:'; pgrep -af '^java'; echo '8081 占用:'; lsof -ti :8081; echo done"
-```
-
-期望：`残留 java:` 和 `8081 占用:` 两行后面均无输出，最后是 `done`（无残留 JVM、8081 空闲）。`pkill` 没匹配到进程时返回非 0 是正常的（分号连接、无 `set -e`，不会中断）。
-
-#### 2.3 启动 JVM（单行 ssh，关键）
+#### 2.2 systemctl 重启（一条单行 ssh）
 
 ```bash
-ssh qxx 'setsid nohup java -Xms256m -Xmx512m -XX:MaxMetaspaceSize=256m -XX:MaxDirectMemorySize=128m -XX:+UseG1GC -jar /var/www/qixiaoxia-mes/backend/ruoyi-admin/target/ruoyi-admin.jar --server.port=8081 --ruoyi.profile=/var/www/qixiaoxia-mes/uploadPath </dev/null > /tmp/qxx-backend.log 2>&1 & disown; sleep 3; echo "java 进程:"; pgrep -af "^java.*ruoyi-admin.jar"'
+ssh qxx 'systemctl restart qxx-backend.service && sleep 2 && systemctl is-active qxx-backend.service && systemctl show qxx-backend -p MainPID --value && ss -ltnp | grep 8081'
 ```
 
-期望：输出一行 `<pid> java -Xms256m ... ruoyi-admin.jar ...`，表示 JVM 已起。`pgrep` 同样用 `^java` 锚定，避免把当前 `bash -c` 自身列出来干扰判断。
+期望：`active`、打印新 PID、8081 被该 PID 监听。JVM 参数（`-Xms256m -Xmx512m -XX:MaxMetaspaceSize=256m -XX:MaxDirectMemorySize=128m -XX:+UseG1GC`）和 profile 路径都在 unit 文件里，重启命令不需要也不应该再带。
 
-**坑位备忘**：
-- **内存**：仅 `-Xmx512m` 不够（Metaspace + DirectMemory 会让总虚拟内存飙到 ~3.8GB 触发 OOM Killer），必须同时 `-XX:MaxMetaspaceSize=256m -XX:MaxDirectMemorySize=128m`。
-- **信号**：`nohup ... &` 单独不够，SSH session 结束的 SIGHUP 仍可能波及新进程；必须 `setsid ... </dev/null > log 2>&1 & disown` 彻底脱离控制终端与作业表。
-- **PID**：`setsid` 后 `$!` 归属会变，判活用 `pgrep -f '^java.*ruoyi-admin.jar'`，别用 `kill -0 $!`。
+改 JVM 参数/启动参数：编辑 `/etc/systemd/system/qxx-backend.service` 后 `systemctl daemon-reload && systemctl restart qxx-backend`。看日志：`tail -f /tmp/qxx-backend.log`（应用日志）或 `journalctl -u qxx-backend -n 100`（systemd 事件）。
 
-#### 2.4 等待就绪（单行 ssh，最多 180s）
+#### 2.3 等待就绪 + 确认新版本（单行 ssh，最多 180s）
 
 ```bash
-ssh qxx 'for i in $(seq 1 180); do code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/login -X POST -H "Content-Type: application/json" -d "{}" 2>/dev/null); if [ "$code" != "000" ] && [ -n "$code" ]; then echo "✅ 后端就绪 HTTP $code (${i}s)"; break; fi; if ! pgrep -f "^java.*ruoyi-admin.jar" >/dev/null; then echo "❌ 进程退出 (${i}s)"; tail -50 /tmp/qxx-backend.log; exit 1; fi; sleep 1; done'
+ssh qxx 'for i in $(seq 1 180); do code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/login -X POST -H "Content-Type: application/json" -d "{}" 2>/dev/null); if [ "$code" != "000" ] && [ -n "$code" ]; then echo "✅ 后端就绪 HTTP $code (${i}s)"; break; fi; if [ "$(systemctl is-active qxx-backend)" != "active" ]; then echo "❌ 服务退出 (${i}s)"; tail -50 /tmp/qxx-backend.log; exit 1; fi; sleep 1; done'
 ```
 
-期望：`✅ 后端就绪 HTTP 200 (10~40s)`。若报 `❌ 进程退出`，末尾会打印日志尾部帮定位（Flyway checksum 冲突/SQL 错/端口占用等）。
+期望：`✅ 后端就绪 HTTP 200 (10~40s)`。`captchaImage`/空 body 的 login 200 **只能证明有进程在服务，不能证明跑的是新 jar**。必须再用 token 调一个**本次发布涉及的接口**确认新版本（旧代码没有该路由时会返回 `No static resource ...` 的 500/404），并在有 Flyway 迁移时查一次 `flyway_schema_history`：
+
+```bash
+ssh qxx 'docker exec qxx-mysql mysql -uroot -pqxx123456 mes -N -e "SELECT version,success FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 5;" 2>/dev/null'
+```
 
 ### 3. 本机上传前端 + 重载 Nginx
 
@@ -170,20 +164,20 @@ ls /Users/huangwenhua/company/self/qixiaoxia-mes/app/unpackage/dist/build/web/ 2
   && echo "✅ HBuilder 已导出" || echo "❌ 请先在 HBuilder 里发行 web"
 ```
 
-**部署**（备份旧版 → 上传新版 → reload nginx）：
+**部署**（备份旧版 → tar 管道上传新版 → reload nginx）。app 包小文件多，同样走 tar 单连接，不用 `scp -r`：
 ```bash
-# 备份当前版本（带时间戳,便于回滚）
-ssh qxx 'mv /var/www/qixiaoxia-mes/app/dist /var/www/qixiaoxia-mes/app/dist.bak.$(date +%s)'
+# 备份当前版本（带时间戳，便于回滚；首次部署 dist 不存在也不报错）
+ssh qxx 'if [ -d /var/www/qixiaoxia-mes/app/dist ]; then mv /var/www/qixiaoxia-mes/app/dist /var/www/qixiaoxia-mes/app/dist.bak.$(date +%s); fi; mkdir -p /var/www/qixiaoxia-mes/app/dist'
 
-# 上传新构建（HBuilder 输出路径 → 服务器 nginx 实际路径）
-scp -r /Users/huangwenhua/company/self/qixiaoxia-mes/app/unpackage/dist/build/web \
-  qxx:/var/www/qixiaoxia-mes/app/dist
+# 上传新构建（HBuilder 输出目录内容 → 服务器 nginx 实际目录）
+cd /Users/huangwenhua/company/self/qixiaoxia-mes/app/unpackage/dist/build/web && \
+  tar czf - . 2>/dev/null | ssh qxx 'tar xzf - -C /var/www/qixiaoxia-mes/app/dist/ 2>/dev/null'
 
-# reload + 验证
-ssh qxx 'nginx -s reload && curl -s -o /dev/null -w "app /app/ → %{http_code}\n" http://localhost/app/'
+# reload + 验证（200 之外再确认首页引用的是新构建的 hash 资源）
+ssh qxx 'nginx -s reload && curl -s -o /dev/null -w "app /app/ → %{http_code}\n" http://localhost/app/ && curl -s -o /dev/null -w "app 图片代理 /app/prod-api/ → %{http_code}\n" http://localhost/app/prod-api/captchaImage'
 ```
 
-期望 `HTTP 200`。
+期望两条均 `HTTP 200`。
 
 **关键路径对应**：
 - 本机 HBuilder 输出：`app/unpackage/dist/build/web/`
@@ -200,16 +194,15 @@ ssh qxx 'rm -rf /var/www/qixiaoxia-mes/app/dist && mv /var/www/qixiaoxia-mes/app
 
 | 现象 | 原因 | 解决 |
 |------|------|------|
-| 后端启动后立即退出 | Docker 容器未启动 | `docker start qxx-mysql qxx-redis qxx-minio` |
-| 后端启动瞬间被 Killed，日志空、dmesg 无新 OOM | ssh heredoc 里 `nohup ... &` 收到 SSH session 结束的 SIGHUP/SIGKILL，JVM 还没输出就被杀 | 启动命令必须是 `setsid nohup java ... </dev/null > log 2>&1 &` + 显式 `disown`（见步骤 2.3）；判活用 `pgrep -f '^java.*ruoyi-admin.jar'` 而不是 `kill -0 $!`（setsid 后 $! 归属已变） |
-| 停旧进程时 SSH 返回 255，后续 `kill`/`sleep` 没执行 | 单行 ssh 里 `pkill -f 'ruoyi-admin.jar'` 把执行命令的 `bash -c` 自身也匹配杀掉（其命令行含该字样） | `pkill/pgrep -f` 模式一律用 `^java` 锚定开头，如 `pkill -9 -f '^java.*ruoyi-admin.jar'`（见步骤 2.2） |
-| heredoc 内启动命令"消失"：`ps` 无进程、`/tmp/qxx-backend.log` 0 字节、无任何报错 | 未定位透彻的 heredoc + `setsid & disown` 交互问题（2026-07-27 本机连续复现 2 次），像整段启动指令被 shell 跳过 | **不要把启动 JVM 放进 heredoc**。按步骤 2.2 / 2.3 / 2.4 拆成 3 条独立单行 ssh 命令执行，每条都能立刻看到输出。git pull + mvn 保留在 heredoc 稳定 |
-| 后端进程被 Killed（OOM） | JVM 总虚拟内存超物理内存被 OOM Killer 杀（**仅 `-Xmx` 不够**，Metaspace/DirectMemory 会让总内存飙到 ~3.8GB） | 启动前按步骤 2.2 `pkill -f '^java.*classworlds...'` 清 Maven 残留；启动命令按步骤 2.3 同时限制 `-Xmx512m -XX:MaxMetaspaceSize=256m -XX:MaxDirectMemorySize=128m`；等 `free -m` available > 800MB 再启；查 `dmesg -T \| grep -i oom` 确认是否 OOM |
-| `scp -r dist/*` 中途 `Connection closed by remote host`（退出码 255） | scp 建大量小连接超出服务器 SSH 限制 | 改用步骤 3 的 tar 管道方案（单连接一次性传完），并先 `rm -rf dist/*` 清残留 |
+| 后端启动后立即退出（`systemctl is-active` 非 active） | Docker 容器未启动 | `docker start qxx-mysql qxx-redis qxx-minio`，再 `systemctl restart qxx-backend` |
+| 接口 200 但跑的是旧代码；新 JVM 日志有 `Port 8081 was already in use` | 构建前/构建中 kill 了 JVM，systemd 5 秒内用旧 jar 自动拉起并占住 8081，新进程端口冲突退出（2026-09-24 实际事故） | 不要手动 kill；确认旧 PID 后 `systemctl restart qxx-backend` 完成切换，用"调本次新接口"验证版本。构建期确实需要内存：`systemctl stop` → 打包 → `systemctl start`（见 2.1） |
+| 改完代码重启，服务仍像旧版本 | 重启打到了别的进程（手动 nohup 的游离 JVM），或 unit 的 ExecStart 路径不是当前 jar 路径 | `systemctl show qxx-backend -p MainPID --value` 与 `ss -ltnp \| grep 8081` 的 PID 必须一致；`systemctl cat qxx-backend` 核对 jar 路径 |
+| 后端进程被 Killed（OOM） | 1.8GB 机器上 Maven + JVM 并发内存不足；或 JVM 堆外内存未限制 | 内存紧张时按 2.1 用 `systemctl stop` 停服务再打包，完成后 `systemctl start`；JVM 内存参数在 unit 文件里（`-Xmx512m -XX:MaxMetaspaceSize=256m -XX:MaxDirectMemorySize=128m`）；`dmesg -T \| grep -i oom` 确认 OOM |
+| `scp -r dist/*` 中途 `Connection closed by remote host`（退出码 255） | scp 建大量小连接超出服务器 SSH 限制 | PC（步骤 3）和 app（步骤 5）一律 tar 管道单连接上传 |
 | Nginx 502 | 后端未就绪 | 等 `curl :8081` 返回 200 后再重载 |
-| 前端 404 | dist/ 未上传或路径错误 | 确认 scp 目标路径 `/var/www/qixiaoxia-mes/frontend/dist/` |
+| 前端 404 | dist/ 未上传或路径错误 | 确认上传目标路径 `/var/www/qixiaoxia-mes/frontend/dist/`，且 `index.html` 在该目录直接存在 |
 | 登录验证码报错 | 服务器已关闭验证码 | `"uuid":""` 传空字符串 |
-| app `/app/` 404 | scp 路径写错（常见错：传到 `app/unpackage/dist/build/web/` 而非 `app/dist/`） | 确认服务器 `app/dist/index.html` 存在；nginx location 是 `alias /var/www/qixiaoxia-mes/app/dist/` |
+| app `/app/` 404 | 上传路径写错（常见错：传到 `app/unpackage/dist/build/web/` 而非 `app/dist/`，或把 `web/` 目录本身解成了 `app/dist/web/`） | 确认服务器 `app/dist/index.html` 直接存在（多一层 web 目录就是 tar 时没 cd 进去）；nginx location 是 `alias /var/www/qixiaoxia-mes/app/dist/` |
 | app `/app/` 白屏 | HBuilder 输出后没 reload nginx，或浏览器缓存 | `ssh qxx 'nginx -s reload'`；强制刷新（Cmd+Shift+R） |
 | app 接口跨域 | app 走相对路径 `/prod-api/`，但访问路径带了 `/app/` 前缀 | 检查 `app/config.js` 的 `baseUrl` 配置是否相对路径，nginx 是否正确代理 `/app/prod-api/` |
 | app 里图片裂开（HTML 而非图片）| uni-app H5 把 `<image src="/prod-api/xxx">` 自动前缀化为 `/app/prod-api/xxx`，nginx 若无对应 location 就走 SPA fallback 返回 `app/dist/index.html`（Content-Type: text/html，几百字节）| 服务器 `/etc/nginx/conf.d/qixiaoxia-mes.conf` 必须有 `location /app/prod-api/ { proxy_pass http://127.0.0.1:8081/; ... }`；对比 `./nginx.conf` 权威副本，缺就用本 skill "nginx 配置"章节同步 |

@@ -3,6 +3,7 @@ package com.ruoyi.system.domain.mes.pro;
 import java.math.BigDecimal;
 import java.util.Date;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import com.ruoyi.common.annotation.Excel;
@@ -29,8 +30,10 @@ public class ProUserWorkstation extends BaseEntity
     private String enableFlag;
     private Date operationTime;
 
-    // —— 非持久查询字段（仅列表查询用，不进 insert/update）——
+    // —— 非持久查询字段（仅 GET 列表查询入参，不进 JSON 输出/insert/update）——
+    @JsonIgnore
     private String userKeyword;
+    @JsonIgnore
     private String workstationKeyword;
 
     public Long getRecordId() { return recordId; }

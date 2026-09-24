@@ -62,7 +62,7 @@ import com.ruoyi.system.service.mes.wm.OutsourceResultStrategy;
 /**
  * 通用外协服务实现。
  *
- * 三步流程（发料→录结果→收货）从 ProSlittingServiceImpl 抽取，
+ * 三步流程（发料→录结果→收货）在通用外协框架内实现，
  * 不依赖 WmRollDetail，仅依赖通用 itemId/batchId/warehouseId。
  * 分切等业务通过 OutsourceResultStrategy 注入领域逻辑。
  *
@@ -1511,7 +1511,7 @@ public class OutsourceServiceImpl implements IOutsourceService
         fb.setCreateBy(operator);
         feedbackMapper.insertProFeedback(fb);
 
-        // 末工序回写工单产量 + 自动完工（与 ProFeedbackServiceImpl.auditFeedback / ProSlittingServiceImpl 一致）
+        // 末工序回写工单产量 + 自动完工（与 ProFeedbackServiceImpl.auditFeedback 一致）
         if (order.getWorkorderId() != null && isLastProcess(order))
         {
             workorderMapper.addQuantityProduced(order.getWorkorderId(), qty);

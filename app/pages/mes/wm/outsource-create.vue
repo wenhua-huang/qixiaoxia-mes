@@ -124,7 +124,7 @@
 <script setup>
 import { ref, reactive, getCurrentInstance } from 'vue'
 import { getWorkorderOutsourceInfo } from '@/api/mes/pro/workorder'
-import { listOutsourceVendor } from '@/api/mes/pro/slitting'
+import { listAllVendor } from '@/api/mes/md/vendor'
 import { createOutsource } from '@/api/mes/wm/outsource'
 import { availableBatches } from '@/api/mes/wm/issue'
 
@@ -181,7 +181,7 @@ async function searchWorkorder() {
     } else {
       // 预载厂商
       if (vendorOptions.value.length === 0) {
-        const vres = await listOutsourceVendor()
+        const vres = await listAllVendor()
         vendorOptions.value = (vres.data || []).filter(v => v.vendorType === 'OUTSOURCE' || v.vendorType === 'BOTH')
       }
       // 为无外协单的工序初始化表单；只有一道时自动展开

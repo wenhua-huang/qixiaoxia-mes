@@ -186,12 +186,7 @@ function goResult(item) {
   proxy.$tab.navigateTo('/pages/mes/wm/outsource-result?orderId=' + item.orderId)
 }
 function goReceive(item) {
-  // 分切来源走专用收货页（子卷入库+母卷消耗+报工）；通用外协走通用收货页
-  if (item.sourceType === 'SLITTING' && item.sourceRefId) {
-    proxy.$tab.navigateTo('/pages/mes/pro/slitting-receive?slitId=' + item.sourceRefId)
-  } else {
-    proxy.$tab.navigateTo('/pages/mes/wm/outsource-receive?orderId=' + item.orderId)
-  }
+  proxy.$tab.navigateTo('/pages/mes/wm/outsource-receive?orderId=' + item.orderId)
 }
 function goCreate() {
   proxy.$tab.navigateTo('/pages/mes/wm/outsource-create')

@@ -132,12 +132,6 @@
             <text class="text">外协单</text>
           </view>
         </uni-grid-item>
-        <uni-grid-item @click="goSlittingList">
-          <view class="grid-item-box">
-            <uni-icons type="list" size="30" color="#9c27b0"></uni-icons>
-            <text class="text">分切管理</text>
-          </view>
-        </uni-grid-item>
       </uni-grid>
     </view>
     </template>
@@ -301,9 +295,6 @@
   // 外协收料：待收货（已发货）列表，点选入库
   function goOutsourceRecpt() {
     proxy.$tab.navigateTo('/pages/mes/wm/outsource-recpt-list')
-  }
-  function goSlittingList() {
-    proxy.$tab.navigateTo('/pages/mes/pro/slitting-list')
   }
   function goMyOutsource() {
     proxy.$tab.navigateTo('/pages/mes/wm/outsource-list')

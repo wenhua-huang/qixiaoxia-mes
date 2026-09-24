@@ -231,4 +231,21 @@ class ProUserWorkstationServiceImplTest {
                 .isInstanceOf(ServiceException.class).hasMessageContaining("已绑定此工位");
         verify(mapper, never()).updateProUserWorkstation(any());
     }
+
+    @Test
+    @DisplayName("改绑目标（人,工位）已存在停用记录：同样拦截，防双启用行")
+    void update_pairChange_targetHasDisabledTwin_blocked() {
+        ProUserWorkstation old = row(7L, "1");
+        ProUserWorkstation patch = new ProUserWorkstation();
+        patch.setRecordId(7L);
+        patch.setUserId(2L);
+        when(mapper.selectProUserWorkstationByRecordId(7L)).thenReturn(old);
+        when(userService.selectUserById(2L)).thenReturn(user(2L));
+        when(workstationMapper.selectMdWorkstationByWorkstationId(100L)).thenReturn(ws(100L, "1"));
+        when(mapper.selectByUserAndWorkstation(2L, 100L)).thenReturn(List.of(row(77L, "0")));
+
+        assertThatThrownBy(() -> service.updateProUserWorkstation(patch))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("已绑定此工位");
+        verify(mapper, never()).updateProUserWorkstation(any());
+    }
 }

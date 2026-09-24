@@ -192,7 +192,7 @@ public class ProUserWorkstationServiceImpl implements IProUserWorkstationService
         }
     }
 
-    /** 改绑（人/工位变化）：解析新名称并拦截与其他启用记录冲突 */
+    /** 改绑（人/工位变化）：解析新名称并拦截与其他记录冲突（无论启用与否，一对只允许一行） */
     private void applyChangedPair(ProUserWorkstation patch, ProUserWorkstation old) {
         Long uid = patch.getUserId() != null ? patch.getUserId() : old.getUserId();
         Long wid = patch.getWorkstationId() != null ? patch.getWorkstationId() : old.getWorkstationId();
@@ -203,7 +203,7 @@ public class ProUserWorkstationServiceImpl implements IProUserWorkstationService
             throw new ServiceException("工位不存在或已停用：" + wid);
         }
         boolean conflict = proUserWorkstationMapper.selectByUserAndWorkstation(uid, wid).stream()
-                .anyMatch(x -> "1".equals(x.getEnableFlag()) && !x.getRecordId().equals(patch.getRecordId()));
+                .anyMatch(x -> !x.getRecordId().equals(patch.getRecordId()));
         if (conflict) throw new ServiceException("该用户已绑定此工位，请勿重复绑定");
         patch.setUserId(uid);
         patch.setWorkstationId(wid);

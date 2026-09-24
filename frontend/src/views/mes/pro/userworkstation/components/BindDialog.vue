@@ -102,13 +102,12 @@ const form = reactive<{ workstationIds: number[]; remark: string }>({
 
 watch(() => props.showFlag, async (v) => {
   if (!v) return
-  if (!options.value.length) {
-    optionsLoading.value = true
-    try {
-      const res: any = await workstationOptions()
-      options.value = res.data || []
-    } catch { proxy.$modal.msgError('工位选项加载失败') } finally { optionsLoading.value = false }
-  }
+  // 每次打开都刷新：工位启停用/改名后不残留旧选项
+  optionsLoading.value = true
+  try {
+    const res: any = await workstationOptions()
+    options.value = res.data || []
+  } catch { proxy.$modal.msgError('工位选项加载失败') } finally { optionsLoading.value = false }
 }, { immediate: true })
 
 function onUsersSelected(rows: SelectedUser[]) {
@@ -138,14 +137,21 @@ async function submit() {
     const r = (res.data || {}) as UserWorkstationBatchResult
     const msg = `新增 ${r.successCount || 0} 条，重新启用 ${r.reactivatedCount || 0} 条，跳过已绑定 ${r.skipCount || 0} 条`
     if (r.skips && r.skips.length) {
-      ElMessageBox.alert(r.skips.slice(0, 20).map(escapeHtml).join('<br/>'), `${msg}（跳过明细）`, {
+      const html = r.skips.slice(0, 20).map(escapeHtml)
+      if (r.skips.length > 20) {
+        html.push(`<div style="margin-top:6px;color:#909399">……其余 ${r.skips.length - 20} 条已省略，可缩小人员/工位范围后重试</div>`)
+      }
+      // X/Esc 关闭会 reject，吞掉避免 unhandled rejection
+      ElMessageBox.alert(html.join('<br/>'), `${msg}（跳过明细）`, {
         dangerouslyUseHTMLString: true
-      })
+      }).catch(() => {})
     } else {
       proxy.$modal.msgSuccess(msg)
     }
     emit('success')
     emit('update:showFlag', false)
+  } catch {
+    // 请求拦截器已弹服务端错误，无需重复 toast
   } finally { submitting.value = false }
 }
 

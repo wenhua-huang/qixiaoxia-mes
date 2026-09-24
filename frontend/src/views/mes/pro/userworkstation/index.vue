@@ -110,7 +110,7 @@ function handleEnableChange(row: UserWorkstation & { enableFlag: string }) {
     ;(row as any).enableFlag = newVal === '1' ? '0' : '1'
     getList()
   }
-  proxy.$modal.confirm(`确认要${text}"${row.nickName || row.userName}"的该工位绑定吗？`)
+  proxy.$modal.confirm(`确认要${text}"${row.nickName || row.userName}"的"${row.workstationName}"工位绑定吗？`)
     .then(() => updateUserWorkstation({ recordId: row.recordId, enableFlag: newVal } as any)
       .then(() => proxy.$modal.msgSuccess(`${text}成功`))
       // 更新失败：请求拦截器已弹服务端错误，这里仅还原开关+重查，避免重复 toast

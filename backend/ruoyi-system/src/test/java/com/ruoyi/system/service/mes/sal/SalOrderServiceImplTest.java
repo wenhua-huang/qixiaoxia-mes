@@ -55,9 +55,10 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
- * 销售订单Service单元测试（四态模型：CONFIRMED/PRODUCING/SHIPPED/CLOSED + CANCEL）
- * 覆盖:createWithLines/createFromCrm(建单即 CONFIRMED) / updateWithLines/closeOrder/cancelOrder/
- *      deleteSalOrderByOrderIds(状态守卫) / toWorkorder(CONFIRMED+PRODUCING 两态可转,可转量校验,工单回填)
+ * 销售订单Service单元测试（五态模型：PENDING_ACCEPT/CONFIRMED/PRODUCING/SHIPPED/CLOSED + CANCEL）
+ * 覆盖:createWithLines/createFromCrm(建单即 PENDING_ACCEPT) / acceptOrder(接单) /
+ *      updateWithLines/closeOrder/cancelOrder/deleteSalOrderByOrderIds(状态守卫) /
+ *      toWorkorder(CONFIRMED+PRODUCING 两态可转, PENDING_ACCEPT 拦截, 可转量校验, 工单回填)
  *
  * @author qixiaoxia
  */
@@ -110,11 +111,11 @@ class SalOrderServiceImplTest
     }
 
     @Test
-    @DisplayName("createWithLines - 忽略前端旧状态，强制落 CONFIRMED")
-    void createWithLines_forcesConfirmed() {
+    @DisplayName("createWithLines - 忽略前端传入状态，强制落 PENDING_ACCEPT")
+    void createWithLines_forcesPendingAccept() {
         SalOrder order = new SalOrder();
         order.setOrderCode("SO001");
-        order.setStatus("PREPARE"); // 旧前端可能仍传
+        order.setStatus("CONFIRMED"); // 旧前端可能仍传已确认
         SalOrderLine line = new SalOrderLine();
         line.setProductId(1L);
         line.setQuantity(new BigDecimal("100"));
@@ -126,13 +127,13 @@ class SalOrderServiceImplTest
 
         SalOrder result = salOrderService.createWithLines(req);
 
-        assertThat(result.getStatus()).isEqualTo("CONFIRMED");
+        assertThat(result.getStatus()).isEqualTo("PENDING_ACCEPT");
     }
 
     @Test
-    @DisplayName("createFromCrm - 推单即 CONFIRMED")
-    void createFromCrm_confirmed() {
-        // mdItemMapper 反查物料 + insert 回填 id；断言落库订单 status=CONFIRMED
+    @DisplayName("createFromCrm - 推单即 PENDING_ACCEPT")
+    void createFromCrm_pendingAccept() {
+        // mdItemMapper 反查物料 + insert 回填 id；断言落库订单 status=PENDING_ACCEPT
         com.ruoyi.system.domain.mes.md.MdItem item = new com.ruoyi.system.domain.mes.md.MdItem();
         item.setItemId(9L); item.setItemCode("P1"); item.setItemName("产品");
         when(mdItemMapper.selectMdItemList(any())).thenReturn(Collections.singletonList(item));
@@ -148,8 +149,8 @@ class SalOrderServiceImplTest
 
         SalOrder result = salOrderService.createFromCrm(crm);
 
-        assertThat(result.getStatus()).isEqualTo("CONFIRMED");
-        verify(salOrderMapper).insertSalOrder(argThat(o -> "CONFIRMED".equals(o.getStatus())));
+        assertThat(result.getStatus()).isEqualTo("PENDING_ACCEPT");
+        verify(salOrderMapper).insertSalOrder(argThat(o -> "PENDING_ACCEPT".equals(o.getStatus())));
     }
 
     @Test
@@ -185,6 +186,79 @@ class SalOrderServiceImplTest
         when(salOrderMapper.updateSalOrder(any())).thenReturn(1);
         salOrderService.cancelOrder(2L);
         verify(salOrderMapper).updateSalOrder(argThat(x -> "CANCEL".equals(x.getStatus())));
+    }
+
+    @Test
+    @DisplayName("acceptOrder - PENDING_ACCEPT 接单 -> CONFIRMED")
+    void acceptOrder_ok() {
+        when(salOrderMapper.selectSalOrderByOrderId(1L)).thenReturn(buildOrder(1L, "SO1", "PENDING_ACCEPT"));
+        when(salOrderMapper.updateSalOrder(any())).thenReturn(1);
+
+        salOrderService.acceptOrder(1L);
+
+        verify(salOrderMapper).updateSalOrder(argThat(x -> "CONFIRMED".equals(x.getStatus())));
+    }
+
+    @Test
+    @DisplayName("acceptOrder - 非 PENDING_ACCEPT（CONFIRMED）拒绝接单且不写库")
+    void acceptOrder_gate() {
+        when(salOrderMapper.selectSalOrderByOrderId(1L)).thenReturn(buildOrder(1L, "SO1", "CONFIRMED"));
+
+        assertThatThrownBy(() -> salOrderService.acceptOrder(1L))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("待接单");
+        verify(salOrderMapper, never()).updateSalOrder(any());
+    }
+
+    @Test
+    @DisplayName("updateWithLines - PENDING_ACCEPT 无派生工单时可改，状态以库中值为准")
+    void update_pendingAccept_ok() {
+        when(salOrderMapper.selectSalOrderByOrderId(1L)).thenReturn(buildOrder(1L, "SO1", "PENDING_ACCEPT"));
+        when(salOrderMapper.selectWorkorderCountsByOrderIds(anyList())).thenReturn(java.util.Collections.emptyList());
+        SalOrderCreateRequest req = new SalOrderCreateRequest();
+        req.setOrder(buildOrder(1L, "SO1", "PENDING_ACCEPT"));
+        req.setLines(Collections.emptyList());
+
+        salOrderService.updateWithLines(req);
+
+        verify(salOrderMapper).updateSalOrder(argThat(o -> "PENDING_ACCEPT".equals(o.getStatus())));
+        verify(salOrderLineMapper).deleteSalOrderLineByOrderId(1L);
+    }
+
+    @Test
+    @DisplayName("delete - PENDING_ACCEPT 无派生工单时可删")
+    void delete_pendingAccept_ok() {
+        when(salOrderMapper.selectSalOrderByOrderId(1L)).thenReturn(buildOrder(1L, "SO1", "PENDING_ACCEPT"));
+        when(salOrderMapper.selectWorkorderCountsByOrderIds(anyList())).thenReturn(java.util.Collections.emptyList());
+        when(salOrderMapper.deleteSalOrderByOrderIds(any())).thenReturn(1);
+
+        salOrderService.deleteSalOrderByOrderIds(new Long[]{1L});
+
+        verify(salOrderLineMapper).deleteSalOrderLineByOrderId(1L);
+        verify(salOrderMapper).deleteSalOrderByOrderIds(any());
+    }
+
+    @Test
+    @DisplayName("cancelOrder - PENDING_ACCEPT 可取消 -> CANCEL")
+    void cancelOrder_pendingAccept_ok() {
+        when(salOrderMapper.selectSalOrderByOrderId(3L)).thenReturn(buildOrder(3L, "SO3", "PENDING_ACCEPT"));
+        when(salOrderMapper.updateSalOrder(any())).thenReturn(1);
+
+        salOrderService.cancelOrder(3L);
+
+        verify(salOrderMapper).updateSalOrder(argThat(x -> "CANCEL".equals(x.getStatus())));
+    }
+
+    @Test
+    @DisplayName("toWorkorder - PENDING_ACCEPT 未接单拒绝转工单")
+    void toWorkorder_pendingAccept_rejected() {
+        when(salOrderLineMapper.selectSalOrderLineByLineId(10L)).thenReturn(buildLine(10L, 1L, new BigDecimal("100")));
+        when(salOrderMapper.selectSalOrderByOrderId(1L)).thenReturn(buildOrder(1L, "SO1", "PENDING_ACCEPT"));
+        SalOrderToWorkorderRequest req = new SalOrderToWorkorderRequest();
+        req.setLineId(10L); req.setQuantity(new BigDecimal("10")); req.setWorkorderCode("W1");
+
+        assertThatThrownBy(() -> salOrderService.toWorkorder(req))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("已确认/生产中");
+        verify(proWorkorderService, never()).createWorkorderWithBom(any(), any(), any());
     }
 
     @Test

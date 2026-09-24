@@ -37,6 +37,8 @@ public interface ISalOrderService
     public int closeOrder(Long orderId);
     /** 取消:CONFIRMED/PRODUCING->CANCEL（SHIPPED/CLOSED/CANCEL 不可取消） */
     public int cancelOrder(Long orderId);
+    /** 接单:PENDING_ACCEPT->CONFIRMED（仅待接单可接，其他态拒绝） */
+    public int acceptOrder(Long orderId);
 
     public int deleteSalOrderByOrderIds(Long[] orderIds);
 

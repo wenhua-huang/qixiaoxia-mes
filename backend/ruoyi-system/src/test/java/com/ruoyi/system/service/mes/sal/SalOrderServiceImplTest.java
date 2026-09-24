@@ -154,7 +154,7 @@ class SalOrderServiceImplTest
     }
 
     @Test
-    @DisplayName("updateWithLines - 仅 CONFIRMED 可改；PRODUCING 拒绝且不改状态")
+    @DisplayName("updateWithLines - 仅待接单/已确认可改；PRODUCING 拒绝且不改状态")
     void update_gate() {
         when(salOrderMapper.selectSalOrderByOrderId(1L)).thenReturn(buildOrder(1L, "SO1", "PRODUCING"));
         SalOrderCreateRequest req = new SalOrderCreateRequest();
@@ -262,7 +262,7 @@ class SalOrderServiceImplTest
     }
 
     @Test
-    @DisplayName("delete - 非 CONFIRMED 不可删")
+    @DisplayName("delete - 待接单/已确认之外状态不可删")
     void delete_gate() {
         when(salOrderMapper.selectSalOrderByOrderId(1L)).thenReturn(buildOrder(1L, "SO1", "PRODUCING"));
         assertThatThrownBy(() -> salOrderService.deleteSalOrderByOrderIds(new Long[]{1L}))

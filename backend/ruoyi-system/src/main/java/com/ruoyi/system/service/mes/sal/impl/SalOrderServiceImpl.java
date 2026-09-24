@@ -240,7 +240,7 @@ public class SalOrderServiceImpl implements ISalOrderService
         order.setUpdateBy(SecurityUtils.getUsername());
         order.setUpdateTime(DateUtils.getNowDate());
         salOrderMapper.updateSalOrder(order);
-        // CONFIRMED 且未派生工单才可整单改单,全量替换行（派生工单即使未开工也被上面闸门拦截，避免工单引用成孤儿）
+        // 待接单/已确认且未派生工单才可整单改单,全量替换行（派生工单即使未开工也被上面闸门拦截，避免工单引用成孤儿）
         salOrderLineMapper.deleteSalOrderLineByOrderId(order.getOrderId());
         saveLines(order, req.getLines(), true);
         return order;

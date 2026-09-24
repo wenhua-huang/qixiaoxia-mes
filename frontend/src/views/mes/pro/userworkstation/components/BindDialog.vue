@@ -6,6 +6,8 @@
     width="640px"
     append-to-body
     :close-on-click-modal="false"
+    :show-close="!submitting"
+    :close-on-press-escape="!submitting"
     @close="onClose"
   >
     <el-form label-width="92px">
@@ -22,7 +24,6 @@
             :key="u.userId"
             closable
             type="info"
-            class="user-tag"
             @close="removeUser(u.userId)"
           >
             {{ u.nickName || u.userName }}
@@ -118,6 +119,11 @@ function removeUser(uid: number) {
   selectedUsers.value = selectedUsers.value.filter(u => u.userId !== uid)
 }
 
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}
+
 async function submit() {
   if (!selectedUsers.value.length) { proxy.$modal.msgError('请选择绑定人员'); return }
   if (!form.workstationIds.length) { proxy.$modal.msgError('请选择绑定工位'); return }
@@ -131,7 +137,7 @@ async function submit() {
     const r = (res.data || {}) as UserWorkstationBatchResult
     const msg = `新增 ${r.successCount || 0} 条，重新启用 ${r.reactivatedCount || 0} 条，跳过已绑定 ${r.skipCount || 0} 条`
     if (r.skips && r.skips.length) {
-      ElMessageBox.alert(r.skips.slice(0, 20).join('<br/>'), `${msg}（跳过明细）`, {
+      ElMessageBox.alert(r.skips.slice(0, 20).map(escapeHtml).join('<br/>'), `${msg}（跳过明细）`, {
         dangerouslyUseHTMLString: true
       })
     } else {

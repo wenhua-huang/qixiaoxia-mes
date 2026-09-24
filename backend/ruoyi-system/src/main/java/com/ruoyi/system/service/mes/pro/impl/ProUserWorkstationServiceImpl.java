@@ -28,7 +28,7 @@ public class ProUserWorkstationServiceImpl implements IProUserWorkstationService
     private static final int MAX_USERS = 50;
     private static final int MAX_WORKSTATIONS = 20;
     private static final int REMARK_MAX = 500;
-    /** 绑定写入工厂级粗锁：低频管理操作（单批最多 1000 对），工厂内串行最简单可靠 */
+    /** 绑定写入/更新工厂级粗锁：低频管理操作（单批最多 1000 对），工厂内串行最简单可靠 */
     private static final String LOCK_BIND_PREFIX = "mes:pro:userworkstation:bind:";
 
     private final ProUserWorkstationMapper proUserWorkstationMapper;
@@ -116,37 +116,35 @@ public class ProUserWorkstationServiceImpl implements IProUserWorkstationService
         req.setUserIds(List.of(e.getUserId()));
         req.setWorkstationIds(List.of(e.getWorkstationId()));
         req.setRemark(e.getRemark());
-        batchBind(req);
+        UserWorkstationBatchResult r = batchBind(req);
+        // 并发落败（锁外守卫通过、锁内查重已存在）：批处理 0 写入，单条语义仍按重复报错
+        if (r.getSuccessCount() + r.getReactivatedCount() == 0) {
+            throw new ServiceException("该用户已绑定此工位，请勿重复绑定");
+        }
         return 1;
     }
 
     @Override
     public int updateProUserWorkstation(ProUserWorkstation e) {
         if (e.getRecordId() == null) throw new ServiceException("记录ID不能为空");
-        ProUserWorkstation old = proUserWorkstationMapper.selectProUserWorkstationByRecordId(e.getRecordId());
-        if (old == null) throw new ServiceException("绑定记录不存在");
-
-        if (isPairChanging(e, old)) {
-            // 改绑与批量绑定同锁：冲突检查+更新原子，事务提交后才放锁
-            return lockTemplate.execute(bindLockKey(),
-                    () -> txTemplate.execute(tx -> doUpdateChangedPair(e)));
-        }
-        // 仅启停用：不涉绑定对，保持原样不加锁
-        return applyUpdate(e);
+        // 所有更新统一进锁：是否改绑也以锁内重读的最新记录判定，消除锁外读旧值的 TOCTOU
+        return lockTemplate.execute(bindLockKey(),
+                () -> txTemplate.execute(tx -> doUpdate(e)));
     }
 
-    private boolean isPairChanging(ProUserWorkstation patch, ProUserWorkstation old) {
-        return (patch.getUserId() != null && !patch.getUserId().equals(old.getUserId()))
-                || (patch.getWorkstationId() != null && !patch.getWorkstationId().equals(old.getWorkstationId()));
-    }
-
-    /** 锁内重读最新记录再做冲突检查/回填，同事务更新 */
-    private Integer doUpdateChangedPair(ProUserWorkstation patch) {
+    private Integer doUpdate(ProUserWorkstation patch) {
         ProUserWorkstation current =
                 proUserWorkstationMapper.selectProUserWorkstationByRecordId(patch.getRecordId());
         if (current == null) throw new ServiceException("绑定记录不存在");
-        applyChangedPair(patch, current);
+        if (isPairChanging(patch, current)) {
+            applyChangedPair(patch, current);
+        }
         return applyUpdate(patch);
+    }
+
+    private boolean isPairChanging(ProUserWorkstation patch, ProUserWorkstation current) {
+        return (patch.getUserId() != null && !patch.getUserId().equals(current.getUserId()))
+                || (patch.getWorkstationId() != null && !patch.getWorkstationId().equals(current.getWorkstationId()));
     }
 
     private int applyUpdate(ProUserWorkstation e) {

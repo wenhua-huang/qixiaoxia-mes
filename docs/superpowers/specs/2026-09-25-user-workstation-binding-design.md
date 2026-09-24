@@ -95,10 +95,11 @@ domain 增加两个**非持久**查询字段 `userKeyword`、`workstationKeyword
 
 ### 4.5 并发与一致性
 
-- 绑定写入（批量绑定、单条新增、改绑）用工厂级 Redisson 锁 `mes:pro:userworkstation:bind:{factoryId}` 串行化，**先锁后事务**（`RedisLockTemplate.execute` + `TransactionTemplate`，与质检放行 `ProQcBlockServiceImpl` 同范式，waitSec 用模板默认 5 秒）：查重 → insert / 重启用 / 改绑的 check-then-act 整体在锁内事务中完成，事务提交后才释放锁；
+- 绑定写入（批量绑定、单条新增）与更新（改绑、启停用）用工厂级 Redisson 锁 `mes:pro:userworkstation:bind:{factoryId}` 串行化，**先锁后事务**（`RedisLockTemplate.execute` + `TransactionTemplate`，与质检放行 `ProQcBlockServiceImpl` 同范式，waitSec 用模板默认 5 秒）：查重 → insert / 重启用 / 改绑的 check-then-act 整体在锁内事务中完成，事务提交后才释放锁；
 - 该锁是「同一（用户, 工位）只许一行」在**表无唯一索引**前提下的并发兜底；本次不动表结构，`qxx_pro_user_workstation` 仍无唯一索引；
 - 取工厂级粗锁（而非逐（人,工位）细锁）：低频管理页操作，单批最多 1000 对，工厂内串行最简单可靠；
-- 仅启停用（只传 recordId + enableFlag）不改变绑定对，不进锁。
+- 更新统一进锁：是否改绑以锁内重读的最新记录判定（不在锁外预读），消除 TOCTOU；启停用持锁仅一次动态 UPDATE；
+- 单条 POST 新增在锁外做启用快拒，权威查重随 `batchBind` 在锁内完成；并发落败（批结果 0 写入）时仍按单条语义抛「该用户已绑定此工位，请勿重复绑定」。
 
 ### 4.6 错误处理
 

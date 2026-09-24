@@ -307,4 +307,76 @@ class ProUserWorkstationServiceImplTest {
                 && x.getOperationTime() != null));
         verify(mapper, never()).updateProUserWorkstation(any());
     }
+
+    @Test
+    @DisplayName("单条新增并发落败：锁外守卫通过但锁内查重已存在，仍按重复报错且 0 写入")
+    void insert_concurrentLoser_stillThrows() {
+        when(userService.selectUserById(1L)).thenReturn(user(1L));
+        when(workstationMapper.selectMdWorkstationByWorkstationId(100L)).thenReturn(ws(100L, "1"));
+        // 第一次：锁外快拒未命中；第二次：锁内权威查重已被并发请求抢先建成启用行
+        when(mapper.selectByUserAndWorkstation(1L, 100L))
+                .thenReturn(new ArrayList<>(), List.of(row(9L, "1")));
+
+        ProUserWorkstation e = new ProUserWorkstation();
+        e.setUserId(1L);
+        e.setWorkstationId(100L);
+        assertThatThrownBy(() -> service.insertProUserWorkstation(e))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("已绑定此工位");
+        verify(mapper, never()).insertProUserWorkstation(any());
+    }
+
+    @Test
+    @DisplayName("更新（含仅启停用）也走工厂锁，且以锁内重读记录为准")
+    void update_enableFlagOnly_alsoRunsUnderFactoryLock() {
+        when(mapper.selectProUserWorkstationByRecordId(7L)).thenReturn(row(7L, "1"));
+
+        ProUserWorkstation patch = new ProUserWorkstation();
+        patch.setRecordId(7L);
+        patch.setEnableFlag("0");
+        service.updateProUserWorkstation(patch);
+
+        verify(lockTemplate).execute(startsWith("mes:pro:userworkstation:bind:"), any(Supplier.class));
+        verify(mapper).updateProUserWorkstation(argThat(e ->
+                e.getRecordId().equals(7L) && "0".equals(e.getEnableFlag())));
+        verify(userService, never()).selectUserById(any());
+    }
+
+    @Test
+    @DisplayName("selectAll：以 enableFlag=1 条件走列表查询（App 只取启用绑定）")
+    void selectAll_usesEnabledCondition() {
+        when(mapper.selectProUserWorkstationList(any())).thenReturn(List.of(row(9L, "1")));
+
+        List<ProUserWorkstation> all = service.selectAll();
+
+        assertThat(all).hasSize(1);
+        verify(mapper).selectProUserWorkstationList(argThat(e -> "1".equals(e.getEnableFlag())));
+    }
+
+    @Test
+    @DisplayName("工位选项：仅查启用工位并按编码升序（null 垫底）")
+    void selectWorkstationOptions_enabledOnly_sortedByCode() {
+        MdWorkstation a = new MdWorkstation();
+        a.setWorkstationId(1L); a.setWorkstationCode("BAG-02"); a.setEnableFlag("1");
+        MdWorkstation b = new MdWorkstation();
+        b.setWorkstationId(2L); b.setWorkstationCode("BAG-01"); b.setEnableFlag("1");
+        MdWorkstation c = new MdWorkstation();
+        c.setWorkstationId(3L); c.setWorkstationCode(null); c.setEnableFlag("1");
+        when(workstationMapper.selectMdWorkstationList(argThat(w -> "1".equals(w.getEnableFlag()))))
+                .thenReturn(new ArrayList<>(List.of(a, c, b)));
+
+        List<MdWorkstation> options = service.selectWorkstationOptions();
+
+        assertThat(options).extracting(MdWorkstation::getWorkstationCode)
+                .containsExactly("BAG-01", "BAG-02", null);
+    }
+
+    @Test
+    @DisplayName("删除：批量/单条均直接委托 Mapper")
+    void delete_delegatesToMapper() {
+        service.deleteProUserWorkstationByRecordIds(new Long[] { 1L, 2L });
+        service.deleteProUserWorkstationByRecordId(3L);
+
+        verify(mapper).deleteProUserWorkstationByRecordIds(new Long[] { 1L, 2L });
+        verify(mapper).deleteProUserWorkstationByRecordId(3L);
+    }
 }

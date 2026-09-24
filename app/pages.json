@@ -210,6 +210,11 @@
       "navigationBarTitleText": "外协收货"
     }
   }, {
+    "path": "pages/mes/pro/exception-create",
+    "style": {
+      "navigationBarTitleText": "报异常"
+    }
+  }, {
     "path": "pages/mes/wm/outsource-list",
     "style": {
       "navigationBarTitleText": "外协任务",

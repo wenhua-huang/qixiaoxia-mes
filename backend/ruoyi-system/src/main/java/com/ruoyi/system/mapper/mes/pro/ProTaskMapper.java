@@ -65,4 +65,12 @@ public interface ProTaskMapper {
      * @return 影响行数；0 表示任务已被其他流程推进/取消
      */
     int completeTaskIfProducing(@Param("taskId") Long taskId, @Param("operator") String operator);
+
+    /**
+     * 异常顺延改期：精准更新任务计划完成时间（异常模块 E3 RESCHEDULE 出口），
+     * 不走全实体 update，避免覆盖并发状态变更。factory_id 由拦截器注入。
+     */
+    int updateTaskEndTime(@Param("taskId") Long taskId,
+                          @Param("endTime") Date endTime,
+                          @Param("operator") String operator);
 }

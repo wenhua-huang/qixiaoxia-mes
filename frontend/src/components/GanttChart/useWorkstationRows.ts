@@ -31,7 +31,9 @@ export function buildLaneRows(lanes: WorkstationLane[], parseDate: ParseDate): G
         aS: t.actualStartTime ? parseDate(t.actualStartTime) : null,
         aE: t.actualEndTime ? parseDate(t.actualEndTime) : null,
         progress: typeof t.progressPercent === 'number' ? Math.min(100, Math.max(0, t.progressPercent)) : 0,
-        delayLevel: t.delayLevel || 'NORMAL'
+        delayLevel: t.delayLevel || 'NORMAL',
+        isException: !!t.isException,
+        exceptionCode: t.exceptionCode
       })
     }
     rows.push({

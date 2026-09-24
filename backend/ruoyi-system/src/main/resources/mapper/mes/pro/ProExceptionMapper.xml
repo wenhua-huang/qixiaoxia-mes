@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.pro.ProExceptionMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.pro.ProException" id="ProExceptionResult">
+        <result property="exceptionId"          column="exception_id"/>
+        <result property="factoryId"            column="factory_id"/>
+        <result property="exceptionCode"        column="exception_code"/>
+        <result property="exceptionType"        column="exception_type"/>
+        <result property="status"               column="status"/>
+        <result property="responsibleParty"     column="responsible_party"/>
+        <result property="workorderId"          column="workorder_id"/>
+        <result property="workorderCode"        column="workorder_code"/>
+        <result property="workorderName"        column="workorder_name"/>
+        <result property="taskId"               column="task_id"/>
+        <result property="taskCode"             column="task_code"/>
+        <result property="processId"            column="process_id"/>
+        <result property="processCode"          column="process_code"/>
+        <result property="processName"          column="process_name"/>
+        <result property="targetType"           column="target_type"/>
+        <result property="targetId"             column="target_id"/>
+        <result property="targetCode"           column="target_code"/>
+        <result property="reporterId"          column="reporter_id"/>
+        <result property="reporterName"        column="reporter_name"/>
+        <result property="occurTime"            column="occur_time"/>
+        <result property="impactQuantity"       column="impact_quantity"/>
+        <result property="description"          column="description"/>
+        <result property="sceneImages"          column="scene_images"/>
+        <result property="qualitySubclass"      column="quality_subclass"/>
+        <result property="usableQuantity"       column="usable_quantity"/>
+        <result property="needRework"           column="need_rework"/>
+        <result property="itemId"               column="item_id"/>
+        <result property="itemCode"             column="item_code"/>
+        <result property="itemName"             column="item_name"/>
+        <result property="shortageQuantity"     column="shortage_quantity"/>
+        <result property="expectedArrivalDate"  column="expected_arrival_date"/>
+        <result property="originalPlanTime"     column="original_plan_time"/>
+        <result property="newExpectedTime"      column="new_expected_time"/>
+        <result property="delayReason"          column="delay_reason"/>
+        <result property="returnQuantity"       column="return_quantity"/>
+        <result property="returnReason"         column="return_reason"/>
+        <result property="customerAcceptRework" column="customer_accept_rework"/>
+        <result property="conclusion"           column="conclusion"/>
+        <result property="resolveType"          column="resolve_type"/>
+        <result property="resolveBy"            column="resolve_by"/>
+        <result property="resolveTime"          column="resolve_time"/>
+        <result property="targetDocType"        column="target_doc_type"/>
+        <result property="targetDocId"          column="target_doc_id"/>
+        <result property="targetDocCode"        column="target_doc_code"/>
+        <result property="scrapQuantity"        column="scrap_quantity"/>
+        <result property="closeBy"              column="close_by"/>
+        <result property="closeTime"            column="close_time"/>
+        <result property="remark"               column="remark"/>
+        <result property="createBy"             column="create_by"/>
+        <result property="createTime"           column="create_time"/>
+        <result property="updateBy"             column="update_by"/>
+        <result property="updateTime"           column="update_time"/>
+    </resultMap>
+
+    <sql id="selectProExceptionVo">
+        select exception_id, factory_id, exception_code, exception_type, status, responsible_party,
+               workorder_id, workorder_code, workorder_name, task_id, task_code,
+               process_id, process_code, process_name, target_type, target_id, target_code,
+               reporter_id, reporter_name, occur_time, impact_quantity, description, scene_images,
+               quality_subclass, usable_quantity, need_rework,
+               item_id, item_code, item_name, shortage_quantity, expected_arrival_date,
+               original_plan_time, new_expected_time, delay_reason,
+               return_quantity, return_reason, customer_accept_rework,
+               conclusion, resolve_type, resolve_by, resolve_time,
+               target_doc_type, target_doc_id, target_doc_code, scrap_quantity,
+               close_by, close_time, remark, create_by, create_time, update_by, update_time
+        from qxx_pro_exception
+    </sql>
+
+    <select id="selectProExceptionList" parameterType="com.ruoyi.system.domain.mes.pro.ProException"
+            resultMap="ProExceptionResult">
+        <include refid="selectProExceptionVo"/>
+        <where>
+            <if test="exceptionCode != null and exceptionCode != ''"> and exception_code like concat('%', #{exceptionCode}, '%')</if>
+            <if test="exceptionType != null and exceptionType != ''"> and exception_type = #{exceptionType}</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+            <if test="responsibleParty != null and responsibleParty != ''"> and responsible_party = #{responsibleParty}</if>
+            <if test="workorderId != null"> and workorder_id = #{workorderId}</if>
+            <if test="workorderCode != null and workorderCode != ''"> and workorder_code like concat('%', #{workorderCode}, '%')</if>
+            <if test="taskId != null"> and task_id = #{taskId}</if>
+            <if test="processId != null"> and process_id = #{processId}</if>
+            <if test="resolveType != null and resolveType != ''"> and resolve_type = #{resolveType}</if>
+            <if test="params.beginOccurTime != null and params.beginOccurTime != ''">
+                and date_format(occur_time,'%Y%m%d') &gt;= date_format(#{params.beginOccurTime},'%Y%m%d')
+            </if>
+            <if test="params.endOccurTime != null and params.endOccurTime != ''">
+                and date_format(occur_time,'%Y%m%d') &lt;= date_format(#{params.endOccurTime},'%Y%m%d')
+            </if>
+        </where>
+        order by exception_id desc
+    </select>
+
+    <select id="selectProExceptionByExceptionId" parameterType="Long" resultMap="ProExceptionResult">
+        <include refid="selectProExceptionVo"/>
+        where exception_id = #{exceptionId}
+    </select>
+
+    <!-- factory_id 由 FactoryIdInterceptor 注入，业务 INSERT 不写 factory_id 列 -->
+    <insert id="insertProException" parameterType="com.ruoyi.system.domain.mes.pro.ProException"
+            useGeneratedKeys="true" keyProperty="exceptionId">
+        insert into qxx_pro_exception
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="exceptionCode != null and exceptionCode != ''">exception_code,</if>
+            <if test="exceptionType != null and exceptionType != ''">exception_type,</if>
+            <if test="status != null and status != ''">status,</if>
+            <if test="responsibleParty != null and responsibleParty != ''">responsible_party,</if>
+            <if test="workorderId != null">workorder_id,</if>
+            <if test="workorderCode != null">workorder_code,</if>
+            <if test="workorderName != null">workorder_name,</if>
+            <if test="taskId != null">task_id,</if>
+            <if test="taskCode != null">task_code,</if>
+            <if test="processId != null">process_id,</if>
+            <if test="processCode != null">process_code,</if>
+            <if test="processName != null">process_name,</if>
+            <if test="targetType != null">target_type,</if>
+            <if test="targetId != null">target_id,</if>
+            <if test="targetCode != null">target_code,</if>
+            <if test="reporterId != null">reporter_id,</if>
+            <if test="reporterName != null">reporter_name,</if>
+            <if test="occurTime != null">occur_time,</if>
+            <if test="impactQuantity != null">impact_quantity,</if>
+            <if test="description != null">description,</if>
+            <if test="sceneImages != null">scene_images,</if>
+            <if test="qualitySubclass != null">quality_subclass,</if>
+            <if test="usableQuantity != null">usable_quantity,</if>
+            <if test="needRework != null">need_rework,</if>
+            <if test="itemId != null">item_id,</if>
+            <if test="itemCode != null">item_code,</if>
+            <if test="itemName != null">item_name,</if>
+            <if test="shortageQuantity != null">shortage_quantity,</if>
+            <if test="expectedArrivalDate != null">expected_arrival_date,</if>
+            <if test="originalPlanTime != null">original_plan_time,</if>
+            <if test="newExpectedTime != null">new_expected_time,</if>
+            <if test="delayReason != null">delay_reason,</if>
+            <if test="returnQuantity != null">return_quantity,</if>
+            <if test="returnReason != null">return_reason,</if>
+            <if test="customerAcceptRework != null">customer_accept_rework,</if>
+            <if test="conclusion != null">conclusion,</if>
+            <if test="resolveType != null">resolve_type,</if>
+            <if test="resolveBy != null">resolve_by,</if>
+            <if test="resolveTime != null">resolve_time,</if>
+            <if test="targetDocType != null">target_doc_type,</if>
+            <if test="targetDocId != null">target_doc_id,</if>
+            <if test="targetDocCode != null">target_doc_code,</if>
+            <if test="scrapQuantity != null">scrap_quantity,</if>
+            <if test="closeBy != null">close_by,</if>
+            <if test="closeTime != null">close_time,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="exceptionCode != null and exceptionCode != ''">#{exceptionCode},</if>
+            <if test="exceptionType != null and exceptionType != ''">#{exceptionType},</if>
+            <if test="status != null and status != ''">#{status},</if>
+            <if test="responsibleParty != null and responsibleParty != ''">#{responsibleParty},</if>
+            <if test="workorderId != null">#{workorderId},</if>
+            <if test="workorderCode != null">#{workorderCode},</if>
+            <if test="workorderName != null">#{workorderName},</if>
+            <if test="taskId != null">#{taskId},</if>
+            <if test="taskCode != null">#{taskCode},</if>
+            <if test="processId != null">#{processId},</if>
+            <if test="processCode != null">#{processCode},</if>
+            <if test="processName != null">#{processName},</if>
+            <if test="targetType != null">#{targetType},</if>
+            <if test="targetId != null">#{targetId},</if>
+            <if test="targetCode != null">#{targetCode},</if>
+            <if test="reporterId != null">#{reporterId},</if>
+            <if test="reporterName != null">#{reporterName},</if>
+            <if test="occurTime != null">#{occurTime},</if>
+            <if test="impactQuantity != null">#{impactQuantity},</if>
+            <if test="description != null">#{description},</if>
+            <if test="sceneImages != null">#{sceneImages},</if>
+            <if test="qualitySubclass != null">#{qualitySubclass},</if>
+            <if test="usableQuantity != null">#{usableQuantity},</if>
+            <if test="needRework != null">#{needRework},</if>
+            <if test="itemId != null">#{itemId},</if>
+            <if test="itemCode != null">#{itemCode},</if>
+            <if test="itemName != null">#{itemName},</if>
+            <if test="shortageQuantity != null">#{shortageQuantity},</if>
+            <if test="expectedArrivalDate != null">#{expectedArrivalDate},</if>
+            <if test="originalPlanTime != null">#{originalPlanTime},</if>
+            <if test="newExpectedTime != null">#{newExpectedTime},</if>
+            <if test="delayReason != null">#{delayReason},</if>
+            <if test="returnQuantity != null">#{returnQuantity},</if>
+            <if test="returnReason != null">#{returnReason},</if>
+            <if test="customerAcceptRework != null">#{customerAcceptRework},</if>
+            <if test="conclusion != null">#{conclusion},</if>
+            <if test="resolveType != null">#{resolveType},</if>
+            <if test="resolveBy != null">#{resolveBy},</if>
+            <if test="resolveTime != null">#{resolveTime},</if>
+            <if test="targetDocType != null">#{targetDocType},</if>
+            <if test="targetDocId != null">#{targetDocId},</if>
+            <if test="targetDocCode != null">#{targetDocCode},</if>
+            <if test="scrapQuantity != null">#{scrapQuantity},</if>
+            <if test="closeBy != null">#{closeBy},</if>
+            <if test="closeTime != null">#{closeTime},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateProException" parameterType="com.ruoyi.system.domain.mes.pro.ProException">
+        update qxx_pro_exception
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="exceptionCode != null and exceptionCode != ''">exception_code = #{exceptionCode},</if>
+            <if test="exceptionType != null and exceptionType != ''">exception_type = #{exceptionType},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="responsibleParty != null and responsibleParty != ''">responsible_party = #{responsibleParty},</if>
+            <if test="workorderId != null">workorder_id = #{workorderId},</if>
+            <if test="workorderCode != null">workorder_code = #{workorderCode},</if>
+            <if test="workorderName != null">workorder_name = #{workorderName},</if>
+            <if test="taskId != null">task_id = #{taskId},</if>
+            <if test="taskCode != null">task_code = #{taskCode},</if>
+            <if test="processId != null">process_id = #{processId},</if>
+            <if test="processCode != null">process_code = #{processCode},</if>
+            <if test="processName != null">process_name = #{processName},</if>
+            <if test="targetType != null">target_type = #{targetType},</if>
+            <if test="targetId != null">target_id = #{targetId},</if>
+            <if test="targetCode != null">target_code = #{targetCode},</if>
+            <if test="reporterId != null">reporter_id = #{reporterId},</if>
+            <if test="reporterName != null">reporter_name = #{reporterName},</if>
+            <if test="occurTime != null">occur_time = #{occurTime},</if>
+            <if test="impactQuantity != null">impact_quantity = #{impactQuantity},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="sceneImages != null">scene_images = #{sceneImages},</if>
+            <if test="qualitySubclass != null">quality_subclass = #{qualitySubclass},</if>
+            <if test="usableQuantity != null">usable_quantity = #{usableQuantity},</if>
+            <if test="needRework != null">need_rework = #{needRework},</if>
+            <if test="itemId != null">item_id = #{itemId},</if>
+            <if test="itemCode != null">item_code = #{itemCode},</if>
+            <if test="itemName != null">item_name = #{itemName},</if>
+            <if test="shortageQuantity != null">shortage_quantity = #{shortageQuantity},</if>
+            <if test="expectedArrivalDate != null">expected_arrival_date = #{expectedArrivalDate},</if>
+            <if test="originalPlanTime != null">original_plan_time = #{originalPlanTime},</if>
+            <if test="newExpectedTime != null">new_expected_time = #{newExpectedTime},</if>
+            <if test="delayReason != null">delay_reason = #{delayReason},</if>
+            <if test="returnQuantity != null">return_quantity = #{returnQuantity},</if>
+            <if test="returnReason != null">return_reason = #{returnReason},</if>
+            <if test="customerAcceptRework != null">customer_accept_rework = #{customerAcceptRework},</if>
+            <if test="conclusion != null">conclusion = #{conclusion},</if>
+            <if test="resolveType != null">resolve_type = #{resolveType},</if>
+            <if test="resolveBy != null">resolve_by = #{resolveBy},</if>
+            <if test="resolveTime != null">resolve_time = #{resolveTime},</if>
+            <if test="targetDocType != null">target_doc_type = #{targetDocType},</if>
+            <if test="targetDocId != null">target_doc_id = #{targetDocId},</if>
+            <if test="targetDocCode != null">target_doc_code = #{targetDocCode},</if>
+            <if test="scrapQuantity != null">scrap_quantity = #{scrapQuantity},</if>
+            <if test="closeBy != null">close_by = #{closeBy},</if>
+            <if test="closeTime != null">close_time = #{closeTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where exception_id = #{exceptionId}
+    </update>
+
+    <!--
+      PC 补全编辑专用：动态 UPDATE 全列带 !=null 条件，无法把可空列清空。
+      这里显式 SET 表单拥有的可空列（非本类型列恒为 null，回写无害），
+      仅由补全编辑路径调用；出口处理/关闭走 updateProException。
+    -->
+    <update id="updateExceptionEditOptional" parameterType="com.ruoyi.system.domain.mes.pro.ProException">
+        update qxx_pro_exception
+        set impact_quantity = #{impactQuantity},
+            usable_quantity = #{usableQuantity},
+            expected_arrival_date = #{expectedArrivalDate},
+            scene_images = #{sceneImages},
+            need_rework = #{needRework},
+            customer_accept_rework = #{customerAcceptRework},
+            remark = #{remark}
+        where exception_id = #{exceptionId}
+    </update>
+
+    <!-- 硬拦/角标/工单警示区只取计数、单号、工序所需列，不取 description/scene_images 等大字段 -->
+    <sql id="selectOpenExceptionBriefVo">
+        select exception_id, factory_id, exception_code, status, workorder_id, process_name, occur_time
+        from qxx_pro_exception
+    </sql>
+
+    <!-- 未关闭=待处理+处理中；已关闭/已作废均不硬拦完工（VOID 见 V158） -->
+    <select id="selectOpenByWorkorderId" resultMap="ProExceptionResult">
+        <include refid="selectOpenExceptionBriefVo"/>
+        where workorder_id = #{workorderId}
+          and status in ('OPEN', 'PROCESSING')
+        order by occur_time asc, exception_id asc
+    </select>
+
+    <select id="selectOpenByWorkorderIds" resultMap="ProExceptionResult">
+        <include refid="selectOpenExceptionBriefVo"/>
+        where status in ('OPEN', 'PROCESSING')
+          and workorder_id in
+        <foreach collection="workorderIds" item="wid" open="(" separator="," close=")">
+            #{wid}
+        </foreach>
+        order by occur_time asc, exception_id asc
+    </select>
+
+    <!-- -E 序号计数：同原任务下异常(返工/补做)任务数 -->
+    <select id="countExceptionTasksByOrigin" resultType="int">
+        select count(*) from qxx_pro_task
+        where origin_task_id = #{originTaskId}
+          and is_exception = 'Y'
+    </select>
+
+</mapper>

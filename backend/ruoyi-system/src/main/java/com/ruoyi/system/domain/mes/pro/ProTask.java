@@ -82,6 +82,15 @@ public class ProTask extends BaseEntity
     private Long snapshotId;
     private Integer ganttSort;
 
+    /** 是否异常(返工/补做)任务：Y/N */
+    @Excel(name = "是否异常任务", readConverterExp = "Y=是,N=否") private String isException;
+    /** 来源异常单ID */
+    private Long exceptionId;
+    /** 来源异常单号 */
+    private String exceptionCode;
+    /** 原工序任务ID（返工/补做任务的源头，-E 序号计数用） */
+    private Long originTaskId;
+
     /** 该任务待审核(PREPARE)报工数（非持久化，由 feedbackEntry 回填，供前端展示状态） */
     private Integer pendingFeedbackCount;
 
@@ -200,6 +209,15 @@ public class ProTask extends BaseEntity
     public void setSnapshotId(Long v) { this.snapshotId = v; }
     public Integer getGanttSort() { return ganttSort; }
     public void setGanttSort(Integer v) { this.ganttSort = v; }
+
+    public String getIsException() { return isException; }
+    public void setIsException(String v) { this.isException = v; }
+    public Long getExceptionId() { return exceptionId; }
+    public void setExceptionId(Long v) { this.exceptionId = v; }
+    public String getExceptionCode() { return exceptionCode; }
+    public void setExceptionCode(String v) { this.exceptionCode = v; }
+    public Long getOriginTaskId() { return originTaskId; }
+    public void setOriginTaskId(Long v) { this.originTaskId = v; }
 
     public Integer getPendingFeedbackCount() { return pendingFeedbackCount; }
     public void setPendingFeedbackCount(Integer v) { this.pendingFeedbackCount = v; }

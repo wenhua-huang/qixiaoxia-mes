@@ -31,6 +31,7 @@ import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
 import com.ruoyi.system.domain.mes.pro.ProRouteProduct;
 import com.ruoyi.system.domain.mes.md.MdWorkstation;
 import com.ruoyi.system.service.ISysUserService;
+import com.ruoyi.system.service.mes.pro.IProExceptionBlockService;
 import com.ruoyi.system.service.mes.pro.IProTaskService;
 import com.ruoyi.system.service.mes.pro.TaskReportDefaultsApplier;
 
@@ -69,6 +70,9 @@ public class ProTaskServiceImpl implements IProTaskService
 
     @Autowired
     private TaskReportDefaultsApplier defaultsApplier;
+
+    @Autowired
+    private IProExceptionBlockService proExceptionBlockService;
 
     @Override
     public ProTask selectProTaskByTaskId(Long taskId)
@@ -364,6 +368,7 @@ public class ProTaskServiceImpl implements IProTaskService
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void completeTask(Long taskId)
     {
         ProTask task = proTaskMapper.selectProTaskByTaskId(taskId);
@@ -568,6 +573,8 @@ public class ProTaskServiceImpl implements IProTaskService
         BigDecimal planned = wo.getQuantity() != null ? wo.getQuantity() : BigDecimal.ZERO;
         if (produced.compareTo(planned) >= 0)
         {
+            // E5 硬拦：存在未关闭异常单时禁止工单自动完工（整笔任务完成回滚）
+            proExceptionBlockService.assertCompletable(task.getWorkorderId());
             wo.setStatus("COMPLETED");  // 工单状态暂无常量类，沿用字符串
             wo.setFinishDate(new Date());
             wo.setUpdateTime(DateUtils.getNowDate());

@@ -27,6 +27,10 @@ export interface GanttTask {
   behindSchedule?: boolean
   children?: GanttTask[]
   materialStatus?: { status: 'ok' | 'shortage'; shortageNames: string }
+  /** 返工/补做异常任务（由异常单出口生成） */
+  isException?: boolean
+  exceptionId?: number
+  exceptionCode?: string
 }
 
 /** 甘特图依赖连线 */

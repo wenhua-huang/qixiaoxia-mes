@@ -54,6 +54,11 @@ export default defineConfig(({ mode, command }) => {
           changeOrigin: true,
           rewrite: (p) => p.replace(/^\/dev-api/, '')
         },
+        // MinIO 图片：后端返回 http://localhost:9010 源，经 utils/image.ts 改写成同源 /qxx-mes 后代理
+        '/qxx-mes': {
+          target: 'http://localhost:9010',
+          changeOrigin: true
+        },
          // springdoc proxy
          '^/v3/api-docs/(.*)': {
           target: baseUrl,

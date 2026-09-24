@@ -63,13 +63,14 @@
       </el-form-item>
     </el-form>
 
-    <UserMultiSelect v-model:showFlag="userSelectVisible" @onSelected="onUsersSelected" />
-
     <template #footer>
       <el-button :disabled="submitting" @click="emit('update:showFlag', false)">取 消</el-button>
       <el-button type="primary" :loading="submitting" @click="submit">确 定</el-button>
     </template>
   </el-dialog>
+
+  <!-- 与父 el-dialog 同级（组件自身 append-to-body，保持与 md/workstation 用法一致） -->
+  <UserMultiSelect v-model:showFlag="userSelectVisible" @onSelected="onUsersSelected" />
 </template>
 
 <script setup lang="ts" name="UserWorkstationBindDialog">

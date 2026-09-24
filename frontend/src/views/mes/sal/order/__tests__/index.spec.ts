@@ -7,6 +7,7 @@ import SalOrder from '../index.vue'
 const mockListOrder = vi.fn()
 const mockResolveBatch = vi.fn()
 const mockListRoute = vi.fn()
+const mockAcceptOrder = vi.fn()
 const mockModal = { confirm: vi.fn(), msgSuccess: vi.fn(), msgError: vi.fn(), msgWarning: vi.fn() }
 vi.mock('@/api/mes/sal/order', () => ({
   listOrder: (...args: any[]) => mockListOrder(...args),
@@ -17,6 +18,7 @@ vi.mock('@/api/mes/sal/order', () => ({
   updateOrderWithLines: vi.fn().mockResolvedValue({ code: 200 }),
   closeOrder: vi.fn().mockResolvedValue({ code: 200 }),
   cancelOrder: vi.fn().mockResolvedValue({ code: 200 }),
+  acceptOrder: (...args: any[]) => mockAcceptOrder(...args),
   toWorkorder: vi.fn().mockResolvedValue({ code: 200, data: { workorderCode: 'WO001' } }),
   delOrder: vi.fn().mockResolvedValue({ code: 200 }),
 }))
@@ -142,6 +144,39 @@ describe('SalOrder index.vue', () => {
     expect(btnTexts).not.toContain('结单')
     // 删除图标按钮是行内唯一无文本按钮：不应出现
     expect(btnTexts.filter(t => t === '')).toHaveLength(0)
+  })
+
+  it('待接单订单：有接单/改/删/取消，无生成工单/结单', async () => {
+    mockListOrder.mockResolvedValue({ rows: [
+      { orderId: 5, orderCode: 'SO005', orderName: 'x', clientName: 'c', status: 'PENDING_ACCEPT', progressPercent: 0 }
+    ], total: 1 })
+    const wrapper = mount(SalOrder, { global: globalStubs })
+    await nextTick(); await nextTick()
+    const btnTexts = wrapper.findAll('tbody tr')[0]!.findAll('button').map(b => b.text().trim())
+    expect(btnTexts).toContain('查看')
+    expect(btnTexts).toContain('接单')
+    expect(btnTexts).toContain('改')
+    expect(btnTexts).toContain('取消')
+    expect(btnTexts).not.toContain('生成工单')
+    expect(btnTexts).not.toContain('结单')
+    // 删除图标按钮是行内唯一无文本按钮：应出现
+    expect(btnTexts.filter(t => t === '')).toHaveLength(1)
+  })
+
+  it('点接单确认后调 acceptOrder 并刷新列表提示成功', async () => {
+    mockListOrder.mockResolvedValue({ rows: [
+      { orderId: 5, orderCode: 'SO005', orderName: 'x', clientName: 'c', status: 'PENDING_ACCEPT' }
+    ], total: 1 })
+    mockAcceptOrder.mockResolvedValue({ code: 200 })
+    const wrapper = mount(SalOrder, { global: globalStubs })
+    await nextTick(); await nextTick()
+    const callsBefore = mockListOrder.mock.calls.length
+    ;(wrapper.vm as any).handleAccept({ orderId: 5, orderCode: 'SO005' })
+    await new Promise(resolve => setTimeout(resolve, 10))  // handleAccept 不返回 promise，用宏任务等链落完
+    expect(mockAcceptOrder).toHaveBeenCalledTimes(1)
+    expect(mockAcceptOrder).toHaveBeenCalledWith(5)
+    expect(mockListOrder.mock.calls.length).toBe(callsBefore + 1)
+    expect(mockModal.msgSuccess).toHaveBeenCalledWith('接单成功')
   })
 
   it('已出货订单显示结单按钮，不显示取消', async () => {

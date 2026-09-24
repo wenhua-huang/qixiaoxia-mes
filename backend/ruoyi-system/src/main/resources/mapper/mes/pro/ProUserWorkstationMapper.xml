@@ -32,6 +32,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="userId != null"> and user_id = #{userId}</if>
             <if test="workstationId != null"> and workstation_id = #{workstationId}</if>
             <if test="enableFlag != null  and enableFlag != ''"> and enable_flag = #{enableFlag}</if>
+            <if test="userKeyword != null and userKeyword != ''">
+                and (user_name like concat('%', #{userKeyword}, '%')
+                     or nick_name like concat('%', #{userKeyword}, '%'))
+            </if>
+            <if test="workstationKeyword != null and workstationKeyword != ''">
+                and (workstation_code like concat('%', #{workstationKeyword}, '%')
+                     or workstation_name like concat('%', #{workstationKeyword}, '%'))
+            </if>
         </where>
         order by record_id desc
     </select>
@@ -39,6 +47,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectProUserWorkstationByRecordId" parameterType="Long" resultMap="ProUserWorkstationResult">
         <include refid="selectProUserWorkstationVo"/>
         where record_id = #{recordId}
+    </select>
+
+    <select id="selectByUserAndWorkstation" resultMap="ProUserWorkstationResult">
+        <include refid="selectProUserWorkstationVo"/>
+        where user_id = #{userId} and workstation_id = #{workstationId}
+        order by record_id
     </select>
 
     <insert id="insertProUserWorkstation" parameterType="ProUserWorkstation" useGeneratedKeys="true" keyProperty="recordId">

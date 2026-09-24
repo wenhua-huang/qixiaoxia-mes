@@ -29,6 +29,10 @@ public class ProUserWorkstation extends BaseEntity
     private String enableFlag;
     private Date operationTime;
 
+    // —— 非持久查询字段（仅列表查询用，不进 insert/update）——
+    private String userKeyword;
+    private String workstationKeyword;
+
     public Long getRecordId() { return recordId; }
     public void setRecordId(Long v) { this.recordId = v; }
     public Long getFactoryId() { return factoryId; }
@@ -49,6 +53,10 @@ public class ProUserWorkstation extends BaseEntity
     public void setEnableFlag(String v) { this.enableFlag = v; }
     public Date getOperationTime() { return operationTime; }
     public void setOperationTime(Date v) { this.operationTime = v; }
+    public String getUserKeyword() { return userKeyword; }
+    public void setUserKeyword(String userKeyword) { this.userKeyword = userKeyword; }
+    public String getWorkstationKeyword() { return workstationKeyword; }
+    public void setWorkstationKeyword(String workstationKeyword) { this.workstationKeyword = workstationKeyword; }
 
     @Override
     public String toString() {

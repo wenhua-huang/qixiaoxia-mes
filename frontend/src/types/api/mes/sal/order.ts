@@ -1,5 +1,8 @@
 import type { PageDomain, BaseEntity } from "../../common";
 
+/** 销售订单状态（四态主线 + CANCEL 链外） */
+export type SalOrderStatus = 'CONFIRMED' | 'PRODUCING' | 'SHIPPED' | 'CLOSED' | 'CANCEL'
+
 export interface SalOrderQueryParams extends PageDomain {
   orderCode?: string;
   orderName?: string;
@@ -7,9 +10,13 @@ export interface SalOrderQueryParams extends PageDomain {
   clientName?: string;
   clientOrderCode?: string;
   businessLine?: string;
-  /** 订单类型：NEW=新单 REPEAT=返单 STOCK=备货订单（字典 mes_sal_order_type） */
+  /** 订单类型：STANDARD=标品 SMALL_BATCH=小批量 GIFT=礼品 STOCK=备货订单 PLATE=制版（字典 mes_sal_order_type） */
   orderType?: string;
   status?: string;
+  /** 多状态筛选（后端 List<String> 绑定，重复 statusList 参数） */
+  statusList?: SalOrderStatus[];
+  /** 是否在列表行内返回生产进度 progressPercent */
+  includeProgress?: boolean;
   /** 订单来源：1=直接新增 2=CRM系统 */
   source?: number;
 }
@@ -28,18 +35,26 @@ export interface SalOrder extends BaseEntity {
   salesperson?: string;
   businessLine?: string;
   sampleFlag?: string;
+  /** 是否外发 Y/N */
+  outsourceFlag?: string;
+  /** 是否包装 Y/N */
+  packageFlag?: string;
   /** 订单来源：1=直接新增 2=CRM系统 */
   source?: number;
   orderDate?: string;
   requestDate?: string;
   totalAmount?: number;
   paymentMethod?: string;
-  status?: string;
-  /** 审核人 */
+  status?: SalOrderStatus;
+  /** 生产进度百分比（includeProgress=true 时后端返回，0-100） */
+  progressPercent?: number;
+  /** 已派生未取消工单数（includeProgress=true 时后端返回；>0 时改/删隐藏） */
+  workorderCount?: number;
+  /** @deprecated 审核流已废弃，历史数据 */
   approveBy?: string;
-  /** 审核时间 */
+  /** @deprecated 审核流已废弃，历史数据 */
   approveTime?: string;
-  /** 审核意见/驳回原因 */
+  /** @deprecated 审核流已废弃，历史数据 */
   approveRemark?: string;
   lines?: SalOrderLine[];
 }
@@ -64,6 +79,12 @@ export interface SalOrderLine extends BaseEntity {
   ropeSpec?: string;
   packageReq?: string;
   shippingReq?: string;
+  /** 绑定的产品-路线 record_id（开单按头维度自动带出，可手改） */
+  routeProductId?: number;
+  /** 路线编码快照 */
+  routeCode?: string;
+  /** 路线名称快照 */
+  routeName?: string;
   requestDate?: string;
   /** 扩展属性(扁平JSON {attrCode:value})，分类驱动的动态属性快照 */
   lineAttrs?: Record<string, any>;

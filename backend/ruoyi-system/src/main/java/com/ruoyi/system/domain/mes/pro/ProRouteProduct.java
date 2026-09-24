@@ -62,6 +62,18 @@ public class ProRouteProduct extends BaseEntity
     @Excel(name = "时长单位类型")
     private String timeUnitType;
 
+    /** 适用订单类型 STANDARD/SMALL_BATCH/GIFT/STOCK/PLATE；null=通配 */
+    private String applyOrderType;
+
+    /** 适用是否外发 Y/N；null=通配 */
+    private String applyOutsource;
+
+    /** 适用是否包装 Y/N；null=通配 */
+    private String applyPackage;
+
+    /** 同产品同分时候选首选 Y/N */
+    private String isDefault;
+
     public void setRecordId(Long recordId)
     {
         this.recordId = recordId;
@@ -182,6 +194,46 @@ public class ProRouteProduct extends BaseEntity
         return timeUnitType;
     }
 
+    public void setApplyOrderType(String applyOrderType)
+    {
+        this.applyOrderType = applyOrderType;
+    }
+
+    public String getApplyOrderType()
+    {
+        return applyOrderType;
+    }
+
+    public void setApplyOutsource(String applyOutsource)
+    {
+        this.applyOutsource = applyOutsource;
+    }
+
+    public String getApplyOutsource()
+    {
+        return applyOutsource;
+    }
+
+    public void setApplyPackage(String applyPackage)
+    {
+        this.applyPackage = applyPackage;
+    }
+
+    public String getApplyPackage()
+    {
+        return applyPackage;
+    }
+
+    public void setIsDefault(String isDefault)
+    {
+        this.isDefault = isDefault;
+    }
+
+    public String getIsDefault()
+    {
+        return isDefault;
+    }
+
     @Override
     public String toString() {
         return new ToStringBuilder(this,ToStringStyle.MULTI_LINE_STYLE)
@@ -197,6 +249,10 @@ public class ProRouteProduct extends BaseEntity
             .append("quantity", getQuantity())
             .append("productionTime", getProductionTime())
             .append("timeUnitType", getTimeUnitType())
+            .append("applyOrderType", getApplyOrderType())
+            .append("applyOutsource", getApplyOutsource())
+            .append("applyPackage", getApplyPackage())
+            .append("isDefault", getIsDefault())
             .append("remark", getRemark())
             .append("createBy", getCreateBy())
             .append("createTime", getCreateTime())

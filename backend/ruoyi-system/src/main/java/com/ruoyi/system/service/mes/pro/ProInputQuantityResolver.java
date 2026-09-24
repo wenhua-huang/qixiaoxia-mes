@@ -17,8 +17,14 @@ import com.ruoyi.system.mapper.mes.pro.ProFeedbackMapper;
  * <ul>
  *   <li>无路线/工序信息或当前工序不在路线上 → null（不默认、不留痕）；</li>
  *   <li>首道工序（无前驱）→ 任务排产数量 firstProcessDefault；</li>
- *   <li>其余工序 → 上一道工序累计已审核(AUDITED)报工产出 − 本工序累计上机数量，差额最小钳 0。</li>
+ *   <li>其余工序 → 上一道工序累计已审核(AUDITED)报工产出 − 本工序累计报工产出（含待审核），
+ *       差额最小钳 0。</li>
  * </ul>
+ *
+ * <p>口径说明：在制余额只有「产出报工」才会消耗，「上机」只是把实物挪到机台、并未消耗。
+ * 故减项必须用本工序累计报工数量（quantity_feedback），不能用累计上机数量（quantity_input）：
+ * 例如上机 2、首批只产出 1，机台仍压着 1 个在制品，下一次报工默认值应为 2−1=1，而非 2−2=0。
+ * 本工序产出含 PREPARE 待审核行——待审核代表实物已产出，且报工被删除时为物理删除，不会残留虚减。
  *
  * <p>一期聚合按 workorderId + processId，不区分流转卡（与质检门控/放行口径一致，
  * 保证预填默认值与提交时重算值同源、不会产生假的人工修改痕迹）；
@@ -73,7 +79,7 @@ public class ProInputQuantityResolver {
                 flow.prevNode(nodes, processId));
     }
 
-    /** 当前节点已确认存在后的统一收尾：首道返回排产数，其余返回上道产出−本道上机（钳 0） */
+    /** 当前节点已确认存在后的统一收尾：首道返回排产数，其余返回上道产出−本道产出（钳 0） */
     private BigDecimal resolveAfterCurrent(Long workorderId, Long processId,
                                            BigDecimal firstProcessDefault,
                                            Optional<ProRouteProcess> prev) {
@@ -81,10 +87,10 @@ public class ProInputQuantityResolver {
             // 首道工序：默认带出任务排产数量
             return firstProcessDefault;
         }
-        BigDecimal produced = nz(feedbackMapper.sumAuditedQuantityFeedback(
+        BigDecimal upstreamProduced = nz(feedbackMapper.sumAuditedQuantityFeedback(
                 workorderId, prev.get().getProcessId()));
-        BigDecimal used = nz(feedbackMapper.sumQuantityInput(workorderId, processId));
-        return produced.subtract(used).max(BigDecimal.ZERO);
+        BigDecimal currentProduced = nz(feedbackMapper.sumQuantityFeedback(workorderId, processId));
+        return upstreamProduced.subtract(currentProduced).max(BigDecimal.ZERO);
     }
 
     private BigDecimal nz(BigDecimal v) {

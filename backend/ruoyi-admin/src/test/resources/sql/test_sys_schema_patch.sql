@@ -195,3 +195,97 @@ SET @sql = IF(@col_exists = 0,
     'ALTER TABLE qxx_pro_doc_generation_log ADD COLUMN source_feedback_id bigint DEFAULT NULL COMMENT ''触发单据的报工record_id''',
     'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- V88 的 qxx_wm_product_sales_box：ry 旧基线/manual_tables 均无（Flyway baseline=136 不重放 V88）。
+-- V151 存量 SHIPPED 回填在 Flyway 阶段即引用本表，必须在 sql.init（先于 Flyway）补齐；
+-- DDL 与 SalOrderIT.ensureShipmentBoxTable 逐列一致，IF NOT EXISTS 幂等。
+CREATE TABLE IF NOT EXISTS qxx_wm_product_sales_box (
+  box_id bigint NOT NULL AUTO_INCREMENT COMMENT '装箱ID',
+  factory_id bigint NOT NULL COMMENT '工厂ID',
+  sales_id bigint NOT NULL COMMENT '销售出库单ID',
+  line_id bigint DEFAULT NULL COMMENT '出库行ID',
+  box_no varchar(32) NOT NULL COMMENT '箱号',
+  item_id bigint DEFAULT NULL COMMENT '物料ID',
+  item_code varchar(64) DEFAULT '' COMMENT '物料编码快照',
+  item_name varchar(200) DEFAULT '' COMMENT '物料名称快照',
+  specification varchar(200) DEFAULT '' COMMENT '规格快照',
+  quantity decimal(16,4) DEFAULT 0.0000 COMMENT '本箱数量',
+  unit_of_measure varchar(64) DEFAULT '' COMMENT '计量单位编码',
+  unit_name varchar(64) DEFAULT '' COMMENT '单位名称',
+  box_spec varchar(100) DEFAULT '' COMMENT '箱规描述',
+  box_length decimal(10,2) DEFAULT 0.00 COMMENT '箱长cm',
+  box_width decimal(10,2) DEFAULT 0.00 COMMENT '箱宽cm',
+  box_height decimal(10,2) DEFAULT 0.00 COMMENT '箱高cm',
+  volume decimal(12,4) DEFAULT 0.0000 COMMENT '体积m3',
+  weight decimal(12,4) DEFAULT 0.0000 COMMENT '重量kg',
+  shipment_id bigint DEFAULT NULL COMMENT '关联发运单ID',
+  status varchar(20) DEFAULT 'PACKED' COMMENT 'PACKED/SHIPPED',
+  remark varchar(500) DEFAULT '' COMMENT '备注',
+  create_by varchar(64) DEFAULT '' COMMENT '创建者',
+  create_time datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_by varchar(64) DEFAULT '' COMMENT '更新者',
+  update_time datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (box_id),
+  KEY idx_factory_id (factory_id),
+  KEY idx_sales_id (sales_id),
+  KEY idx_shipment_id (shipment_id),
+  KEY idx_line_id (line_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='销售出库-装箱明细';
+
+-- ============================================================
+-- V141 依赖补丁：qxx_wm_outsource_order 由 V100 建表（baseline=136 跳过，
+-- manual_tables.sql 未含），V141 用 add_col_if_missing 加 iqc_id/iqc_code，
+-- ADD COLUMN ... AFTER feedback_id 要求表与 feedback_id 列均存在。
+-- 仅 Flyway 迁移需要；补最小列集。
+-- ============================================================
+CREATE TABLE IF NOT EXISTS qxx_wm_outsource_order (
+  outsource_order_id bigint NOT NULL AUTO_INCREMENT COMMENT '外协订单ID',
+  factory_id         bigint NOT NULL DEFAULT 1 COMMENT '工厂ID',
+  outsource_code     varchar(64) DEFAULT NULL COMMENT '外协单号',
+  feedback_id        bigint DEFAULT NULL COMMENT '来源报工ID(V141 iqc_id 挂在其后)',
+  create_by          varchar(64) DEFAULT '' COMMENT '创建者',
+  create_time        datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (outsource_order_id),
+  KEY idx_factory_id (factory_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='外协订单表(测试最小列集,V141迁移用)';
+
+-- V142 依赖补丁：manual_tables 的 qxx_pro_workrecord 结构旧于 V65，
+-- 缺 clock_in_time（V142 在该列上建 idx_workrecord_clock_team）。
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'qxx_pro_workrecord' AND column_name = 'clock_in_time');
+SET @sql = IF(@col_exists = 0,
+    'ALTER TABLE qxx_pro_workrecord ADD COLUMN clock_in_time datetime DEFAULT NULL COMMENT ''上工时间''',
+    'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ============================================================
+-- V150 集成测试前置种子（test schema baseline=136，早期业务种子迁移不回放；
+-- V150 的 RT-SMALL/RT-GIFT 路线工序 INSERT...JOIN 依赖下列既有工序）
+-- 生产库这些工序由业务主数据提供；此处仅补测试库，幂等。
+-- ============================================================
+INSERT INTO qxx_pro_process (factory_id, process_code, process_name, enable_flag, create_by, create_time)
+SELECT 1, 'PRC-PRINT', '印刷', '1', 'admin', NOW()
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM qxx_pro_process WHERE process_code='PRC-PRINT');
+INSERT INTO qxx_pro_process (factory_id, process_code, process_name, enable_flag, create_by, create_time)
+SELECT 1, 'PRC-BAG', '制袋', '1', 'admin', NOW()
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM qxx_pro_process WHERE process_code='PRC-BAG');
+INSERT INTO qxx_pro_process (factory_id, process_code, process_name, enable_flag, create_by, create_time)
+SELECT 1, 'PRC-PACK', '包装', '1', 'admin', NOW()
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM qxx_pro_process WHERE process_code='PRC-PACK');
+-- 外发工序 + RT-OUTSRC 路线 + 外发节点(无供应商)：让 V150 ⑤g 回填逻辑真实执行
+INSERT INTO qxx_pro_process (factory_id, process_code, process_name, process_type, enable_flag, create_by, create_time)
+SELECT 1, 'PRC-OUT-PRINT', '外发印刷', 'OUTSOURCE', '1', 'admin', NOW()
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM qxx_pro_process WHERE process_code='PRC-OUT-PRINT');
+INSERT INTO qxx_pro_route (factory_id, route_code, route_name, enable_flag, create_by, create_time)
+SELECT 1, 'RT-OUTSRC', '外发工艺路线', '1', 'admin', NOW()
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM qxx_pro_route WHERE route_code='RT-OUTSRC');
+INSERT INTO qxx_pro_route_process (factory_id, route_id, process_id, process_code, process_name, order_num, link_type, key_flag, is_check, is_outsource, create_by, create_time)
+SELECT 1, r.route_id, p.process_id, p.process_code, p.process_name, 1, 'SS', 'N', 'N', '1', 'admin', NOW()
+FROM qxx_pro_route r JOIN qxx_pro_process p ON p.process_code='PRC-OUT-PRINT'
+WHERE r.route_code='RT-OUTSRC'
+  AND NOT EXISTS (SELECT 1 FROM qxx_pro_route_process rp WHERE rp.route_id=r.route_id AND rp.process_id=p.process_id);
+-- 外协供应商(万隆), 带工厂映射以便 V150 ⑤g 回填 outsource_factory_id
+INSERT INTO qxx_md_vendor (factory_id, vendor_code, vendor_name, vendor_type, enable_flag, outsource_factory_id, create_by, create_time)
+SELECT 1, 'OUT-WANLONG', '万隆外协厂', 'OUTSOURCE', '1', 1, 'admin', NOW()
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM qxx_md_vendor WHERE vendor_code='OUT-WANLONG');
+UPDATE qxx_md_vendor SET outsource_factory_id=1 WHERE vendor_code='OUT-WANLONG' AND outsource_factory_id IS NULL;

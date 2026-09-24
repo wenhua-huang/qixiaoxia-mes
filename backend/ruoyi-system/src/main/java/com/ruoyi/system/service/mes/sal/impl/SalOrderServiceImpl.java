@@ -640,7 +640,7 @@ public class SalOrderServiceImpl implements ISalOrderService
         return order;
     }
 
-    /** 改/删闸门：订单 CONFIRMED 但已派生工单（含未开工 PREPARE）时拒绝，避免行硬删使工单引用成孤儿+可转量重复占用 */
+    /** 改/删闸门：订单仅待接单/已确认可操作，但已派生工单（含未开工 PREPARE）时拒绝，避免行硬删使工单引用成孤儿+可转量重复占用 */
     private void assertNoDerivedWorkorder(Long orderId, String action)
     {
         List<SalOrderWorkorderCountRow> rows =

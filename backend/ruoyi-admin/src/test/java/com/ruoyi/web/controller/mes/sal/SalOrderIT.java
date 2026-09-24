@@ -31,7 +31,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 销售订单四态收敛 —— 主链路集成测试（Task 6 验收）。
+ * 销售订单五态收敛 —— 主链路集成测试（V161 待接单验收）。
  *
  * <p>验收链：建单即 PENDING_ACCEPT（factory_id=1 由 FactoryIdInterceptor 注入）→ accept 接单
  * → CONFIRMED → toWorkorder → 开工事务（AFTER_COMMIT 事件同步投递）→ PRODUCING → ...
@@ -50,7 +50,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author qixiaoxia
  */
-@DisplayName("销售订单四态主链路集成测试")
+@DisplayName("销售订单五态主链路集成测试")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class SalOrderIT extends BaseIntegrationTest
 {
@@ -112,7 +112,7 @@ class SalOrderIT extends BaseIntegrationTest
     // ==================== 测试 ====================
 
     @Test
-    @DisplayName("四态主链路：建单PENDING_ACCEPT→接单CONFIRMED→开工PRODUCING→连续报工进度递增状态不跳→发齐SHIPPED→结单CLOSED")
+    @DisplayName("五态主链路：建单PENDING_ACCEPT→接单CONFIRMED→开工PRODUCING→连续报工进度递增状态不跳→发齐SHIPPED→结单CLOSED")
     void four_status_main_flow()
     {
         Long orderId = createOrderAndWorkorder("SO-IT-M1", "WO-IT-M1", new BigDecimal("100"));

@@ -18,6 +18,7 @@ import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.system.domain.mes.pro.ProUserWorkstation;
+import com.ruoyi.system.domain.mes.pro.UserWorkstationBatchRequest;
 import com.ruoyi.system.service.mes.pro.IProUserWorkstationService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.page.TableDataInfo;
@@ -42,6 +43,19 @@ public class ProUserWorkstationController extends BaseController
     @PreAuthorize("@ss.hasPermi('mes:pro:userworkstation:query')")
     @GetMapping("/listAll")
     public AjaxResult listAll() { return success(proUserWorkstationService.selectAll()); }
+
+    @PreAuthorize("@ss.hasPermi('mes:pro:userworkstation:query')")
+    @GetMapping("/workstationOptions")
+    public AjaxResult workstationOptions() {
+        return success(proUserWorkstationService.selectWorkstationOptions());
+    }
+
+    @PreAuthorize("@ss.hasPermi('mes:pro:userworkstation:add')")
+    @Log(title = "用户工作站", businessType = BusinessType.INSERT)
+    @PostMapping("/batch")
+    public AjaxResult batch(@RequestBody UserWorkstationBatchRequest request) {
+        return success(proUserWorkstationService.batchBind(request));
+    }
 
     @PreAuthorize("@ss.hasPermi('mes:pro:userworkstation:export')")
     @Log(title = "用户工作站", businessType = BusinessType.EXPORT)

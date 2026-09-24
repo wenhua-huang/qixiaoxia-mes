@@ -112,7 +112,7 @@ class SalOrderIT extends BaseIntegrationTest
     // ==================== 测试 ====================
 
     @Test
-    @DisplayName("四态主链路：建单CONFIRMED→开工PRODUCING→连续报工进度递增状态不跳→发齐SHIPPED→结单CLOSED")
+    @DisplayName("四态主链路：建单PENDING_ACCEPT→接单CONFIRMED→开工PRODUCING→连续报工进度递增状态不跳→发齐SHIPPED→结单CLOSED")
     void four_status_main_flow()
     {
         Long orderId = createOrderAndWorkorder("SO-IT-M1", "WO-IT-M1", new BigDecimal("100"));
@@ -120,7 +120,7 @@ class SalOrderIT extends BaseIntegrationTest
         Long woId = jdbcTemplate.queryForObject(
                 "select workorder_id from qxx_pro_workorder where workorder_code='WO-IT-M1'", Long.class);
 
-        // 建单即 CONFIRMED（不再有 submit/approve），factory_id=1 由拦截器注入
+        // 建单默认 PENDING_ACCEPT，接单后变 CONFIRMED；factory_id=1 由拦截器注入
         assertThat(queryStatus(orderId)).isEqualTo("CONFIRMED");
 
         // 开工 + 事件投递包在同一真实事务里：提交后 AFTER_COMMIT 监听器同步执行条件 UPDATE
@@ -371,7 +371,7 @@ class SalOrderIT extends BaseIntegrationTest
     // ==================== 辅助：建单 + 转工单 ====================
 
     /**
-     * 建单（不传 status → 建单即 CONFIRMED）并整单转工单。
+     * 建单（不传 status → 默认 PENDING_ACCEPT，helper 内接单转 CONFIRMED）并整单转工单。
      * 保留旧用例 create_confirm_toWorkorder 的全部断言语义：来源列回填、已转量/可转量回算，
      * 仅去掉已废弃的 submit/approve 两步。
      */

@@ -58,11 +58,12 @@
       <el-table-column label="操作" align="center" width="360" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="View" @click="handleView(scope.row)">查看</el-button>
-          <el-button v-if="scope.row.status==='CONFIRMED' && !hasWorkorder(scope.row)" link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:sal:order:edit']">改</el-button>
+          <el-button v-if="scope.row.status==='PENDING_ACCEPT'" link type="success" size="small" @click="handleAccept(scope.row)" v-hasPermi="['mes:sal:order:edit']">接单</el-button>
+          <el-button v-if="['PENDING_ACCEPT','CONFIRMED'].includes(scope.row.status) && !hasWorkorder(scope.row)" link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:sal:order:edit']">改</el-button>
           <el-button v-if="scope.row.status==='CONFIRMED' || scope.row.status==='PRODUCING'" link type="warning" size="small" @click="handleToWorkorder(scope.row)" v-hasPermi="['mes:sal:order:workorder']">生成工单</el-button>
           <el-button v-if="scope.row.status==='SHIPPED'" link type="success" size="small" @click="handleClose(scope.row)" v-hasPermi="['mes:sal:order:edit']">结单</el-button>
-          <el-button v-if="scope.row.status==='CONFIRMED' || scope.row.status==='PRODUCING'" link type="danger" size="small" @click="handleCancel(scope.row)" v-hasPermi="['mes:sal:order:edit']">取消</el-button>
-          <el-button v-if="scope.row.status==='CONFIRMED' && !hasWorkorder(scope.row)" link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:sal:order:remove']"></el-button>
+          <el-button v-if="['PENDING_ACCEPT','CONFIRMED','PRODUCING'].includes(scope.row.status)" link type="danger" size="small" @click="handleCancel(scope.row)" v-hasPermi="['mes:sal:order:edit']">取消</el-button>
+          <el-button v-if="['PENDING_ACCEPT','CONFIRMED'].includes(scope.row.status) && !hasWorkorder(scope.row)" link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:sal:order:remove']"></el-button>
           <el-dropdown @command="(cmd) => handleRowExport(scope.row, cmd)" v-hasPermi="['mes:sal:order:exportDetail']">
             <el-button link type="primary" size="small">导出<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
             <template #dropdown>
@@ -142,7 +143,7 @@
 </template>
 
 <script>
-import { listOrder, getOrderDetail, createOrderWithLines, updateOrderWithLines, closeOrder, cancelOrder, delOrder } from '@/api/mes/sal/order'
+import { listOrder, getOrderDetail, createOrderWithLines, updateOrderWithLines, closeOrder, cancelOrder, acceptOrder, delOrder } from '@/api/mes/sal/order'
 import { getDicts } from '@/api/system/dict/data'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import { resolveRouteProductBatch } from '@/api/mes/pro/routeproduct'
@@ -222,7 +223,7 @@ export default {
     sourceTag(s) { return s === 2 ? 'warning' : 'info' },
     cancel() { this.open = false; this.reset() },
     reset() {
-      this.form = { orderId: null, orderCode: null, orderName: null, orderType: 'STANDARD', clientId: null, clientCode: null, clientName: null, clientOrderCode: null, salesperson: null, businessLine: null, sampleFlag: 'N', outsourceFlag: 'N', packageFlag: 'N', orderDate: null, requestDate: null, totalAmount: 0, paymentMethod: null, status: 'CONFIRMED', remark: null }
+      this.form = { orderId: null, orderCode: null, orderName: null, orderType: 'STANDARD', clientId: null, clientCode: null, clientName: null, clientOrderCode: null, salesperson: null, businessLine: null, sampleFlag: 'N', outsourceFlag: 'N', packageFlag: 'N', orderDate: null, requestDate: null, totalAmount: 0, paymentMethod: null, status: 'PENDING_ACCEPT', remark: null }
       this.optType = undefined; this.lineList = []; this.autoGenFlag = true; this.resetForm('form')
     },
     handleQuery() { this.queryParams.pageNum = 1; this.getList() },
@@ -296,6 +297,7 @@ export default {
         fn(payload).then(() => { this.$modal.msgSuccess(this.form.orderId ? '修改成功' : '新增成功'); this.open = false; this.getList() })
       })
     },
+    handleAccept(row) { this.$modal.confirm('确认接单 "' + row.orderCode + '"？接单后进入已确认状态，可转工单生产。').then(() => acceptOrder(row.orderId)).then(() => { this.getList(); this.$modal.msgSuccess('接单成功') }).catch(() => {}) },
     handleClose(row) { this.$modal.confirm('确认结单 "' + row.orderCode + '"？结单后不可恢复。').then(() => closeOrder(row.orderId)).then(() => { this.getList(); this.$modal.msgSuccess('结单成功') }).catch(() => {}) },
     handleCancel(row) { this.$modal.confirm('确认取消 "' + row.orderCode + '" ?').then(() => cancelOrder(row.orderId)).then(() => { this.getList(); this.$modal.msgSuccess('取消成功，关联工单需另行处理') }).catch(() => {}) },
     handleDelete(row) { const ids = row.orderId || this.ids; this.$modal.confirm('是否确认删除销售订单 "' + ids + '" ?').then(() => delOrder(ids)).then(() => { this.getList(); this.$modal.msgSuccess('删除成功') }).catch(() => {}) },
@@ -308,10 +310,10 @@ export default {
     }
   },
   computed: {
-    /** 顶部「修改」：选中行均 CONFIRMED 且均未派生工单（含未开工）才可用 */
-    canEditSelected() { return this.selectedRows.length > 0 && this.selectedRows.every(r => r.status === 'CONFIRMED' && !this.hasWorkorder(r)) },
-    /** 顶部「删除」：同修改口径，CONFIRMED 且未派生工单 */
-    canDeleteSelected() { return this.selectedRows.length > 0 && this.selectedRows.every(r => r.status === 'CONFIRMED' && !this.hasWorkorder(r)) }
+    /** 顶部「修改」：选中行均为待接单/已确认且均未派生工单（含未开工）才可用 */
+    canEditSelected() { return this.selectedRows.length > 0 && this.selectedRows.every(r => ['PENDING_ACCEPT','CONFIRMED'].includes(r.status) && !this.hasWorkorder(r)) },
+    /** 顶部「删除」：同修改口径，待接单/已确认且未派生工单 */
+    canDeleteSelected() { return this.selectedRows.length > 0 && this.selectedRows.every(r => ['PENDING_ACCEPT','CONFIRMED'].includes(r.status) && !this.hasWorkorder(r)) }
   }
 }
 </script>

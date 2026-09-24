@@ -25,6 +25,9 @@ export function closeOrder(id: number): Promise<AjaxResult> {
 export function cancelOrder(id: number): Promise<AjaxResult> {
   return request({ url: '/mes/sal/order/cancel/' + id, method: 'put' })
 }
+export function acceptOrder(id: number): Promise<AjaxResult> {
+  return request({ url: '/mes/sal/order/accept/' + id, method: 'put' })
+}
 export function toWorkorder(data: SalOrderToWorkorderRequest): Promise<AjaxResult<SalOrder>> {
   return request({ url: '/mes/sal/order/toWorkorder', method: 'post', data })
 }

@@ -12,7 +12,8 @@
       </el-form-item>
       <el-form-item label="状态" prop="enableFlag">
         <el-select v-model="queryParams.enableFlag" placeholder="全部" clearable style="width:110px">
-          <el-option v-for="d in sys_yes_no" :key="d.value" :label="d.label" :value="d.value" />
+          <el-option label="启用" value="1" />
+          <el-option label="停用" value="0" />
         </el-select>
       </el-form-item>
       <el-form-item>
@@ -69,7 +70,6 @@ import { listUserWorkstation, updateUserWorkstation } from '@/api/mes/pro/userwo
 import BindDialog from './components/BindDialog.vue'
 
 const { proxy } = getCurrentInstance() as any
-const { sys_yes_no } = proxy.useDict('sys_yes_no')
 
 const loading = ref(true)
 const bindOpen = ref(false)

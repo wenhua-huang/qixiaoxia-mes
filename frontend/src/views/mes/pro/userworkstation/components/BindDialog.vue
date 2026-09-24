@@ -66,7 +66,7 @@
     <UserMultiSelect v-model:showFlag="userSelectVisible" @onSelected="onUsersSelected" />
 
     <template #footer>
-      <el-button @click="emit('update:showFlag', false)">取 消</el-button>
+      <el-button :disabled="submitting" @click="emit('update:showFlag', false)">取 消</el-button>
       <el-button type="primary" :loading="submitting" @click="submit">确 定</el-button>
     </template>
   </el-dialog>

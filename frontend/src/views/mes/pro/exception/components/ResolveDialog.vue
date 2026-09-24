@@ -103,7 +103,9 @@ const rules = {
   scrapQuantity: [{ required: true, trigger: 'blur', validator: positiveQty }],
   newExpectedTime: [{ required: true, message: '请选择新的计划完成时间', trigger: 'change' }],
   conclusion: [{ required: true, trigger: 'blur', validator: (_r: any, v: string, cb: (e?: Error) => void) => {
-    if (!(v || '').trim()) cb(new Error('请填写结论说明'))
+    const t = (v || '').trim()
+    if (!t) cb(new Error('请填写结论说明'))
+    else if (t.length < 2) cb(new Error('请填写至少 2 个字的结论'))
     else cb()
   } }]
 }

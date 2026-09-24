@@ -1,8 +1,11 @@
 package com.ruoyi.system.service.mes.pro.impl;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,8 +44,9 @@ import jakarta.annotation.PostConstruct;
 /**
  * 生产异常单 Service 实现：手机上报 → PC 补全定责 → 七出口处理 → 回流手动收口。
  *
- * <p>出口处理先锁后事务（锁 key pro:exception:resolve:{id}），锁内完成建异常任务/
- * DRAFT 采购单/顺延/关闭，避免并发重复开单。factory_id 由 FactoryIdInterceptor 注入。
+ * <p>补全/选出口/关闭/作废统一先锁后事务（锁 key pro:exception:lock:{id}），锁内完成
+ * 状态流转与建异常任务/DRAFT 采购单/顺延，避免并发互相覆盖、重复开单；同原任务开 -E 序号
+ * 另加 pro:exception:task:{originTaskId} 锁。factory_id 由 FactoryIdInterceptor 注入。
  *
  * @author qixiaoxia
  */
@@ -126,6 +130,7 @@ public class ProExceptionServiceImpl implements IProExceptionService
         {
             throw new ServiceException("请填写异常说明");
         }
+        String sceneImages = validateSceneImages(input.getSceneImages());
         ProTask task = proTaskMapper.selectProTaskByTaskId(input.getTaskId());
         if (task == null)
         {
@@ -143,7 +148,7 @@ public class ProExceptionServiceImpl implements IProExceptionService
         ex.setOccurTime(new Date());
         ex.setImpactQuantity(input.getImpactQuantity());
         ex.setDescription(StringUtils.trim(input.getDescription()));
-        ex.setSceneImages(StringUtils.trimToNull(input.getSceneImages()));
+        ex.setSceneImages(sceneImages);
         ex.setRemark(StringUtils.trimToNull(input.getRemark()));
         ex.setCreateBy(SecurityUtils.getUsername());
         ex.setCreateTime(new Date());
@@ -152,8 +157,18 @@ public class ProExceptionServiceImpl implements IProExceptionService
     }
 
     @Override
-    @Transactional
     public int updateProException(ProException input)
+    {
+        if (input.getExceptionId() == null)
+        {
+            throw new ServiceException("缺少异常单标识");
+        }
+        Long exceptionId = input.getExceptionId();
+        return lockTemplate.execute(ProExceptionConstants.LOCK_PREFIX + exceptionId,
+                () -> txTemplate.execute(tx -> doUpdate(input)));
+    }
+
+    private int doUpdate(ProException input)
     {
         ProException ex = mustGet(input.getExceptionId());
         if (!ProExceptionStatus.OPEN.is(ex.getStatus()))
@@ -168,11 +183,12 @@ public class ProExceptionServiceImpl implements IProExceptionService
         }
         applyParty(ex, input.getResponsibleParty());
         applyEditableFields(ex, input);
+        ex.setSceneImages(validateSceneImages(ex.getSceneImages()));
         validateTypeSpecific(ex);
         ex.setUpdateBy(SecurityUtils.getUsername());
         ex.setUpdateTime(new Date());
         int rows = proExceptionMapper.updateProException(ex);
-        // 动态 UPDATE 无法置空：可空列（数量/到货日/备注）清空由专用语句落库
+        // 动态 UPDATE 无法置空：可空列（数量/到货日/照片/备注/单选标记）清空由专用语句落库
         proExceptionMapper.updateExceptionEditOptional(ex);
         return rows;
     }
@@ -185,30 +201,45 @@ public class ProExceptionServiceImpl implements IProExceptionService
         {
             throw new ServiceException("请选择处理出口");
         }
-        // 先锁后事务：防并发重复开返工任务/采购单
-        lockTemplate.execute(ProExceptionConstants.LOCK_RESOLVE_PREFIX + exceptionId,
-                (Runnable) () -> txTemplate.execute(tx ->
-                {
-                    doResolve(exceptionId, input, resolve);
-                    return null;
-                }));
+        // 先锁后事务：与补全/关闭/作废互斥，防并发状态覆盖与重复开单
+        lockTemplate.execute(ProExceptionConstants.LOCK_PREFIX + exceptionId, (Runnable) () ->
+        {
+            Runnable inTx = () -> txTemplate.execute(tx ->
+            {
+                doResolve(exceptionId, input, resolve);
+                return null;
+            });
+            // 返工/补做的序号锁必须在开事务前获取、在事务提交后释放：
+            // 锁内取号+插入，否则两线程会在对方提交前同时取到同序号
+            if (resolve == ProExceptionResolve.REWORK || resolve == ProExceptionResolve.REMAKE)
+            {
+                ProException locked = mustGet(exceptionId);
+                lockTemplate.execute(ProExceptionConstants.LOCK_TASK_PREFIX + locked.getTaskId(), inTx);
+            }
+            else
+            {
+                inTx.run();
+            }
+        });
         return proExceptionMapper.selectProExceptionByExceptionId(exceptionId);
     }
 
     @Override
-    @Transactional
     public int closeException(Long exceptionId, String conclusion)
+    {
+        return lockTemplate.execute(ProExceptionConstants.LOCK_PREFIX + exceptionId,
+                () -> txTemplate.execute(tx -> doClose(exceptionId, conclusion)));
+    }
+
+    private int doClose(Long exceptionId, String conclusion)
     {
         ProException ex = mustGet(exceptionId);
         if (!ProExceptionStatus.PROCESSING.is(ex.getStatus()))
         {
             throw new ServiceException("仅处理中的异常单可关闭");
         }
-        if (StringUtils.isBlank(conclusion))
-        {
-            throw new ServiceException("请填写处理结论后再关闭");
-        }
-        ex.setConclusion(StringUtils.trim(conclusion));
+        ex.setConclusion(normalizeConclusion(conclusion, "处理结论",
+                "请填写处理结论后再关闭", ProExceptionConstants.MAX_CONCLUSION_LEN));
         stampClosed(ex, SecurityUtils.getUsername(), new Date());
         ex.setUpdateBy(SecurityUtils.getUsername());
         ex.setUpdateTime(new Date());
@@ -216,21 +247,24 @@ public class ProExceptionServiceImpl implements IProExceptionService
     }
 
     @Override
-    @Transactional
     public int voidException(Long exceptionId, String reason)
+    {
+        return lockTemplate.execute(ProExceptionConstants.LOCK_PREFIX + exceptionId,
+                () -> txTemplate.execute(tx -> doVoid(exceptionId, reason)));
+    }
+
+    private int doVoid(Long exceptionId, String reason)
     {
         ProException ex = mustGet(exceptionId);
         if (!ProExceptionStatus.OPEN.is(ex.getStatus()))
         {
             throw new ServiceException("仅待处理状态的异常单可作废（已产生处理单据请先收口）");
         }
-        if (StringUtils.isBlank(reason))
-        {
-            throw new ServiceException("请填写作废原因");
-        }
+        String trimmedReason = normalizeConclusion(reason, "作废原因",
+                "请填写作废原因", ProExceptionConstants.MAX_VOID_REASON_LEN);
         String operator = SecurityUtils.getUsername();
         Date now = new Date();
-        ex.setConclusion(ProExceptionConstants.VOID_CONCLUSION_PREFIX + StringUtils.trim(reason));
+        ex.setConclusion(ProExceptionConstants.VOID_CONCLUSION_PREFIX + trimmedReason);
         ex.setStatus(ProExceptionStatus.VOID.getCode());
         ex.setCloseBy(operator);
         ex.setCloseTime(now);
@@ -301,6 +335,13 @@ public class ProExceptionServiceImpl implements IProExceptionService
         {
             throw new ServiceException("请填写有效的返工/补做数量");
         }
+        // 序号锁由 resolveException 在开事务前持有（LOCK_TASK_PREFIX+原任务），此处锁内直接取号建单
+        return buildExceptionTask(origin, qty, ex, resolve);
+    }
+
+    private DocInfo buildExceptionTask(ProTask origin, BigDecimal qty, ProException ex,
+                                       ProExceptionResolve resolve)
+    {
         int seq = proExceptionMapper.countExceptionTasksByOrigin(origin.getTaskId()) + 1;
         String suffix = ProExceptionResolve.REWORK == resolve
                 ? ProExceptionConstants.TASK_SUFFIX_REWORK : ProExceptionConstants.TASK_SUFFIX_REMAKE;
@@ -314,6 +355,23 @@ public class ProExceptionServiceImpl implements IProExceptionService
                                          ProException ex, int seq)
     {
         ProTask t = new ProTask();
+        copyOriginSnapshot(t, origin, suffix);
+        t.setTaskCode(origin.getTaskCode() + ProExceptionConstants.TASK_CODE_EXCEPTION_SEP + seq);
+        String baseName = StringUtils.defaultIfBlank(origin.getTaskName(), origin.getTaskCode());
+        t.setTaskName(baseName + suffix);
+        t.setQuantity(qty);
+        t.setStatus(ProConstants.TASK_STATUS_NORMAL);
+        t.setIsException(ProExceptionConstants.YES);
+        t.setOriginTaskId(origin.getTaskId());
+        t.setExceptionId(ex.getExceptionId());
+        t.setExceptionCode(ex.getExceptionCode());
+        t.setRemark("来源异常单 " + ex.getExceptionCode());
+        return t;
+    }
+
+    /** 复制原任务的业务快照（工序名追加返工/补做后缀），不含编号、数量、状态等异常单专属字段 */
+    private void copyOriginSnapshot(ProTask t, ProTask origin, String suffix)
+    {
         t.setWorkorderId(origin.getWorkorderId());
         t.setWorkorderCode(origin.getWorkorderCode());
         t.setWorkorderName(origin.getWorkorderName());
@@ -349,18 +407,6 @@ public class ProExceptionServiceImpl implements IProExceptionService
         t.setOutsourceFactoryId(origin.getOutsourceFactoryId());
         t.setWorkerId(origin.getWorkerId());
         t.setLeaderId(origin.getLeaderId());
-
-        t.setTaskCode(origin.getTaskCode() + ProExceptionConstants.TASK_CODE_EXCEPTION_SEP + seq);
-        String baseName = StringUtils.defaultIfBlank(origin.getTaskName(), origin.getTaskCode());
-        t.setTaskName(baseName + suffix);
-        t.setQuantity(qty);
-        t.setStatus(ProConstants.TASK_STATUS_NORMAL);
-        t.setIsException(ProExceptionConstants.YES);
-        t.setOriginTaskId(origin.getTaskId());
-        t.setExceptionId(ex.getExceptionId());
-        t.setExceptionCode(ex.getExceptionCode());
-        t.setRemark("来源异常单 " + ex.getExceptionCode());
-        return t;
     }
 
     /** 开补料出口：建 DRAFT 采购单（供应商待定、一行缺料），双向以异常单号挂链，不下发 */
@@ -390,7 +436,7 @@ public class ProExceptionServiceImpl implements IProExceptionService
         PurOrder po = new PurOrder();
         po.setOrderName(StringUtils.defaultIfBlank(ex.getWorkorderName(), ex.getWorkorderCode())
                 + "-异常补料-" + ex.getExceptionCode());
-        po.setVendorId(0L);
+        po.setVendorId(ProExceptionConstants.VENDOR_PENDING_ID);
         po.setOrderDate(new Date());
         po.setExpectedDate(ex.getExpectedArrivalDate());
         po.setStatus(PurOrderStatus.DRAFT.getCode());
@@ -412,7 +458,7 @@ public class ProExceptionServiceImpl implements IProExceptionService
         line.setQuantityOrdered(qty);
         line.setExpectedDate(ex.getExpectedArrivalDate());
         line.setSourceOrderCode(ex.getExceptionCode());
-        line.setStatus(PurOrderStatus.ORDERED.getCode());
+        // 行状态留空：insertPurOrderLine 强制与订单头同步为 DRAFT，避免伪装已下单
         return line;
     }
 
@@ -469,11 +515,10 @@ public class ProExceptionServiceImpl implements IProExceptionService
 
     private DocInfo prepareTerminalConclusion(ProException ex, ProException input, ProExceptionResolve resolve)
     {
-        if (StringUtils.isBlank(input.getConclusion()))
-        {
-            throw new ServiceException(resolve == ProExceptionResolve.CONCESSION
-                    ? "请填写让步接收结论" : "请填写退款结单说明");
-        }
+        // 终结出口（让步接收/退款结单）与手动关闭同一结论口径：非空、2~1000 字，防止单字/超长结论入库
+        ex.setConclusion(normalizeConclusion(input.getConclusion(), "处理结论",
+                resolve == ProExceptionResolve.CONCESSION ? "请填写让步接收结论" : "请填写退款结单说明",
+                ProExceptionConstants.MAX_CONCLUSION_LEN));
         return null;
     }
 
@@ -632,7 +677,58 @@ public class ProExceptionServiceImpl implements IProExceptionService
                 // 规则缺失/序列故障降级，保证上报不被编码阻断（与任务/报工编码同策略）
             }
         }
-        return "EX" + System.currentTimeMillis();
+        // 加随机尾段，防同毫秒并发降级撞 uk_factory_code
+        return "EX" + System.currentTimeMillis() + "-" + UUID.randomUUID().toString().substring(0, 8);
+    }
+
+    /**
+     * 结论类文本统一兜底：trim 后校验非空/字数上下限，返回规整文本。
+     * 关闭、作废、终结出口共用同一口径，避免绕过前端直调 API 时 Data too long 打成 500
+     */
+    private static String normalizeConclusion(String raw, String label, String blankMsg, int maxLen)
+    {
+        String v = StringUtils.trim(raw);
+        if (StringUtils.isBlank(v))
+        {
+            throw new ServiceException(blankMsg);
+        }
+        if (v.length() < ProExceptionConstants.MIN_CLOSE_CONCLUSION_LEN)
+        {
+            throw new ServiceException(label + "至少填写 " + ProExceptionConstants.MIN_CLOSE_CONCLUSION_LEN + " 个字");
+        }
+        if (v.length() > maxLen)
+        {
+            throw new ServiceException(label + "不能超过 " + maxLen + " 个字");
+        }
+        return v;
+    }
+
+    /** 现场照片逗号串兜底校验：逐段 trim 去空段、张数 ≤9、总长不超列宽（前端已拦，后端必须再断言） */
+    private static String validateSceneImages(String raw)
+    {
+        String v = StringUtils.trimToNull(raw);
+        if (v == null)
+        {
+            return null;
+        }
+        // 归一化串内空段/段内空白（"a,, ,b" → "a,b"），落库即规整串，展示端 split 无需再过滤
+        String normalized = Arrays.stream(v.split(","))
+                .map(StringUtils::trimToEmpty).filter(s -> !s.isEmpty())
+                .collect(Collectors.joining(","));
+        if (normalized.isEmpty())
+        {
+            return null;
+        }
+        if (normalized.length() > ProExceptionConstants.SCENE_IMAGES_MAX_LEN)
+        {
+            throw new ServiceException("现场照片数据超长，请减少照片后重试");
+        }
+        long count = normalized.chars().filter(c -> c == ',').count() + 1;
+        if (count > ProExceptionConstants.MAX_SCENE_IMAGES)
+        {
+            throw new ServiceException("现场照片最多 " + ProExceptionConstants.MAX_SCENE_IMAGES + " 张");
+        }
+        return normalized;
     }
 
     /** 操作人快照：nickName(userName)，取不到姓名退化为账号 */

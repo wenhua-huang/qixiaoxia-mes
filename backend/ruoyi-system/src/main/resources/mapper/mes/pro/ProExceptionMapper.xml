@@ -277,20 +277,29 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         set impact_quantity = #{impactQuantity},
             usable_quantity = #{usableQuantity},
             expected_arrival_date = #{expectedArrivalDate},
+            scene_images = #{sceneImages},
+            need_rework = #{needRework},
+            customer_accept_rework = #{customerAcceptRework},
             remark = #{remark}
         where exception_id = #{exceptionId}
     </update>
 
+    <!-- 硬拦/角标/工单警示区只取计数、单号、工序所需列，不取 description/scene_images 等大字段 -->
+    <sql id="selectOpenExceptionBriefVo">
+        select exception_id, factory_id, exception_code, status, workorder_id, process_name, occur_time
+        from qxx_pro_exception
+    </sql>
+
     <!-- 未关闭=待处理+处理中；已关闭/已作废均不硬拦完工（VOID 见 V158） -->
     <select id="selectOpenByWorkorderId" resultMap="ProExceptionResult">
-        <include refid="selectProExceptionVo"/>
+        <include refid="selectOpenExceptionBriefVo"/>
         where workorder_id = #{workorderId}
           and status in ('OPEN', 'PROCESSING')
         order by occur_time asc, exception_id asc
     </select>
 
     <select id="selectOpenByWorkorderIds" resultMap="ProExceptionResult">
-        <include refid="selectProExceptionVo"/>
+        <include refid="selectOpenExceptionBriefVo"/>
         where status in ('OPEN', 'PROCESSING')
           and workorder_id in
         <foreach collection="workorderIds" item="wid" open="(" separator="," close=")">

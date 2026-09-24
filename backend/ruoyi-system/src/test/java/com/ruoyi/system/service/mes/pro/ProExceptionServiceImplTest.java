@@ -2,6 +2,7 @@ package com.ruoyi.system.service.mes.pro;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.function.Supplier;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
@@ -18,6 +20,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.ruoyi.common.core.redis.RedisLockTemplate;
 import com.ruoyi.common.enums.ProExceptionParty;
 import com.ruoyi.common.enums.ProExceptionResolve;
 import com.ruoyi.common.enums.ProExceptionStatus;
@@ -42,7 +45,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -63,7 +68,7 @@ class ProExceptionServiceImplTest {
     @Mock private IPurOrderLineService purOrderLineService;
     @Mock private MdItemMapper mdItemMapper;
     @Mock private AutoCodeGenerator autoCodeGenerator;
-    @Mock private com.ruoyi.common.core.redis.RedisLockTemplate lockTemplate;
+    @Mock private RedisLockTemplate lockTemplate;
     @Mock private PlatformTransactionManager transactionManager;
 
     @InjectMocks
@@ -85,6 +90,9 @@ class ProExceptionServiceImplTest {
             ((Runnable) inv.getArgument(1)).run();
             return null;
         }).when(lockTemplate).execute(anyString(), any(Runnable.class));
+        // 带返回值的锁重载（补全/关闭/作废）直接执行 Supplier
+        lenient().doAnswer(inv -> ((Supplier<?>) inv.getArgument(1)).get())
+                .when(lockTemplate).execute(anyString(), any(Supplier.class));
         lenient().when(transactionManager.getTransaction(any()))
                 .thenReturn(new SimpleTransactionStatus());
         ReflectionTestUtils.setField(service, "txTemplate", new TransactionTemplate(transactionManager));
@@ -383,6 +391,10 @@ class ProExceptionServiceImplTest {
         assertThatThrownBy(() -> service.closeException(EX_ID, "  "))
                 .isInstanceOf(ServiceException.class).hasMessageContaining("处理结论");
 
+        // 单字结论后端兜底拒绝（前端 prompt 校验不能绕过）
+        assertThatThrownBy(() -> service.closeException(EX_ID, "x"))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("至少");
+
         service.closeException(EX_ID, "返工完成复检合格");
         assertThat(ex.getStatus()).isEqualTo(ProExceptionStatus.CLOSED.getCode());
         assertThat(ex.getConclusion()).isEqualTo("返工完成复检合格");
@@ -426,6 +438,130 @@ class ProExceptionServiceImplTest {
         ex.setStatus(ProExceptionStatus.CLOSED.getCode());
         assertThatThrownBy(() -> service.voidException(EX_ID, "x"))
                 .isInstanceOf(ServiceException.class).hasMessageContaining("待处理");
+    }
+
+    @Test
+    @DisplayName("结论字数口径统一：关闭/作废/终结出口都拒绝单字与超长（防绕前端打出 Data too long）")
+    void should_reject_conclusion_out_of_length_bounds() {
+        // 关闭：超长拒绝
+        ProException processing = openException(ProExceptionType.QUALITY, ProExceptionParty.FACTORY.getCode());
+        processing.setStatus(ProExceptionStatus.PROCESSING.getCode());
+        when(proExceptionMapper.selectProExceptionByExceptionId(EX_ID)).thenReturn(processing);
+        assertThatThrownBy(() -> service.closeException(EX_ID, "x".repeat(ProExceptionConstants.MAX_CONCLUSION_LEN + 1)))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("不能超过");
+
+        // 作废：待处理下单字拒绝、超长拒绝（前缀占 4 字，原因上限 996）
+        ProException openVoid = openException(ProExceptionType.QUALITY, ProExceptionParty.PENDING.getCode());
+        when(proExceptionMapper.selectProExceptionByExceptionId(EX_ID)).thenReturn(openVoid);
+        assertThatThrownBy(() -> service.voidException(EX_ID, "x"))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("至少");
+        assertThatThrownBy(() -> service.voidException(EX_ID, "y".repeat(ProExceptionConstants.MAX_VOID_REASON_LEN + 1)))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("不能超过");
+
+        // 让步接收（终结出口）：单字拒绝，口径与手动关闭一致
+        ProException openConc = openException(ProExceptionType.QUALITY, ProExceptionParty.SUPPLIER.getCode());
+        when(proExceptionMapper.selectProExceptionByExceptionId(EX_ID)).thenReturn(openConc);
+        ProException oneChar = resolveInput(ProExceptionResolve.CONCESSION);
+        oneChar.setConclusion("行");
+        assertThatThrownBy(() -> service.resolveException(EX_ID, oneChar))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("至少");
+    }
+
+    @Test
+    @DisplayName("并发防护：作废走异常单维度同一把锁，与补全/关闭/选出口互斥")
+    void should_lock_by_exception_when_void() {
+        ProException ex = openException(ProExceptionType.QUALITY, ProExceptionParty.PENDING.getCode());
+        when(proExceptionMapper.selectProExceptionByExceptionId(EX_ID)).thenReturn(ex);
+
+        service.voidException(EX_ID, "挂错任务");
+
+        verify(lockTemplate).execute(eq(ProExceptionConstants.LOCK_PREFIX + EX_ID),
+                any(Supplier.class));
+    }
+
+    @Test
+    @DisplayName("并发防护：开返工任务按原任务加 -En 序号锁，防跨异常单并发重号")
+    void should_lock_origin_task_when_create_exception_task() {
+        ProException ex = openException(ProExceptionType.QUALITY, ProExceptionParty.FACTORY.getCode());
+        when(proExceptionMapper.selectProExceptionByExceptionId(EX_ID)).thenReturn(ex);
+        when(proTaskMapper.selectProTaskByTaskId(TASK_ID)).thenReturn(originTask());
+        when(proExceptionMapper.countExceptionTasksByOrigin(TASK_ID)).thenReturn(0);
+
+        service.resolveException(EX_ID, resolveInput(ProExceptionResolve.REWORK));
+
+        // 序号锁改为 Runnable 且必须在事务外获取：先异常单锁、后原任务锁，顺序固定防死锁
+        InOrder locks = inOrder(lockTemplate);
+        locks.verify(lockTemplate).execute(eq(ProExceptionConstants.LOCK_PREFIX + EX_ID),
+                any(Runnable.class));
+        locks.verify(lockTemplate).execute(eq(ProExceptionConstants.LOCK_TASK_PREFIX + TASK_ID),
+                any(Runnable.class));
+    }
+
+    @Test
+    @DisplayName("补全编辑：清空现场照片/单选标记可落库（专用置空 UPDATE 收到 null），并走异常单锁")
+    void should_clear_scene_images_on_edit() {
+        ProException ex = openException(ProExceptionType.QUALITY, ProExceptionParty.FACTORY.getCode());
+        ex.setQualitySubclass("BROKEN");
+        ex.setSceneImages("http://minio/x.png");
+        ex.setNeedRework("Y");
+        ex.setCustomerAcceptRework("N");
+        when(proExceptionMapper.selectProExceptionByExceptionId(EX_ID)).thenReturn(ex);
+
+        ProException input = new ProException();
+        input.setExceptionId(EX_ID);
+        input.setQualitySubclass("BROKEN");
+        input.setSceneImages("   ");
+        input.setNeedRework("  ");
+        input.setCustomerAcceptRework(" ");
+        service.updateProException(input);
+
+        ArgumentCaptor<ProException> cap = ArgumentCaptor.forClass(ProException.class);
+        verify(proExceptionMapper).updateExceptionEditOptional(cap.capture());
+        assertThat(cap.getValue().getSceneImages()).isNull();
+        assertThat(cap.getValue().getNeedRework()).isNull();
+        assertThat(cap.getValue().getCustomerAcceptRework()).isNull();
+        verify(lockTemplate).execute(eq(ProExceptionConstants.LOCK_PREFIX + EX_ID),
+                any(Supplier.class));
+    }
+
+    @Test
+    @DisplayName("上报/补全：现场照片超过 9 张或超长被后端拒绝")
+    void should_reject_too_many_or_too_long_scene_images() {
+        // 上报路径：10 个 URL
+        ProException report = new ProException();
+        report.setTaskId(TASK_ID);
+        report.setExceptionType(ProExceptionType.QUALITY.getCode());
+        report.setDescription("x");
+        report.setSceneImages("u1,u2,u3,u4,u5,u6,u7,u8,u9,u10");
+        assertThatThrownBy(() -> service.reportException(report))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("9 张");
+
+        // 补全路径：总长超 2000
+        ProException ex = openException(ProExceptionType.QUALITY, ProExceptionParty.FACTORY.getCode());
+        when(proExceptionMapper.selectProExceptionByExceptionId(EX_ID)).thenReturn(ex);
+        ProException input = new ProException();
+        input.setExceptionId(EX_ID);
+        input.setQualitySubclass("BROKEN");
+        input.setSceneImages("u".repeat(2001));
+        assertThatThrownBy(() -> service.updateProException(input))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("超长");
+    }
+
+    @Test
+    @DisplayName("现场照片：串内空段/段内空白落库前归一化（a,, ,b → a,b）")
+    void should_normalize_scene_images_segments() {
+        when(proTaskMapper.selectProTaskByTaskId(TASK_ID)).thenReturn(originTask());
+        ArgumentCaptor<ProException> cap = ArgumentCaptor.forClass(ProException.class);
+        ProException input = new ProException();
+        input.setTaskId(TASK_ID);
+        input.setExceptionType(ProExceptionType.QUALITY.getCode());
+        input.setDescription("x");
+        input.setSceneImages(" http://minio/a.png ,,  , http://minio/b.png , ");
+
+        service.reportException(input);
+
+        verify(proExceptionMapper).insertProException(cap.capture());
+        assertThat(cap.getValue().getSceneImages()).isEqualTo("http://minio/a.png,http://minio/b.png");
     }
 
     // ---------------- E3/E4 详情聚合处理单据状态 ----------------

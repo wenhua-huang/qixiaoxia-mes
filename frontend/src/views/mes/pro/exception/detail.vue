@@ -171,11 +171,11 @@
 
       <!-- 底部操作 -->
       <div class="footer-bar">
-        <el-button @click="goBack">返 回</el-button>
-        <el-button type="primary" v-if="canEdit" :loading="saving" @click="save">保存补全</el-button>
-        <el-button type="warning" v-if="canResolve" @click="openResolve">选出口处理</el-button>
-        <el-button type="success" v-if="canClose" @click="closeEx">关闭异常单</el-button>
-        <el-button type="danger" plain v-if="canVoid" @click="voidEx">作废</el-button>
+        <el-button :disabled="closing" @click="goBack">返 回</el-button>
+        <el-button type="primary" v-if="canEdit" :loading="saving" :disabled="closing" @click="save">保存补全</el-button>
+        <el-button type="warning" v-if="canResolve" :disabled="closing" @click="openResolve">选出口处理</el-button>
+        <el-button type="success" v-if="canClose" :loading="closing" @click="closeEx">关闭异常单</el-button>
+        <el-button type="danger" plain v-if="canVoid" :loading="closing" @click="voidEx">作废</el-button>
       </div>
     </div>
 
@@ -204,13 +204,16 @@ const {
 const exceptionId = Number(route.query.exceptionId)
 const loading = ref(false)
 const saving = ref(false)
+const closing = ref(false)
 const form = ref<any>({})
+// 已落库责任方：未保存的本地选择不锁定下拉、不放行出口（后端 PENDING 另有硬拦兜底）
+const savedParty = ref('')
 const previewIndex = ref(-1)
 const resolveRef = ref<InstanceType<typeof ResolveDialog>>()
 
 const imageList = computed(() => (form.value.sceneImages || '').split(',').map((s: string) => normalizeImageUrl(s.trim())).filter(Boolean))
 const partyOptions = computed(() => mes_pro_exception_party.value?.filter((d: any) => d.value !== 'PENDING') || [])
-const partyLocked = computed(() => !!form.value.responsibleParty && form.value.responsibleParty !== 'PENDING')
+const partyLocked = computed(() => !!savedParty.value && savedParty.value !== 'PENDING')
 const canEdit = computed(() => form.value.status === 'OPEN' && checkPermi(['mes:pro:exception:edit']))
 const canResolve = computed(() => form.value.status === 'OPEN' && checkPermi(['mes:pro:exception:handle']))
 const canClose = computed(() => form.value.status === 'PROCESSING' && checkPermi(['mes:pro:exception:handle']))
@@ -219,15 +222,21 @@ const canVoid = computed(() => form.value.status === 'OPEN' && checkPermi(['mes:
 function fmt(v?: string) { return v ? proxy.parseTime(v, '{y}-{m}-{d} {h}:{i}') : '-' }
 
 function loadDetail() {
-  if (!exceptionId) return
+  if (!exceptionId) return Promise.resolve()
   loading.value = true
-  getException(exceptionId).then((r: any) => { form.value = r.data || {} }).finally(() => { loading.value = false })
+  return getException(exceptionId).then((r: any) => {
+    form.value = r.data || {}
+    savedParty.value = form.value.responsibleParty || ''
+  }).finally(() => { loading.value = false })
 }
 
 function save() {
   saving.value = true
-  updateException(form.value).then(() => { proxy.$modal.msgSuccess('保存成功'); loadDetail() })
-    .finally(() => { saving.value = false })
+  updateException(form.value).then(() => {
+    proxy.$modal.msgSuccess('保存成功')
+    savedParty.value = form.value.responsibleParty || ''
+    loadDetail()
+  }).finally(() => { saving.value = false })
 }
 
 function openResolve() {
@@ -236,20 +245,31 @@ function openResolve() {
 }
 
 function closeEx() {
-  proxy.$modal.prompt('请填写处理结论（必填）', '关闭异常单', {
-    inputType: 'textarea', inputValidator: (v: string) => (v || '').trim().length >= 2 || '请填写至少 2 个字的处理结论'
+  proxy.$modal.prompt('请填写处理结论（必填，2~1000 字）', '关闭异常单', {
+    inputType: 'textarea', inputValidator: (v: string) => {
+      const len = (v || '').trim().length
+      return (len >= 2 && len <= 1000) || '处理结论需为 2~1000 个字'
+    }
   }).then(({ value }: any) => {
+    closing.value = true
     return closeException(exceptionId, value.trim())
-  }).then(() => { proxy.$modal.msgSuccess('已关闭'); loadDetail() }).catch(() => {})
+  }).then(() => { proxy.$modal.msgSuccess('已关闭'); return loadDetail() })
+    .catch(() => {}).finally(() => { closing.value = false })
 }
 
 function voidEx() {
-  proxy.$modal.prompt('请填写作废原因（必填）。作废后单据留痕不可恢复，请确认是否挂错对象。', '作废异常单', {
+  proxy.$modal.prompt('请填写作废原因（必填，2~996 字）。作废后单据留痕不可恢复，请确认是否挂错对象。', '作废异常单', {
     inputType: 'textarea',
-    inputValidator: (v: string) => (v || '').trim().length >= 2 || '请填写至少 2 个字的作废原因'
+    // 落库结论带【作废】前缀占 4 字，conclusion 列总长 1000
+    inputValidator: (v: string) => {
+      const len = (v || '').trim().length
+      return (len >= 2 && len <= 996) || '作废原因需为 2~996 个字'
+    }
   }).then(({ value }: any) => {
+    closing.value = true
     return voidException(exceptionId, value.trim())
-  }).then(() => { proxy.$modal.msgSuccess('已作废'); loadDetail() }).catch(() => {})
+  }).then(() => { proxy.$modal.msgSuccess('已作废'); return loadDetail() })
+    .catch(() => {}).finally(() => { closing.value = false })
 }
 
 /** E3 验收：处理单据可点回源——异常任务跳排产任务，补料采购单跳采购单详情 */
@@ -258,6 +278,8 @@ function goTargetDoc() {
     router.push({ path: '/mes/pro/task', query: { taskCode: form.value.targetDocCode } })
   } else if (form.value.targetDocType === 'PUR_ORDER') {
     router.push({ path: '/mes/pur/order_detail', query: { orderId: form.value.targetDocId } })
+  } else {
+    proxy.$modal.msgWarning('暂不支持该类型单据的跳转')
   }
 }
 

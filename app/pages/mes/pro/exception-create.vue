@@ -61,7 +61,7 @@
     <view class="footer-bar">
       <button class="cu-btn lg" :class="canSubmit ? 'bg-red' : 'bg-disabled'"
         :disabled="!canSubmit || submitting" @click="submit">
-        {{ submitting ? '提交中...' : (uploading ? '图片上传中，请稍候' : '提交异常单') }}
+        {{ submitting ? '提交中...' : (uploading ? '图片上传中，请稍候' : (contextReady ? '提交异常单' : '任务信息加载中…')) }}
       </button>
     </view>
   </view>
@@ -69,7 +69,7 @@
 
 <script setup>
 import { ref, reactive, computed, getCurrentInstance } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { onLoad, onUnload } from '@dcloudio/uni-app'
 import uniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue'
 import uniEasyinput from '@/uni_modules/uni-easyinput/components/uni-easyinput/uni-easyinput.vue'
 import { addException, getReportContext, uploadExceptionImage } from '@/api/mes/pro/exception'
@@ -86,9 +86,19 @@ const TYPE_OPTIONS = [
 ]
 // 现场照片上限（与 scene_images 单列逗号串、九宫格 UI 对齐）
 const MAX_SCENE_IMAGES = 9
+const MAX_IMAGE_MB = 10
+const ALLOWED_IMAGE_EXT = ['jpg', 'jpeg', 'png', 'bmp', 'gif', 'webp']
+// 提交兜底：9 张完整 URL 逗号串不超过列宽（V159 varchar(2000)）
+const SCENE_IMAGES_MAX_LEN = 1900
+// 上传兜底：网关 502/204 空体时 uni.uploadFile 也走 success，JSON.parse 抛错会让 Promise 永挂
+const UPLOAD_TIMEOUT_MS = 30000
+// 提示后延迟返回的时长（非法入口/加载失败/提交成功）
+const BACK_DELAY_MS = 800
+const SUCCESS_BACK_DELAY_MS = 1200
 
 const taskId = ref(null)
 const ctx = ref({})
+const contextReady = ref(false)
 const form = reactive({ exceptionType: '', impactQuantity: '', description: '' })
 // 库内原始形态：MinIO 返回的 URL 逗号串（展示一律走 normalizeImageUrl，避免相对路径回写污染）
 const sceneImages = ref('')
@@ -98,15 +108,33 @@ const submitting = ref(false)
 const imageList = computed(() =>
   sceneImages.value ? sceneImages.value.split(',').filter(Boolean).map(normalizeImageUrl) : [])
 const canSubmit = computed(() =>
-  !!form.exceptionType && form.description.trim().length >= 2 && uploading.value === 0)
+  contextReady.value && !!form.exceptionType && form.description.trim().length >= 2 && uploading.value === 0)
+
+// 页面卸载后忽略迟到的上传回调，避免返回后弹 toast / 写已销毁实例
+let pageActive = true
+// 延迟返回定时器：用户提前手动返回时必须清掉，否则会在来源页再 pop 一次
+const backTimers = []
+onUnload(() => {
+  pageActive = false
+  backTimers.forEach(clearTimeout)
+  backTimers.length = 0
+})
+
+/** 延迟执行（用于提示后返回）；页面已卸载则放弃，定时器在 onUnload 统一清理 */
+function delayRun(fn, delay) {
+  const timer = setTimeout(() => { if (pageActive.value) fn() }, delay)
+  backTimers.push(timer)
+}
 
 onLoad((options) => {
-  if (!options || !options.taskId) {
+  const id = Number(options?.taskId)
+  // 主键必须是正整数；0/负数/小数/空格会放行到 400 或拼错 path
+  if (!options?.taskId || !Number.isInteger(id) || id <= 0) {
     proxy.$modal.msgError('缺少关联任务')
-    setTimeout(() => uni.navigateBack(), 800)
+    delayRun(() => uni.navigateBack(), BACK_DELAY_MS)
     return
   }
-  taskId.value = Number(options.taskId)
+  taskId.value = id
   loadContext()
 })
 
@@ -114,24 +142,83 @@ async function loadContext() {
   try {
     const res = await getReportContext(taskId.value)
     ctx.value = res.data || {}
-  } catch (e) {
-    proxy.$modal.msgError('任务信息加载失败')
+    contextReady.value = true
+  } catch {
+    // request 封装已 toast 具体原因；停留在此是死路，退回上一页重新进入
+    if (pageActive.value) {
+      proxy.$modal.msgError('任务信息加载失败')
+      delayRun(() => uni.navigateBack(), BACK_DELAY_MS)
+    }
   }
 }
 
-function takePhoto() {
+function isAcceptableImage(path, file) {
+  const name = file?.name || path || ''
+  const dot = String(name).lastIndexOf('.')
+  const ext = dot > -1 ? String(name).slice(dot + 1).toLowerCase() : ''
+  if (ext && !ALLOWED_IMAGE_EXT.includes(ext)) return false
+  // size 未知（老端取不到）放行；0 字节/超限拒绝，避免白图与上传失败
+  if (typeof file?.size === 'number') {
+    if (file.size <= 0) return false
+    if (file.size / 1024 / 1024 > MAX_IMAGE_MB) return false
+  }
+  return true
+}
+
+/** 上传竞速超时：超时按失败 reject，保证 pending/uploading 必然归零（共用 upload.js 不改） */
+function uploadImageWithTimeout(path) {
+  return Promise.race([
+    uploadExceptionImage(path),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('upload timeout')), UPLOAD_TIMEOUT_MS))
+  ])
+}
+
+async function takePhoto() {
+  // 提交在途时禁止再起上传：成功路径随即返回，新传图不会进入已提交单据
+  if (submitting.value) return
   const remain = MAX_SCENE_IMAGES - imageList.value.length - uploading.value
   if (remain <= 0) return
-  chooseImageAsync({ count: remain, sizeType: ['compressed'] }).then((res) => {
-    // H5 可选多张；逐张上传，失败提示并保留已成功部分
-    res.tempFilePaths.forEach((path) => {
-      uploading.value++
-      uploadExceptionImage(path).then((r) => {
-        sceneImages.value = sceneImages.value ? sceneImages.value + ',' + r.url : r.url
-      }).catch(() => uni.showToast({ title: '图片上传失败', icon: 'none' }))
-        .finally(() => { uploading.value = Math.max(0, uploading.value - 1) })
-    })
-  }).catch(() => {})
+  let picked
+  try {
+    picked = await chooseImageAsync({ count: remain, sizeType: ['compressed'] })
+  } catch (err) {
+    // 用户取消保持静默（H5 reject 的是中文“取消选择”，App 端 errMsg 含 cancel）
+    const msg = String(err?.errMsg || err?.message || '')
+    if (pageActive.value && msg && !/cancel|取消/i.test(msg)) {
+      uni.showToast({ title: '无法打开相机/相册，请检查授权', icon: 'none' })
+    }
+    return
+  }
+  // 先统一校验，非法张合并成一条提示，避免多条 toast 互相覆盖
+  const accepted = []
+  let rejected = 0
+  picked.tempFilePaths.forEach((path, idx) => {
+    if (isAcceptableImage(path, picked.tempFiles?.[idx])) accepted.push(path)
+    else rejected++
+  })
+  if (rejected > 0 && pageActive.value) {
+    uni.showToast({ title: `已跳过 ${rejected} 张（格式不符、空文件或超 ${MAX_IMAGE_MB}MB）`, icon: 'none' })
+  }
+  if (!accepted.length) return
+  // 按选择序占位，全部完成后按序拼接，避免并发完成顺序打乱九宫格
+  const slots = new Array(accepted.length).fill('')
+  // pending 按本批计数：两批并发上传时各自等自己的文件全部落地再拼接，避免 URL 丢失
+  let pending = accepted.length
+  uploading.value += accepted.length
+  accepted.forEach((path, idx) => {
+    uploadImageWithTimeout(path).then((r) => { slots[idx] = r.url })
+      .catch(() => {
+        if (pageActive.value) uni.showToast({ title: '图片上传失败', icon: 'none' })
+      })
+      .finally(() => {
+        uploading.value = Math.max(0, uploading.value - 1)
+        pending--
+        if (pending === 0 && slots.some(Boolean)) {
+          const urls = slots.filter(Boolean).join(',')
+          sceneImages.value = sceneImages.value ? sceneImages.value + ',' + urls : urls
+        }
+      })
+  })
 }
 
 function removeImg(i) {
@@ -145,25 +232,38 @@ function previewImg(i) {
 }
 
 async function submit() {
+  if (!contextReady.value) { proxy.$modal.msg('任务信息未加载完成，请稍候'); return }
   if (!form.exceptionType) { proxy.$modal.msg('请选择异常类型'); return }
   if (form.description.trim().length < 2) { proxy.$modal.msg('请填写异常说明（至少 2 个字）'); return }
   if (uploading.value > 0) { proxy.$modal.msg('图片仍在上传，请稍候'); return }
-  const qty = Number(form.impactQuantity)
+  let impactQuantity = null
+  if (form.impactQuantity !== '') {
+    impactQuantity = Number(form.impactQuantity)
+    if (!Number.isFinite(impactQuantity) || impactQuantity <= 0) {
+      proxy.$modal.msg('影响数量需为大于 0 的数字，或清空留空')
+      return
+    }
+  }
+  if (sceneImages.value.length > SCENE_IMAGES_MAX_LEN) {
+    proxy.$modal.msg(`现场照片地址过长（${sceneImages.value.length}），请减少照片后再提交`)
+    return
+  }
   const data = {
     taskId: taskId.value,
     exceptionType: form.exceptionType,
     description: form.description.trim(),
     sceneImages: sceneImages.value || undefined
   }
-  if (form.impactQuantity !== '' && !Number.isNaN(qty) && qty > 0) {
-    data.impactQuantity = qty
+  if (impactQuantity !== null) {
+    data.impactQuantity = impactQuantity
   }
   submitting.value = true
   try {
     await addException(data)
+    if (!pageActive.value) return
     proxy.$modal.msgSuccess('异常单已提交，待主管处理')
     // 成功后保持提交态直到页面返回，避免延迟返回窗口内重复提单
-    setTimeout(() => proxy.$tab.navigateBack(), 1200)
+    delayRun(() => proxy.$tab.navigateBack(), SUCCESS_BACK_DELAY_MS)
   } catch (e) {
     submitting.value = false
   }

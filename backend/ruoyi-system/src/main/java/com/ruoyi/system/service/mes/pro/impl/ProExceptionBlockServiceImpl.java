@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,7 +60,12 @@ public class ProExceptionBlockServiceImpl implements IProExceptionBlockService
         {
             return Map.of();
         }
-        List<Long> distinct = workorderIds.stream().distinct().collect(Collectors.toList());
+        List<Long> distinct = workorderIds.stream()
+                .filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        if (distinct.isEmpty())
+        {
+            return Map.of();
+        }
         if (distinct.size() > ProExceptionConstants.BATCH_STATE_MAX)
         {
             throw new ServiceException("单次最多查询 " + ProExceptionConstants.BATCH_STATE_MAX + " 个工单的异常态");
@@ -68,7 +74,7 @@ public class ProExceptionBlockServiceImpl implements IProExceptionBlockService
                 .stream().collect(Collectors.groupingBy(ProException::getWorkorderId));
 
         Map<String, Map<String, Object>> result = new LinkedHashMap<>();
-        for (Long workorderId : workorderIds)
+        for (Long workorderId : distinct)
         {
             result.put(String.valueOf(workorderId), stateOf(grouped.get(workorderId)));
         }

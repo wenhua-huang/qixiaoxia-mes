@@ -4,10 +4,13 @@
  * 指向浏览者自身，图片会裂。这里去掉任意 host 的 9010 源，改成同源相对路径 /qxx-mes/...，
  * 本地由 vite proxy、生产由 nginx /qxx-mes/ 反代到 MinIO（与 app/utils/image.js 同策略）。
  */
-const MINIO_ORIGIN_RE = /^https?:\/\/[^/]+:9010(?=\/)/i
+// 同时覆盖 http://host:9010、https:// 与协议相对 //host:9010
+const MINIO_ORIGIN_RE = /^(?:https?:)?\/\/[^/]+:9010(?=\/)/i
 
 export function normalizeImageUrl(url?: string): string {
   if (!url) return ''
-  if (url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('/')) return url
-  return url.replace(MINIO_ORIGIN_RE, '')
+  if (url.startsWith('blob:') || url.startsWith('data:')) return url
+  if (MINIO_ORIGIN_RE.test(url)) return url.replace(MINIO_ORIGIN_RE, '')
+  // 已是相对路径（/qxx-mes、/profile 等）或其他源绝对地址，原样返回
+  return url
 }

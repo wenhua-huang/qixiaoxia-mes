@@ -170,6 +170,14 @@ public class SalOrderController extends BaseController
         return toAjax(salOrderService.cancelOrder(orderId));
     }
 
+    @PreAuthorize("@ss.hasPermi('mes:sal:order:edit')")
+    @Log(title = "销售订单接单", businessType = BusinessType.UPDATE)
+    @PutMapping("/accept/{orderId}")
+    public AjaxResult accept(@PathVariable("orderId") Long orderId)
+    {
+        return toAjax(salOrderService.acceptOrder(orderId));
+    }
+
     @PreAuthorize("@ss.hasPermi('mes:sal:order:workorder')")
     @Log(title = "销售订单转工单", businessType = BusinessType.INSERT)
     @PostMapping("/toWorkorder")

@@ -33,8 +33,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 销售订单四态收敛 —— 主链路集成测试（Task 6 验收）。
  *
- * <p>验收链：建单即 CONFIRMED（factory_id=1 由 FactoryIdInterceptor 注入）→ toWorkorder
- * → 开工事务（AFTER_COMMIT 事件同步投递）→ PRODUCING → 两道任务连续报工进度
+ * <p>验收链：建单即 PENDING_ACCEPT（factory_id=1 由 FactoryIdInterceptor 注入）→ accept 接单
+ * → CONFIRMED → toWorkorder → 开工事务（AFTER_COMMIT 事件同步投递）→ PRODUCING → ...
  * 0→25→50→50→100 且订单状态恒 PRODUCING（D1：报工/产量绝不动订单状态）→ 部分发货 60
  * 事件复核不通过仍 PRODUCING → 第二张出库单 40 累计发齐 → SHIPPED → close → CLOSED。
  *
@@ -211,6 +211,44 @@ class SalOrderIT extends BaseIntegrationTest
     }
 
     @Test
+    @DisplayName("待接单闸门：建单PENDING_ACCEPT；未接单转工单500；接单200→CONFIRMED后可转工单")
+    void pending_accept_gate_then_accept()
+    {
+        Long orderId = createOrderRaw("SO-IT-PA");
+        Long lineId = getFirstLineId(orderId);
+        assertThat(queryStatus(orderId)).isEqualTo("PENDING_ACCEPT");
+
+        // 未接单转工单 → 500
+        Map<String, Object> twReq = new HashMap<>();
+        twReq.put("lineId", lineId);
+        twReq.put("quantity", new BigDecimal("100"));
+        twReq.put("workorderCode", "WO-IT-PA-BLOCKED");
+        twReq.put("requestDate", "2026-07-30 00:00:00");
+        ResponseEntity<Map> blocked = restTemplate.postForEntity(
+                baseUrl() + "/toWorkorder", authRequest(twReq), Map.class);
+        assertThat(blocked.getBody().get("code")).isEqualTo(500);
+        assertThat(blocked.getBody().get("msg").toString()).contains("已确认/生产中");
+
+        // 接单 → 200 / CONFIRMED
+        ResponseEntity<Map> accept = restTemplate.exchange(baseUrl() + "/accept/" + orderId,
+                HttpMethod.PUT, authRequest(), Map.class);
+        assertThat(accept.getBody().get("code")).isEqualTo(200);
+        assertThat(queryStatus(orderId)).isEqualTo("CONFIRMED");
+
+        // 重复接单 → 500
+        ResponseEntity<Map> repeat = restTemplate.exchange(baseUrl() + "/accept/" + orderId,
+                HttpMethod.PUT, authRequest(), Map.class);
+        assertThat(repeat.getBody().get("code")).isEqualTo(500);
+        assertThat(repeat.getBody().get("msg").toString()).contains("待接单");
+
+        // 接单后转工单 → 200
+        twReq.put("workorderCode", "WO-IT-PA");
+        ResponseEntity<Map> ok = restTemplate.postForEntity(
+                baseUrl() + "/toWorkorder", authRequest(twReq), Map.class);
+        assertThat(ok.getBody().get("code")).isEqualTo(200);
+    }
+
+    @Test
     @DisplayName("冲销对称降级：SHIPPED 删发运单（箱回 PACKED）→PRODUCING；仍发齐时冲销事件不动 SHIPPED；重发后回到 SHIPPED")
     void shipment_revoke_demotion_roundtrip()
     {
@@ -363,11 +401,17 @@ class SalOrderIT extends BaseIntegrationTest
         assertThat(createResp.getBody().get("code")).isEqualTo(200);
         Long orderId = ((Number) ((Map<?, ?>) createResp.getBody().get("data")).get("orderId")).longValue();
 
-        // 建单即 CONFIRMED，factory_id 由 FactoryIdInterceptor 注入为线程工厂 1
+        // 建单即 PENDING_ACCEPT（V161 起），factory_id 由 FactoryIdInterceptor 注入为线程工厂 1
         Map<String, Object> created = jdbcTemplate.queryForMap(
                 "select status, factory_id from qxx_sal_order where order_id=?", orderId);
-        assertThat(created.get("status")).isEqualTo("CONFIRMED");
+        assertThat(created.get("status")).isEqualTo("PENDING_ACCEPT");
         assertThat(((Number) created.get("factory_id")).longValue()).isEqualTo(FACTORY.longValue());
+
+        // 接单后才 CONFIRMED，方可转工单
+        ResponseEntity<Map> accepted = restTemplate.exchange(baseUrl() + "/accept/" + orderId,
+                HttpMethod.PUT, authRequest(), Map.class);
+        assertThat(accepted.getBody().get("code")).isEqualTo(200);
+        assertThat(queryStatus(orderId)).isEqualTo("CONFIRMED");
 
         Long lineId = getFirstLineId(orderId);
         Map<String, Object> twReq = new HashMap<>();
@@ -399,9 +443,20 @@ class SalOrderIT extends BaseIntegrationTest
         return orderId;
     }
 
-    /** 仅建单（建单即 CONFIRMED），不转工单——用于无工单降级 CONFIRMED 分支 */
-    @SuppressWarnings("unchecked")
+    /** 仅建单并接单（CONFIRMED，无工单）——用于无工单降级 CONFIRMED 分支 */
     private Long createOrderOnly(String orderCode)
+    {
+        Long orderId = createOrderRaw(orderCode);
+        ResponseEntity<Map> accepted = restTemplate.exchange(baseUrl() + "/accept/" + orderId,
+                HttpMethod.PUT, authRequest(), Map.class);
+        assertThat(accepted.getBody().get("code")).isEqualTo(200);
+        assertThat(queryStatus(orderId)).isEqualTo("CONFIRMED");
+        return orderId;
+    }
+
+    /** 仅原始建单（V161 起落 PENDING_ACCEPT），不接单不转工单 */
+    @SuppressWarnings("unchecked")
+    private Long createOrderRaw(String orderCode)
     {
         Map<String, Object> line = new HashMap<>();
         line.put("productId", 1);

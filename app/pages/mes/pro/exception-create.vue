@@ -110,12 +110,14 @@ const imageList = computed(() =>
 const canSubmit = computed(() =>
   contextReady.value && !!form.exceptionType && form.description.trim().length >= 2 && uploading.value === 0)
 
-// 页面卸载后忽略迟到的上传回调，避免返回后弹 toast / 写已销毁实例
-let pageActive = true
+// 页面卸载后忽略迟到的上传回调，避免返回后弹 toast / 写已销毁实例。
+// 必须是 ref：提交成功路径靠 pageActive.value 判定，误写成普通布尔会使
+// `!pageActive.value` 恒为 true，成功响应后直接 return，按钮永久停在"提交中..."
+const pageActive = ref(true)
 // 延迟返回定时器：用户提前手动返回时必须清掉，否则会在来源页再 pop 一次
 const backTimers = []
 onUnload(() => {
-  pageActive = false
+  pageActive.value = false
   backTimers.forEach(clearTimeout)
   backTimers.length = 0
 })
@@ -126,12 +128,28 @@ function delayRun(fn, delay) {
   backTimers.push(timer)
 }
 
+/**
+ * 返回上一页；本页为栈底（H5 直链/刷新、外部唤入等）时 navigateBack 必然 fail，
+ * 改 switchTab 回首页（再 fail 用 reLaunch 兜底），否则页面会停在原地：
+ * 提交成功路径刻意保持 submitting=true，navigateBack 失败即按钮永久"提交中..."
+ */
+function goBackOrHome() {
+  if (getCurrentPages().length > 1) {
+    uni.navigateBack()
+    return
+  }
+  uni.switchTab({
+    url: '/pages/index',
+    fail: () => uni.reLaunch({ url: '/pages/index' })
+  })
+}
+
 onLoad((options) => {
   const id = Number(options?.taskId)
   // 主键必须是正整数；0/负数/小数/空格会放行到 400 或拼错 path
   if (!options?.taskId || !Number.isInteger(id) || id <= 0) {
     proxy.$modal.msgError('缺少关联任务')
-    delayRun(() => uni.navigateBack(), BACK_DELAY_MS)
+    delayRun(goBackOrHome, BACK_DELAY_MS)
     return
   }
   taskId.value = id
@@ -147,7 +165,7 @@ async function loadContext() {
     // request 封装已 toast 具体原因；停留在此是死路，退回上一页重新进入
     if (pageActive.value) {
       proxy.$modal.msgError('任务信息加载失败')
-      delayRun(() => uni.navigateBack(), BACK_DELAY_MS)
+      delayRun(goBackOrHome, BACK_DELAY_MS)
     }
   }
 }
@@ -263,7 +281,7 @@ async function submit() {
     if (!pageActive.value) return
     proxy.$modal.msgSuccess('异常单已提交，待主管处理')
     // 成功后保持提交态直到页面返回，避免延迟返回窗口内重复提单
-    delayRun(() => proxy.$tab.navigateBack(), SUCCESS_BACK_DELAY_MS)
+    delayRun(goBackOrHome, SUCCESS_BACK_DELAY_MS)
   } catch (e) {
     submitting.value = false
   }

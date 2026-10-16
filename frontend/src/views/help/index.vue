@@ -74,6 +74,12 @@ const docTree = ref<DocGroup[]>([
     ]
   },
   {
+    title: '生产管理',
+    items: [
+      { file: 'pro-exception.md', title: '生产异常：上报与处理' }
+    ]
+  },
+  {
     title: '质量管理',
     items: [
       { file: 'qc-quality-inspection.md', title: '来料/过程/出货/退料检验（IQC/IPQC/OQC/RQC）' }

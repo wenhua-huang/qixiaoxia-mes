@@ -41,4 +41,9 @@ public class CacheConstants
      * 登录账户密码错误次数 redis key
      */
     public static final String PWD_ERR_CNT_KEY = "pwd_err_cnt:";
+
+    /**
+     * AI 问答限流计数 redis key 前缀（ai_chat:min:{userId}:... / ai_chat:daily:{userId}:...）
+     */
+    public static final String AI_CHAT_KEY = "ai_chat:";
 }

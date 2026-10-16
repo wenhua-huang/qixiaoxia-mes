@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.ai.AiChatSessionMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.ai.AiChatSession" id="AiChatSessionResult">
+        <result property="sessionId"  column="session_id"/>
+        <result property="factoryId"  column="factory_id"/>
+        <result property="userId"     column="user_id"/>
+        <result property="title"      column="title"/>
+        <result property="delFlag"    column="del_flag"/>
+        <result property="createBy"   column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy"   column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark"     column="remark"/>
+    </resultMap>
+
+    <sql id="selectSessionVo">
+        select session_id, factory_id, user_id, title, del_flag,
+               create_by, create_time, update_by, update_time, remark
+        from qxx_sys_ai_chat_session
+    </sql>
+
+    <!-- 会话隔离：WHERE 恒带 user_id，用户只能看到归属自己的会话 -->
+    <select id="selectSessionListByUserId" parameterType="java.lang.Long" resultMap="AiChatSessionResult">
+        <include refid="selectSessionVo"/>
+        where user_id = #{userId} and del_flag = '0'
+        order by update_time desc, session_id desc
+    </select>
+
+    <select id="selectSessionById" parameterType="java.lang.Long" resultMap="AiChatSessionResult">
+        <include refid="selectSessionVo"/>
+        where session_id = #{sessionId}
+    </select>
+
+    <!-- factory_id 由 FactoryIdInterceptor 注入，业务 INSERT 不写 factory_id 列 -->
+    <insert id="insertSession" parameterType="com.ruoyi.system.domain.mes.ai.AiChatSession"
+            useGeneratedKeys="true" keyProperty="sessionId">
+        insert into qxx_sys_ai_chat_session (user_id, title, create_by, create_time, update_time)
+        values (#{userId}, #{title}, #{createBy}, #{createTime}, #{updateTime})
+    </insert>
+
+    <update id="updateTitleAndTime" parameterType="com.ruoyi.system.domain.mes.ai.AiChatSession">
+        update qxx_sys_ai_chat_session
+        set title = #{title}, update_time = now()
+        where session_id = #{sessionId}
+    </update>
+
+    <update id="touchSession" parameterType="java.lang.Long">
+        update qxx_sys_ai_chat_session set update_time = now()
+        where session_id = #{sessionId}
+    </update>
+
+    <!-- 逻辑删除限定归属人，防越权删他人会话 -->
+    <update id="deleteSessionByOwner">
+        update qxx_sys_ai_chat_session set del_flag = '2'
+        where session_id = #{sessionId} and user_id = #{userId} and del_flag = '0'
+    </update>
+</mapper>

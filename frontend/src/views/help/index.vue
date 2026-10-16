@@ -39,13 +39,21 @@
         </div>
       </el-main>
     </el-container>
+
+    <!-- AI 助手：右下角悬浮入口 + 聊天抽屉 -->
+    <div class="ai-float-btn" @click="aiChatVisible = true">
+      <el-icon :size="18"><ChatDotRound /></el-icon>
+      <span>AI 助手</span>
+    </div>
+    <AiChatPanel v-model="aiChatVisible" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { marked } from 'marked'
-import { Document, Reading } from '@element-plus/icons-vue'
+import { Document, Reading, ChatDotRound } from '@element-plus/icons-vue'
+import AiChatPanel from './components/AiChatPanel.vue'
 import 'github-markdown-css'
 
 interface DocItem {
@@ -100,6 +108,7 @@ const docTree = ref<DocGroup[]>([
 ])
 
 const activeFile = ref<string>('quick-start.md')
+const aiChatVisible = ref<boolean>(false)
 const html = ref<string>('')
 const loading = ref(false)
 const loadError = ref('')
@@ -175,6 +184,30 @@ onMounted(() => {
 .help-container {
   height: 100%;
   background: #f5f7fa;
+}
+
+/* AI 助手悬浮入口 */
+.ai-float-btn {
+  position: fixed;
+  right: 32px;
+  bottom: 32px;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 20px;
+  background: #409eff;
+  color: #fff;
+  font-size: 14px;
+  border-radius: 24px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.4);
+  transition: transform 0.15s;
+
+  &:hover {
+    transform: translateY(-2px);
+    background: #337ecc;
+  }
 }
 
 .help-aside {

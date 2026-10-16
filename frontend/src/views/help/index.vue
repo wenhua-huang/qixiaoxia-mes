@@ -54,7 +54,8 @@ import { ref, onMounted } from 'vue'
 import { marked } from 'marked'
 import { Document, Reading, ChatDotRound } from '@element-plus/icons-vue'
 import AiChatPanel from './components/AiChatPanel.vue'
-import 'github-markdown-css'
+// 用纯浅色版：自适应版在系统深色模式下会把文字切为浅色，白底气泡/文档区将不可读
+import 'github-markdown-css/github-markdown-light.css'
 
 interface DocItem {
   file: string

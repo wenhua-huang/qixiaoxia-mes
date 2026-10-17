@@ -79,12 +79,29 @@ const docTree = ref<DocGroup[]>([
     title: '入门',
     items: [
       { file: 'quick-start.md', title: '快速上手' },
-      { file: 'pro-workflow.md', title: '订单到交付：销售订单→生产→发货' }
+      { file: 'pro-workflow.md', title: '订单到交付：销售订单→生产→发货' },
+      { file: 'app-guide.md', title: '手机端使用指南' }
+    ]
+  },
+  {
+    title: '主数据管理',
+    items: [
+      { file: 'md-master-data.md', title: '物料、客户、供应商等基础档案' }
+    ]
+  },
+  {
+    title: '仓库管理',
+    items: [
+      { file: 'wm-issue.md', title: '生产领料与退料' },
+      { file: 'wm-stock-taking.md', title: '库存盘点（方案与任务）' },
+      { file: 'wm-transfer.md', title: '转移调拨与杂项出入库' },
+      { file: 'wm-outsource.md', title: '外协管理' }
     ]
   },
   {
     title: '生产管理',
     items: [
+      { file: 'pro-workorder.md', title: '工单/排产/报工/流转卡操作手册' },
       { file: 'pro-exception.md', title: '生产异常：上报与处理' }
     ]
   },
@@ -92,6 +109,31 @@ const docTree = ref<DocGroup[]>([
     title: '质量管理',
     items: [
       { file: 'qc-quality-inspection.md', title: '来料/过程/出货/退料检验（IQC/IPQC/OQC/RQC）' }
+    ]
+  },
+  {
+    title: '采购管理',
+    items: [
+      { file: 'pur-order.md', title: '采购订单、入库与退货' }
+    ]
+  },
+  {
+    title: '日历管理',
+    items: [
+      { file: 'cal-schedule.md', title: '班组、排班与节假日' }
+    ]
+  },
+  {
+    title: '设备与工装',
+    items: [
+      { file: 'dv-machinery.md', title: '设备类型与设备档案' },
+      { file: 'tm-tool.md', title: '工装类型与清单' }
+    ]
+  },
+  {
+    title: '系统管理',
+    items: [
+      { file: 'sys-admin.md', title: '账号、编码与平台维护（管理员）' }
     ]
   },
   {

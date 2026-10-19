@@ -280,7 +280,8 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
     private int doInsertProFeedback(ProFeedback proFeedback) {
         proFeedback.setCreateTime(DateUtils.getNowDate());
         proFeedback.setCreateBy(SecurityUtils.getUsername());
-        if (proFeedback.getStatus() == null) proFeedback.setStatus(ProConstants.FEEDBACK_STATUS_PREPARE);
+        // 状态由服务端权威赋值：新增一律待确认，禁止客户端携带 status 绕过确认/审核状态机
+        proFeedback.setStatus(ProConstants.FEEDBACK_STATUS_PREPARE);
         if (proFeedback.getFeedbackTime() == null) proFeedback.setFeedbackTime(DateUtils.getNowDate());
         // 报工编码：服务端权威生成（DB 唯一约束兜底）
         ensureFeedbackCode(proFeedback);
@@ -637,6 +638,8 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
     @Transactional
     public int updateProFeedback(ProFeedback proFeedback) {
         ProFeedback old = qxxProFeedbackMapper.selectProFeedbackByRecordId(proFeedback.getRecordId());
+        // 状态只允许走 confirm/audit 专用入口流转，普通修改钉死为库中现值，防止 PUT 绕过状态机
+        if (old != null) proFeedback.setStatus(old.getStatus());
         proFeedback.setUpdateTime(DateUtils.getNowDate());
         proFeedback.setUpdateBy(SecurityUtils.getUsername());
         int rows = qxxProFeedbackMapper.updateProFeedback(proFeedback);

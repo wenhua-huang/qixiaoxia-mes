@@ -99,6 +99,35 @@ class ProFeedbackServiceUnitTest {
         assertThat(fb.getStatus()).isEqualTo("PREPARE");
     }
 
+    @Test @DisplayName("插入报工忽略客户端携带的 status，强制待确认")
+    void testInsertIgnoresClientStatus() {
+        when(feedbackMapper.insertProFeedback(any(ProFeedback.class))).thenReturn(1);
+        ProFeedback fb = new ProFeedback();
+        fb.setFeedbackCode("FB-NEW");
+        fb.setStatus("AUDITED");
+        feedbackService.insertProFeedback(fb);
+        assertThat(fb.getStatus()).isEqualTo("PREPARE");
+    }
+
+    @Test @DisplayName("修改报工不允许变更状态，钉死为库中现值")
+    void testUpdateKeepsCurrentStatus() {
+        ProFeedback old = new ProFeedback();
+        old.setRecordId(1L);
+        old.setStatus("PREPARE");
+        when(feedbackMapper.selectProFeedbackByRecordId(1L)).thenReturn(old);
+        when(feedbackMapper.updateProFeedback(any(ProFeedback.class))).thenReturn(1);
+
+        ProFeedback fb = new ProFeedback();
+        fb.setRecordId(1L);
+        fb.setStatus("AUDITED");
+        fb.setRemark("只改备注");
+        feedbackService.updateProFeedback(fb);
+
+        org.mockito.ArgumentCaptor<ProFeedback> cap = org.mockito.ArgumentCaptor.forClass(ProFeedback.class);
+        verify(feedbackMapper).updateProFeedback(cap.capture());
+        assertThat(cap.getValue().getStatus()).isEqualTo("PREPARE");
+    }
+
     @Test @DisplayName("下发闸门：任务未下发（NORMAL）禁止厂内报工")
     void testInsertRejectsUndispatchedTask() {
         ProFeedback fb = new ProFeedback();

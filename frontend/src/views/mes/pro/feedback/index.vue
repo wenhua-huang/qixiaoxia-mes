@@ -814,10 +814,14 @@ function reset() {
   form.lotNumber = null
   form.feedbackTime = null
   form.remark = null
+  // 编辑/查看时 Object.assign 会把后端返回的 status 挂进 form，必须删掉，否则新增提交携带残留状态
+  delete form.status
   consumeList.value = []
   paramList.value = []
   activeTab.value = 'feedback'
-  proxy.resetForm('formRef')
+  // 不能用 resetForm/resetFields：它会把字段恢复成弹窗首次挂载时捕获的"初始值"，
+  // 若首次打开的是修改弹窗，编辑值会被当成初始值恢复，污染新增表单
+  formRef.value?.clearValidate()
 }
 
 function handleAdd() {
